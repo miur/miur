@@ -1,0 +1,14 @@
+%%%%% Arch
+
+Structure
+  ui
+    view
+      dom
+        async update
+        incremental loading
+        partial/framed view (for long lists)
+        VIZ.
+          list
+          text
+    ai-scripting ?
+    redo

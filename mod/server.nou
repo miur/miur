@@ -1,0 +1,26 @@
+%%%%% Server
+allow toggleable server-mode (vim-like)
+
+IDEA
+  pipe/fifo/socket (like qutebrowser, tmux or nvim --headless)
+  share choosen info between instances
+
+connect to same background ranger instance on demand
+  on demand make standalone as server
+  distributed model -- any instance can be server
+  many different *gui* can connect to single '*core*'
+
+launch new instance from inside current manager
+  > keep it independent
+  > connect it to server automatically to share info
+
+MAYBE when spawning shell -- don't use it as child
+  - keep *core* working as server
+  - close interface completely
+  - run commands directly in the underlying shell
+  - launch and connect interface again
+
+keep background interactive shell (eliminate its startup time)
+  = seems like I need nvim-like virtual terminal to virtualize IA with term escape codes
+  * add '-s' server flag to :shell and make it DFL
+  * replace entering into shell by switching to already launched one (with scrollback?)

@@ -1,0 +1,13 @@
+%%%%% Modules
+All and only components are plugins
+
+Modular system
+  How to combine all of components inside distribution ecosystem ?
+    = components in different languages
+    = developer must be able to combine local bundle for testing without installing
+    = choose one of alternative components (language / impl details / name)
+      how to discover their existance ?
+        rehash all possible plugins dirs/types only on demand -- and cache 'used' list (neovim-like)
+      choice based on
+        cmdline flags
+        global config
