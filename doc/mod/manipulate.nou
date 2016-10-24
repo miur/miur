@@ -1,0 +1,41 @@
+%%%%% Manipulation
+macro/scripting
+
+native commands set
+  fm operations
+  ? written in native code
+  ? separate module
+
+sam's structural regex
+  apply to files in dir
+
+shell
+  apply commands directly
+  DEV: more intuitive way then %s, etc
+
+nvim
+  ex commands
+  manipulate filenames in dir as plain text file
+
+ipython
+  manipulation
+
+Lisp/guile
+  directly typing commands
+
+J
+  useful for list manipulation
+  try over numeric cheatsheets, etc
+
+
+%% Redo
+  !! NEED heuristic which operations are pending and which are immediate
+  THINK: press ':save' explicitly after making rename on :s/../../g ?
+  queue all actions and do in sync/async bkgr mode
+  ':save' for virtual graphs results in saving their respective files
+  for search results ':save' works as text file saving
+    OR create my own format to save fs DOM used by fm
+  you can create virtual archive with name, open it and copy files there,
+  \ and then by ':save' initiate actual archiving operation
+    show those 'copied' files with different color to emphase their ephemeral nature
+  ALSO you can see 'diff' for all your pending operations

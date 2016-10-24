@@ -1,0 +1,46 @@
+%%%%% UI
+
+NEED protocol to communicate with core
+  [_] SEE neovim
+  block / mutex on operations from different gui
+    =>> WTF when you launch several different cores at time, how to sync ?
+
+
+Adoption
+  nvim (headless server)
+    edit text regions
+      entry (file rename)
+      preview (like fast-edit/substitute)
+  w3m
+    img preview
+  readline
+    ALT
+      https://code.google.com/archive/p/squires
+
+
+Frontend
+  cli
+    interactive query-like fm (ls, zsh, fzf)
+      * embed into zsh to interactively select files
+    headless scripting
+      ! feels like bloating ?
+      alternative shell language
+        * allows to apply shell/etc commands to virtual lists/files DOM
+  tui
+    ncurses
+  web
+    browser, etc
+    [_] SEE radare2
+  gui
+    qt frontend
+  2d
+    graphviz
+      integration to interpret graphs in one click
+  3d
+    opengl graphs like xmind
+      redirect catched input to bkgr *core* server for DOM manipulation
+
+
+Embedding (augment instead of complete ui)
+  nvim / gvim
+  emacs

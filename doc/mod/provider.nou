@@ -1,0 +1,60 @@
+%%%%% Provider
+Virtualized tree-structure to represent any tree info
+
+
+Logic
+  caching virtual results (like for objdump results)
+    * to be able to restore session after closing
+  prowide instruments to work with trees
+    * textobj and operators
+    * substitution on selection with virtual backup and showing post-diff
+    * load and parse output directly from tools -- use ranger as viewer for their output
+    SEE |manipulation.nou|
+
+
+E.G.
+  Filesystem (real)
+    host fs
+    remote fs
+      ftp
+      ssh
+      scp
+
+  Meta-fs
+    archive
+
+  Inner
+    virtual archive creation interface
+    lists of yanked/tagged/etc -- i.a. recursive
+    operation undo history
+      view in ranger's tree view
+      mark 'unrestorable' actions in history view
+      => 'undo' -- collect inverted commands pattern
+
+  Interpreted (plain text)
+    stdin
+    find :: results
+    ag :: search matches
+    ps processes flat/tree
+    installed packages
+    logs
+      so, you can grep some matching lines, and move them into subdirs to organize investigation
+    ncmpcpp :: playlist, music.db
+    mutt :: mailbox
+
+  Converted (lossless)
+    cscope :: namespace/class/function
+    nou :: outlines
+    fs tree diff / rsync diff
+    spreadsheet: db / xls
+      like rename-in-place by 'a,i,c'
+      create new dir by 'o,go' -- like insert new line
+    elf/pe headers structure, symbols and functions objdumps in preview
+    mindmaps
+
+  Adapted (partial)
+    web navigation -- extract links list / tree
+    mp3 splitted by soundcloud-like wavefront
+    music src like fruity-loops splitted by instruments
+    pidgin integration
+      dirs as users, files as date + user + message's oneline summary, preview -- complete message
