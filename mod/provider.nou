@@ -24,6 +24,12 @@ E.G.
     archive
 
   Inner
+    metadata as list
+      dates
+      permissions
+      media metainfo
+      ...etc
+        MAYBE:ALSO output from 'file'
     virtual archive creation interface
     lists of yanked/tagged/etc -- i.a. recursive
     operation undo history
