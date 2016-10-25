@@ -7,8 +7,14 @@ ALT:(ncurses)
     https://github.com/urwid/urwid
   https://github.com/nsf/termbox
     BUT no true color
+    $ pacaur -S --edit termbox-git
+    # package()+ python setup.py install --root="$pkgdir"
   http://alternativeto.net/software/libtcod/
   http://alternativeto.net/software/ncurses/
+  https://github.com/thomasballinger/curtsies
+  http://www.npcole.com/npyscreen/
+  https://github.com/peterbrittain/asciimatics
+  http://plie.readthedocs.io/en/master/
 
 Haskell
   http://stackoverflow.com/questions/6924009/hscurses-or-ncurses-which-one-to-use
