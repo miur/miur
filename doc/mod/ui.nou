@@ -51,6 +51,8 @@ Frontend
   3d
     opengl graphs like xmind
       redirect catched input to bkgr *core* server for DOM manipulation
+    E.G. renderers
+      https://github.com/tunabrain/tungsten
 
 
 Embedding (augment instead of complete ui)
