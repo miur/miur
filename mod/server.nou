@@ -3,7 +3,68 @@ allow toggleable server-mode (vim-like)
 
 IDEA
   pipe/fifo/socket (like qutebrowser, tmux or nvim --headless)
+    NOTE: using sockets allows us to use *core* on client and *ui* on host
+    https://docs.python.org/3.5/library/socket.html
+    https://docs.python.org/3.5/library/socketserver.html
+      http://stackoverflow.com/questions/20745352/creating-a-multithreaded-server-using-socketserver-framework-in-python
+    https://docs.python.org/3.5/library/asyncore.html
+    http://stackoverflow.com/questions/23828264/how-to-make-a-simple-multithreaded-socket-server-in-python-that-remembers-client
+      https://andreymal.org/socket3/
+    Shutdown gracefully -- reuse dead connection
+      http://stackoverflow.com/questions/22171441/shutting-down-python-tcpserver-by-custom-handler
+      = XXX server shutdown is too slow
+  multithread pool
+    = NEED limited pool of threads to manage fs operations
+    http://asvetlov.blogspot.ru/2010/11/1.html
+    https://bytes.com/topic/python/answers/44416-how-kill-socketserver
   share choosen info between instances
+
+THINK
+  *core* must notify *ui* when /dir/* changed to reload view
+    ? is it possible in current socket model, when server only inside *core* ?
+    ? use 'dbus' ?
+  Thin relay: 'preview image' --> *ui*
+    + we need to deliver info onto screen anyway
+      => be it relaying through *core* or directly
+      * image/data must be aquired/generated
+      * results must be outputted
+        - container (memory, file, pipe, etc)
+          = must be interpreted before displaying
+          SEE:(mail://dev@suckless.org) universal format for image displaying, as 'feh' ALT
+        - or directly to screen
+          = has appeal only when greatly optimized
+    ? how to do it fast ?
+      < high cpu load on image transmition through socket
+      ! NEED direct access
+        direct memory access
+        GPU memory
+        X apps embedding (like already existing viewer)
+          then *miur* controls only 'bonding/setup' of apps
+    THINK: *core*/*ui* on different machines
+      ? heuristic what is faster
+        ~ generate preview on target and send image to host
+        ~ send file itself (or its parts) to host and generate preview there
+
+  Distributed model
+    ? How to provide cross-communication ?
+    *core* -- target
+    *ui* -- host
+    *preview* -- positioned completely on 3rd-party server
+      like 3d rendering
+      conveys only resulting images / analytics
+
+  Serialization
+    E.G.
+      JSON
+      pickle
+    compress tree structures
+    snapshot diff
+
+  Transparency (no socket)
+    (option) tight-coupling of modules written in single language
+      eliminate socket/serialization stuff in-between of them
+    Essential for fast startup/shutdown
+      server shutdown itself is 'SLOW' ~0.5s
 
 connect to same background ranger instance on demand
   on demand make standalone as server

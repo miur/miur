@@ -11,3 +11,18 @@ Modular system
       choice based on
         cmdline flags
         global config
+    >> use mods mgmt for plugins
+
+
+Mods mgmt
+  [_] TODO: investigate other plugin systems
+      mc, sublime
+  Structure (vim-like)
+    runtime
+      distributed with *core*
+    site
+      native packaging (pacman)
+    xdg
+      embedded framework for mods mgmt (vim8.0 / dein.nvim)
+    user
+      manually installed 'unmanaged' mods
