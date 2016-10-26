@@ -1,5 +1,6 @@
 %%%% Multiple servers
-  Race conditions on *fs* operations
+  * Non-shared 'undo' history
+  * Race conditions on *fs* operations
     REF
       https://en.wikipedia.org/wiki/File_locking
       + http://www.tldp.org/HOWTO/Secure-Programs-HOWTO/avoid-race.html
@@ -10,24 +11,3 @@
       http://www.cgsecurity.org/Articles/SecProg/Art5/
     http://stackoverflow.com/questions/28517236/can-posix-linux-unlink-file-entries-completely-race-free
     https://www.gnu.org/software/findutils/manual/html_node/find_html/Deleting-Files.html
-  Non-shared 'undo' history
-
-  Settings locality
-    tmux/vim model
-      global
-      server
-      + gui-global
-      + view-global
-      window / tab
-      panel
-    THINK: is there any alternatives to separation with fallback ?
-    ? what is effective management strategy ?
-
-    incapsulation
-      global shared static
-      local independent sync
-
-  Package mgmt system
-    dein-like
-    TODO: investigate other plugin systems
-      mc, sublime

@@ -28,6 +28,16 @@ Frontend
       ! feels like bloating ?
       alternative shell language
         * allows to apply shell/etc commands to virtual lists/files DOM
+    make it independent plugin
+    E.G.
+      launch by $ miur --cli
+      similar to shell itself
+      has prompt with current status
+      builtins == actual *miur* keywords
+      instead of mappings -- buildins (like zle widgets)
+      use shlex to parse flags
+      track current 'tab' and switch between them
+      you can launch shell inside
   tui
     ncurses
   web

@@ -12,3 +12,34 @@ Structure
           text
     ai-scripting ?
     redo
+  core
+    dom
+      properties <= providers <= accessors
+        relay requests
+      caching of results
+        cache /dir/* list
+          keep navigation fast w/o re-accessing
+          each other *ui* reuses already cached results
+      refreshing | verifying
+        E.G. update cache with query on each [timer/poll/inotify]
+        pause refreshing
+          view dir which changes too fast
+          immediate dirty snapshot may be broken
+          at least it allows to understand situation
+    relay
+      any means of communication
+        identify
+        connect
+        relay data
+        E.G.
+          inner
+            essential modules
+          interprocess
+            core / ui
+            whole servers
+    reflection
+    projection
+      cursor
+      ui-specific stuff
+      ~ view ?
+    colorscheme

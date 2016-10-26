@@ -1,0 +1,16 @@
+%%%%% Settings
+
+Locality
+  tmux/vim model
+    global
+    server
+    + gui-global
+    + view-global
+    window / tab
+    panel
+  THINK: is there any alternatives to separation with fallback ?
+  ? what is effective management strategy ?
+
+  incapsulation
+    global shared static
+    local independent sync
