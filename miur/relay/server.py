@@ -10,12 +10,14 @@ from miur import dom
 class ThreadedTCPRequestHandler(socketserver.BaseRequestHandler):
     def handle(self):
         data = pickle.loads(self.request.recv(1024))
-        # data = str(self.request.recv(1024), 'ascii')
-        cur_thread = threading.current_thread()
 
+        # data = str(self.request.recv(1024), 'ascii')
         dom.update(data)
 
-        response = bytes("{}: {}".format(cur_thread.name, 'done'), 'ascii')
+        response = pickle.dumps(dom.entries, protocol=pickle.HIGHEST_PROTOCOL)
+        # cur_thread = threading.current_thread()
+        # response = bytes("{}: {}".format(cur_thread.name, 'done'), 'ascii')
+
         self.request.sendall(response)
 
 
@@ -35,10 +37,11 @@ class Listener:
     def __init__(self, server_address):
         if isinstance(server_address, tuple):
             # Port 0 means to select an arbitrary unused port
-            make = socketserver.ThreadingTCPServer
+            mksrv = socketserver.ThreadingTCPServer
         else:
-            make = socketserver.UnixStreamServer
-        self.server = make(server_address, ThreadedTCPRequestHandler)
+            mksrv = socketserver.UnixStreamServer
+        mksrv.allow_reuse_address = True
+        self.server = mksrv(server_address, ThreadedTCPRequestHandler)
 
     def __enter__(self):
         # Start a thread with the server -- that thread will then start one

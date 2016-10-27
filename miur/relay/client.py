@@ -13,8 +13,16 @@ def send(server_address, message):
     # Create a socket (SOCK_STREAM means a TCP socket)
     with socket.socket(family, socket.SOCK_STREAM) as sock:
         sock.connect(server_address)
+
         sock.sendall(data)
         # sock.sendfile(f)  # ret nbytes
         # sock.sendall(bytes(message, 'ascii'))
-        response = str(sock.recv(1024), 'ascii')
+
+        # FIXME: magic 1024 -- how process packets without limitations?
+        response = pickle.loads(sock.recv(1024))
+        # response = str(sock.recv(1024), 'ascii')
+
         print("Received: {}".format(response))
+
+        # THINK: when to close 'sock' -- after each request? Or after session?
+        return response

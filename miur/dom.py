@@ -1,5 +1,7 @@
+import os
 import threading
 
+# MOVE: global var to local registry hive
 entries = []
 
 
@@ -8,4 +10,5 @@ def update(data):
 
     # threading.current_thread()
     with threading.Lock():
-        entries += data
+        entries = os.listdir(data)
+        # entries += data
