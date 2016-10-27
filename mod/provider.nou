@@ -10,6 +10,19 @@ Logic
     * substitution on selection with virtual backup and showing post-diff
     * load and parse output directly from tools -- use ranger as viewer for their output
     SEE |manipulation.nou|
+  dom / frame
+    each list must have address / coordinates to be accessible
+    virtual lists (grep results)
+      has temporary access point
+      may be cached on *core* or *ui* or _both_ side
+      repeated searches may have history graph
+        to access earlier (cached) results through history
+          garbage collector (GC) must remove too old / stale search results
+        to repeat search command
+          to re-cache results for command in this history node
+            ! BUT repeated searches can produce different results if files changed !
+          to re-generate cache, earlier destroyed by GC
+        to edit command for search -- and therefore fork history
 
 
 E.G.
