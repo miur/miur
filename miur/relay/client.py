@@ -22,7 +22,8 @@ def send(server_address, message):
         response = pickle.loads(sock.recv(1024))
         # response = str(sock.recv(1024), 'ascii')
 
-        print("Received: {}".format(response))
+        # FIXME: print to bkgr screen, don't overlap with ncurses window
+        # print("Received: {}".format(response))
 
         # THINK: when to close 'sock' -- after each request? Or after session?
         return response
