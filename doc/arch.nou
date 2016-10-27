@@ -2,6 +2,12 @@
 
 Structure
   ui
+    ui-caching
+      consists of received *dom* frames
+      old frames marked 'dirty'
+    colorscheme
+      separate for each *ui*
+      future: derive individual colorscheme from single combined one
     view
       dom
         async update
@@ -42,4 +48,99 @@ Structure
       cursor
       ui-specific stuff
       ~ view ?
-    colorscheme
+
+
+Flow
+  ??? [_] how to split 'selection' between *ui*/*core* ???
+    ~ query whole dom and manage state in gui
+      E.G.(functional) choose showed columns
+      => no need to wait until whole *dom* transmitted
+        query one list part at a time (frame)
+          don't query anything more until user moves cursor
+          query status (file count, etc) very first
+          *ui* specifies which metainfo it needs now
+          query hidden metainfo only on demand
+        query whole, but show list along transmission
+          user moves in bounds of already received cached list
+          even if cursor stays in place, background transmission continues
+          cancel transmission if dir was leaved
+
+    ~ create client reflection in server and use gui _only_ for display
+      E.G.(imperative) no action until response from server
+      + multiple *ui* can have cursor in sync
+
+    BETTER: flexible constructor
+      many intermediate joints
+        accessors (access point)
+          ? == preview ? (WTF: what the difference?)
+        dom (state point)
+          independent dom can gather from many accessors
+        cursor (sync point)
+          can combine multiple remote machines in one interface
+          BUT: inter-machine operations also require *core* on host
+            => data sharing between remotes provided through host
+              E.G. impossible direct connection (VPN, port forward, etc)
+            => host's *core* only provides identification for remote *core*(s)
+              < and their communication occurs directly
+              < without traversing data through *host*
+        ui (view point)
+          has no user state, only colors
+          simply queries all the objects it must draw
+          all similar *ui* will show the same image
+        display
+          allows to show X and Wayland at the same time
+      combine subsets under independent processes
+        tight coupling / shared_mem in each subset
+        communicate by sockets / shared_mem between adjacent joints
+        each accessor -- may be placed in subsets independently
+        subsets formed due to available resources on each involved system
+      ? how to (dis)assemble subsets in runtime ?
+
+    << Corner cases
+      broken/restored connection
+        => who must keep state to be effective
+      low-resources target
+        = stateless *core*
+        = manages *dom* only
+        = small cache -- frequently destroys *dom* branches
+        = preview generated on host from received file (complete or partial)
+      low-resources host
+        = stateless *ui*
+        = *core* manages all 'cursores'
+        = preview generated on target, host views results only
+      very low speed, great delay
+        => state mgmt on which side makes it more responsive
+      sync/share cursor state between *ui*
+        ? why I may need this ?
+          => control *gui* from _fifo_ -- on _vim_ exit, etc
+      cursor moves down fast
+        ~ sync -- send cursor state for each entry and wait on response
+        ~ async -- send for each
+        ~ async -- send state once a time or when long hover over entry
+          skips through files when moving
+          need *ui*'s own state
+          => world state prediction and correction
+            E.G. similar to "counter-strike"
+      edit file in pager by headless neovim
+        ~ receive file from target and edit on host (E.G. ftpfs, sshfs, curlfs)
+        ~ edit on target and send from host only keys
+          BUT: connection must become _sync_ : screen must be refreshed on each key press
+  ui
+    > event (+) keymap
+        > self
+          chg view setting + refresh
+        > miur-core
+          send command
+            = if *core* manages state => sync cmd (wait on results)
+              ENH: *core* launches thread with command and returns immediately
+              BUT: *ui* must monitor 'state updated' signal
+            = if *ui* manages state => async cmd (you can keep browse same dir)
+            ?? sync and wait ??
+    < signal
+      E.G. 'state updated' -> 'pull required'
+  core
+    < receive command
+      > dispatch + process
+        > return 'job state'
+        > return current *dom*
+      > notify 'state updated'
