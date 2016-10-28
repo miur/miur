@@ -1,0 +1,60 @@
+digraph G {
+  graph [rankdir="LR" overlap=false root=core ratio=0.4];
+
+  node [shape=none fontcolor=red];
+  cfg [label="config"];
+  col [label="colors"];
+  map [label="keymap"];
+
+  node [shape=box style=solid fontcolor=black];
+  itpr [label="itpr"];
+  acsr [label="accessor"];
+  prvw [label="preview"];
+  curs [label="cursor"];
+
+  node [shape=hexagon style=bold fontcolor=black];
+  X  [label="Xorg"];
+  W  [label="Wayland"];
+
+  node [shape=circle style=bold fontcolor=black];
+  ui [label="TUI"];
+  ui2 [label="GUI"];
+  core [label="core"];
+
+  edge [fontsize=9 fontcolor=gray];
+  X -> ui, ui2;
+  W -> ui, ui2;
+
+  ui, ui2 -> itpr -> core;
+
+  itpr -> ui; // [label="cmds"];
+
+  itpr -> ui2;
+  curs -> ui2;
+
+  core2 -> core [dir=both];
+  acsr, prvw -> sys;
+
+  core -> prvw;
+  core -> acsr;
+  core -> curs;
+  curs -> ui;
+
+  // edge [constraint=false];
+  col -> ui;
+  cfg -> core; // [label="behaviour"];
+  map -> itpr; // [label="dispatch"];
+
+  // R -> ui, core, itpr, X [shape=none];
+
+
+  // { rank="same"; X; ui; itpr; core; }
+  // { rank="same"; ui; core; }
+  // { rank="same"; col; map; cfg; }
+  // { rank="same"; acsr; prvw; }
+  // { rank="same"; itpr; curs; }
+  { rank="same"; cfg; core; }
+  { rank="same"; col; ui; }
+  { rank="same"; map; itpr; }
+  // subgraph cluster_gui { ui, X; }
+}
