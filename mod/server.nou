@@ -56,6 +56,10 @@ THINK
     *preview* -- positioned completely on 3rd-party server
       like 3d rendering
       conveys only resulting images / analytics
+    Distributed protocols
+      * sync *proj* between *ui*
+      * exchange data between *core*'s
+      bittorrent
 
   Serialization
     E.G.

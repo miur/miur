@@ -1,5 +1,19 @@
 %%%%% Arch
 
+Graph
+  display
+    Xorg
+    Wayland
+  ui
+    tui
+    gui
+    cli
+  itpr
+    keymap
+      one for each ui kind
+  cursor
+
+
 Structure
   ui
     ui-caching
