@@ -11,7 +11,52 @@ Graph
   itpr
     keymap
       one for each ui kind
+  view
+    layout + widgets
+    dispatcher to switch view
   cursor
+    ?? allow to contol/modify list/tree itself OR inside *dom* only ??
+      sort order
+      filtering
+        ? is there need to gain access to filtered list from independent viewer ?
+          MAYBE query 'filtered' view from *cursor* back to *dom* on demand ?
+      selection
+    allow preview to stick to
+      cursor
+        load another img on cursor move
+      choosen dir / file / selection
+        stick to path and refresh img on file change
+        ! allow even inexistant files
+          - show when them are created
+          - remove when them are deleted
+    read tree from stdin into *cursor*
+      ? or better read it only into *core* ?
+      ? or directly into *ui* ?
+    multiple *ui* for one cursor
+      navigate file from fm
+      kepp curr file preview in sync
+    multiple *preview* for one file
+      some settings may be shared
+        like relative position
+        :: fallback set -c pos
+      some settings -- individual
+        like zoom
+        set -v zoom
+      Result: multizoom preview for images
+        * use 'local' settings for individual parts
+        * define signal to reset 'local' settings on preview
+          = to regain preview control from
+    external preview
+      copy file through net to /tmp
+      view through independent image viewer
+
+
+Back-api
+  register each cursor in *dom*
+    and each view register in *cursor*
+    export access/control *api* back to *dom*
+    query cursor/view settings from another cursor through *dom*/*core*
+      bittorent sync all cached info in cursors ?
 
 
 Structure
