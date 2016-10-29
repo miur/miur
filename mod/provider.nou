@@ -49,6 +49,16 @@ E.G.
       view in ranger's tree view
       mark 'unrestorable' actions in history view
       => 'undo' -- collect inverted commands pattern
+    its own keymap hierarchy
+      entry: key -- description
+      each key sequence -- nested dirs for each key
+        so, it will show nice graph with 'tree' widget
+    any help topics / tutorials
+      E.G. navigate, edit, search, execute, ...
+        inside -- reduced list of keymaps, helpful in this case
+      all small tutorials must be embedded into *miur*
+        SEE: success of Wolfram Mathematica excessive help
+        no reason to spawn third-rate usage tutorials from voyeurists
 
   Interpreted (plain text)
     stdin

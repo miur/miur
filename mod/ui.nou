@@ -21,13 +21,25 @@ Adoption
 
 
 Frontend
-  cli
-    interactive query-like fm (ls, zsh, fzf)
-      * embed into zsh to interactively select files
-    headless scripting
+  test_mock
+    inner testing only
+  raw
+    $ nc <mod_dst> [<mod_port>]
+  pipe
+    not_raw: supports *keymap*, so can use macro (E.G. vim's ':norm ...')
+      insert text commands directly in pipe
+    ? THINK: unidirectional : no ret/output ?
+    goal: headless scripting
       ! feels like bloating ?
       alternative shell language
         * allows to apply shell/etc commands to virtual lists/files DOM
+        => ALT:USE: bash $ miur -H -t core -c '...'
+  cli
+    interactive query-like fm (ls, zsh, fzf)
+      * embed into zsh to interactively select files
+    approximates *view* : zsh-like or ipython-like
+      curses-free widgets
+      textual infostring representations
     make it independent plugin
     E.G.
       launch by $ miur --cli
@@ -53,8 +65,12 @@ Frontend
       redirect catched input to bkgr *core* server for DOM manipulation
     E.G. renderers
       https://github.com/tunabrain/tungsten
+  wrappers / embedding
+    = augment existing facilities instead of recreating ui from scratch
+    nvim / gvim
+    emacs
 
 
-Embedding (augment instead of complete ui)
-  nvim / gvim
-  emacs
+Display
+  Has no interest here == must be incorporated in frameworks api
+    altr: Xorg, Wayland

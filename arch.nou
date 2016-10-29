@@ -1,21 +1,125 @@
 %%%%% Arch
 
-Graph
-  display
-    Xorg
-    Wayland
+%%%% Graph
+
+VIZ.
   ui
-    tui
-    gui
-    cli
-  itpr
-    keymap
-      one for each ui kind
   view
-    layout + widgets
-    dispatcher to switch view
   cursor
+  dom
+
+E.G.
+  ui
+    > event (+) keymap
+        > self
+          chg view setting + refresh
+        > miur-core
+          send command
+            = if *core* manages state => sync cmd (wait on results)
+              ENH: *core* launches thread with command and returns immediately
+              BUT: *ui* must monitor 'state updated' signal
+            = if *ui* manages state => async cmd (you can keep browse same dir)
+            ?? sync and wait ??
+    < signal
+      E.G. 'state updated' -> 'pull required'
+  core
+    < receive command
+      > dispatch + process
+        > return 'job state'
+        > return current *dom*
+      > notify 'state updated'
+
+%%% Structure
+
+%% Mod
+  * provides (exports) list of smth (struct)
+  * caches their own representation
+  * has focus on smth (state of struct in general)
+  * supports universal input/output protocol
+    - list of supported commands may be queried
+    - return err on non-existent command
+  * has its own config
+    each *mod* has its own *conf* overlay on top of universal combined *config*
+  * dispatches commands
+    - control smth provided, change state
+    - pass unrelated cmds further down/up
+  * altr impl : different only in these aspects
+
+
+%% Impl
+
+  *ui*
+    altr: 3d, gui, web, tui, vim, cli, pipe, test_mock, ...
+    goal:
+      = multiple processes with several windows each attached to single *view*/*cursor*
+      user interaction
+    do: map (approximate) *view* to concrete framework api
+    cache: framework objects hierarchy
+    provides:
+      colorscheme
+        future: derive individual colorscheme from universal combined *colorscheme*
+      [state] hide/show/fullscr objs (cached framework hierarchy)
+        = allowed only temporal insignificant changes
+        = framework layout is based on view layout, but not completely equal
+          => *view* layout is not touched
+        ! can be dumped/loaded on restart (save session)
+    *itpr*:
+      converts keys to cmds before inserting them into dispatcher
+    dispatch:
+      react on resizing events directly by *ui* itself
+
+  *view*
+    goal:
+      = attached to single *cursor*, but support for multi-cursor implemented anyway
+        (no sense to display non-related cursor info if there is no interaction in-betwee)
+      if *ui* crashes -- reconnect and get _exactly_ the same view as before
+      if *cursor* crashes -- *ui* must simply re-fetch content into their widgets
+      dump *view* to disk and restore between sessions
+      share *view* between preview programs (zoom, pos)
+    cache:
+      layout
+      bindings between widgets and *cursor*(s), which provide content for widget
+        =>
+    provides:
+      layout (relative positionings = advices to ui)
+      access to widgets content (relay/props to *cursor*)
+        = widget == ~window~ to *cursor*, and has no list inside itself
+      widgets state (abstract representation)
+        - no fixed width/height : shared *ui* has different size
+        - no list crop : need full list of displayed items
+        - only relative scrolling : no way to predict scroll itself
+          = impossible to implement : scrolloff/scrolljump
+            NEED to know exact count N displayed in widget
+            ALSO this N must be the same in all *ui*
+    dispatch:
+      switch view to another
+        predefined or constructed on the site
+      choose focused widget
+
+  *cursor*
+    goal:
+      projection of *dom*
+      minimize traffic
+        partial/framed view (for long lists)
+      keep navigation fast w/o re-accessing *dom*
+      refreshing / verifying
+        dir state can become changed in time between operations
+        NEED verify integrity before applying operations
+          = what user see must be equal to actual state of remote fs
+          = only then confirm operation
+    cache:
+      received *dom* frames
+        old frames marked 'dirty' (pending to sync/trash)
+      pending operations
+        = only with visual representation
+        E.G: move/copy/delete files -- mark as 'pending' when send command to *core*
+      filtering/sorting mask
     ?? allow to contol/modify list/tree itself OR inside *dom* only ??
+      * read only access to *dom*
+      * allow modifying => so list can be loaded from stdin
+        => then loaded from stdin and edited list can be used as selector for query to *core*
+        => you can even delete all entries you don't like from this list w/o affecting *dom*
+          USAGE: offline (detached):  pipe 'ag' results by stdin and filter in graph *ui*
       sort order
       filtering
         ? is there need to gain access to filtered list from independent viewer ?
@@ -50,63 +154,80 @@ Graph
       copy file through net to /tmp
       view through independent image viewer
 
-
-Back-api
-  register each cursor in *dom*
-    and each view register in *cursor*
-    export access/control *api* back to *dom*
-    query cursor/view settings from another cursor through *dom*/*core*
-      bittorent sync all cached info in cursors ?
-
-
-Structure
-  ui
-    ui-caching
-      consists of received *dom* frames
-      old frames marked 'dirty'
-    colorscheme
-      separate for each *ui*
-      future: derive individual colorscheme from single combined one
-    view
-      dom
-        async update
-        incremental loading
-        partial/framed view (for long lists)
-        VIZ.
-          list
-          text
-    ai-scripting ?
-    redo
-  core
-    dom
-      properties <= providers <= accessors
-        relay requests
-      caching of results
-        cache /dir/* list
-          keep navigation fast w/o re-accessing
-          each other *ui* reuses already cached results
-      refreshing | verifying
-        E.G. update cache with query on each [timer/poll/inotify]
+  *dom*
+    goal:
+      incremental loading (for long file lists)
+      async update (long operations)
+        properties <= providers <= accessors
+          relay requests
+    cache:
+      reflection of all connected *cursor*/*ui*
+      cache /dir/* list, path coords
+        each other *cursor*/*ui* reuses already cached results
+        keep cache in sync with underlying fs
+        update cache with query on each explicit {timer,poll,inotify}
         pause refreshing
           view dir which changes too fast
           immediate dirty snapshot may be broken
           at least it allows to understand situation
-    relay
-      any means of communication
-        identify
-        connect
-        relay data
-        E.G.
-          inner
-            essential modules
-          interprocess
-            core / ui
-            whole servers
-    reflection
-    projection
-      cursor
-      ui-specific stuff
-      ~ view ?
+      history + undo
+      search results
+
+
+%% Interlayer
+
+  *itpr*
+    * directly imported/linked to concrete *ui* (as module/shared lib)
+    * each *ui* has its own *keymap* overlay on top of universal combined *keymap*
+      one for each ui kind OR universal one
+      allow remap (one-time local online changes) for each *ui* _instance_
+    * each widget can have its own keymap
+      => at least remap subset of keys and fallback all other
+      = :map -t <wdg_nm> <key> <cmd> <comment>
+        SEE: man on zsh_zle, mutt_keymap
+      query focused widget from *view* before applying *keymap*
+
+  *dispatcher*
+    change focus, state
+      BAD: we must parse command with arguments in each dispatcher !
+        ALT:(not better) consult independent dispatcher (single shared one)
+    pass unrelated cmds further down/up
+      = depending on original flow: *core* -> *ui*, *ui* -> *core*
+      = depending on cmd: *ui* -> *view* -> broadcast to all *ui*
+        BUT: each joint must know which cmds are 'up' and which are 'down'
+        ALT: prepend each cmd with dst prf
+          # :(send|run|exec|eval) -t core <cmd> <args>
+          ++ commands can have the same name in different *mod*
+      ! wrong command = how to know it's wrong ?
+        ~ must traverse through all *mod* and gather all-errors list
+          BAD: delays on slow connection before error will be known
+        ~ keep copy of all commands list in each *mod*
+        ~ consult independent dispatcher
+          +1 list of commands loaded only into this single *mod*
+          -1 all cmds delivered by detour on *core*
+
+  *relay*
+    = any means of *mod* communication
+    VIZ.
+      identify
+      connect
+      relay data
+    E.G.
+      inner
+        essential modules
+      interprocess
+        core / ui
+        whole servers
+
+  Back-api
+    register each *cursor* in *dom*
+      and each *view* register in *cursor*
+      export access/control *api* back to *dom*
+      query cursor/view settings from another cursor through *dom*/*core*
+        bittorent sync all cached info in cursors ?
+      !! any *cursor* -- is no more then *accessor* in terms of *core* !!
+
+
 
 
 Flow
@@ -184,22 +305,4 @@ Flow
         ~ receive file from target and edit on host (E.G. ftpfs, sshfs, curlfs)
         ~ edit on target and send from host only keys
           BUT: connection must become _sync_ : screen must be refreshed on each key press
-  ui
-    > event (+) keymap
-        > self
-          chg view setting + refresh
-        > miur-core
-          send command
-            = if *core* manages state => sync cmd (wait on results)
-              ENH: *core* launches thread with command and returns immediately
-              BUT: *ui* must monitor 'state updated' signal
-            = if *ui* manages state => async cmd (you can keep browse same dir)
-            ?? sync and wait ??
-    < signal
-      E.G. 'state updated' -> 'pull required'
-  core
-    < receive command
-      > dispatch + process
-        > return 'job state'
-        > return current *dom*
-      > notify 'state updated'
+

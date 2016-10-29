@@ -1,6 +1,9 @@
 %%%%% Manipulation
 macro/scripting
 
+aliases
+  user-defined combo from other sets
+
 native commands set
   fm operations
   ? written in native code
@@ -26,6 +29,15 @@ Lisp/guile
 J
   useful for list manipulation
   try over numeric cheatsheets, etc
+
+
+ALSO
+  make bindings to *miur* for each of lang in question
+    E.G. miur.eval('...')
+    => allows to use scripts written completely in target lang
+      = source them from cmdline (headless scripting)
+    => make possible to script actions even on Windows (w/o bash)
+      BUT: you need to send cmds backward:  *core* -> *ui*
 
 
 %% Redo

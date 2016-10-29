@@ -48,6 +48,13 @@ Slice
     quadro-commander like four-panels
 
 
+Term
+  show last two-three lines of output and err code
+    * maximize widget on keymap (like quake console)
+    = eliminates *ranger* problem with 'show last output'
+  support remote interactive -- use libvte ?
+
+
 Preview
   short preview on right
   sublime-like dir/file preview
