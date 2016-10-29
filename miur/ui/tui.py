@@ -1,38 +1,75 @@
 import curses
 
+from miur.config.keymap import keymap
 from miur.ui import frame
 
 
 def draw(stdscr):
-    for i, e in enumerate(frame.entries):
-        stdscr.addstr(i, 0, e)
-    stdscr.refresh()
+    curs = frame.cursor
+    lines = frame.entries
+    if curs is None or lines is None:
+        return
+
+    x, y = 1, 0
+    h, w = stdscr.getmaxyx()
+
+    st = int(h/2)
+    sb = int(h/2)
+
+    if len(lines) < h:
+        top = 0
+    elif curs < st:
+        top = 0
+    elif curs > len(lines) - sb - 1:
+        top = len(lines) - h
+    else:
+        top = curs - st
+
+    # FIXME: slice is slow on large set
+    vlst = lines[top:(top + h)]
+    vpos = curs - top
+
+    for i, e in enumerate(vlst):
+        yt = y + i
+        xt = x
+        rx = w - xt
+
+        # WARN: don't call addstr at all if there is no place even for 1 char
+        if rx > 0:
+            if rx < len(e):
+                e = e[:rx]
+
+            # ALT:(faster) draw whole list -- then re-draw line for cursor
+            #   => BUT: if we choose individual colors -- no sense in optimization
+            if i == vpos:
+                stdscr.addstr(yt, xt, e, curses.color_pair(2),)
+            else:
+                stdscr.addstr(yt, xt, e)
+
+    stdscr.move(vpos, 0)
 
 
-def loop(stdscr):
-    stdscr.clear()
-
+def prepare(stdscr):
     # begin_x = 20
     # begin_y = 7
     # height = 5
     # width = 40
     # curses.newwin(height, width, begin_y, begin_x)
 
-    curses.init_pair(1, curses.COLOR_RED, curses.COLOR_WHITE)
+    curses.init_pair(1, curses.COLOR_WHITE, curses.COLOR_BLACK)
+    curses.init_pair(2, curses.COLOR_BLACK, curses.COLOR_CYAN)
     stdscr.attron(curses.color_pair(1))
 
+
+def loop(stdscr):
+    prepare(stdscr)
     stdscr.nodelay(False)
-    nd = 0
     while True:
-        c = stdscr.getch()
-        if c == ord('n'):
-            ++nd
-            if nd >= len(frame.dirs):
-                nd = 0
-            frame.update(frame.dirs[nd])
-        elif c == ord('q') or c == curses.KEY_ENTER:
-            break  # Exit the while loop
+        stdscr.clear()
         draw(stdscr)
+        stdscr.refresh()
+        if frame.update(keymap.get(stdscr.getkey(), None)) is not None:
+            break
 
 
 def main(saddr):

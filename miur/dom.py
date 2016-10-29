@@ -1,5 +1,6 @@
-import os
 import threading
+
+import miur.access.fs as graph
 
 # MOVE: global var to local registry hive
 entries = []
@@ -10,5 +11,6 @@ def update(data):
 
     # threading.current_thread()
     with threading.Lock():
-        entries = os.listdir(data)
+        path = data
+        entries = graph.list_nodes(path)
         # entries += data
