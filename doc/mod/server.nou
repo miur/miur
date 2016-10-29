@@ -21,6 +21,9 @@ IDEA
   share choosen info between instances
 
 THINK
+  ! allow enable socket server / choose *relay* after startup by options
+    E.G. enable control for *gui* colorscheme to control from outside
+    => each *mod* must have 'dispatcher' for commands :: functions
   *core* must notify *ui* when /dir/* changed to reload view
     ? is it possible in current socket model, when server only inside *core* ?
     ? use 'dbus' ?
