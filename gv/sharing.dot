@@ -14,7 +14,6 @@ digraph G {
     fillcolor=white
     color=gray
 
-    sys1, sys2 -> net1 [dir=both]
     dom2, dom3 -> sys1, sys2
     dom1 -> sys1
     dom1 -> dom2 [dir=both constraint=false]
