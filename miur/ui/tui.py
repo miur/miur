@@ -1,12 +1,12 @@
 import curses
 
 from miur.config.keymap import keymap
-from miur.ui import frame
+from miur.graph import graph, cursor, update
 
 
 def draw(stdscr):
-    curs = frame.cursor
-    lines = frame.entries
+    curs = cursor.cursor
+    lines = graph.entries
     if curs is None or lines is None:
         return
 
@@ -68,10 +68,10 @@ def loop(stdscr):
         stdscr.clear()
         draw(stdscr)
         stdscr.refresh()
-        if frame.update(keymap.get(stdscr.getkey(), None)) is not None:
+        if update.update(keymap.get(stdscr.getkey(), None)) is not None:
             break
 
 
 def main(saddr):
-    frame.saddr = saddr
+    # frame.saddr = saddr
     curses.wrapper(loop)
