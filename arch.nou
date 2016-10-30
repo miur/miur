@@ -40,6 +40,14 @@ E.G.
     - return err on non-existent command
   * has its own config
     each *mod* has its own *conf* overlay on top of universal combined *config*
+    HACK: configs for any *mod* can be sent by network directly
+      => no need for *conf* file on remote systems
+      ?? XXX: if several users use the same remote *core* and need different *conf*
+        ~ run its own core for each user
+        ~ change architecture, so *core* won't need any *conf* at all
+        ~ attach received 'virtual' *conf* to user's *cursor* reflection
+          = and switch actual *conf* before any execution depending on which user/*cursor* sent cmds
+          MAYBE:ALSO:USE: in any other dispatcher ?
   * dispatches commands
     - control smth provided, change state
     - pass unrelated cmds further down/up
@@ -91,6 +99,8 @@ E.G.
           = impossible to implement : scrolloff/scrolljump
             NEED to know exact count N displayed in widget
             ALSO this N must be the same in all *ui*
+      TEMP:(here) provide widgets itself
+        viewing different graph slices
     dispatch:
       switch view to another
         predefined or constructed on the site
@@ -114,12 +124,16 @@ E.G.
         = only with visual representation
         E.G: move/copy/delete files -- mark as 'pending' when send command to *core*
       filtering/sorting mask
+    provides:
+      TEMP:(here) provide operations on graphs
+        abstract graphs manipulation
     ?? allow to contol/modify list/tree itself OR inside *dom* only ??
       * read only access to *dom*
       * allow modifying => so list can be loaded from stdin
         => then loaded from stdin and edited list can be used as selector for query to *core*
         => you can even delete all entries you don't like from this list w/o affecting *dom*
           USAGE: offline (detached):  pipe 'ag' results by stdin and filter in graph *ui*
+          ALT: instead of 'delete' use 'temporarily hide' on undesirable entries
       sort order
       filtering
         ? is there need to gain access to filtered list from independent viewer ?
@@ -173,6 +187,14 @@ E.G.
       history + undo
       search results
 
+  *accessor*
+    ??? (dispatcher) is there need to specify cmds directly to them ???
+      OR use them only through *core*
+    ! *cursor*'s reflection is completely competent accessor
+      * provides access to filter lists, cursor, view layout, etc
+      * allows contolling of *ui* execution
+      * sends *dom* and *preview* data to display on *ui*'s end
+
 
 %% Interlayer
 
@@ -204,7 +226,8 @@ E.G.
         ~ keep copy of all commands list in each *mod*
         ~ consult independent dispatcher
           +1 list of commands loaded only into this single *mod*
-          -1 all cmds delivered by detour on *core*
+          -1 all cmds will be delivered after detour by *core*
+          -1 no support for 'offline' *ui* mode -- for graph manipulation only
 
   *relay*
     = any means of *mod* communication
