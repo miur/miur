@@ -1,0 +1,11 @@
+REF
+  Python sync primitives with diagrams
+    http://www.laurentluce.com/posts/python-threads-synchronization-locks-rlocks-semaphores-conditions-events-and-queues/
+    http://effbot.org/zone/thread-synchronization.htm
+
+Readers-writers lock
+  REF https://en.wikipedia.org/wiki/Readers%E2%80%93writers_problem
+  http://stackoverflow.com/questions/16261902/python-any-way-to-get-one-process-to-have-a-write-lock-and-others-to-just-read
+    * https://majid.info/blog/a-reader-writer-lock-for-python/
+    * http://code.activestate.com/recipes/577803-reader-writer-lock-with-priority-for-writers/
+    https://www.safaribooksonline.com/library/view/python-cookbook/0596001673/ch06s04.html
