@@ -1,3 +1,5 @@
+% FM
+
 Orthodox FM
   solid
     $ miur
@@ -20,3 +22,10 @@ Tiling WM
   GUI preview, TUI fm
     $ miur --tui
     $ miur --gui --preview
+
+
+% Util
+
+Fzf list picker
+  Show paths/dirs
+    $ ls | miur --pick

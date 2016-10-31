@@ -2,7 +2,8 @@
 allow toggleable server-mode (vim-like)
 
 IDEA
-  pipe/fifo/socket (like qutebrowser, tmux or nvim --headless)
+  share choosen info between instances
+  REF pipe/fifo/socket (like qutebrowser, tmux or nvim --headless)
     NOTE: using sockets allows us to use *core* on client and *ui* on host
     https://docs.python.org/3.5/library/socket.html
       !!! [_] READ https://docs.python.org/3/howto/sockets.html
@@ -18,7 +19,61 @@ IDEA
     = NEED limited pool of threads to manage fs operations
     http://asvetlov.blogspot.ru/2010/11/1.html
     https://bytes.com/topic/python/answers/44416-how-kill-socketserver
-  share choosen info between instances
+  cooperative concurrency in single thread (Python3.5 async/await)
+    https://habrahabr.ru/post/266743/
+    http://stackabuse.com/python-async-await-tutorial/
+    http://www.snarky.ca/how-the-heck-does-async-await-work-in-python-3-5
+  asyncio
+    https://docs.python.org/3/library/asyncio-task.html
+    https://docs.python.org/3.5/library/asyncio.html
+  shared memory
+    http://stackoverflow.com/questions/33535386/better-way-to-share-memory-for-multiprocessing-in-python
+    http://stackoverflow.com/questions/14124588/python-multiprocessing-shared-memory
+    https://habrahabr.ru/post/167503/
+    https://jeffknupp.com/blog/2013/06/30/pythons-hardest-problem-revisited/
+    http://semanchuk.com/philip/posix_ipc/
+  socket-only server
+    http://danielhnyk.cz/simple-server-client-aplication-python-3/
+  send signal from server (G: push message / z-push)
+    http://stackoverflow.com/questions/2876024/linux-is-there-a-read-or-recv-from-socket-with-timeout?rq=1
+    http://stackoverflow.com/questions/3745592/python-persistent-socket-connection
+    - long polling :: BAD:(deprecated by websockets) too many problems if connection lost
+      = hard to process all connection errors on client side
+      ++ http://moduscreate.com/fast-polling-vs-websockets-2/
+      http://resthooks.org/docs/alternatives/
+    - fast polling :: BAD: queries in cycle, has response latency
+    - server-sent-events
+      https://www.html5rocks.com/en/tutorials/eventsource/basics/
+  discovering running client/server nodes
+    http://stackoverflow.com/questions/10914750/connect-two-tcp-sockets-without-defining-client-server-role
+  +++ socket simultaneous read/write
+    http://stackoverflow.com/questions/11697855/python-multithreading-run-two-functions-at-the-same-time
+    http://stackoverflow.com/questions/28879706/multiple-clients-cannot-listen-and-write-at-the-same-time
+  How can we verify that the server can still send messages through a socket to reach the client, without actually sending anything through that socket?
+    :: You can't, unless you've enabled TCP keepalives.
+    https://delog.wordpress.com/2013/08/16/handling-tcp-keepalive/
+    http://www.digi.com/wiki/developer/index.php/Handling_Socket_Error_and_Keepalive
+    http://note.artchiu.org/2014/07/10/how-to-change-tcp-keepalive-timer-using-python-script/
+  C -- event loop
+    http://software.schmorp.de/pkg/libev.html
+      http://pod.tst.eu/http://cvs.schmorp.de/libev/ev.pod
+      http://www.win.tue.nl/~aeb/linux/lk/lk-12.html
+  Protocol Design Notes
+    http://www.linuxtopia.org/online_books/programming_books/python_programming/python_ch36s06.html?
+
+
+State Synchronization Protocol (SSP)
+  [_] TODO: look at 'mosh' internals
+    https://github.com/mobile-shell/mosh
+    ~ 6k lines in {crypto,network,protobufs,util}
+  READ: Technical details on SSP protocol
+    https://mosh.org/#techinfo
+    = UDP datagrams are encrypted and authenticated using AES-128 in OCB mode.
+    = synchronizing the state of any object from one host to another
+  [_] TRY: implement SSP for frames sync from *dom*
+  SEE:IDEA
+    https://en.wikipedia.org/wiki/WASTE
+
 
 THINK
   ! allow enable socket server / choose *relay* after startup by options

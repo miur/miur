@@ -32,36 +32,37 @@ E.G.
 %%% Structure
 
 %% Mod
-  * provides (exports) list of smth (struct)
-  * caches their own representation
-  * has focus on smth (state of struct in general)
-  * supports universal input/output protocol
-    - list of supported commands may be queried
-    - return err on non-existent command
-  * has its own config
-    each *mod* has its own *conf* overlay on top of universal combined *config*
-    HACK: configs for any *mod* can be sent by network directly
-      => no need for *conf* file on remote systems
-      ?? XXX: if several users use the same remote *core* and need different *conf*
-        ~ run its own core for each user
-        ~ change architecture, so *core* won't need any *conf* at all
-        ~ attach received 'virtual' *conf* to user's *cursor* reflection
-          = and switch actual *conf* before any execution depending on which user/*cursor* sent cmds
-          MAYBE:ALSO:USE: in any other dispatcher ?
-  * dispatches commands
-    - control smth provided, change state
-    - pass unrelated cmds further down/up
-  * altr impl : different only in these aspects
+  * main
+    - read/parse its own config, (*ui* also has keymap)
+  * multithreading
+    - waiting main thread
+    - listening/working threads
+    - spawning (*core* only)
+  * state
+    - provides (exports) list of smth (struct)
+    - has focus on smth (state of struct in general)
+  * data flow
+    - query
+    - convert (here altr impl is diff)
+    - cache (their own representation)
+  * commands
+    - dispatch (universal *io*)
+      = control smth provided, change state
+      = pass unrelated cmds further down/up
+      = return err on non-existent command
+      = list of supported *api* commands may be queried
+    - execute
+    - send cache
 
 
 %% Impl
 
-  *ui*
+%   ui
     altr: 3d, gui, web, tui, vim, cli, pipe, test_mock, ...
     goal:
       = multiple processes with several windows each attached to single *view*/*cursor*
       user interaction
-    do: map (approximate) *view* to concrete framework api
+      map (approximate) *view* to concrete framework api
     cache: framework objects hierarchy
     provides:
       colorscheme
@@ -76,7 +77,7 @@ E.G.
     dispatch:
       react on resizing events directly by *ui* itself
 
-  *view*
+%   view
     goal:
       = attached to single *cursor*, but support for multi-cursor implemented anyway
         (no sense to display non-related cursor info if there is no interaction in-betwee)
@@ -106,7 +107,7 @@ E.G.
         predefined or constructed on the site
       choose focused widget
 
-  *cursor*
+%   cursor
     goal:
       projection of *dom*
       minimize traffic
@@ -168,7 +169,7 @@ E.G.
       copy file through net to /tmp
       view through independent image viewer
 
-  *dom*
+%   dom
     goal:
       incremental loading (for long file lists)
       async update (long operations)
@@ -187,7 +188,7 @@ E.G.
       history + undo
       search results
 
-  *accessor*
+%   accessor
     ??? (dispatcher) is there need to specify cmds directly to them ???
       OR use them only through *core*
     ! *cursor*'s reflection is completely competent accessor
@@ -208,6 +209,17 @@ E.G.
       = :map -t <wdg_nm> <key> <cmd> <comment>
         SEE: man on zsh_zle, mutt_keymap
       query focused widget from *view* before applying *keymap*
+
+  *conf*
+    each *mod* has its own *conf* overlay on top of universal combined *config*
+    HACK: configs for any *mod* can be sent by network directly
+      => no need for *conf* file on remote systems
+      ?? XXX: if several users use the same remote *core* and need different *conf*
+        ~ run its own core for each user
+        ~ change architecture, so *core* won't need any *conf* at all
+        ~ attach received 'virtual' *conf* to user's *cursor* reflection
+          = and switch actual *conf* before any execution depending on which user/*cursor* sent cmds
+          MAYBE:ALSO:USE: in any other dispatcher ?
 
   *dispatcher*
     change focus, state
@@ -328,4 +340,3 @@ Flow
         ~ receive file from target and edit on host (E.G. ftpfs, sshfs, curlfs)
         ~ edit on target and send from host only keys
           BUT: connection must become _sync_ : screen must be refreshed on each key press
-
