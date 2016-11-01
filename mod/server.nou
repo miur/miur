@@ -37,6 +37,11 @@ IDEA
     http://semanchuk.com/philip/posix_ipc/
   socket-only server
     http://danielhnyk.cz/simple-server-client-aplication-python-3/
+    !! https://www.quora.com/Does-the-TCPServer-in-Python%E2%80%99s-SocketServer-close-the-socket-after-each-call-to-handle()
+    https://www.quora.com/Can-we-leave-a-socket-open-and-send-many-send-requests-without-any-problem
+    https://www.quora.com/Do-TCP-sockets-queue-multiple-messages-in-a-buffer-to-be-read-one-at-a-time-Or-does-the-buffer-only-store-the-most-recently-received-message
+    https://pymotw.com/2/select/
+    + http://www.ual.es/~vruiz/Docencia/Apuntes/Programming/Socket_Programming/index.html
   send signal from server (G: push message / z-push)
     ++ https://www.quora.com/What-is-the-best-way-to-push-realtime-data-to-a-mobile-app
       https://www.leggetter.co.uk/real-time-web-technologies-guide/
@@ -58,6 +63,13 @@ IDEA
   +++ socket simultaneous read/write
     http://stackoverflow.com/questions/11697855/python-multithreading-run-two-functions-at-the-same-time
     http://stackoverflow.com/questions/28879706/multiple-clients-cannot-listen-and-write-at-the-same-time
+    https://ask.wireshark.org/questions/25591/who-send-data-first-after-tcp-connection-is-established
+    ~ https://github.com/rust-lang/rust/issues/11165
+    http://www.chilkatforum.com/questions/7150/socket-is-locked-internally-while-waiting-for-some-data-and-we-are-not-able-to-send-data-at-the-same-time-from-another-thread
+    - http://blog.davidwolinsky.com/2010/07/headaches-of-blocking-sockets.html
+    +++ G: tcp send recv latency
+      https://encrypted.google.com/search?q=tcp%20send%20recv%20latency
+      G: (mosh): retain responsivness, fill up network buffers
   How can we verify that the server can still send messages through a socket to reach the client, without actually sending anything through that socket?
     :: You can't, unless you've enabled TCP keepalives.
     https://delog.wordpress.com/2013/08/16/handling-tcp-keepalive/
@@ -69,20 +81,57 @@ IDEA
     http://software.schmorp.de/pkg/libev.html
       http://pod.tst.eu/http://cvs.schmorp.de/libev/ev.pod
       http://www.win.tue.nl/~aeb/linux/lk/lk-12.html
+  socket send by DMA to buffer
+    https://www.quora.com/How-can-you-do-DMA-between-an-user-space-buffer-and-a-socket
+    https://codemonkeytips.blogspot.com/2011/07/zero-copy-network-transmission-with.html
 
 
 !!! READ
   server architecture (G: socket connection architecture)
-    http://berb.github.io/diploma-thesis/original/042_serverarch.html
-      http://berb.github.io/diploma-thesis/index.html
+    2016-11-01 [X] http://berb.github.io/diploma-thesis/original/042_serverarch.html
+      +++ http://berb.github.io/diploma-thesis/index.html
+        = Cool overview for server/concurrency/scaling
+      https://github.com/berb/diploma-thesis/tree/gh-pages
     https://www.tutorialspoint.com/unix_sockets/client_server_model.htm
     http://www.codeproject.com/Articles/990474/Scalable-Socket-Server
     http://caml.inria.fr/pub/docs/oreilly-book/html/book-ora187.html
     http://cis-linux1.temple.edu/~giorgio/cis307/readings/unix4.html
     https://pymotw.com/2/socket/tcp.html
     http://www.softwaretestingclass.com/what-is-difference-between-two-tier-and-three-tier-architecture/
+    http://www.isi.edu/touch/pubs/infocomm99/infocomm99-web/
+  CouchDB definitive guide
+    http://guide.couchdb.org/
   Protocol Design Notes
     http://www.linuxtopia.org/online_books/programming_books/python_programming/python_ch36s06.html?
+    waka
+      http://berb.github.io/diploma-thesis/original/091_archtrends.html#waka
+        http://tools.ietf.org/agenda/83/slides/slides-83-httpbis-5.pdf
+    SPDY
+      http://berb.github.io/diploma-thesis/original/091_archtrends.html#spdy
+    !! Event sourcing and CQRS
+      http://berb.github.io/diploma-thesis/original/091_archtrends.html#escqrs
+        = seems like what I desire to build
+        ru: http://blog.byndyu.ru/2014/07/command-and-query-responsibility.html
+        http://www.baeldung.com/cqrs-event-sourced-architecture-resources
+        http://blog.jonathanoliver.com/why-i-still-love-cqrs-and-messaging-and-event-sourcing/
+        http://docs.geteventstore.com/
+        https://elixirforum.com/t/ddd-cqrs-es-nosql-and-functional-programming/519
+        https://softwaremill.com/entry-level-event-sourcing/
+        http://softwareengineering.stackexchange.com/questions/294715/what-are-the-differences-between-event-sourcing-and-service-layer-pattern
+        http://blog.langer.eu/2014/09/02/literature.html
+      Event Sourcing
+      * http://martinfowler.com/eaaDev/EventSourcing.html
+          https://ookami86.github.io/event-sourcing-in-practice/#event-sourcing-vs-active-record/01-event-sourcing-vs-active-record.md
+          https://craigsmith.id.au/2016/03/29/martin-fowler-on-microservices-event-sourcing-and-infrastructure-as-code/
+          http://thinkbeforecoding.com/post/2013/07/28/Event-Sourcing-vs-Command-Sourcing
+          http://blog.arkency.com/2015/03/why-use-event-sourcing/
+      CQRS : Command Query Responsibility Segregation
+      * http://udidahan.com/2009/12/09/clarified-cqrs/
+          https://jeremywsherman.com/blog/2013/12/20/clarified-cqrs-reading-notes/
+          http://udidahan.com/2011/04/22/when-to-avoid-cqrs/
+          http://udidahan.com/wp-content/uploads/Clarified_CQRS.pdf
+          audio: http://www.se-radio.net/2015/01/episode-218-udi-dahan-on-cqrs-command-query-responsibility-segregation/
+          + https://en.wikipedia.org/wiki/Command%E2%80%93query_separation
 
 
 Spec
