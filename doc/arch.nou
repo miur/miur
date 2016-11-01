@@ -196,6 +196,27 @@ E.G.
       * allows contolling of *ui* execution
       * sends *dom* and *preview* data to display on *ui*'s end
 
+%   preview
+  use thread pool
+  smart priority
+    move down through directory listing
+      * fifo for old preview
+      * lifo for around cursor
+      = combine: preview will appear around cursor and at the beginning of its moving
+  permanent preview cache
+    ? how to know when preview is obsolete ?
+      ? what faster: check file hash/date or re-generate preview ?
+    container
+      ~ local .db
+        single file = fast loading to memory
+        query/sort/etc = no need to manage structure
+      ~ archived bundles : .tar.gz, lzma, etc
+        compressing CPU overhead / delay
+        slow access to single file at time
+      ~ unpacked preview in fs
+        too much disk space / inodes
+
+
 
 %% Interlayer
 
