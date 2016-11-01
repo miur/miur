@@ -69,7 +69,11 @@ IDEA
     - http://blog.davidwolinsky.com/2010/07/headaches-of-blocking-sockets.html
     +++ G: tcp send recv latency
       https://encrypted.google.com/search?q=tcp%20send%20recv%20latency
-      G: (mosh): retain responsivness, fill up network buffers
+      G: (mosh): retain responsiveness, fill up network buffers
+        => MAYBE Ctrl-C problem is related to SSH architecture itself ?
+    + http://stackoverflow.com/questions/467396/can-the-server-use-the-same-socket-to-send-the-response-to-the-client-how
+      TRY: shutdown(client_socket, SHUT_WR) to half-close socket and send message EOF
+        ~ MAYBE has latency drawbacks from protocol/kernel compared to custom msg delimiters
   How can we verify that the server can still send messages through a socket to reach the client, without actually sending anything through that socket?
     :: You can't, unless you've enabled TCP keepalives.
     https://delog.wordpress.com/2013/08/16/handling-tcp-keepalive/
@@ -103,6 +107,9 @@ IDEA
     http://guide.couchdb.org/
   Protocol Design Notes
     http://www.linuxtopia.org/online_books/programming_books/python_programming/python_ch36s06.html?
+    FTP
+      two connections == ASCII commands control connection and Binary data transfer
+      http://stackoverflow.com/questions/18700840/why-we-need-two-connections-between-the-ftp-server-and-the-ftp-client
     waka
       http://berb.github.io/diploma-thesis/original/091_archtrends.html#waka
         http://tools.ietf.org/agenda/83/slides/slides-83-httpbis-5.pdf
@@ -132,6 +139,13 @@ IDEA
           http://udidahan.com/wp-content/uploads/Clarified_CQRS.pdf
           audio: http://www.se-radio.net/2015/01/episode-218-udi-dahan-on-cqrs-command-query-responsibility-segregation/
           + https://en.wikipedia.org/wiki/Command%E2%80%93query_separation
+  READ:ALSO:
+    G: tcp socket duplex latency
+      https://blog.cloudflare.com/revenge-listening-sockets/
+      https://github.com/cloudflare/cloudflare-blog/tree/master/2016-04-bind-to-star
+      http://tpierrain.blogspot.com/2013/09/some-web-mechanical-sympathy-lets.html
+    G: tcp send both
+      http://stackoverflow.com/questions/467396/can-the-server-use-the-same-socket-to-send-the-response-to-the-client-how
 
 
 Spec
