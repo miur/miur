@@ -146,6 +146,69 @@ Spec
   is there need for servers on both sides?
     we can use pull-only connect from client
       if send long file to server -- use separate thread
+  open direct socket : preview <--> ui
+    for cached preview -- need separate mgmt entity
+      * preview threads pool
+      * cache db mgmt / garbage-collecting
+      * transmitting preview
+        broadcasting *core* sockets == connect to receive
+        OR sink *ui* sockets == connect to send
+        = even if preview_mgmt linked to *core* == it opens/manages its own socket to send data
+          # except when *preview* completely linked to *ui* == then direct memory usage
+      BAD: big preview re-displaying
+        slow to generate preview (CPU/IO bound)
+          ! want to access already cached preview when reconnecting *ui*
+          => NEED cache on target side
+        repeated additional net traffic
+          ! want to minimize traffic
+          => NEED cache on host side
+        slow to display -- wait until transmitted, show after
+          ! want immediate preview of cached entries
+          => NEED cache directly in *ui* (or DMA/shared mem with host's *preview/db* conterpart)
+    for preview on host's side -- need second mgmt entity
+      target one sends binary files to process
+      host one makes preview and caches it in its own db
+      then shows cached preview on each host request
+      rebuilds review for file
+        when *cursor* requests content (cursor over file)
+        and *core* confirms that file was changed
+      BUT: multiple *cursor* must reuse the same *preview/db*
+        you need proxy *core* on host's side for all *cursor* to connect to
+          MAYBE: create separate lightweight entity *proxy* for such occasions?
+          * proxy *core* has no access to host fs
+          * proxy *core* connects to real remote *core* to provide *dom*
+    no need to traverse data through all *mod*
+      * less CPU usage on re-transmitting
+      * more responsiveness
+      * specialized commands-only protocol
+        must send sync-chunks for *dom*/*frame*
+        ??? which cmds server thinks important enough to send when it transmits *dom* ???
+    !! NAT/firewall support
+        all *mod* traversing by creating parallel sockets for preview transmission
+          + useful for penetrating multiple firewalls at once
+          - additional ports may be closed / unavailable
+          - at least +1 thread to each process
+        send preview through command socket
+          useful for small text-only preview in highly restricted environment
+          - impossible signals from *core* until preview transmitted
+          => so, enable this option only on demand and toggle only temporarily
+
+
+preview _vs_ accessors
+  ? different or the same ?
+  preview
+    cache: large compressed database
+      = can be stored on separate server ?
+    accent: processed file content
+    representation: big binary blob
+  accessors
+    cache: relatively small dom
+      = has sense only in immediate context
+    accent: entries lists
+    representation: part of *dom* itself
+      fs metainfo
+      results of ops (*ag*, etc)
+      virtual tree (converted outline, *ag* results, etc)
 
 
 State Synchronization Protocol (SSP)
