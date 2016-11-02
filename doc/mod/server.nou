@@ -266,6 +266,8 @@ THINK
         GPU memory
         X apps embedding (like already existing viewer)
           then *miur* controls only 'bonding/setup' of apps
+        ! pipes/shared_mem --> faster then socket
+          [_] SEE: 'multiprocessing' -- integrates api for cross-platform IPC
     THINK: *core*/*ui* on different machines
       ? heuristic what is faster
         ~ generate preview on target and send image to host
