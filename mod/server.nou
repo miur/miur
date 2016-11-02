@@ -9,7 +9,7 @@ IDEA
         # short statements about sockets in general
     NOTE: using sockets allows us to use *core* on client and *ui* on host
     https://docs.python.org/3.5/library/socket.html
-      !!! [_] READ https://docs.python.org/3/howto/sockets.html
+      !!! 2016-11-02 [X] READ https://docs.python.org/3/howto/sockets.html
     https://docs.python.org/3.5/library/socketserver.html
       http://stackoverflow.com/questions/20745352/creating-a-multithreaded-server-using-socketserver-framework-in-python
     https://docs.python.org/3.5/library/asyncore.html
@@ -141,11 +141,12 @@ IDEA
           + https://en.wikipedia.org/wiki/Command%E2%80%93query_separation
   READ:ALSO:
     G: tcp socket duplex latency
-      https://blog.cloudflare.com/revenge-listening-sockets/
-      https://github.com/cloudflare/cloudflare-blog/tree/master/2016-04-bind-to-star
+      2016-11-02 [35%] https://blog.cloudflare.com/revenge-listening-sockets/
+      System tap scripts -- meashure soft IRQ function
+        https://github.com/cloudflare/cloudflare-blog/tree/master/2016-04-bind-to-star
       http://tpierrain.blogspot.com/2013/09/some-web-mechanical-sympathy-lets.html
     G: tcp send both
-      http://stackoverflow.com/questions/467396/can-the-server-use-the-same-socket-to-send-the-response-to-the-client-how
+      2016-11-02 [X] http://stackoverflow.com/questions/467396/can-the-server-use-the-same-socket-to-send-the-response-to-the-client-how
 
 
 Spec
