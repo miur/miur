@@ -55,6 +55,27 @@ E.G.
     - send cache
 
 
+%% Joints
+  Loose : coupling by sockets
+  Tight : coupling by linking
+    solid box
+    launch single listening server on demand (by setting options)
+      server has universal type for any of *mod*
+      clients send their own expected type as first message
+      server creates socket and integrates it into appropriate joint between *mod*
+        => any *mod* can be connected to already running self-sufficient *miur*
+    split any joint between *mod* on demand
+      fork *miur* on signal
+        on user action with explicit intent to split
+        ~ (option) when user closes *miur* but some other *mod* is still connected
+          => to keep *core* working for that another *ui*
+      close/remove/deallocate duplicated parts
+        keep *ui* in currently focused pid
+      connect parts by socket
+    rejoin any *mod* combo
+
+
+
 %% Impl
 
 %   ui
@@ -79,6 +100,7 @@ E.G.
 
 %   view
     goal:
+      projection of *cursor*'s *dom* reflection onto view layout
       = attached to single *cursor*, but support for multi-cursor implemented anyway
         (no sense to display non-related cursor info if there is no interaction in-betwee)
       if *ui* crashes -- reconnect and get _exactly_ the same view as before
@@ -109,7 +131,7 @@ E.G.
 
 %   cursor
     goal:
-      projection of *dom*
+      reflection of *dom*, centered around current file (cursor)
       minimize traffic
         partial/framed view (for long lists)
       keep navigation fast w/o re-accessing *dom*
@@ -128,6 +150,8 @@ E.G.
     provides:
       TEMP:(here) provide operations on graphs
         abstract graphs manipulation
+    impl:
+      no action until cmd on listening socket
     ?? allow to contol/modify list/tree itself OR inside *dom* only ??
       * read only access to *dom*
       * allow modifying => so list can be loaded from stdin
@@ -300,6 +324,9 @@ Flow
           user moves in bounds of already received cached list
           even if cursor stays in place, background transmission continues
           cancel transmission if dir was leaved
+        if files in dir were deleted after selection was accepted
+          show files as 'ghosts' in that dir instead of marking selected real files
+            = so user will know what is inside selection buffer w/o looking
 
     ~ create client reflection in server and use gui _only_ for display
       E.G.(imperative) no action until response from server
