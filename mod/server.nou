@@ -58,6 +58,9 @@ IDEA
     - fast polling :: BAD: queries in cycle, has response latency
     - server-sent-events
       https://www.html5rocks.com/en/tutorials/eventsource/basics/
+      https://taoofmac.com/space/blog/2014/11/16/1940
+      https://github.com/boppreh/server-sent-events
+      https://github.com/mpetazzoni/sseclient
   discovering running client/server nodes
     http://stackoverflow.com/questions/10914750/connect-two-tcp-sockets-without-defining-client-server-role
   +++ socket simultaneous read/write
@@ -88,6 +91,16 @@ IDEA
   socket send by DMA to buffer
     https://www.quora.com/How-can-you-do-DMA-between-an-user-space-buffer-and-a-socket
     https://codemonkeytips.blogspot.com/2011/07/zero-copy-network-transmission-with.html
+  NEED: insert new packet (cmd) with higher priority to send before file stream
+    ! NEED: inject cmd even if socket network buffers completely full
+      ? Reset socket buffers -- but we will lose all that data ?
+      GOAL: keep filled buffers intact, but place our commands on top of queue
+        So, even if currently client is blocking and don't read our data
+        \ when it will be read again, he will receive our cmd first of all
+    https://encrypted.google.com/search?q=socket+packet+priority
+    http://stackoverflow.com/questions/37998404/what-is-the-effect-of-setting-a-linux-socket-high-priority
+    http://stackoverflow.com/questions/11429403/how-to-set-message-priority-using-tos
+    + https://softwareengineering.stackexchange.com/questions/332258/how-to-manipulate-packets-flow-in-a-tcp-proxy
 
 
 !!! READ
@@ -268,6 +281,7 @@ THINK
           then *miur* controls only 'bonding/setup' of apps
         ! pipes/shared_mem --> faster then socket
           [_] SEE: 'multiprocessing' -- integrates api for cross-platform IPC
+            https://pymotw.com/2/multiprocessing/communication.html
     THINK: *core*/*ui* on different machines
       ? heuristic what is faster
         ~ generate preview on target and send image to host
