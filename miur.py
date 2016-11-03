@@ -1,7 +1,23 @@
 #!/usr/bin/python
 
+import time
+import logging
+import multiprocessing as mp
+
+from miur.cursor import main as curs
 from miur.ui import tui
 # from miur.relay.server import Listener
+from miur.relay.client import send
+
+logging.basicConfig(filename='/tmp/miur.log', level=logging.DEBUG)
+
+
+def test(server_address):
+    try:
+        time.sleep(1.0)
+        send(server_address, 'hi')
+    except KeyboardInterrupt:
+        pass
 
 
 if __name__ == '__main__':
@@ -9,4 +25,22 @@ if __name__ == '__main__':
     # with Listener('/tmp/miur') as l:
     # with Listener(("localhost", 7773)) as l:
     #     tui.main(l.server.server_address)
-    tui.main(None)
+
+    # mp.set_start_method('spawn')
+
+    # exit_event = mp.Event()
+    server_address = ('127.0.0.1', 8888)
+    p_curs = mp.Process(target=curs.main, args=(server_address,))
+    p_test = mp.Process(target=test, args=(server_address,))
+
+    p_curs.start()
+    p_test.start()
+
+    try:
+        tui.main(None)
+    except KeyboardInterrupt:
+        logging.info("end")
+        # shutdown to all
+    finally:
+        p_test.join()
+        p_curs.join()
