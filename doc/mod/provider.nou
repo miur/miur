@@ -69,6 +69,7 @@ E.G.
     logs
       so, you can grep some matching lines, and move them into subdirs to organize investigation
     ncmpcpp :: playlist, music.db
+      undo: when removing song from playlist -- store removed list in history, to re-insert song back on demand
     mutt :: mailbox
 
   Converted (lossless)
