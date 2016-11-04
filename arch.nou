@@ -29,6 +29,22 @@ E.G.
         > return current *dom*
       > notify 'state updated'
 
+
+%%% Evolution
+
+Logic
+  * single-thread asyncio
+  ! find sync points
+    joints between coro chains
+    data path sinks
+  + thread/process pool for long single coro
+    {Proces,Thread}PoolExecutor
+      https://docs.python.org/3/library/concurrent.futures.html
+  + threads for independent data paths
+  + threads for blocking IO to enhance reaction latency
+  ?? event sourcing and CQRS
+
+
 %%% Structure
 
 %% Mod
@@ -53,6 +69,17 @@ E.G.
       = list of supported *api* commands may be queried
     - execute
     - send cache
+
+
+%% Coro
+  main loop
+    server listening
+      rarely needed : on new client attach
+  ?? main
+    clients communication
+    command dispatching
+  ?? pool
+    request processing
 
 
 %% Joints
