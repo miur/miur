@@ -1,8 +1,11 @@
 import pickle
-import asyncio
 import logging
+import asyncio
+import functools
+# import signal
 
 clients = []
+_DEFAULT_LIMIT = 2 ** 16
 
 
 class ClientProtocol(asyncio.Protocol):
@@ -25,26 +28,35 @@ class ClientProtocol(asyncio.Protocol):
         logging.info('Send: {!r}'.format(message))
 
         response = pickle.dumps(message, protocol=pickle.HIGHEST_PROTOCOL)
+        # FIND how to call it from outside
         self.transport.write(response)
 
         logging.info('Close the client socket')
-        self.transport.close()
+        self.transport.close()  # TEMP:REM
 
-    def connection_lost(self, exc):
+    # def connection_lost(self, exc):
         # TEMP:REM: one-time connection
-        self.loop.stop()
+        # self.loop.stop()
+
+
+# def factory(loop):
+#     reader = asyncio.StreamReader(limit=_DEFAULT_LIMIT, loop=loop)
+#     protocol = asyncio.StreamReaderProtocol(reader, ClientProtocol, loop=loop)
+#     return protocol
 
 
 class EventDriver:
     def __init__(self, server_address, callback):
-        ip, port = server_address
         self.loop = asyncio.get_event_loop()
+        self.loop.set_debug(True)
+        # self.loop.add_signal_handler(signal.SIGINT, self.loop.stop)
         # Each client connection will create a new protocol instance
+        # coro = (await ...)
         coro = self.loop.create_server(
-            lambda: ClientProtocol(self.loop, callback), ip, port,
-            reuse_address=True, reuse_port=True)
+            functools.partial(ClientProtocol, self.loop, callback),
+            *server_address, reuse_address=True, reuse_port=True)
         self.server = self.loop.run_until_complete(coro)
-        ## loop.set_debug()
+        # SEE self.server.sockets
 
     def __enter__(self):
         # Serve requests until Ctrl+C is pressed
@@ -54,4 +66,5 @@ class EventDriver:
     def __exit__(self, *args):
         self.server.close()
         self.loop.run_until_complete(self.server.wait_closed())
+        # ALT: yield from self.server.wait_closed()
         self.loop.close()

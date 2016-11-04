@@ -30,6 +30,8 @@ if __name__ == '__main__':
 
     # exit_event = mp.Event()
     server_address = ('127.0.0.1', 8888)
+    # DEV: redirect stderr to logging
+    # SEE http://stackoverflow.com/questions/7714868/python-multiprocessing-how-can-i-reliably-redirect-stdout-from-a-child-process
     p_curs = mp.Process(target=curs.main, args=(server_address,))
     p_test = mp.Process(target=test, args=(server_address,))
 
