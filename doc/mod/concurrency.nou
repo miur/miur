@@ -9,3 +9,24 @@ Readers-writers lock
     * https://majid.info/blog/a-reader-writer-lock-for-python/
     * http://code.activestate.com/recipes/577803-reader-writer-lock-with-priority-for-writers/
     https://www.safaribooksonline.com/library/view/python-cookbook/0596001673/ch06s04.html
+
+
+Temporal Logic Planning Toolbox
+# E.G. Robot Motion Planning, etc
+= TRY using as operations planing for *core*
+  http://tulip-control.sourceforge.net/doc/
+
+
+Coroutines
+  co-routines
+    http://dabeaz.com/generators/
+    http://dabeaz.com/coroutines/
+    http://eli.thegreenplace.net/2009/08/29/co-routines-as-an-alternative-to-state-machines/
+    https://docs.python.org/3/library/asyncio-task.html#coroutine
+  asyncio
+    https://habrahabr.ru/post/242541/
+    https://habrahabr.ru/post/282972/
+      # SEE asyncio+pycurl and perform() in cycle
+    ++ http://www.curiousefficiency.org/posts/2015/07/asyncio-background-calls.html
+      E.G. simple demo for bkgr coros
+    ++ http://www.buzzcapture.com/en/2014/05/python-asyncio-inside/

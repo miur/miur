@@ -12,6 +12,8 @@ Modular system
         cmdline flags
         global config
     >> use mods mgmt for plugins
+  REF
+    http://www.curiousefficiency.org/posts/2016/09/python-packaging-ecosystem.html#my-core-software-ecosystem-design-philosophy
 
 
 Mods mgmt
