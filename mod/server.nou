@@ -118,6 +118,9 @@ IDEA
     http://www.isi.edu/touch/pubs/infocomm99/infocomm99-web/
   CouchDB definitive guide
     http://guide.couchdb.org/
+  RabbitMQ -- messaging and queuing
+    http://www.rabbitmq.com/getstarted.html
+    https://lostechies.com/jimmybogard/2012/10/08/favor-query-objects-over-repositories/
   Protocol Design Notes
     http://www.linuxtopia.org/online_books/programming_books/python_programming/python_ch36s06.html?
     FTP
@@ -131,7 +134,13 @@ IDEA
     !! Event sourcing and CQRS
       http://berb.github.io/diploma-thesis/original/091_archtrends.html#escqrs
         = seems like what I desire to build
-        ru: http://blog.byndyu.ru/2014/07/command-and-query-responsibility.html
+        ru: ++ http://blog.byndyu.ru/2014/07/command-and-query-responsibility.html
+            http://blog.byndyu.ru/2014/05/blog-post.html
+              https://en.wikipedia.org/wiki/CAP_theorem
+            http://blog.byndyu.ru/2014/01/intergration-patterns-shared-db-state.html
+            + http://blog.byndyu.ru/2010/06/domain-driven-design-aggregation-root.html
+          https://lostechies.com/jimmybogard/2012/10/08/favor-query-objects-over-repositories/
+          https://www.amazon.com/Implementing-Domain-Driven-Design-Vaughn-Vernon/dp/0321834577
         http://www.baeldung.com/cqrs-event-sourced-architecture-resources
         http://blog.jonathanoliver.com/why-i-still-love-cqrs-and-messaging-and-event-sourcing/
         http://docs.geteventstore.com/
@@ -152,6 +161,10 @@ IDEA
           http://udidahan.com/wp-content/uploads/Clarified_CQRS.pdf
           audio: http://www.se-radio.net/2015/01/episode-218-udi-dahan-on-cqrs-command-query-responsibility-segregation/
           + https://en.wikipedia.org/wiki/Command%E2%80%93query_separation
+    Asyncio Queue -- massive push scaling
+      https://habrahabr.ru/company/mailru/blog/271513/
+    When DB "stops working"
+      http://cacm.acm.org/magazines/2011/6/108666-if-you-have-too-much-data-then-good-enough-is-good-enough/fulltext
   READ:ALSO:
     G: tcp socket duplex latency
       2016-11-02 [35%] https://blog.cloudflare.com/revenge-listening-sockets/
@@ -164,6 +177,8 @@ IDEA
 
 Spec
   minimal (optimal) resource usage
+  authentication and encryption
+    http://members.tripod.com/professor_tom/archives/srpsocket.html
   immediate reaction on clients messages
     single thread event-driven has delay
       * FIFO -- until msg queue exhausted
