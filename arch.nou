@@ -82,6 +82,32 @@ Logic
     request processing
 
 
+%% Channel
+  queue multiple msgs
+    save each msg to queue and continue wait on socket
+    mark msg by emitter for response (add back-ref to client)
+      ~ directly use ref to explicitly call client code
+      ~ use 'id' to resolve it into client
+        BETTER :: allows to use write queue
+        http://stackoverflow.com/questions/10605083/python-asyncore-keep-track-of-clients
+  special 'cancel <op>' msg to reset queue
+    what receiving data format to be expected to 'cancel' at any time ?
+  reply to same client
+    embed returning 'id'
+  broadcast *dom* state change
+    do it until *ui* and only there make decision to update *cursor*
+      = make updating _on demand_ only
+  msg => cmd => class
+    search handler by type/class
+      = Haskell way
+      = C++ polymorphisms
+    easier to process/split cmds queue/pool
+  cmd authentication (check access/ops permissions), logging
+    NEED formal dispatcher between cmd and handler
+  cmd => event
+
+
+
 %% Joints
   Loose : coupling by sockets
   Tight : coupling by linking
