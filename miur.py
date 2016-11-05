@@ -39,7 +39,8 @@ if __name__ == '__main__':
     p_test.start()
 
     try:
-        tui.main(None)
+        # tui.main(None)
+        pass
     except KeyboardInterrupt:
         logging.info("end")
         # shutdown to all

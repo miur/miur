@@ -18,8 +18,12 @@ def send(server_address, message):
         # sock.sendfile(f)  # ret nbytes
         # sock.sendall(bytes(message, 'ascii'))
 
-        # FIXME: magic 1024 -- how process packets without limitations?
-        response = pickle.loads(sock.recv(1024))
+        try:
+            # FIXME: magic 1024 -- how process packets without limitations?
+            response = pickle.loads(sock.recv(1024))
+        # BAD: unreliable and slow
+        except (pickle.UnpicklingError, KeyError, EOFError):
+            response = data.decode()
         # response = str(sock.recv(1024), 'ascii')
 
         # FIXME: print to bkgr screen, don't overlap with ncurses window
