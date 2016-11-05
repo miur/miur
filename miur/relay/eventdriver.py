@@ -12,24 +12,25 @@ qmsg = asyncio.Queue()
 
 # Quiet poll
 # logging.getLogger('asyncio').setLevel(logging.WARNING)
+log = logging.getLogger(__name__)
 
 
 def rememberClient(id, obj):
     with _lock:
         _clients[id] = obj
-    logging.info('Client {} remembered'.format(id))
+    log.info('Client {} remembered'.format(id))
 
 
 def forgetClient(id):
     with _lock:
         del _clients[id]
-    logging.info('Client {} forgotten'.format(id))
+    log.info('Client {} forgotten'.format(id))
 
 
 def disconnectAll():
     with _lock:
         for c in _clients.values():
-            logging.info('Closing the client {!r} socket'.format(c))
+            log.info('Closing the client {!r} socket'.format(c))
             c.transport.close()
 
 
@@ -60,19 +61,19 @@ def disconnectAll():
 
 # asyncio.get_event_loop().run_until_complete(producer())
 
-async def send(id, msg):
-    logging.info('Send to {!r}: {!r}'.format(id, msg))
-    if isinstance(msg, str):
+async def send(id, fmt, msg):
+    log.info('Send to {!r}: {!r}'.format(id, msg))
+    if fmt is str:
         data = msg.encode()
-    else:
+    elif fmt is pickle:
         data = pickle.dumps(msg, protocol=pickle.HIGHEST_PROTOCOL)
     # BAD: exc if client was already deleted when executor was suspended
     _clients[id].transport.write(data)
 
 async def executor():
     while True:
-        id, msg = await qmsg.get()
-        await send(id, msg)
+        id, (ifmt, msg) = await qmsg.get()
+        await send(id, ifmt, msg)
 
 
 # ALT: replace by coro handler
@@ -81,12 +82,12 @@ class ClientProtocol(asyncio.Protocol):
     def connection_made(self, transport):
         self.transport = transport
         self.peer = self.transport.get_extra_info('peername')
-        logging.info('Connection from {}'.format(self.peer))
+        log.info('Connection from {}'.format(self.peer))
         self.id = self.peer  # ALT: use first msg from client as its ID
         rememberClient(self.id, self)
 
     def connection_lost(self, exc):
-        logging.info('Connection lost {}'.format(self.peer))
+        log.info('Connection lost {}'.format(self.peer))
         if exc is not None:
             raise exc
         forgetClient(self.id)
@@ -95,12 +96,14 @@ class ClientProtocol(asyncio.Protocol):
         try:
             # CHECK: 'data_received' guarantee complete msg OR only partial ones
             msg = pickle.loads(data)
+            ifmt = pickle  # Is correct ? Or can't use types in this way ?
         # BAD: unreliable and slow method to combine data + text_msg by 'nc'
         except (pickle.UnpicklingError, KeyError, EOFError):
             msg = data.decode()
-        logging.info('Data received: {!r}'.format(msg))
-        qmsg.put_nowait((self.id, msg))
-        # logging.info('Size: {!r}'.format(qmsg.qsize()))
+            ifmt = str
+        log.info('Data received: {!r}'.format(msg))
+        qmsg.put_nowait((self.id, (ifmt, msg)))
+        # log.info('Size: {!r}'.format(qmsg.qsize()))
 
 
 # def factory(loop):
@@ -125,7 +128,7 @@ class EventDriver:
 
     def __enter__(self):
         # Serve requests until Ctrl+C is pressed
-        logging.info('Serving on {}'.format(self.server.sockets[0].getsockname()))
+        log.info('Serving on {}'.format(self.server.sockets[0].getsockname()))
         return self.loop
 
     def __exit__(self, *args):

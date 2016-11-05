@@ -39,11 +39,20 @@ if __name__ == '__main__':
     p_test.start()
 
     try:
-        # tui.main(None)
-        pass
+        tui.main(None)
     except KeyboardInterrupt:
-        logging.info("end")
-        # shutdown to all
-    finally:
+        pass
+
+    # DEV: send 'quit all' through socket
+
+    try:
         p_test.join()
+    except KeyboardInterrupt:
+        pass
+
+    try:
         p_curs.join()
+    except KeyboardInterrupt:
+        pass
+
+    logging.info("end")
