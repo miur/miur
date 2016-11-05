@@ -17,6 +17,20 @@ Temporal Logic Planning Toolbox
   http://tulip-control.sourceforge.net/doc/
 
 
+Atomic ops
+  http://effbot.org/zone/thread-synchronization.htm
+
+
+Profiling
+  https://github.com/what-studio/profiling
+  http://stackoverflow.com/questions/39348869/understanding-python-asyncio-profiler-output
+
+
+Multithreading
+  Kill childs on Ctrl-C
+    http://code.activestate.com/recipes/496735-workaround-for-missed-sigint-in-multithreaded-prog/
+
+
 Coroutines
   co-routines
     http://dabeaz.com/generators/
@@ -30,3 +44,9 @@ Coroutines
     ++ http://www.curiousefficiency.org/posts/2015/07/asyncio-background-calls.html
       E.G. simple demo for bkgr coros
     ++ http://www.buzzcapture.com/en/2014/05/python-asyncio-inside/
+    +++ http://stackoverflow.com/questions/26154125/why-is-the-asyncio-library-slower-than-threads-for-this-i-o-bound-operation
+      # asyncio vs threading -- typical errors
+    Two threads for two event-loops
+      http://stackoverflow.com/questions/31623194/asyncio-two-loops-for-different-i-o-tasks
+    Keep-alive
+      http://stackoverflow.com/questions/32054066/python-how-to-run-multiple-coroutines-concurrently-using-asyncio

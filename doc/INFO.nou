@@ -3,6 +3,10 @@
 Refactoring and evolution
 Microkernel relay in fm world
 
+TODO
+  [_] move ideas from 'term/ranger'
+  [_] move ideas from 'nou.vim'
+
 Fork
   ? is there need for compatibility with python2 ?
   ? MAYBE use C++ or haskell instead of python ?
