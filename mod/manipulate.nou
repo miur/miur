@@ -30,6 +30,13 @@ J
   useful for list manipulation
   try over numeric cheatsheets, etc
 
+textobj
+  * files with identical prf/joint/sfx/ext
+  * use next immediate filter as textobj mask
+  * search results for curr dir
+  E.G.
+    minicom provider -- sort by name -- choose all lines with 'INFO' prefix
+    fs -- directly select/yank all files with ext w/o filtering dir beforehand
 
 ALSO
   make bindings to *miur* for each of lang in question
@@ -38,6 +45,11 @@ ALSO
       = source them from cmdline (headless scripting)
     => make possible to script actions even on Windows (w/o bash)
       BUT: you need to send cmds backward:  *core* -> *ui*
+  prompt to directly type-in cmds in favorite language
+    process file list
+      like using {J} for processing spreadsheet virtual view
+    send command to *miur* itself
+      some langs have more compact syntax for chaining, etc
 
 
 %% Redo
