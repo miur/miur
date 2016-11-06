@@ -190,6 +190,10 @@ Logic
       search results
 
 %   accessor
+    altr: fs, db, xml, mime/*, (even remote/neighbour core)
+    goal:
+      unified ifc to access entities
+      always returns *dom* frames to inject into shared *dom*
     ??? (dispatcher) is there need to specify cmds directly to them ???
       OR use them only through *core*
     ! *cursor*'s reflection is completely competent accessor

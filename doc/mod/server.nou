@@ -77,6 +77,10 @@ IDEA
     + http://stackoverflow.com/questions/467396/can-the-server-use-the-same-socket-to-send-the-response-to-the-client-how
       TRY: shutdown(client_socket, SHUT_WR) to half-close socket and send message EOF
         ~ MAYBE has latency drawbacks from protocol/kernel compared to custom msg delimiters
+    urgent / out-of-band data
+      https://tools.ietf.org/html/rfc6093
+      http://www.ibm.com/support/knowledgecenter/ssw_aix_71/com.ibm.aix.progcomc/out_ofband.htm
+      http://www.serverframework.com/asynchronousevents/2011/10/out-of-band-data-and-overlapped-io.html
   How can we verify that the server can still send messages through a socket to reach the client, without actually sending anything through that socket?
     :: You can't, unless you've enabled TCP keepalives.
     https://delog.wordpress.com/2013/08/16/handling-tcp-keepalive/

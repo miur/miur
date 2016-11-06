@@ -55,8 +55,14 @@ Coroutines
       http://stackoverflow.com/questions/33128325/how-to-set-class-attribute-with-await-in-init
     Client-server
       ++ https://gist.github.com/dbehnke/9627160
+       + http://stackoverflow.com/questions/37452039/how-to-correct-asyncio-yield-from-in-data-received
       http://stackoverflow.com/questions/31077182/python-asyncio-streaming-api
       https://pymotw.com/3/asyncio/io_coroutine.html
       https://gist.github.com/nathan-hoad/8966377
       http://stackoverflow.com/questions/27676954/non-blocking-i-o-with-asyncio
       http://www.drdobbs.com/open-source/the-new-asyncio-in-python-34-servers-pro/240168408
+    TODO
+      [_] FIND what it means that 'streams API' implements pause_writing/resume_reading ?
+        ? Socket can't be used simultaneously on read/write ?
+        ? Cross-platform code generalization/limitation w/o explicit exception for Linux ?
+        ? Optimization over kernel net-buffers for better responsiveness ?

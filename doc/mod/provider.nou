@@ -79,6 +79,13 @@ E.G.
     spreadsheet: db / xls
       like rename-in-place by 'a,i,c'
       create new dir by 'o,go' -- like insert new line
+      NEED special table-like view
+        * multiple vertical lists for cols
+          up/down switches row
+          left/right moves between cols
+        * all lists are equivalent (no tree structure)
+        * allow to transpose cols/rows
+        * macro %c1 %cC %c(C-2) to use in bindings (manipulation langs)
     elf/pe headers structure, symbols and functions objdumps in preview
     mindmaps
 
@@ -88,3 +95,7 @@ E.G.
     music src like fruity-loops splitted by instruments
     pidgin integration
       dirs as users, files as date + user + message's oneline summary, preview -- complete message
+    minicom
+      emulate scrollback
+      each 'file' == line
+      + sort by: DFL:date, content
