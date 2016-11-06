@@ -1,3 +1,14 @@
+miur
+  launcher / wrapper
+  plugin mngr
+    = may itself be separated into ~miur-plugin-mngr~
+miur-docs.py
+  CC-BY-NC-SA
+    READ https://creativecommons.org/faq/
+    + architectural notes, user stories, etc
+    + graphviz diag / images
+    - man, usage doc
+    - url bundles
 miur-core.py
 miur-accessor-fs.py
 miur-preview.py
