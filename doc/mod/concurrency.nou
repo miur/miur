@@ -53,3 +53,10 @@ Coroutines
       http://stackoverflow.com/questions/32054066/python-how-to-run-multiple-coroutines-concurrently-using-asyncio
     Using in class methods
       http://stackoverflow.com/questions/33128325/how-to-set-class-attribute-with-await-in-init
+    Client-server
+      ++ https://gist.github.com/dbehnke/9627160
+      http://stackoverflow.com/questions/31077182/python-asyncio-streaming-api
+      https://pymotw.com/3/asyncio/io_coroutine.html
+      https://gist.github.com/nathan-hoad/8966377
+      http://stackoverflow.com/questions/27676954/non-blocking-i-o-with-asyncio
+      http://www.drdobbs.com/open-source/the-new-asyncio-in-python-34-servers-pro/240168408
