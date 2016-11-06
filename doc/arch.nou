@@ -43,91 +43,15 @@ Logic
   + threads for independent data paths
   + threads for blocking IO to enhance reaction latency
   ?? event sourcing and CQRS
+    cmds applying to fs/sys (works as relation db)
+    cmds induse query to update *dom* from fs/sys
+    all client queries fetch data from *dom*
+      = if there no data in *dom* it will be fetched and cached
+      ? is there need to save/restore *dom* between sessions ?
+        OR lazy loading/filling/caching is good enough ?
 
 
 %%% Structure
-
-%% Mod
-  * main
-    - read/parse its own config, (*ui* also has keymap)
-  * multithreading
-    - waiting main thread
-    - listening/working threads
-    - spawning (*core* only)
-  * state
-    - provides (exports) list of smth (struct)
-    - has focus on smth (state of struct in general)
-  * data flow
-    - query
-    - convert (here altr impl is diff)
-    - cache (their own representation)
-  * commands
-    - dispatch (universal *io*)
-      = control smth provided, change state
-      = pass unrelated cmds further down/up
-      = return err on non-existent command
-      = list of supported *api* commands may be queried
-    - execute
-    - send cache
-
-
-%% Coro
-  main loop
-    server listening
-      rarely needed : on new client attach
-  ?? main
-    clients communication
-    command dispatching
-  ?? pool
-    request processing
-
-
-%% Channel
-  queue multiple msgs
-    save each msg to queue and continue wait on socket
-    mark msg by emitter for response (add back-ref to client)
-      ~ directly use ref to explicitly call client code
-      ~ use 'id' to resolve it into client
-        BETTER :: allows to use write queue
-        http://stackoverflow.com/questions/10605083/python-asyncore-keep-track-of-clients
-  special 'cancel <op>' msg to reset queue
-    what receiving data format to be expected to 'cancel' at any time ?
-  reply to same client
-    embed returning 'id'
-  broadcast *dom* state change
-    do it until *ui* and only there make decision to update *cursor*
-      = make updating _on demand_ only
-  msg => cmd => class
-    search handler by type/class
-      = Haskell way
-      = C++ polymorphisms
-    easier to process/split cmds queue/pool
-  cmd authentication (check access/ops permissions), logging
-    NEED formal dispatcher between cmd and handler
-  cmd => event
-
-
-
-%% Joints
-  Loose : coupling by sockets
-  Tight : coupling by linking
-    solid box
-    launch single listening server on demand (by setting options)
-      server has universal type for any of *mod*
-      clients send their own expected type as first message
-      server creates socket and integrates it into appropriate joint between *mod*
-        => any *mod* can be connected to already running self-sufficient *miur*
-    split any joint between *mod* on demand
-      fork *miur* on signal
-        on user action with explicit intent to split
-        ~ (option) when user closes *miur* but some other *mod* is still connected
-          => to keep *core* working for that another *ui*
-      close/remove/deallocate duplicated parts
-        keep *ui* in currently focused pid
-      connect parts by socket
-    rejoin any *mod* combo
-
-
 
 %% Impl
 
@@ -441,3 +365,12 @@ Flow
         ~ receive file from target and edit on host (E.G. ftpfs, sshfs, curlfs)
         ~ edit on target and send from host only keys
           BUT: connection must become _sync_ : screen must be refreshed on each key press
+  Shutdown
+    signals can't be used -- if *mod* works on diff systems
+    quit all *mod* on curr host isn't primary case
+    when *view* exits, *cursor* must be left working
+      = especially if second *view* connected to *cursor*
+      ! only *cursor* know if it allowed to exit
+      - *cursor* must notify *ui* about existing of other clients
+      * allow 'forced' exit for all connected clients
+    support for 'disconnect' signal -- has same magnitude as support for 'quit'
