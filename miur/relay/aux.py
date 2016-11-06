@@ -6,7 +6,9 @@ from miur.relay import protocol
 
 
 _log = logging.getLogger(__name__)
-servers = {}  # task -> (reader, writer)
+
+_servers = {}  # task -> (reader, writer)
+active_srv = None
 
 
 def send_once(server_address, obj):
@@ -36,41 +38,52 @@ def send_once(server_address, obj):
 # TRY: reuse eventdriver/ClientProtocol
 #   BUT then 'qin' will contain mix of clients 'ask' and parent 'rsp'
 # THINK: is there need for multiple parent conn at once ?
-#   ? Can preview be treated as such ?
+#   Can be treated as such or not ?:
+#       ? preview -- as binary data provider in rsp
+#       ? stdin provider to load list/selection/yank/etc from stdin directly in cursor ?
+#   * At least I need hot-plug to switch between multiple servers
+#       => cached dom/frame must be saved independently ?
 
-def client_done(task):
-    del servers[task]
-    _log.info("Client Task Finished")
-    # if len(servers) == 0:
-    #     _log.info("servers is empty, stopping loop.")
-    #     loop = asyncio.get_event_loop()
-    #     loop.stop()
-
-
-def make_connection(server_address, loop):
-    task = loop.create_task(handle_client(server_address))
-    servers[task] = server_address
-    _log.info("New Client Task")
-    task.add_done_callback(client_done)
-    return task
+async def core_connect(server_address, loop):
+    global _servers
+    reader, writer = await asyncio.open_connection(*server_address, loop=loop)
+    _servers[server_address] = (reader, writer)
+    _log.info('Connected to {!r}'.format(server_address))
 
 
-async def handle_client(server_address):
-    reader, writer = await asyncio.open_connection(*server_address)
-    _log.info("Connected to %s %d", *server_address)
+async def core_send(obj):
+    global _servers, active_srv
+    (_, writer) = _servers[active_srv]
+    _log.info('Sent: {!r}'.format(obj))
+    data = protocol.serialize(obj)
+    writer.write(data)
+    await writer.drain()  # MAYBE: need only before 'writer.close()' ?
 
-    msg = 'yes\n'
-    writer.write(msg.encode('utf-8'))
-    await writer.drain()  # MAYBE: need only before 'close()' ?
 
-    data = await asyncio.wait_for(reader.readline(), timeout=2.0)
-    print(data)
+async def core_recv():
+    global _servers, active_srv
+    (reader, _) = _servers[active_srv]
+    # data = await asyncio.wait_for(reader.readline(), timeout=2.0)
+    data = await reader.readline()
+    obj, _ = protocol.deserialize(data)
+    _log.info('Recv: {!r}'.format(obj))
+    return obj
 
+
+async def core_close():
+    global _servers, active_srv
+    (_, writer) = _servers[active_srv]
     writer.close()
+    del _servers[active_srv]
+    _log.info('Disconnected from {!r}'.format(active_srv))
 
 
 def loop(server_address):
+    global active_srv
+    active_srv = server_address  # OR another id
+
     loop = asyncio.get_event_loop()
-    coro = make_connection(server_address, loop)
-    loop.run_until_complete(coro)
+    loop.run_until_complete(core_connect(server_address, loop))
+    loop.run_until_complete(core_send('yes\n'))
+    loop.run_until_complete(core_close())
     loop.close()
