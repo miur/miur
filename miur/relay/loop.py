@@ -20,6 +20,8 @@ def main_loop(server_address):
     loop.set_debug(True)
 
     with eventdriver.Bay(server_address, loop):
+        # FIXME:RFC Flyover is independent from Bay
+        #   => server can reject new conn but continue server already established
         with entrepot.Flyover(loop) as task:
             loop.run_until_complete(task)
             # loop.run_forever()

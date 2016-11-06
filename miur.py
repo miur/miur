@@ -19,10 +19,11 @@ def cursor():
 
 def test():
     import time
-    from miur.relay.aux import send
+    from miur.relay import aux
     try:
-        time.sleep(1.0)
-        send(server_address, 'test')
+        time.sleep(0.5)
+        # aux.send_once(server_address, 'test')
+        aux.loop(server_address)
     except KeyboardInterrupt:
         pass
 
@@ -48,7 +49,7 @@ if __name__ == '__main__':
 
     try:
         from miur.ui import tui
-        tui.main(None)
+        # tui.main(None)
     except KeyboardInterrupt:
         pass
 

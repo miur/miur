@@ -1,10 +1,9 @@
 import miur.access.fs as fs  # TEMP:CHG
-import miur.graph.cursor as cursor
+# from miur.relay.aux import send_once
 
 # TEMP:CHG: use intermediate caching
 graph = fs
-
-entries = fs.list_nodes(cursor.path)
+entries = None
 
 
 def parent_node(p):

@@ -15,6 +15,7 @@ class Dispatcher:
     def __init__(self):
         self.g = graph
         self.c = cursor
+        self.g.entries = self.g.list_nodes(self.c.path)
 
     def _err_wrong_cmd(self):
         raise
@@ -41,7 +42,7 @@ class Dispatcher:
         self.c.cursor = 0 if self.g.entries else None
 
     def shift_node_current(self):
-        if self.c.cursor is None:
+        if self.c.cursor is None or self.g.entries is None:
             return
         self.c.path = self.g.child_node(self.c.path, self.g.entries[self.c.cursor])
         self.g.entries = self.g.list_nodes(self.c.path)

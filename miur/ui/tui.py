@@ -74,6 +74,6 @@ def loop(stdscr):
             break
 
 
-def main(saddr):
+def main(server_address):
     # frame.saddr = saddr
     curses.wrapper(loop)
