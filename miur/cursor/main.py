@@ -1,16 +1,15 @@
-import logging
+# import logging
 
-from miur.relay.eventdriver import EventDriver
+from miur.relay.loop import main_loop
+
+# Quiet poll
+# logging.getLogger('asyncio').setLevel(logging.WARNING)
 
 
-def hello(msg):
-    logging.info(msg)
-
-
-# return os.listdir(p)
 def main(server_address):
-    with EventDriver(server_address, hello) as loop:
-        try:
-            loop.run_forever()
-        except KeyboardInterrupt:
-            pass
+    # DEV: pass mod-specific code into main_loop
+    try:
+        # Serve requests until Ctrl+C is pressed
+        main_loop(server_address)
+    except KeyboardInterrupt:
+        pass
