@@ -8,6 +8,7 @@ entries = fs.list_nodes(cursor.path)
 
 
 def parent_node(p):
+    # DEV: rpc 'parent_node' and update 'path' when done
     return graph.parent_node(p)
 
 

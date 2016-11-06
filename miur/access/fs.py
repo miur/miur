@@ -15,4 +15,6 @@ def child_node(p, e):
 
 def list_nodes(p):
     if os.path.isdir(p):
+        # SEE:ALT:(scandir) faster
+        # THINK: how to update *dom* by iterator instead of pre-generated list
         return list(sorted(os.listdir(p)))

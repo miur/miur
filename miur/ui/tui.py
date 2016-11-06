@@ -68,6 +68,8 @@ def loop(stdscr):
         stdscr.clear()
         draw(stdscr)
         stdscr.refresh()
+        # WARN:NEED:(coro) if socket blocks -- ui will block too
+        # DEV: send cmd to socket, get list to show
         if update.update(keymap.get(stdscr.getkey(), None)) is not None:
             break
 

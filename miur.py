@@ -7,7 +7,7 @@ import multiprocessing as mp
 from miur.cursor import main as curs
 from miur.ui import tui
 # from miur.relay.server import Listener
-from miur.relay.client import send
+from miur.relay.aux import send
 
 logging.basicConfig(filename='/tmp/miur.log', level=logging.DEBUG)
 
