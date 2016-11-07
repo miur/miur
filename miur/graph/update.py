@@ -1,11 +1,14 @@
 import re
+import logging
 import threading
 from miur.graph.dispatch import Dispatcher
 
 dsp = Dispatcher()
+_log = logging.getLogger(__name__)
 
 
 def dispatch(self, cmd, *args):
+    _log.info("Cmd: {}".format(cmd))
     # TEMP: normalize command name
     cmd = re.sub(r'\W', '_', cmd)
     # ALT: bound = self.dispatch_map[cmd].__get__(self, type(self))

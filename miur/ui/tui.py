@@ -70,9 +70,14 @@ def loop(stdscr):
         stdscr.refresh()
         # WARN:NEED:(coro) if socket blocks -- ui will block too
         # DEV: send cmd to socket, get list to show
+        # THINK: use non-blocking input in single-thread asyncio coroutine ?
         key = stdscr.getkey()
+        # Search user mapping
         cmd = keymap.get(key, None)
+        if cmd is None:
+            continue
         ret = update.update(cmd)
+        # TEMP:HACK:(asymmetrical) quit
         if ret is not None:
             break
 

@@ -17,6 +17,8 @@ class Dispatcher:
         self.c = cursor
 
     def _err_wrong_cmd(self):
+        # Move err processing to 'update.py' (make more symmetrical)
+        # _log.error("Wrong cmd: {}".format(cmd))
         raise
 
     def focus_node_next(self):
