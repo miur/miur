@@ -72,3 +72,15 @@ TODO
   cmd authentication (check access/ops permissions), logging
     NEED formal dispatcher between cmd and handler
   cmd => event
+
+
+%% Serialization
+  [_] TRY: json/gzip
+  REF
+    https://en.wikipedia.org/wiki/Comparison_of_data_serialization_formats
+  Blog
+    https://www.sitepoint.com/choosing-right-serialization-format/
+    http://stackoverflow.com/questions/144435/whats-the-best-way-to-serialize-data-in-a-language-independent-binary-format
+    http://maxondev.com/serialization-performance-comparison-c-net-formats-frameworks-xmldatacontractserializer-xmlserializer-binaryformatter-json-newtonsoft-servicestack-text/
+  E.G.
+    http://msgpack.org/
