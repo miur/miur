@@ -49,6 +49,8 @@ Coroutines
       # asyncio vs threading -- typical errors
     Two threads for two event-loops
       http://stackoverflow.com/questions/31623194/asyncio-two-loops-for-different-i-o-tasks
+    ensure_future <vs> create_task
+      ++ http://stackoverflow.com/questions/36342899/asyncio-ensure-future-vs-baseeventloop-create-task-vs-simple-coroutine
     Keep-alive
       http://stackoverflow.com/questions/32054066/python-how-to-run-multiple-coroutines-concurrently-using-asyncio
     Using in class methods

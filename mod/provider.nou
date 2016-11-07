@@ -64,6 +64,8 @@ E.G.
     stdin
     find :: results
     ag :: search matches
+      * matching file list -- immediately load in panel to select/etc
+      IDEA: continuous operations, like interactive step-at-once pipe -- can replace fzf
     ps processes flat/tree
     installed packages
     logs
