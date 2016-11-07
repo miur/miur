@@ -1,7 +1,10 @@
 #!/usr/bin/python
 
+import time
 import logging
 import multiprocessing as mp
+
+from miur.relay import aux
 
 
 server_address = ('127.0.0.1', 8888)
@@ -18,18 +21,15 @@ def cursor():
 
 
 def test():
-    import time
-    from miur.relay import aux
     try:
         time.sleep(0.5)
-        # aux.send_once(server_address, 'test')
-        aux.loop(server_address)
+        aux.send_once(server_address, 'test')
     except KeyboardInterrupt:
         pass
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO,
+    logging.basicConfig(level=logging.DEBUG,
                         filename='/tmp/miur.log',
                         datefmt='%H:%M:%S',
                         format="%(asctime)s %(levelname)s " +
@@ -42,14 +42,18 @@ if __name__ == '__main__':
     # EXPL: pass args to process
     # p_curs = mp.Process(target=cursor, args=(server_address,))
     p_curs = mp.Process(target=cursor)
-    p_test = mp.Process(target=test)
-
     p_curs.start()
+
+    p_test = mp.Process(target=test)
     p_test.start()
 
     try:
         from miur.ui import tui
-        # tui.main(None)
+        # BUG:WARN: wait until cursor server started
+        #   => otherwise exception 'ConnectionRefusedError'
+        time.sleep(0.5)
+        aux.run_in_background(server_address)
+        tui.main(None)
     except KeyboardInterrupt:
         pass
 

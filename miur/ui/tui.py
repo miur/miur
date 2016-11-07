@@ -70,10 +70,14 @@ def loop(stdscr):
         stdscr.refresh()
         # WARN:NEED:(coro) if socket blocks -- ui will block too
         # DEV: send cmd to socket, get list to show
-        if update.update(keymap.get(stdscr.getkey(), None)) is not None:
+        key = stdscr.getkey()
+        cmd = keymap.get(key, None)
+        ret = update.update(cmd)
+        if ret is not None:
             break
 
 
 def main(server_address):
-    # frame.saddr = saddr
+    # EXPL: Init first screen (WARN: multithreading timings)
+    graph.entries = graph.list_nodes(cursor.path)
     curses.wrapper(loop)

@@ -15,7 +15,6 @@ class Dispatcher:
     def __init__(self):
         self.g = graph
         self.c = cursor
-        self.g.entries = self.g.list_nodes(self.c.path)
 
     def _err_wrong_cmd(self):
         raise

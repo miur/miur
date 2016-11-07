@@ -1,17 +1,20 @@
 import logging
 import socket
 import asyncio
+import threading
 
 from miur.relay import protocol
 
 
 _log = logging.getLogger(__name__)
-
+_thread_loop = None
+is_initialized = threading.Semaphore(0)
 is_watching = True
+
 _servers = {}  # task -> (reader, writer)
 active_srv = None
-qcmd = asyncio.Queue()
-qdat = asyncio.Queue()
+qcmd = None
+qdat = None
 
 
 def send_once(server_address, obj):
@@ -101,6 +104,11 @@ def put_cmd(obj):
     _log.debug('Size qcmd: {!r}'.format(qcmd.qsize()))
 
 
+def put_cmd_threadsafe(obj):
+    # WARN:NEED: wait until 'qcmd' initialized
+    _thread_loop.call_soon_threadsafe(put_cmd, obj)
+
+
 async def test():
     global is_watching
 
@@ -116,18 +124,49 @@ async def test():
     put_cmd('bad\n')
 
 
-def loop(server_address):
+def new_loop():
+    global qcmd, qdat, _thread_loop
+    # BUG: There is no current event loop in thread 'Thread-1'
+    # _thread_loop = asyncio.get_event_loop()
+    _thread_loop = loop = asyncio.new_event_loop()
+    qcmd = asyncio.Queue(loop=loop)
+    qdat = asyncio.Queue(loop=loop)
+    return loop
+
+
+def main_loop(server_address, loop=None):
     global active_srv
-
     active_srv = server_address  # OR another id
+    loop = _thread_loop
 
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(core_connect(server_address, loop))
+    conn = core_connect(server_address, loop)
+    loop.run_until_complete(conn)
     tasks = [loop.create_task(qcmd_send()),
              loop.create_task(qdat_recv()),
-             loop.create_task(qdat_apply()),
-             loop.create_task(test())]
+             loop.create_task(qdat_apply())]
     loop.run_until_complete(asyncio.gather(*tasks))
     loop.run_until_complete(core_close())
-
     loop.close()
+
+
+def _runner(server_address):
+    loop = new_loop()
+    is_initialized.release()
+    _log.info("Event loop running in thread: {!r}".format(
+                threading.current_thread().name))
+    try:
+        main_loop(server_address, loop)
+        pass
+    except KeyboardInterrupt:
+        pass
+
+
+# Call from main_thread
+def run_in_background(server_address):
+    relay = threading.Thread(target=_runner, args=(server_address,))
+    # Exit the server thread when the main thread terminates
+    relay.daemon = True
+
+    relay.start()
+    # Wait until msg bus created
+    is_initialized.acquire()
