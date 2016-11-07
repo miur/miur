@@ -67,7 +67,8 @@ async def core_send(obj):
 async def core_recv():
     (reader, _) = _servers[active_srv]
     # data = await asyncio.wait_for(reader.readline(), timeout=2.0)
-    data = await reader.read()
+    # BAD: magic size
+    data = await reader.read(1024)
     obj, _ = protocol.deserialize(data)
     _log.info('Recv: {!r}'.format(obj))
     return obj
@@ -84,19 +85,22 @@ async def qcmd_send():
     while is_watching:
         cmd = await qcmd.get()
         await core_send(cmd)
+        # ALT:
+        # if cmd == 'quit_all':
+        #     break
 
 
 async def qdat_recv():
     while is_watching:
         obj = await core_recv()
-        await qdat.put(obj)
+        qdat.put_nowait(obj)
         _log.debug('Size qdat: {!r}'.format(qdat.qsize()))
 
 
 async def qdat_apply():
     while is_watching:
         obj = await qdat.get()
-        print(obj)
+        _log.warning('Dat: {!r}'.format(obj))
 
 
 def put_cmd(obj):
@@ -141,10 +145,11 @@ def main_loop(server_address, loop=None):
 
     conn = core_connect(server_address, loop)
     loop.run_until_complete(conn)
-    tasks = [loop.create_task(qcmd_send()),
-             loop.create_task(qdat_recv()),
-             loop.create_task(qdat_apply())]
-    loop.run_until_complete(asyncio.gather(*tasks))
+    tasks = [asyncio.ensure_future(qcmd_send(), loop=loop),
+             asyncio.ensure_future(qdat_recv(), loop=loop),
+             asyncio.ensure_future(qdat_apply(), loop=loop)]
+    _all = asyncio.gather(*tasks, loop=loop)
+    loop.run_until_complete(_all)
     loop.run_until_complete(core_close())
     loop.close()
 
@@ -170,3 +175,4 @@ def run_in_background(server_address):
     relay.start()
     # Wait until msg bus created
     is_initialized.acquire()
+    return relay

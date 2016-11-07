@@ -36,6 +36,7 @@ class Dispatcher:
             self.c.cursor = len(self.g.entries) - 1
 
     def shift_node_parent(self):
+        # DEV: combine these multiple queue in single request to *core*
         self.c.path = self.g.parent_node(self.c.path)
         self.g.entries = self.g.list_nodes(self.c.path)
         self.c.cursor = 0 if self.g.entries else None

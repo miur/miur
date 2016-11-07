@@ -21,8 +21,10 @@ def put_in(obj):
 
 async def executor():
     while True:
-        cid, (ifmt, msg) = await qin.get()
-        await ClientProtocol.send(cid, msg, ifmt)
+        cid, (ifmt, obj) = await qin.get()
+        await ClientProtocol.send(cid, obj, ifmt)
+        if obj == 'quit_all':
+            break
 
 
 class Flyover:

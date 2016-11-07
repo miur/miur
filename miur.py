@@ -20,10 +20,10 @@ def cursor():
         pass
 
 
-def test():
+def test(obj):
     try:
         time.sleep(0.5)
-        aux.send_once(server_address, 'test')
+        aux.send_once(server_address, obj)
     except KeyboardInterrupt:
         pass
 
@@ -36,37 +36,37 @@ if __name__ == '__main__':
                         "[%(module)s:%(lineno)d] %(message)s")
     logging.info('*' * 50)
 
+    prs = []
     # mp.set_start_method('spawn')
     # exit_event = mp.Event()
 
     # EXPL: pass args to process
     # p_curs = mp.Process(target=cursor, args=(server_address,))
-    p_curs = mp.Process(target=cursor)
-    p_curs.start()
+    prs.append(mp.Process(target=cursor))
+    # prs.append(mp.Process(target=test, args=('test',))
 
-    p_test = mp.Process(target=test)
-    p_test.start()
+    for p in prs:
+        p.start()
 
     try:
         from miur.ui import tui
         # BUG:WARN: wait until cursor server started
         #   => otherwise exception 'ConnectionRefusedError'
         time.sleep(0.5)
-        aux.run_in_background(server_address)
+        prs.append(aux.run_in_background(server_address))
         tui.main(None)
     except KeyboardInterrupt:
         pass
 
     # DEV: send 'quit all' through socket
+    aux.is_watching = False
+    logging.info("exiting")
+    aux.put_cmd_threadsafe('quit_all')
 
-    try:
-        p_test.join()
-    except KeyboardInterrupt:
-        pass
-
-    try:
-        p_curs.join()
-    except KeyboardInterrupt:
-        pass
+    for p in reversed(prs):
+        try:
+            p.join()
+        except KeyboardInterrupt:
+            pass
 
     logging.info("end")
