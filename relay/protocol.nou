@@ -49,6 +49,42 @@ TODO
       -t all/ui
 
 
+%% Impl
+  each msg has class
+    = msg based RPC
+    = execute serialized 'future' over sockets
+    + best horizontal scaling for conform classes
+    ? OR better to register callbacks on rsp instead of dispensable class ?
+      ! need to keep request data/cmd to hang around
+        check server correctness/compatibility (verify possible garbage / attack)
+      ! state streaming -- send single *frame* by fragments/segments
+        E.G. stream long directory
+        need isolated state to track transmission progress -- so need obj
+
+  only msg itself knows how to parse rsp from *core*
+    ! keep msg obj around, until rsp will be processed
+    => can't process some server rsp
+      - unknown format (no such obj in dispatcher)
+      - obj instance wasn't scheduled to wait on server rsp
+
+  containers for combined msgs
+    = equal type as other msgs
+    Attributes
+      execution: chain / pipe / parallel
+        parallel = rsp can be returned in arbitrary sequence of other containers
+        chain = similar to Haskell monads chaining
+      results: discard / n-th / last / vector gather
+        gather = return same container with all rsps
+      flow: till 1st err / all
+      failsafe: (all|any) err = ok / (any|all) err = err
+    Consistency
+      single op can req mult cmds to succeed
+      atomically apply all of them to *dom* BUT: how ??
+      revert incomplete operation
+        E.G. no sense to chg curr path to parent's, if you can't load/recv its file list
+      containers must incapsulate this atomic behaviour
+
+
 %% Channel
   queue multiple msgs
     save each msg to queue and continue wait on socket
