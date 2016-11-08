@@ -9,6 +9,35 @@ from miur.graph import graph, cursor
 # Server addr
 # saddr = None
 
+class NodeGetParentCore:
+    def process(self, msg):
+        # send(graph.parent_node(msg))
+        pass
+
+
+# USAGE:
+#   qout.put_in(NodeGetParent(path))
+#   --------------
+#   p = qout.get()
+#   qwait.put_in(p)
+#   await send(p.msg())
+#   --------------
+#   p = qwait.get()
+#   p.rsp(recv())
+
+class NodeGetParent:
+    def __init__(self, path):
+        self.path = path
+
+    def msg(self):
+        return {'cmd': 'NodeGetParent', 'args': [self.path]}
+
+    def rsp(self, rsp):
+        if not isinstance(rsp, type(self.path)):
+            raise
+        cursor.path = rsp
+
+
 class Dispatcher:
     """Apply actions to any unrelated global states"""
 
