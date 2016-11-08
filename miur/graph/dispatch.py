@@ -1,5 +1,11 @@
+import logging
+import asyncio
+
 from miur.graph import graph, cursor
 
+_log = logging.getLogger(__name__)
+qout = asyncio.Queue()
+qwait = asyncio.Queue()
 
 # from miur.relay import client
 # tcp, unix, mem_share, etc
@@ -9,10 +15,14 @@ from miur.graph import graph, cursor
 # Server addr
 # saddr = None
 
+
 class NodeGetParentCore:
     def process(self, msg):
+        path = msg['args'][0]
+        p = graph.parent_node(path)
+        _log.info("New path: {}".format(p))
+        return p
         # send(graph.parent_node(msg))
-        pass
 
 
 # USAGE:
@@ -25,17 +35,28 @@ class NodeGetParentCore:
 #   p = qwait.get()
 #   p.rsp(recv())
 
+# MAYBE: incapsulate even getters from globals to create objects w/o arguments at all ?
+#   OR: at least use it as default args
 class NodeGetParent:
-    def __init__(self, path):
-        self.path = path
+    def __init__(self, path=None):
+        if path is None:
+            path = cursor.path
+        self._msg = {'cmd': type(self).__name__, 'args': [path]}
 
     def msg(self):
-        return {'cmd': 'NodeGetParent', 'args': [self.path]}
+        m = self._msg
+        _log.info("Req msg: {}".format(m))
+        return m
 
     def rsp(self, rsp):
-        if not isinstance(rsp, type(self.path)):
+        # Use more appropriate type for Path. BUT how to serialize in C ?
+        p = rsp
+        if not isinstance(p, str):
             raise
-        cursor.path = rsp
+        # NEED: incapsulate global state changes
+        #   -- another msg bus to eliminate locks and keep definitive order ?
+        _log.info("Response: {}".format(p))
+        cursor.path = p
 
 
 class Dispatcher:
@@ -67,8 +88,13 @@ class Dispatcher:
             self.c.cursor = len(self.g.entries) - 1
 
     def shift_node_parent(self):
+        c = NodeGetParent()
+        m = c.msg()
+        x = NodeGetParentCore().process(m)
+        c.rsp(x)
+
         # DEV: combine these multiple queue in single request to *core*
-        self.c.path = self.g.parent_node(self.c.path)
+        # self.c.path = self.g.parent_node(self.c.path)
         self.g.entries = self.g.list_nodes(self.c.path)
         self.c.cursor = 0 if self.g.entries else None
 
