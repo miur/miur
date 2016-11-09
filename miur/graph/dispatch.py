@@ -7,33 +7,15 @@ _log = logging.getLogger(__name__)
 qout = asyncio.Queue()
 qwait = asyncio.Queue()
 
-# from miur.relay import client
-# tcp, unix, mem_share, etc
-# coupling = None
-# if coupling == 'tcp':
-# ALT: self.g.entries = client.send(saddr, self.c.path)
-# Server addr
-# saddr = None
-
 
 class NodeGetParentCore:
     def process(self, msg):
         path = msg['args'][0]
         p = graph.parent_node(path)
-        _log.info("New path: {}".format(p))
+        # _log.info("New path: {}".format(p))
         return p
         # send(graph.parent_node(msg))
 
-
-# USAGE:
-#   qout.put_in(NodeGetParent(path))
-#   --------------
-#   p = qout.get()
-#   qwait.put_in(p)
-#   await send(p.msg())
-#   --------------
-#   p = qwait.get()
-#   p.rsp(recv())
 
 # MAYBE: incapsulate even getters from globals to create objects w/o arguments at all ?
 #   OR: at least use it as default args
@@ -88,9 +70,14 @@ class Dispatcher:
             self.c.cursor = len(self.g.entries) - 1
 
     def shift_node_parent(self):
-        c = NodeGetParent()
-        m = c.msg()
-        x = NodeGetParentCore().process(m)
+        # Proto
+        qout.put_nowait(NodeGetParent())
+        c = qout.get_nowait()
+        qwait.put_nowait(c)
+        # await send(c.msg())
+        x = NodeGetParentCore().process(c.msg())  # TEMP
+        # if recv() =~ qwait.items()
+        c = qwait.get_nowait()  # USE: access by index and remove only on demand
         c.rsp(x)
 
         # DEV: combine these multiple queue in single request to *core*
