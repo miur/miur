@@ -1,6 +1,6 @@
 import logging
 
-from miur.graph import cursor
+from miur.cursor import state
 
 _log = logging.getLogger(__name__)
 
@@ -10,7 +10,7 @@ _log = logging.getLogger(__name__)
 class NodeGetParent:
     def __init__(self, path=None):
         if path is None:
-            path = cursor.path
+            path = state.path
         self._msg = {'cmd': type(self).__name__, 'args': [path]}
 
     def msg(self):
@@ -27,11 +27,11 @@ class NodeGetParent:
 
         # NEED: incapsulate global state changes
         #   -- another msg bus to eliminate locks and keep definitive order ?
-        #   -- return {'cursor.path' = p} for registry hive, and apply changes in another executor
+        #   -- return {'state.path' = p} for registry hive, and apply changes in another executor
         #   ?? maybe directly send registry hive path with response ??
         #       (-) you need verify path anyways
         #       (-) too tight coupling on sent format
-        cursor.path = p
+        state.path = p
 
 
 # FIXME:BETTER: don't bind 'cmd' to class name -- so you could freely rename

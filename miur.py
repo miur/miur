@@ -4,8 +4,8 @@ import time
 import logging
 import multiprocessing as mp
 
-from miur.relay import aux
-from miur.graph import command as cmd
+from miur.ui import client
+from miur.cursor import command as cmd
 
 
 server_address = ('127.0.0.1', 8888)
@@ -13,10 +13,10 @@ server_address = ('127.0.0.1', 8888)
 
 # DEV: redirect stderr to logging
 # SEE http://stackoverflow.com/questions/7714868/python-multiprocessing-how-can-i-reliably-redirect-stdout-from-a-child-process
-def cursor():
-    from miur.cursor import main as curs
+def core():
+    from miur.core import main
     try:
-        curs.main(server_address)
+        main.main(server_address)
     except KeyboardInterrupt:
         pass
 
@@ -24,7 +24,7 @@ def cursor():
 def test(obj):
     try:
         time.sleep(0.5)
-        aux.send_once(server_address, obj)
+        client.send_once(server_address, obj)
     except KeyboardInterrupt:
         pass
 
@@ -43,7 +43,7 @@ if __name__ == '__main__':
 
     # EXPL: pass args to process
     # p_curs = mp.Process(target=cursor, args=(server_address,))
-    prs.append(mp.Process(target=cursor))
+    prs.append(mp.Process(target=core))
     # prs.append(mp.Process(target=test, args=('test',))
 
     for p in prs:
@@ -54,15 +54,15 @@ if __name__ == '__main__':
         # BUG:WARN: wait until cursor server started
         #   => otherwise exception 'ConnectionRefusedError'
         time.sleep(0.5)
-        prs.append(aux.run_in_background(server_address))
+        prs.append(client.run_in_background(server_address))
         tui.main(None)
     except KeyboardInterrupt:
         pass
 
     # DEV: send 'quit all' through socket
-    aux.is_watching = False
+    client.is_watching = False
     logging.info("exiting")
-    aux.put_cmd_threadsafe(cmd.Quit())
+    client.put_cmd_threadsafe(cmd.Quit())
 
     for p in reversed(prs):
         try:

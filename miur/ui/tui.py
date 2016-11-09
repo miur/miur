@@ -1,12 +1,12 @@
 import curses
 
-from miur.config.keymap import keymap
-from miur.graph import graph, cursor, update
+from .keymap import keymap
+from miur.cursor import graph, state, update
 
 
 def draw(stdscr):
-    curs = cursor.cursor
-    lines = graph.entries
+    curs = state.cursor
+    lines = state.entries
     if curs is None or lines is None:
         return
 
@@ -84,5 +84,5 @@ def loop(stdscr):
 
 def main(server_address):
     # EXPL: Init first screen (WARN: multithreading timings)
-    graph.entries = graph.list_nodes(cursor.path)
+    state.entries = graph.list_nodes(state.path)
     curses.wrapper(loop)

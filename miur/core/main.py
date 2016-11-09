@@ -2,8 +2,10 @@ import logging
 import asyncio
 # import signal
 
-from miur.relay import entrepot, eventdriver
+from . import entrepot, eventdriver
 
+# Quiet poll
+# logging.getLogger('asyncio').setLevel(logging.WARNING)
 _log = logging.getLogger(__name__)
 
 
@@ -28,3 +30,12 @@ def main_loop(server_address):
             # SEE server.sockets
 
     loop.close()
+
+
+def main(server_address):
+    # DEV: pass mod-specific code into main_loop
+    try:
+        # Serve requests until Ctrl+C is pressed
+        main_loop(server_address)
+    except KeyboardInterrupt:
+        pass

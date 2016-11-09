@@ -2,9 +2,10 @@ import logging
 import asyncio
 # import functools
 
+from miur.share import protocol
 # BAD: don't like this circular deps
-from miur.relay import entrepot, protocol
-from miur.relay.client import ClientsList
+from . import entrepot
+from .client import ClientsList
 
 _log = logging.getLogger(__name__)
 

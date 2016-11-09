@@ -1,4 +1,4 @@
-import miur.access.fs as fs
+import miur.core.fs as fs
 
 
 class NodeGetParentCore:

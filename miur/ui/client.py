@@ -4,7 +4,7 @@ import socket
 import asyncio
 import threading
 
-from miur.relay import protocol
+from miur.share import protocol
 
 
 _log = logging.getLogger(__name__)

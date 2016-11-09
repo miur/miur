@@ -1,8 +1,8 @@
 import logging
 import asyncio
 
-from miur.relay.eventdriver import ClientProtocol
-from miur.graph import executor as exe
+from .eventdriver import ClientProtocol
+from . import executor as exe
 
 _log = logging.getLogger(__name__)
 

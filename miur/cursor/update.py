@@ -1,7 +1,7 @@
 import re
 import logging
 import threading
-from miur.graph.dispatch import Dispatcher
+from miur.cursor.dispatch import Dispatcher
 
 dsp = Dispatcher()
 _log = logging.getLogger(__name__)
