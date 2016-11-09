@@ -314,6 +314,10 @@ Flow
       + multiple *ui* can have cursor in sync
 
     BETTER: flexible constructor
+      assemble points
+        symmetrical protocol -- directly connect in any place
+        next pair of points -- detour by another layer of indirection
+        absolute minimum -- msg bus between threads with undo history
       many intermediate joints
         accessors (access point)
           ? == preview ? (WTF: what the difference?)
