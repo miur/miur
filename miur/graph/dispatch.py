@@ -1,3 +1,4 @@
+import time
 import logging
 import asyncio
 
@@ -5,7 +6,8 @@ from miur.graph import graph, cursor
 
 _log = logging.getLogger(__name__)
 qout = asyncio.Queue()
-qwait = asyncio.Queue()
+dwait = {}
+counter = 0
 
 
 class NodeGetParentCore:
@@ -13,7 +15,7 @@ class NodeGetParentCore:
         path = msg['args'][0]
         p = graph.parent_node(path)
         # _log.info("New path: {}".format(p))
-        return p
+        return {'id': msg['id'], 'rsp': p}
         # send(graph.parent_node(msg))
 
 
@@ -24,6 +26,11 @@ class NodeGetParent:
         if path is None:
             path = cursor.path
         self._msg = {'cmd': type(self).__name__, 'args': [path]}
+        global counter
+        counter += 1
+        # ALT: directly use hash from dict()
+        # BUT: no guarantee it won't change between transactions
+        self._msg['id'] = hash((counter, time.clock()))
 
     def msg(self):
         m = self._msg
@@ -73,12 +80,15 @@ class Dispatcher:
         # Proto
         qout.put_nowait(NodeGetParent())
         c = qout.get_nowait()
-        qwait.put_nowait(c)
-        # await send(c.msg())
-        x = NodeGetParentCore().process(c.msg())  # TEMP
-        # if recv() =~ qwait.items()
-        c = qwait.get_nowait()  # USE: access by index and remove only on demand
-        c.rsp(x)
+        m = c.msg()
+        dwait[m['id']] = c
+        # NEED: await send(c.msg()), rsp = await recv()
+        rsp = NodeGetParentCore().process(m)  # TEMP
+        h = rsp['id']
+        # EXPL: if recv() =~ qwait.items()
+        dwait[h].rsp(rsp['rsp'])
+        # USE: remove only on demand
+        del dwait[h]
 
         # DEV: combine these multiple queue in single request to *core*
         # self.c.path = self.g.parent_node(self.c.path)
