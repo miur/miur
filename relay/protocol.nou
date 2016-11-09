@@ -23,6 +23,15 @@ TODO
       id = cmd: BAD performance for large cmd/selection -- no sense to send them back to client
       id = hash('cmd'): WARN: isn't enough for multiple identical cmds or same cmd from diff clients
       id = hash(('cmd', 'time', 'client')): too complex ?
+        NEED: 'counter' to recreate cmd order
+        NEED: 'time' so reconnected client suddenly didn't get rsp for its req before disconnection
+        CHECK:THINK:(collision) incoming msgs with the same hash as waiting on response outgoing ones
+          => ? Can't place all msgs in single pool ?
+          ? Must have separate pool for diff dirs ?
+      id = hash(('counter', 'time')) -- is it unique enough ? Or I need trace of 'cmd' anyway ?
+      id = hashof(dwait, key) -- directly use hash from dict()
+        BAD: no guarantee hash won't change between transactions due to
+        reordering of dict elements on its growth or items deleting
 
     body: cmd/rsp
       maybe gzip
@@ -66,9 +75,17 @@ TODO
     => can't process some server rsp
       - unknown format (no such obj in dispatcher)
       - obj instance wasn't scheduled to wait on server rsp
+    ? WTF with broadcast msgs -- when clients don't expect it ?
+      ? always keep universal objects for allowed broadcast msgs ?
+        = don't destroy after recv processing
+        * keep minimal state (or none)
 
   containers for combined msgs
     = equal type as other msgs
+    * you can pipe results from 'move to parent' to 'list node'
+      + less latency -- eliminates delay between separate reqs
+      + less traffic -- single compressed message
+      + *core* by itself process first and then pipe to second part of msg
     Attributes
       execution: chain / pipe / parallel
         parallel = rsp can be returned in arbitrary sequence of other containers
@@ -83,6 +100,14 @@ TODO
       revert incomplete operation
         E.G. no sense to chg curr path to parent's, if you can't load/recv its file list
       containers must incapsulate this atomic behaviour
+
+  all cmds has global order
+    ! you can't request node listing before you completed choosing dir path
+    = global counter (unique for this client)
+      check missed numbers, wait on them
+      * *core* must add (tuple) it's own global counter to all processed commands
+        = easier coordination through undo history
+        = you can track / undo overlapping actions of other clients
 
 
 %% Channel
