@@ -5,6 +5,7 @@ import logging
 import multiprocessing as mp
 
 from miur.relay import aux
+from miur.graph import command as cmd
 
 
 server_address = ('127.0.0.1', 8888)
@@ -61,7 +62,7 @@ if __name__ == '__main__':
     # DEV: send 'quit all' through socket
     aux.is_watching = False
     logging.info("exiting")
-    aux.put_cmd_threadsafe('quit_all')
+    aux.put_cmd_threadsafe(cmd.Quit())
 
     for p in reversed(prs):
         try:

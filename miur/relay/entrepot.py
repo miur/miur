@@ -2,6 +2,7 @@ import logging
 import asyncio
 
 from miur.relay.eventdriver import ClientProtocol
+from miur.graph import executor as exe
 
 _log = logging.getLogger(__name__)
 
@@ -22,8 +23,17 @@ def put_in(obj):
 async def executor():
     while True:
         cid, (ifmt, obj) = await qin.get()
-        await ClientProtocol.send(cid, obj, ifmt)
-        if obj == 'quit_all':
+        _log.debug('Command: {!r}'.format(obj))
+        c = obj['cmd']
+        if c == 'NodeGetParent':
+            r = exe.NodeGetParentCore().process(obj)
+        elif c == 'Quit':
+            # TEMP:HACK: reflect 'quit' back to rotate cycle once more
+            #   until false condition
+            r = obj
+        _log.debug('Results: {!r}'.format(r))
+        await ClientProtocol.send(cid, r, ifmt)
+        if c == 'Quit':
             break
 
 

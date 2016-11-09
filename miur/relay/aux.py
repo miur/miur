@@ -1,3 +1,4 @@
+import time
 import logging
 import socket
 import asyncio
@@ -15,6 +16,10 @@ _servers = {}  # task -> (reader, writer)
 active_srv = None
 qcmd = None
 qdat = None
+
+tmp_sending = threading.Semaphore(0)
+dwait = {}
+counter = 0
 
 
 def send_once(server_address, obj):
@@ -81,10 +86,23 @@ async def core_close():
     _log.info('Disconnected from {!r}'.format(active_srv))
 
 
+def sign_msg_from_cmd(cmd):
+    # NOTE: this is similar to 'watermarking' packet with ip address
+    global dwait, counter
+    counter += 1
+    h = hash((counter, time.clock()))
+    # Incapsulated requests wait on rsp
+    dwait[h] = cmd
+    m = cmd.msg()
+    m['id'] = h
+    return m
+
+
 async def qcmd_send():
     while is_watching:
         cmd = await qcmd.get()
-        await core_send(cmd)
+        m = sign_msg_from_cmd(cmd)
+        await core_send(m)
         # ALT:
         # if cmd == 'quit_all':
         #     break
@@ -97,10 +115,19 @@ async def qdat_recv():
         _log.debug('Size qdat: {!r}'.format(qdat.qsize()))
 
 
+def process_rsp(obj):
+    # Global state change. NEED: Lock
+    h = obj['id']
+    dwait[h].rsp(obj)  # search rsp processor by hash
+    del dwait[h]  # USE: remove only on demand
+    tmp_sending.release()
+
+
 async def qdat_apply():
     while is_watching:
         obj = await qdat.get()
         _log.warning('Dat: {!r}'.format(obj))
+        process_rsp(obj)
 
 
 def put_cmd(obj):
@@ -111,6 +138,8 @@ def put_cmd(obj):
 def put_cmd_threadsafe(obj):
     # WARN:NEED: wait until 'qcmd' initialized
     _thread_loop.call_soon_threadsafe(put_cmd, obj)
+    # TEMP: sync on waiting cursor.path new value
+    tmp_sending.acquire()
 
 
 async def test():
