@@ -1,7 +1,7 @@
 import curses
 
 from .keymap import keymap
-from miur.cursor import graph, state, update
+from miur.cursor import state, update
 
 
 def draw(stdscr):
@@ -84,5 +84,5 @@ def loop(stdscr):
 
 def main(server_address):
     # EXPL: Init first screen (WARN: multithreading timings)
-    state.entries = graph.list_nodes(state.path)
+    update.update('_init')
     curses.wrapper(loop)

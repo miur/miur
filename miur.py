@@ -60,8 +60,11 @@ if __name__ == '__main__':
         pass
 
     # DEV: send 'quit all' through socket
-    client.is_watching = False
     logging.info("exiting")
+    # BAD: client able to exit only if response come -- and hangs otherwise
+    #   => last msg is empty '' on connection lost -> can't be used to set
+    #   'is_watching=False' inside cmd.Quit()
+    client.is_watching = False
     client.put_cmd_threadsafe(cmd.Quit())
 
     for p in reversed(prs):

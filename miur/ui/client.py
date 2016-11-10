@@ -11,6 +11,7 @@ _log = logging.getLogger(__name__)
 _thread_loop = None
 is_initialized = threading.Semaphore(0)
 is_watching = True
+_DEFAULT_LIMIT = 2 ** 16
 
 _servers = {}  # task -> (reader, writer)
 active_srv = None
@@ -73,7 +74,11 @@ async def core_recv():
     (reader, _) = _servers[active_srv]
     # data = await asyncio.wait_for(reader.readline(), timeout=2.0)
     # BAD: magic size
-    data = await reader.read(1024)
+    #   -- need continuous read and reconstruct whole packet (/usr/lib is big!)
+    #   !!> pickle will raise exception on partial data
+    #   + split whole state diff to many small independent state frame diffs fitting inside single packet
+    #       => losing single frame diff one won't increase significantly total latency of command
+    data = await reader.read(_DEFAULT_LIMIT)
     obj, _ = protocol.deserialize(data)
     _log.info('Recv: {!r}'.format(obj))
     return obj

@@ -25,15 +25,21 @@ async def executor():
         cid, (ifmt, obj) = await qin.get()
         _log.debug('Command: {!r}'.format(obj))
         c = obj['cmd']
-        if c == 'NodeGetParent':
-            r = exe.NodeGetParentCore().process(obj)
-        elif c == 'Quit':
+        # Register all entries __class__.cmd in dict when loading
+        if c == 'get.node.parent':
+            r = exe.NodeGetParent().process(obj)
+        elif c == 'get.node.child':
+            r = exe.NodeGetChild().process(obj)
+        elif c == 'list.node':
+            r = exe.ListNode().process(obj)
+        elif c == 'quit-all':
             # TEMP:HACK: reflect 'quit' back to rotate cycle once more
             #   until false condition
             r = obj
+        # THINK:WTF: if no such cmd ? Client will hang in infinite loop
         _log.debug('Results: {!r}'.format(r))
         await ClientProtocol.send(cid, r, ifmt)
-        if c == 'Quit':
+        if c == 'quit-all':
             break
 
 

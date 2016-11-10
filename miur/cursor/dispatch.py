@@ -1,4 +1,4 @@
-from miur.cursor import state, graph
+from miur.cursor import state, update, command
 
 
 class Dispatcher:
@@ -7,7 +7,7 @@ class Dispatcher:
     def _err_wrong_cmd(self):
         # Move err processing to 'update.py' (make more symmetrical)
         # _log.error("Wrong cmd: {}".format(cmd))
-        raise
+        raise NotImplementedError
 
     def focus_node_next(self):
         if state.cursor is not None and state.entries is not None:
@@ -28,13 +28,17 @@ class Dispatcher:
     def shift_node_parent(self):
         # DEV: combine these multiple queue in single request to *core*
         # state.path =
-        graph.parent_node(state.path)  # TEMP: apply directly to global state
-        state.entries = graph.list_nodes(state.path)
+        # TEMP: apply directly to global state
+        # TEMP: send msg and wait until fully processed (send-recv-apply)
+        update.execute(command.NodeGetParent(state.path))
+        update.execute(command.ListNode(state.path))
         state.cursor = 0 if state.entries else None
 
     def shift_node_current(self):
         if state.cursor is None or state.entries is None:
             return
-        state.path = graph.child_node(state.path, state.entries[state.cursor])
-        state.entries = graph.list_nodes(state.path)
+        # WARN: must send both (p, e) for *core*
+        #   => to check if (p, e) is still available in fs
+        update.execute(command.NodeGetChild(state.path, state.entries[state.cursor]))
+        update.execute(command.ListNode(state.path))
         state.cursor = 0 if state.entries else None

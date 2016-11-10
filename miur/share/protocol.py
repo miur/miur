@@ -1,4 +1,7 @@
+import logging
 import pickle
+
+_log = logging.getLogger(__name__)
 
 
 def serialize(obj, ofmt=None):
@@ -19,6 +22,7 @@ def deserialize(data, ifmt=None):
         ifmt = pickle
     # BAD: unreliable and slow method to combine data + text_msg by 'nc'
     except (pickle.UnpicklingError, KeyError, ValueError, EOFError):
+        _log.error('Wrong data: {!r}'.format(data))
         obj = data.decode()
         ifmt = str
     return (obj, ifmt)

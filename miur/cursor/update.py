@@ -1,7 +1,10 @@
 import re
 import logging
 import threading
+
 from miur.cursor.dispatch import Dispatcher
+from miur.ui import client
+from miur.cursor import state, command
 
 dsp = Dispatcher()
 _log = logging.getLogger(__name__)
@@ -18,6 +21,9 @@ def dispatch(self, cmd, *args):
 
 
 def update(cmd):
+    if cmd == '_init':
+        execute(command.ListNode(state.path))
+        return
     if cmd == 'quit':
         return True
     # BAD: Lock on whole dom NEED: individual on each operation
@@ -25,3 +31,7 @@ def update(cmd):
     #   ALSO: wtf dir list changed (synced) directly after op ?
     with threading.Lock():
         dispatch(dsp, cmd)
+
+
+def execute(cmd_obj):
+    client.put_cmd_threadsafe(cmd_obj)

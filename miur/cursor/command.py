@@ -1,44 +1,80 @@
 import logging
 
-from miur.cursor import state
+from . import state
+from miur.ui import client
 
 _log = logging.getLogger(__name__)
 
+# BETTER: don't bind 'cmd' to class name (type(self).__name__)
+#   -- so you could freely rename classes by adding sfx/prf
 
-# MAYBE: incapsulate even getters from globals to create objects w/o arguments at all ?
-#   OR: at least use it as default args
-class NodeGetParent:
-    def __init__(self, path=None):
-        if path is None:
-            path = state.path
-        self._msg = {'cmd': type(self).__name__, 'args': [path]}
 
-    def msg(self):
-        m = self._msg
+class Command:
+    def __init__(self, *args):
+        _log.fatal('Args: {!r}'.format(args))
+        if args:
+            self.args = args
+
+    def msg(self, args={}):
+        m = {'cmd': self.cmd}
+        if hasattr(self, 'args'):
+            m.update({'args': self.args})
+        m.update(args)
         _log.info("Req msg: {}".format(m))
         return m
 
     def rsp(self, obj):
+        _log.info("Response: {!r}".format(obj))
+        pass
+
+
+# DEV: rpc 'parent_node' and update 'path' when done
+class NodeGetParent(Command):
+    cmd = 'get.node.parent'
+
+    def rsp(self, obj):
         # Use more appropriate type for Path. BUT how to serialize in C ?
         p = obj['rsp']
+        super().rsp(p)
         if not isinstance(p, str):
-            raise
-        _log.info("Response: {}".format(p))
-
-        # NEED: incapsulate global state changes
-        #   -- another msg bus to eliminate locks and keep definitive order ?
-        #   -- return {'state.path' = p} for registry hive, and apply changes in another executor
-        #   ?? maybe directly send registry hive path with response ??
-        #       (-) you need verify path anyways
-        #       (-) too tight coupling on sent format
+            _log.fatal('Err obj: {!r}'.format(p))
+            raise TypeError
         state.path = p
 
 
-# FIXME:BETTER: don't bind 'cmd' to class name -- so you could freely rename
-#   classes by adding sfx/prf
-class Quit:
-    def msg(self):
-        return {'cmd': type(self).__name__}
+class NodeGetChild(Command):
+    cmd = 'get.node.child'
+    # TODO:DFL: self.args = args or state.path
 
     def rsp(self, obj):
-        pass
+        # Use more appropriate type for Path. BUT how to serialize in C ?
+        p = obj['rsp']
+        super().rsp(p)
+        if not isinstance(p, str):
+            _log.fatal('Err obj: {!r}'.format(p))
+            raise TypeError
+        state.path = p
+
+
+class ListNode(Command):
+    cmd = 'list.node'
+
+    def rsp(self, obj):
+        l = obj['rsp']
+        super().rsp(l)
+        if l is None:
+            # BAD: stacks path elements even if can't go inside /path/to/file/file/file/...
+            #   => MUST undo path change left/right back to curr dir
+            return
+        if not isinstance(l, list):
+            _log.fatal('Err obj: {!r}'.format(l))
+            raise TypeError
+        state.entries = l
+
+
+class Quit(Command):
+    cmd = 'quit-all'
+
+    def rsp(self, obj):
+        c = obj['cmd']
+        super().rsp(c)
