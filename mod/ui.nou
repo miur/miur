@@ -37,10 +37,19 @@ Frontend
   cli
     interactive query-like fm (ls, zsh, fzf)
       * embed into zsh to interactively select files
-    approximates *view* : zsh-like or ipython-like
+    approximates *view* widget window : zsh-like or ipython-like
       curses-free widgets
-      textual infostring representations
+      textual infostring representations for lists and statusbars
     make it independent plugin
+    controls like zsh-vi-cmd-mode
+      single letter directly launches cmd in 'vi' by monitoring getch()
+        on 'i' you can go to 'insert' mode with emacs-like edition
+        in emacs-mode you must press <CR> after one-letter alias to execute line
+      perform chosing files through cli
+        first / last / find by rgx
+        NEED: concept of 'cursor' and 'selection' in cli ui (in contrast to tui)
+      type processing commands directly in cli like shell cmds (similar to ipython)
+        E.G. Like typing $ :j /+ %L $ to apply J lang construct on current list
     E.G.
       launch by $ miur --cli
       similar to shell itself
