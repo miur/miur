@@ -11,3 +11,33 @@
       http://www.cgsecurity.org/Articles/SecProg/Art5/
     http://stackoverflow.com/questions/28517236/can-posix-linux-unlink-file-entries-completely-race-free
     https://www.gnu.org/software/findutils/manual/html_node/find_html/Deleting-Files.html
+
+
+%%%% Microservices
+  ! 2016-11-11 [X] https://en.wikipedia.org/wiki/Microservices
+    # my arch is similar to this
+    -- ! https://www.infoq.com/news/2014/08/failing-microservices
+  2016-11-11 [X] https://en.wikipedia.org/wiki/Loose_coupling
+    2016-11-11 [X] https://en.wikipedia.org/wiki/Event-driven_architecture
+      + 2016-11-11 [X] https://en.wikipedia.org/wiki/Event-driven_SOA
+    2016-11-11 [X] https://en.wikipedia.org/wiki/Connascence_(computer_programming)
+    2016-11-11 [X] https://en.wikipedia.org/wiki/Service-oriented_architecture
+
+SEE~
+  https://en.wikipedia.org/wiki/Distributed_computing
+  https://en.wikipedia.org/wiki/Workflow_management_system
+  ++ https://vimeo.com/10837903
+    https://github.com/jimweirich/presentation_connascence
+  2016-11-11 [X] http://www.codingthearchitecture.com/2014/05/01/where_is_the_complexity.html
+    # Complexity only transforms -- you can move it about but it's still there!
+
+
+%%%% Patterns
+  ++ https://en.wikipedia.org/wiki/Enterprise_Integration_Patterns
+  https://en.wikipedia.org/wiki/Software_design_pattern
+  + https://en.wikipedia.org/wiki/Cross-cutting_concern
+  ! https://en.wikipedia.org/wiki/Fallacies_of_distributed_computing
+
+  "Just Enough Software Architecture by George H. Fairbanks"
+  "Software Systems Architecture by Nick Rozanski, Eóin Woods".
+    # Of course, you can use the C4 method to help you design and document them as well!
