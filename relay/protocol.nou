@@ -157,10 +157,25 @@ TODO
             and process() methods
 
   ALT: each cmd IS _event_ (WPF)
+    ~ WPF cmd has ref to target
+      E.G. the same 'Copy' cmd will have different impl for text and img by using target->copy()
+        => ? no need for code logic in cmd itself ?
     * no code inside
     * no ref to target (dst)
+      tuple space instead of pipe
+      pattern matching instead of address
+      unordered (even) subscribers
+        all consumers equal and can't hinder each other (with same level of priority)
+          ! they even can be spread distantly through web
+        priority to form dynamic chains/trees of responsibility
+          can be set individually for each type of event/msg
+          = partial (synchronous) order of msg passing/flow
+          = you can block msg in high priority consumer from passing to others
     * exec() is emit()
       - each subsciber must impl 'port' for cmd to arrive (in addition to api)
+       "The difference being that messages are directed, events are not — a
+       message has a clear addressable recipient while an event just happen
+       for others (0-N) to observe it."
     * event is msg
       important only time instant and embedded data
       event don't interpret its own data at all
@@ -174,17 +189,62 @@ TODO
         => split 'data-graph' structure from actual processing code
     + you can use CQRS also for received responses
       ?? does it has any sense -- storing history of received data ??
-    SEE:
-      https://en.wikipedia.org/wiki/Loose_coupling
-      https://msdn.microsoft.com/en-us/library/ms752308.aspx
+
+    WPF
       http://docs.gigaspaces.com/sbp/master-worker-pattern.html
       https://encrypted.google.com/search?q=executed%20routed%20event
+      [70%] 2016-11-11 https://msdn.microsoft.com/en-us/library/ms752308.aspx
+       The Execute and CanExecute methods of a RoutedCommand do not contain the
+       application logic for the command, but rather they raise routed events
+       that tunnel and bubble through the element tree until they encounter an
+       object with a CommandBinding.
+       https://msdn.microsoft.com/en-us/library/ms742806.aspx
+       https://msdn.microsoft.com/en-us/library/system.windows.input.commandbinding.aspx
+       https://msdn.microsoft.com/en-us/library/system.windows.input.routedcommand.aspx
 
   MAYBE: incapsulate even getters from globals
     create objects w/o arguments at all ?
       # OR: at least use it as default args
       <! gui has button to produce action, but gui has no need \
         to access global state to create args for this action !
+
+  Trade off
+    Tight coupling with high locality
+      raw events
+    More generalized standarization on larger scale
+      pre-processed 'cooked' events/msgs
+
+  event -> cmd --(infusing)-> msg --- msg -> event -> msg --(prc)-> rsp
+    infusing/enrichment of cmd by grabbed context frame
+      like: Copy -> Selection (catch into cmd) -> History
+    indicate to ifc exec() availability/status by: cmd.CanExecute(), cmd.IsBusy()
+      = it can test target itself if compatible with cmd / possible at all to exec()
+      = and target's state (or local context) if ready to exec()
+      event: CanExecuteChanged to listen inside cmd src
+    Concept boundaries
+      external actions (events) [N -> 1] command
+        = map multiple actions to same command
+          (enriched with slightly different ctx)
+      command [1 -> N] bindings
+        = allows flexibility in choosing binding type
+        any choice of actual binding
+          property 'exec()' with __call__ attr may be literally anything
+            being function itself, directly bound to some class method or global func
+          ALT: emit() event on exec()
+    !! postpone key decisons in 'arch'
+      bindings
+        allow multiple choices for impl logic
+          embed into cmd
+            access to global/local execution env -- api/static/singleton/etc
+          delegate to target
+            pass cmd to target's port(..) and target will handle it itself
+          external binding
+            dispatcher finds appropriate independent function to operate on cmd
+          chain of responsibility
+            subscribers decide by themself what to do with msg
+
+
+
 
 %% Scripts as msg
 Use Lua or any other scripting lang
