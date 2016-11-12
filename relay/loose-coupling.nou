@@ -1,0 +1,94 @@
+Test stand (out-of-control environment)
+  multiple process N >> n cores
+    scheduled sleep
+    io blocking
+  multiple threads
+    global ctx continuously changing
+    scheduled sleep
+    blocking on shared access
+  minimal system resources
+    cpu load
+    threads
+    memory
+    io
+    net traffic
+
+
+Coupling / relations
+  immediate timing
+  immediate ctx
+  immediate actions
+  local ctx (self)
+  local actions
+  global timing
+  global ctx
+  global actions
+  other local timing
+  other local ctx
+  other local actions
+  ctx catch duration
+  actions duration
+  locality
+
+
+%%%% Evolution
+
+Each block represents one level of indirection and solves single problem of coupling
+  * no need to introduce indirection if there is no problem
+  * too much of indirection introduces latency and complexity
+  * full normalization isn't possible -- you must stop somewhere
+
+%%% Graph
+Some problems can be solved separately.
+Some -- only on top of previous solution.
+Some require aggregation of multiple previous solutions and adding new aspects.
+=> Therefore -- it _must_ be graph to represent relations.
+
+USE:(.gv)
+  Macaroni --> Organized --> Callback --> Command --> Chain
+      ^--> ...                  ^--> callback of callbacks -->
+
+%% Blocks
+  Macaroni: keypress {event} -> handler {code}
+    + immediate exec
+    + direct access to local_ctx
+    - event:action = 1:1  # code repetition
+    - postpone all new events by total duration  # low responsiveness, big latency
+    - long catch_ctx : slow acquisition of all data  # time inconsistency (blurred snapshot of data), latency
+    - mixed ctx access and code execution over  # complexity, time inconsistency
+    - inconsistent sequential access
+      - immediate data can be changed until they will be read in future
+      - exec ctx may change significantly and changes become incompatible
+    - wide access_dom :: low encapsulation / localization  # complexity, hard correctness proving
+    - long actions :: blocks other code execution (E.G. process new event)
+    - hardcoded code : locality  # code repetition = in-space inconsistency
+    - imm application of evaluation results to global ctx
+
+  Organized: keypress {event} -> handler {code}
+    + catch imm_ctx at beginning  # reduce exter infl
+
+  Callback: handler -> action {code}
+    + event:action = N:1
+      + reduce space inconsistency
+      -
+        SOL: callback of callbacks of ...
+          ~ hard order = can't be reordered
+    + encapsulate {code} deps into sep file
+      connascence by (name, args_type)
+    - local_ctx must be passed to func
+      BAD: back ref to ctx : breaks catched imm_ctx localization
+
+  Command: handler -> obj {init} -> action {code}
+    = {code} split into init() and action()
+    + no need for immediate exec
+      + time distance until execution
+      + space distance until execution
+      ? THINK is it possible to gain only single characteristic of these two by simpler approach ?
+    ! impossible access to immediate local ctx in the moment of execution
+      = local_ctx must be saved into obj
+      = consistency lost -- between saved ctx and actual immediate ctx
+
+  Chain-of-responsibilty:
+    + event:action = N:N
+      - unspecified order
+        # use 'priority', etc to dynamically rearrange order
