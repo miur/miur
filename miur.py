@@ -5,7 +5,7 @@ import logging
 import multiprocessing as mp
 
 from miur.ui import client
-from miur.cursor import command as cmd
+from miur.cursor import message, update
 
 
 server_address = ('127.0.0.1', 8888)
@@ -65,7 +65,7 @@ if __name__ == '__main__':
     #   => last msg is empty '' on connection lost -> can't be used to set
     #   'is_watching=False' inside cmd.Quit()
     client.is_watching = False
-    client.put_cmd_threadsafe(cmd.Quit())
+    update.handle(message.QuitMsg())
 
     for p in reversed(prs):
         try:

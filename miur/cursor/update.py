@@ -4,12 +4,17 @@ import threading
 
 from miur.cursor.dispatch import Dispatcher
 from miur.ui import client
-from miur.cursor import state, command
+from miur.cursor import message
 
 dsp = Dispatcher()
 _log = logging.getLogger(__name__)
 
+# SEE /ranger/api/commands.py:38
+_msgd = {v.cmd: v for v in vars(message).values()
+         if isinstance(v, type) and issubclass(v, message.BaseMessage)}
 
+
+# TODO: replace by constructing 'msg' from _msgd{} classes
 def dispatch(self, cmd, *args):
     _log.info("Cmd: {}".format(cmd))
     # TEMP: normalize command name
@@ -22,7 +27,7 @@ def dispatch(self, cmd, *args):
 
 def update(cmd):
     if cmd == '_init':
-        execute(command.ListNode(state.path))
+        handle(message.ListNodeMsg())
         return
     if cmd == 'quit':
         return True
@@ -33,5 +38,6 @@ def update(cmd):
         dispatch(dsp, cmd)
 
 
-def execute(cmd_obj):
-    client.put_cmd_threadsafe(cmd_obj)
+# NOTE: wrapper to async 'schedule' and sync 'process' functions
+def handle(msg):
+    client.put_cmd_threadsafe(msg)

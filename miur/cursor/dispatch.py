@@ -1,4 +1,4 @@
-from miur.cursor import state, update, command
+from miur.cursor import state, update, message as msg
 
 
 class Dispatcher:
@@ -30,8 +30,8 @@ class Dispatcher:
         # state.path =
         # TEMP: apply directly to global state
         # TEMP: send msg and wait until fully processed (send-recv-apply)
-        update.execute(command.NodeGetParent(state.path))
-        update.execute(command.ListNode(state.path))
+        update.handle(msg.NodeGetParentMsg())
+        update.handle(msg.ListNodeMsg())
         state.cursor = 0 if state.entries else None
 
     def shift_node_current(self):
@@ -39,6 +39,6 @@ class Dispatcher:
             return
         # WARN: must send both (p, e) for *core*
         #   => to check if (p, e) is still available in fs
-        update.execute(command.NodeGetChild(state.path, state.entries[state.cursor]))
-        update.execute(command.ListNode(state.path))
+        update.handle(msg.NodeGetChildMsg())
+        update.handle(msg.ListNodeMsg())
         state.cursor = 0 if state.entries else None

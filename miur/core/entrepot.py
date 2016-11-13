@@ -2,7 +2,7 @@ import logging
 import asyncio
 
 from .eventdriver import ClientProtocol
-from . import executor as exe
+from . import command
 
 _log = logging.getLogger(__name__)
 
@@ -13,6 +13,8 @@ _log = logging.getLogger(__name__)
 qin = asyncio.Queue()
 qout = asyncio.Queue()
 qtransit = asyncio.Queue()
+_cmdd = {v.cmd: v for v in vars(command).values()
+         if isinstance(v, type) and issubclass(v, command.BaseCommand)}
 
 
 def put_in(obj):
@@ -24,22 +26,25 @@ async def executor():
     while True:
         cid, (ifmt, obj) = await qin.get()
         _log.debug('Command: {!r}'.format(obj))
-        c = obj['cmd']
-        # Register all entries __class__.cmd in dict when loading
-        if c == 'get.node.parent':
-            r = exe.NodeGetParent().process(obj)
-        elif c == 'get.node.child':
-            r = exe.NodeGetChild().process(obj)
-        elif c == 'list.node':
-            r = exe.ListNode().process(obj)
-        elif c == 'quit-all':
-            # TEMP:HACK: reflect 'quit' back to rotate cycle once more
-            #   until false condition
-            r = obj
+
+        if obj['cmd'] == 'quit-all':
+            # TEMP:HACK: reflect 'quit' back to rotate cycle once more until false condition
+            r = None
+        else:
+            # ALT: Register all entries __class__.cmd in dict when loading
+            C = _cmdd.get(obj['cmd'])
+            c = C(*obj['args'])
+            r = c.execute()
+
         # THINK:WTF: if no such cmd ? Client will hang in infinite loop
         _log.debug('Results: {!r}'.format(r))
-        await ClientProtocol.send(cid, r, ifmt)
-        if c == 'quit-all':
+
+        # THINK: instead of directly send msg you can save it to self._msg and
+        #   later process this object in send queue
+        rsp = {'id': obj['id'], 'rsp': r}
+        await ClientProtocol.send(cid, rsp, ifmt)
+
+        if obj['cmd'] == 'quit-all':
             break
 
 

@@ -5,6 +5,7 @@ import asyncio
 import threading
 
 from miur.share import protocol
+from miur.cursor import effect
 
 
 _log = logging.getLogger(__name__)
@@ -21,6 +22,8 @@ qdat = None
 tmp_sending = threading.Semaphore(0)
 dwait = {}
 counter = 0
+_effd = {v.cmd: v for v in vars(effect).values()
+         if isinstance(v, type) and issubclass(v, effect.BaseEffect)}
 
 
 def send_once(server_address, obj):
@@ -73,11 +76,13 @@ async def core_send(obj):
 async def core_recv():
     (reader, _) = _servers[active_srv]
     # data = await asyncio.wait_for(reader.readline(), timeout=2.0)
-    # BAD: magic size
+    # DEV:TODO:FIXME:BAD: magic size
     #   -- need continuous read and reconstruct whole packet (/usr/lib is big!)
     #   !!> pickle will raise exception on partial data
     #   + split whole state diff to many small independent state frame diffs fitting inside single packet
     #       => losing single frame diff one won't increase significantly total latency of command
+    #   ALT: send size+delim+pickle and combine buf in 'while s < S: s += recv()'
+    #       https://bytes.com/topic/python/answers/894052-sending-pickled-dictionary-over-socket
     data = await reader.read(_DEFAULT_LIMIT)
     obj, _ = protocol.deserialize(data)
     _log.info('Recv: {!r}'.format(obj))
@@ -121,10 +126,12 @@ async def qdat_recv():
 
 
 def process_rsp(obj):
-    # Global state change. NEED: Lock
     h = obj['id']
-    dwait[h].rsp(obj)  # search rsp processor by hash
-    del dwait[h]  # USE: remove only on demand
+    m = dwait.pop(h)        # search sent msg by hash
+    E = _effd.get(m.cmd)    # search eff applier in module
+    e = E(m, obj['rsp'])
+    # Global state change. NEED: Lock
+    e.apply()
     tmp_sending.release()
 
 
