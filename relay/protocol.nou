@@ -18,6 +18,7 @@ TODO
       = NEED for unpacking objects (pickle-like)
 
     id-timestamp:
+      = important only for async/multithread apps -- so can be added after queue.pop() instead of inside imm handle()
       id = timestamp: WARN: may become non-unique due to sys clock discrepancies
         BAD: by hacking timestamp you can alter cmds order and interleave with cmds from another client
       id = cmd: BAD performance for large cmd/selection -- no sense to send them back to client
@@ -80,7 +81,7 @@ TODO
       ? always keep universal objects for allowed broadcast msgs ?
         = don't destroy after recv processing
         * keep minimal state (or none)
-        * use .clone() to create obj with incapsulated rsp and pass to processors
+        * use .clone() to create obj with encapsulated rsp and pass to processors
 
   containers for combined msgs
     = equal type as other msgs
@@ -110,7 +111,7 @@ TODO
         instead of *dom* fragment substitution you can undo effects from already applied sub-cmds
       revert/rollback incomplete operation
         E.G. no sense to chg curr path to parent's, if you can't load/recv its file list
-      containers must incapsulate this atomic behaviour
+      containers must encapsulate this atomic behavior
 
   all cmds has global order
     ! you can't request node listing before you completed choosing dir path
@@ -250,7 +251,7 @@ TODO
 Use Lua or any other scripting lang
 NEED: more cmds implemented and bigger arch prototype fleshed out
 \ to make decision about scripting language. It won't hurt to add
-\ Lua bindings to completed set of commands if I will want scipring capabilites.
+\ Lua bindings to completed set of commands if I will want scripting capabilities.
 
   * provides binding to *core* universal interface
   * directly exchange by Lua snippets instead of 'msg'
@@ -259,10 +260,10 @@ NEED: more cmds implemented and bigger arch prototype fleshed out
   + bindings to *core/api* to combine them under single command
     ! ++ no need to reflect 1-1 each client cmd to each core cmd
       = more untied ifc, more flexibility
-  + ! rsp fmt inscribed directly by Command -- more incapsulation
+  + ! rsp fmt inscribed directly by Command -- more encapsulation
     E.G combination of return types -- constructed structure
       -- written in script text
-  - you still need cmd contrpart to impl *core/api*
+  - you still need cmd counterpart to impl *core/api*
     BUT your client's cmds become completely independent from now on
   - bloat: each *mod* must link to Lua interpreter
   -- slow: script interpreting takes time
@@ -270,7 +271,7 @@ NEED: more cmds implemented and bigger arch prototype fleshed out
     => 'Command' contains most of *fm* logic -- so src will be full of Lua
     ! can't optimize seq ops in native lang (or by using C) due to tie up to low-performance Lua
   -- cumbersome parallelism of commands in Lua syntax
-    NEED create own bulkhead over scipring language constructs
+    NEED create own bulkhead over scripting language constructs
   --- security
     NEED greatly reduce functionality subset (like IO)
 
@@ -299,9 +300,18 @@ NEED: more cmds implemented and bigger arch prototype fleshed out
     NEED formal dispatcher between cmd and handler
   cmd => event
 
+  [_] filter/block some rsp before dispatching into handlers/appliers
+    = use chain of responsibility
+    * mark allowed 'id' to accept rsp
+    * track statistics -- how much 'id' of each type is waiting on rsp
+  [_] wrap 'handle()' over 'put_in_queue' to choose execution method (sync/async/deferred/etc)
+    ? no sense to make sync/async field in msg itself ?
+      ? directly call convenient _method()_ inside 'schedule' by dfl impl or passed VAR ?
+
 
 %% Serialization
   [_] TRY: json/gzip
+    http://stackoverflow.com/questions/2751098/sending-data-as-instances-using-python-sockets
   REF
     https://en.wikipedia.org/wiki/Comparison_of_data_serialization_formats
   Blog
