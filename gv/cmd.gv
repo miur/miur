@@ -1,0 +1,15 @@
+digraph {
+  rankdir="LR"
+  label="cmd execution"
+
+  catch [label="catch\nimm ctx"]
+
+  event -> handler [label="keymap"]
+  handler -> catch -> premsg
+  premsg -> msg [label="infusing\nother ctx"]
+  msg -> cmd  [label="send"]
+  cmd -> exec [label="deliver"]
+  exec -> rsp [label="do"]
+  rsp -> apply [label="chain"]
+  // cmd --(infusing)-> msg --- msg -> event -> msg --(prc)-> rsp
+}
