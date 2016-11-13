@@ -269,6 +269,17 @@ State Synchronization Protocol (SSP)
   [_] TRY: implement SSP for frames sync from *dom*
   SEE:IDEA
     https://en.wikipedia.org/wiki/WASTE
+  [_] BAD: assume dir listing split by frames transfered in packets
+    ? if dir changes fast -- how to produce diff for remote client to send at all ?
+      > can keep on server each client state reflection to generate diff
+        BUT: memory greedy
+    !! Must take into account already sent info to remove entries if them were \
+      deleted before whole batch transaction completes
+    IDEA
+      * mark already sent *dom* parts
+      * diff new changes with *dom*
+      * re-send all marked parts of diff out of turn
+        = interrupt in the middle the whole dir listing sending transaction
 
 
 THINK

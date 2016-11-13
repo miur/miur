@@ -16,7 +16,7 @@ Test stand (out-of-control environment)
 
 Coupling / relations
   immediate timing
-  immediate ctx
+  immediate ctx  # imm catch == __init__
   immediate actions
   local ctx (self)
   local actions
@@ -29,6 +29,37 @@ Coupling / relations
   ctx catch duration
   actions duration
   locality
+
+
+Time inconsistency for imm_ctx
+  THINK: in one thread user look at ui, press key, \
+    handle event and catches 'path' into imm_ctx
+    ! BAD: if 'rsp' of prev action comes between 'handle' and 'catch', \
+      and its effects applied -- then user's intention will be inconsistent \
+      with actual generated msg (containing changed imm_ctx)
+      E.G. user desire move to child, then move to parent
+        => result: he stays in place
+        BUT: his intention is equal to last action -- move to parent
+
+
+%% Lifecycle
+  handle event
+  catch ctx
+  create msg
+  # send msg
+  wrap cmd
+  exec cmd
+    ! currently exec() involves too much of macaroni mess
+      * catch own local/global state
+      * apply actions, read state, again apply actions
+      * then form total rsp to return from func
+    = exec() stages are similar to whole lifecycle stages
+      ? MAYBE its possible to reduce exec() complexity by splitting \
+        responsibilities similar to lifecycle
+  gather rsp
+  # send rsp
+  emit rsp
+  apply rsp
 
 
 %%%% Evolution
@@ -47,6 +78,15 @@ Some require aggregation of multiple previous solutions and adding new aspects.
 USE:(.gv)
   Macaroni --> Organized --> Callback --> Command --> Chain
       ^--> ...                  ^--> callback of callbacks -->
+
+NEED
+  add support for synchronous path (use additional field in msg)
+    default: use impl-dependent preferable way
+    async: allows delays between any stages of action passing
+    full: if you need to execute very high priority cmd immediately
+    partial: block on send()/recv() only, but use async to manage msg on client side
+
+
 
 %% Blocks
   Macaroni: keypress {event} -> handler {code}
@@ -89,6 +129,41 @@ USE:(.gv)
       = consistency lost -- between saved ctx and actual immediate ctx
 
   Chain-of-responsibilty:
-    + event:action = N:N
+    http://wiki.c2.com/?ChainOfResponsibilityPattern
+     Do not use Chain of Responsibility when each request is only handled by
+     one handler, or, when the client object knows which service object should
+     handle the request.
+    + event:action = 1:N
       - unspecified order
         # use 'priority', etc to dynamically rearrange order
+
+  ctx can be gathered in parallel and must be combined before exec() possible
+    <~ augmenting/infusing/enriching msg allows only sequential processing and not parallel
+      msg arrives to aug_ctx subscriber
+      it executes some queries with msg data inside its own local ctx
+      msg is recreated with additional gathered results -- haskell (or added to msg -- python)
+      this new msg sent further or emitted from the beginning
+  state accumulation
+    msg:rsp = N:1
+    = you need send multiple msg,
+      each one executes action
+      each next combines/reuses prev results (parallel/sequential)
+      total/resulting rsp is sent back at once
+  split init()+state -> state+exec()+rsp+apply()
+    cactch whole ctx in one place
+    and execute in another
+    they may be sep by any media and be in diff langs
+  split init() -> state -> exec()+rsp+apply()
+    sep methods to generate plain msg with state structures
+      ++ can have multiple cmds with same 'state' but each impl its own exec()
+    sep method to execute incoming msg
+    msg can be transfered through media unchanged (no need to re-create whole obj)
+  split exec() -> rsp -> apply()
+    results can be retrieved in one place and applied in another
+    ! so -- they can be executed when they have access to global state !
+    rsp is also msg == can be transfered through media
+  msg:rsp = 1:N
+    send partial frames in rsp continuously until condition
+    serve eternaly (like keep-alive)
+    wait on occascional incoming server-initiated state updates
+    listening to the other mods connection through
