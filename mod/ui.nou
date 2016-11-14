@@ -62,7 +62,9 @@ Frontend
   tui
     ncurses
   web
-    browser, etc
+    = browser, etc
+    dynamic web ui on js (gui-like)
+    static web ui (embedded ftp-like fs browsing)
     [_] SEE radare2
   gui
     qt frontend
