@@ -1,0 +1,61 @@
+Problem: pr access by thread pool from cmds queue
+
+Orthogonal
+  any orthogonal cmds are allowed to be async and unordered
+
+
+Auto-distribute non-orthogonal cmds
+  Keep in queue ordered cmds for other threads
+    Mark already running blocking cmds in threads
+    Mark each cmd in queue with number of allowed thread
+    BUT WTF
+      ? if thread closed (dynamic QA) -- and need to exec all cmds on another thread
+      ? if there are intermediate cmds between first and second ordered
+        = so after exec first there is no need to exec second on same thread
+        = snd can be exec by any other thread
+      => we must keep only fact of 'this cmd is blocked by that cmd'
+        BUT: slow to cmp it on each QueueRead
+  Lock
+    BETTER: on queue read -- before distribution
+    BAD: only after launching tasklet
+      thread may freeze before lock will be set
+    BAD: sep queue for each thread
+      total processing time isn't proportional to tasks number
+  Composite cmds
+    received as single packet
+    depending on content may be splitted in several independent
+    some cmds are strictly ordered
+      => so whole composite branch with this cmd becomes ordered
+        => and exec in same thread
+      = it's the way to artificially order even unordered cmds
+
+
+Ghosts
+  Combine tasks in progress with current tree view in *view*
+  State
+    future
+      Show 'future' files which will become copied after task complete
+      Allows to apply ops on that 'future' -- but cmd will be ordered after CopyComplete
+    past
+      Mark 'past' files in dir which will be deleted after moving files complete
+      To disallow immediate deletion/renaming -- block/suppress and warn about locking such cmds
+    incomplete
+      Highlight all files with 'incomplete' when updating dir state
+      * As you don't know if them is still exist on server on regular state update
+      * When doing incremental long dir loading to emphasize to user 'some files may appear later'
+
+
+Task panel
+  USE: indent by "<" and ">" to order tasks exec after another
+    ~ Gantt Diag
+  Pause/Continue
+  Stop/Undo/Reset
+  Cut/Paste
+  Remove/Undo
+
+
+Progressbar on each file
+  Use reverse bkgr to emphasize copy/move cmd state for each file separately
+  = Like I wanted in foobar
+    Show gray bkgr on each song to resume
+      press key to jump to prev saved pos even if playing from start
