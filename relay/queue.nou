@@ -2,6 +2,9 @@ Problem: pr access by thread pool from cmds queue
 
 Orthogonal
   any orthogonal cmds are allowed to be async and unordered
+  ? how to determine and auto categorize non-orthogonal cmds ?
+    * tree merge pts
+    * ...
 
 
 Auto-distribute non-orthogonal cmds
@@ -15,6 +18,15 @@ Auto-distribute non-orthogonal cmds
         = snd can be exec by any other thread
       => we must keep only fact of 'this cmd is blocked by that cmd'
         BUT: slow to cmp it on each QueueRead
+    ALT:BETTER
+      create subqueue for each thread
+      DFL: thread waits when subqueue is empty
+      distributor reads cmds when at least one subqueue is empty
+        each non-orthogonal cmds is placed into other (already running) queue
+        single orthogonal cmd placed in subqueue of curr thread and this tact ends
+      ! when thread disappears: subqueue is relocated/merged
+        * to shortest queue
+        * BETTER: wait on hold until distributor launched by any empty thread
   Lock
     BETTER: on queue read -- before distribution
     BAD: only after launching tasklet
