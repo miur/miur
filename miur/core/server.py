@@ -144,3 +144,11 @@ def main_loop(server_address):
             # SEE server.sockets
 
     loop.close()
+
+
+def main(server_address):
+    try:
+        # Serve requests until Ctrl+C is pressed
+        main_loop(server_address)
+    except KeyboardInterrupt:
+        pass
