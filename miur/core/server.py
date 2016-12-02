@@ -1,11 +1,10 @@
 import logging
 import asyncio
+import threading
 # import functools
 
 from miur.share import protocol
-# BAD: don't like this circular deps
 from . import command
-from .client import ClientsList
 
 _log = logging.getLogger(__name__)
 
@@ -28,20 +27,24 @@ def put_in(obj):
 # ALT: replace by coro handler
 #   http://stackoverflow.com/questions/37452039/how-to-correct-asyncio-yield-from-in-data-received
 class ClientProtocol(asyncio.Protocol):
-    _clients = ClientsList()
+    _clients = {}
+    _lock = threading.Lock()
 
     def connection_made(self, transport):
         self.transport = transport
         self.peer = self.transport.get_extra_info('peername')
         _log.info('Connection from {}'.format(self.peer))
         self.cid = self.peer  # ALT: use first msg from client as its cid
-        ClientProtocol._clients[self.cid] = self
+        with ClientProtocol._lock:
+            ClientProtocol._clients[self.cid] = self
 
     def connection_lost(self, exc):
         _log.info('Connection lost {}'.format(self.peer))
         if exc is not None:
             raise exc
-        del ClientProtocol._clients[self.cid]
+        with ClientProtocol._lock:
+            # BAD: crash if waits on _lock until disconnectAll() exits
+            del ClientProtocol._clients[self.cid]
 
     def data_received(self, data):
         obj, ifmt = protocol.deserialize(data)
@@ -57,7 +60,16 @@ class ClientProtocol(asyncio.Protocol):
     @staticmethod
     async def send(cid, obj, ofmt=None):
         # NOTE: can't await send_data w/o create_task
-        return ClientProtocol._clients[cid].send_data(obj, ofmt)
+        with ClientProtocol._lock:
+            return ClientProtocol._clients[cid].send_data(obj, ofmt)
+
+    @staticmethod
+    def disconnectAll():
+        # BAD: won't close any connection, waiting on _lock to add
+        with ClientProtocol._lock:
+            for client in ClientProtocol._clients.values():
+                _log.info('Closing the client {!r} socket'.format(client))
+                client.transport.close()
 
 
 class Bay:
@@ -74,7 +86,7 @@ class Bay:
         _log.info('Serving on {}'.format(self.server.sockets[0].getsockname()))
 
     def __exit__(self, *args):
-        ClientProtocol._clients.disconnectAll()
+        ClientProtocol.disconnectAll()
         self.server.close()
         self.loop.run_until_complete(self.server.wait_closed())
 
