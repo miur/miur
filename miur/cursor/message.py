@@ -9,6 +9,8 @@ _log = logging.getLogger(__name__)
 # FIXME:TEMP: mix concepts of 'catch_imm_ctx' with 'create_msg'
 # DEV: rpc 'parent_node' and update 'path' when done
 # TODO:DFL: self.args = args or state.path
+# NOTE: __class__.cmd can become unsync
+#   ! but we can't use classes directly -- as diff mods can be in diff langs
 
 
 class BaseMessage:

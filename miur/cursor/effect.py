@@ -1,3 +1,8 @@
+# NOTE: effect is completely equivalent to any other message
+#   * it carries part of new state
+#   * all of them has cmd type 'state.update'
+#   * can be dispatched together with other msgs
+
 import logging
 
 from . import state

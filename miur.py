@@ -14,9 +14,10 @@ server_address = ('127.0.0.1', 8888)
 # DEV: redirect stderr to logging
 # SEE http://stackoverflow.com/questions/7714868/python-multiprocessing-how-can-i-reliably-redirect-stdout-from-a-child-process
 def core():
-    from miur.core import main
+    from miur.core import server
     try:
-        main.main(server_address)
+        # Serve requests until Ctrl+C is pressed
+        server.main_loop(server_address)
     except KeyboardInterrupt:
         pass
 
@@ -30,6 +31,8 @@ def test(obj):
 
 
 if __name__ == '__main__':
+    # Quiet poll
+    # logging.getLogger('asyncio').setLevel(logging.WARNING)
     logging.basicConfig(level=logging.DEBUG,
                         filename='/tmp/miur.log',
                         datefmt='%H:%M:%S',
