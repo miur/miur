@@ -36,9 +36,3 @@ def loop(stdscr):
         # TEMP:HACK:(asymmetrical) quit
         if ret is not None:
             break
-
-
-def main(server_address):
-    # EXPL: Init first screen (WARN: multithreading timings)
-    update.update('_init')
-    curses.wrapper(loop)

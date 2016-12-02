@@ -5,8 +5,6 @@ import logging
 import multiprocessing as mp
 
 from miur.ui import client
-from miur.cursor import message, update
-
 
 server_address = ('127.0.0.1', 8888)
 
@@ -18,14 +16,6 @@ def core():
     try:
         # Serve requests until Ctrl+C is pressed
         server.main_loop(server_address)
-    except KeyboardInterrupt:
-        pass
-
-
-def test(obj):
-    try:
-        time.sleep(0.5)
-        client.send_once(server_address, obj)
     except KeyboardInterrupt:
         pass
 
@@ -47,7 +37,6 @@ if __name__ == '__main__':
     # EXPL: pass args to process
     # p_curs = mp.Process(target=cursor, args=(server_address,))
     prs.append(mp.Process(target=core))
-    # prs.append(mp.Process(target=test, args=('test',))
 
     for p in prs:
         p.start()
@@ -57,19 +46,10 @@ if __name__ == '__main__':
     time.sleep(0.5)
 
     try:
-        from miur.ui import loop
-        prs.append(client.run_in_background(server_address))
-        loop.main(None)
+        from miur.ui import main
+        main.main(server_address)
     except KeyboardInterrupt:
         pass
-
-    # DEV: send 'quit all' through socket
-    logging.info("exiting")
-    # BAD: client able to exit only if response come -- and hangs otherwise
-    #   => last msg is empty '' on connection lost -> can't be used to set
-    #   'is_watching=False' inside cmd.Quit()
-    client.is_watching = False
-    update.handle(message.QuitMsg())
 
     for p in reversed(prs):
         try:

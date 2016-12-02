@@ -26,27 +26,6 @@ _effd = {v.cmd: v for v in vars(effect).values()
          if isinstance(v, type) and issubclass(v, effect.BaseEffect)}
 
 
-def send_once(server_address, obj):
-    if isinstance(server_address, tuple):
-        family = socket.AF_INET
-    else:
-        family = socket.AF_UNIX
-
-    with socket.socket(family, socket.SOCK_STREAM) as sock:
-        sock.connect(server_address)
-
-        data = protocol.serialize(obj)
-        sock.sendall(data)  # ALT: sock.sendfile(f)  # ret nbytes
-        _log.info("Sent: {}".format(obj))
-
-        # FIXME: magic 1024 -- how process packets without limitations?
-        data = sock.recv(1024)
-        obj, _ = protocol.deserialize(data)
-        _log.info("Recv: {}".format(obj))
-
-        return obj
-
-
 # THINK: unite conns from client *mod* and conns to parent *mod*
 #   => all conn list used only to write back into socket and disconnect all on quit
 #   ? is there need to separate list of 'clients' and 'servers' ?
