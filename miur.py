@@ -52,13 +52,14 @@ if __name__ == '__main__':
     for p in prs:
         p.start()
 
+    # BUG:WARN: wait until cursor server started
+    #   => otherwise exception 'ConnectionRefusedError'
+    time.sleep(0.5)
+
     try:
-        from miur.ui import tui
-        # BUG:WARN: wait until cursor server started
-        #   => otherwise exception 'ConnectionRefusedError'
-        time.sleep(0.5)
+        from miur.ui import loop
         prs.append(client.run_in_background(server_address))
-        tui.main(None)
+        loop.main(None)
     except KeyboardInterrupt:
         pass
 
