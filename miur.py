@@ -4,8 +4,8 @@ import time
 import logging
 import multiprocessing as mp
 
-from miur.core import server
-from miur.ui import main
+import miur.core.main as core
+import miur.ui.main as ui
 
 server_address = ('127.0.0.1', 8888)
 
@@ -30,7 +30,7 @@ if __name__ == '__main__':
     # exit_event = mp.Event()
 
     # EXPL: pass args to process
-    prs.append(mp.Process(target=server.main, args=(server_address,)))
+    prs.append(mp.Process(target=core.main, args=(server_address,)))
 
     for p in prs:
         p.start()
@@ -38,7 +38,7 @@ if __name__ == '__main__':
     # BUG:WARN: wait until cursor server started
     #   => otherwise exception 'ConnectionRefusedError'
     time.sleep(0.5)
-    main.main(server_address)
+    ui.main(server_address)
 
     for p in reversed(prs):
         try:
