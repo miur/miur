@@ -13,8 +13,8 @@ _log = logging.getLogger(__name__)
 #   * Exhausting input queue as fast as possible
 #   * Send from qout by multiple senders -- if some 'send' socket becomes blocked
 qin = asyncio.Queue()
-qout = asyncio.Queue()
-qtransit = asyncio.Queue()
+# qout = asyncio.Queue()
+# qtransit = asyncio.Queue()
 _cmdd = {v.cmd: v for v in vars(command).values()
          if isinstance(v, type) and issubclass(v, command.BaseCommand)}
 
@@ -77,6 +77,7 @@ class Bay:
         self.server_address = server_address
         self.loop = loop
 
+    # TRY: __aenter__ and __aexit__
     def __enter__(self):
         # Each client connection will create a new protocol instance
         # functools.partial(ClientProtocol, loop, callback),
@@ -117,43 +118,31 @@ async def executor():
             break
 
 
-class Flyover:
-    global qin
-
-    def __init__(self, loop):
-        self.loop = loop
-
-    # TRY: __aenter__ and __aexit__
-    def __enter__(self):
-        self.task = self.loop.create_task(executor())
-        return self.task
-
-    def __exit__(self, *args):
-        # BAD?coro -- can't exit from server until all commands processed
-        # BAD! if clients continue put new msgs in queue -- it will never exit!
-        #   => must close receiving end of socket
-        #       --> client won't be able to add msgs and will know that socket closed
-        #   BUT: what if we want to cancel 'quit'?
-        #       => No sense :: all funcs already jumped to 'shutdown' state
-
-        qin.join()  # must process all input msg
-
-        # DEV: remove added task from
-        # SEE: http://stackoverflow.com/questions/34710835/proper-way-to-shutdown-asyncio-tasks
-        # self.task.cancel()
-
-
 def main_loop(server_address):
     loop = asyncio.get_event_loop()
     loop.set_debug(True)
 
     with Bay(server_address, loop):
-        # FIXME:RFC Flyover is independent from Bay
+        # FIXME:RFC task is independent from Bay
         #   => server can reject new conn but continue server already established
-        with Flyover(loop) as task:
-            loop.run_until_complete(task)
-            # loop.run_forever()
-            # SEE server.sockets
+        task = loop.create_task(executor())
+
+        loop.run_until_complete(task)
+        # loop.run_forever()
+        # SEE server.sockets
+
+        # BAD?coro -- can't exit from server until all commands processed
+        #   BUT! executor already exited. MAYBE move qin.join() to on_quit event ?
+        # BAD! if clients continue put new msgs in queue -- it will never exit!
+        #   => must close receiving end of socket
+        #       --> client won't be able to add msgs and will know that socket closed
+        #   BUT: what if we want to cancel 'quit'?
+        #       => No sense :: all funcs already jumped to 'shutdown' state
+        qin.join()  # must process all input msg
+
+        # THINK:DEV: remove added task from
+        # SEE: http://stackoverflow.com/questions/34710835/proper-way-to-shutdown-asyncio-tasks
+        # self.task.cancel()
 
     loop.close()
 
