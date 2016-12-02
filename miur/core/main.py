@@ -3,7 +3,7 @@ import asyncio
 
 from . import bus
 from .executor import executor
-from .server import ClientProtocol
+from .server import ClientProtocol, sender
 
 _log = logging.getLogger(__name__)
 
@@ -35,9 +35,10 @@ def main_loop(server_address):
     with Bay(server_address, loop):
         # FIXME:RFC task is independent from Bay
         #   => server can reject new conn but continue server already established
-        task = loop.create_task(executor())
-
-        loop.run_until_complete(task)
+        tasks = [asyncio.ensure_future(executor(), loop=loop),
+                 asyncio.ensure_future(sender(), loop=loop)]
+        _all = asyncio.gather(*tasks, loop=loop)
+        loop.run_until_complete(_all)
         # loop.run_forever()
         # SEE server.sockets
 
@@ -48,7 +49,10 @@ def main_loop(server_address):
         #       --> client won't be able to add msgs and will know that socket closed
         #   BUT: what if we want to cancel 'quit'?
         #       => No sense :: all funcs already jumped to 'shutdown' state
-        bus.qin.join()  # must process all input msg
+
+        # Must process all input msg
+        bus.qin.join()
+        bus.qout.join()
 
         # THINK:DEV: remove added task from
         # SEE: http://stackoverflow.com/questions/34710835/proper-way-to-shutdown-asyncio-tasks

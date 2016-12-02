@@ -55,3 +55,12 @@ class ClientProtocol(asyncio.Protocol):
             for client in ClientProtocol._clients.values():
                 _log.info('Closing the client {!r} socket'.format(client))
                 client.transport.close()
+
+
+# NOTE:FIND: seems like asyncio transports already has necessary queue
+# facilities for receive/send queues ? See 'coro' variant of ClientProtocol
+async def sender():
+    while True:
+        cid, (ifmt, rsp) = await bus.qout.get()
+        _log.debug('Response to: {!r}'.format(rsp['id']))
+        await ClientProtocol.send(cid, rsp, ifmt)

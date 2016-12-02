@@ -2,7 +2,6 @@ import logging
 
 from . import bus
 from . import command
-from .server import ClientProtocol
 
 _log = logging.getLogger(__name__)
 
@@ -21,17 +20,13 @@ async def executor():
             r = None
         else:
             # ALT: Register all entries __class__.cmd in dict when loading
+            # ? THINK:WTF: if no such cmd ? Client will hang in infinite loop
             C = _cmdd.get(obj['cmd'])
             c = C(*obj['args'])
             r = c.execute()
 
-        # THINK:WTF: if no such cmd ? Client will hang in infinite loop
-        _log.debug('Results: {!r}'.format(r))
-
-        # THINK: instead of directly send msg you can save it to self._msg and
-        #   later process this object in send queue
         rsp = {'id': obj['id'], 'rsp': r}
-        await ClientProtocol.send(cid, rsp, ifmt)
+        bus.qout.put_nowait((cid, (ifmt, rsp)))
 
         if obj['cmd'] == 'quit-all':
             break
