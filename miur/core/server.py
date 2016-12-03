@@ -15,6 +15,10 @@ class ClientProtocol(asyncio.Protocol):
     _clients = {}
     _lock = threading.Lock()
 
+    def __init__(self, loop):
+        self.loop = loop
+        self.is_processing = True
+
     def connection_made(self, transport):
         self.transport = transport
         self.peer = self.transport.get_extra_info('peername')
@@ -32,9 +36,15 @@ class ClientProtocol(asyncio.Protocol):
             del ClientProtocol._clients[self.cid]
 
     def data_received(self, data):
+        # NEED:DEV: loop for long data
         obj, ifmt = protocol.deserialize(data)
         _log.info('Recv:{!r}: {!r}'.format(self.cid, obj))
-        bus.qin.put_nowait((self.cid, (ifmt, obj)))
+
+        if self.is_processing is True:
+            if obj.get('cmd', '') == 'quit-all':
+                self.loop.create_task(bus.do_quit(self.loop))
+                self.is_processing = False
+            bus.qin.put_nowait((self.cid, (ifmt, obj)))
 
     def send_data(self, obj, ofmt=None):
         _log.info('Send:{!r}: {!r}'.format(self.cid, obj))
@@ -64,3 +74,4 @@ async def sender():
         cid, (ifmt, rsp) = await bus.qout.get()
         _log.debug('Response to: {!r}'.format(rsp['id']))
         await ClientProtocol.send(cid, rsp, ifmt)
+        bus.qout.task_done()
