@@ -1,6 +1,5 @@
 import time
 import logging
-import socket
 import asyncio
 import threading
 
@@ -92,6 +91,7 @@ async def qcmd_send():
         cmd = await qcmd.get()
         m = sign_msg_from_cmd(cmd)
         await core_send(m)
+        qcmd.task_done()
         # ALT:
         # if cmd == 'quit_all':
         #     break
@@ -119,6 +119,7 @@ async def qdat_apply():
         obj = await qdat.get()
         _log.warning('Dat: {!r}'.format(obj))
         process_rsp(obj)
+        qdat.task_done()
 
 
 def put_cmd(obj):
