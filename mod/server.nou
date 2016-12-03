@@ -280,6 +280,8 @@ State Synchronization Protocol (SSP)
       * diff new changes with *dom*
       * re-send all marked parts of diff out of turn
         = interrupt in the middle the whole dir listing sending transaction
+  WARN: *core* must keep reflection of *view* cached state
+    => on dir navigation *core* won't send again already transmitted dir listing
 
 
 THINK
@@ -341,6 +343,8 @@ THINK
       eliminate socket/serialization stuff in-between of them
     Essential for fast startup/shutdown
       server shutdown itself is 'SLOW' ~0.5s
+    Extend asyncio 'Transport' concept to tight-coupling
+      => socket,ipc,linkage -- will become interchangeable in runtime
 
   Client passive listening
     = NEED to wait on 'state update' signal from server

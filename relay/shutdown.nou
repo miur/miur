@@ -1,0 +1,42 @@
+VIZ shutdown
+  selfish halt
+    + fast: simply breaks connections
+    * ignores all queues
+    * don't wait trying broadcast shutdown notifications
+  immediate quit
+    + broadcast shutdown notifications immediately, even before putting it to queue
+      ! use timeout
+    * ignores all queues (stops processors)
+      => so any client can interrupt/break curr exec or scheduled ops of other clients
+        ! them must be logged as incomplete into server log !
+  DFL graceful shutdown
+    * stops reading (ignores) all new incoming messages
+    + exhaust all queues and unprocessed works
+      ! use timeout
+    * broadcast shutdown notifications after all queues exhausted
+      ! use timeout
+
+
+BAD! if clients continue put new msgs in queue -- it will never exit!
+  NOTE: 'socket.shutdown' allows to close the receiving end to notify client about server's shutdown.
+    http://code.activestate.com/recipes/408997-when-to-not-just-use-socketclose/
+    --> client won't be able to add msgs and will know that socket closed
+  BUT other transports beside socket don't have such api.
+    => ALT: ignore all new data and broadcast 'server shutdown' message to clients
+      # instead of clients waiting on closing receiving end
+      >> so closed transport == always error
+  ? what if we want to cancel 'quit'?
+    => No sense :: all funcs already jumped to 'shutdown' state
+
+
+DEV
+  [_] ALSO clients need timeout for async cmds -- if server crashes
+  [_] THINK:DEV: remove added task by self.task.cancel() (? is there such need ?)
+    SEE: http://stackoverflow.com/questions/34710835/proper-way-to-shutdown-asyncio-tasks
+
+
+NOTE
+  Breaking 'while True' from queue processors is unnecessary
+    when inside do_quit() coro was used the loop.stop()
+    # if obj['cmd'] == 'quit-all':
+    #     break
