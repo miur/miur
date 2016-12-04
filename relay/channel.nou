@@ -1,0 +1,91 @@
+%%% Data fmt channel path
+# raw_data -> protocol -> objects -> exec -> objects -> protocol -> raw_data
+
+???_ where to embed queues (amortized delays) ???
+  >>> queues must operate on *cmds* only for flexibility and encapsulation
+    = so *bus* remains working the same way for all diff transports
+  >>> and channel must convert and apply *cmd* immediately to reduce async delays
+    < at least for now (maybe in future second queue won't render being so unreasonable)
+    + more easily to introduce some 'sync' cmds for DEV when there are only one queue
+  == symmetrical channel
+    queue on the left
+    call on the right
+
+
+%% Cases
+  single short msg
+    rsp received only after all stages are completed
+    best_time: sequentially w/o overlaps
+      ! two async queues is always worse than single one
+      ! no time diff for cmd before/after channel
+  single long msg
+    best_time: overlapping of deserialization, construction, execution and responding
+      ! construct cmd immediately for minimal interval until rsp
+      ! no time diff for cmd before/after channel
+    concept == generator for piping independent ordered lists
+      * raw_msg must be able to partially unpack in streamlined manner
+      * after filling up only metainfo for cmd -- put it in queue
+      * server keeps link to cmd inner cache and pushes all subsequent data in there
+        == create 'transport inside transport'
+      * ideally you need sep thread for each link of seq
+
+
+%% Sequence
+  receive whole msg/data and uncompressing
+    # MAYBE: streamlined uncompression
+    server()
+  convert to cmd and fill up fields
+    ? server()  # = asyncio.Transport
+      ++ immediately able to execute received cmd
+        => more of whole system can be controlled directly by cmds
+      - no access to any pr_ctx
+        ? can all necessary ctx be gained along the path to executor/class and through its ctx ?
+        ? is server ctx is needed when converting to cmd ?
+      - each long req delays income msg queue by obj creation
+        ? is it really that longer then placing data into queue beforehand ?
+        !!! using dict+list as intermediate protocol is _slow_
+          - can't process partially transferred data (closing brackets)
+            => converting raw_data incrementally by chunks may speed up transfer by reducing server idle time
+          - python must create std objs, read them and only then create actual objs
+          << BETTER: parse atoms directly into objs (YAML can support this)
+          ?? USE YAML with stream linewise parsing directly into objs ??
+    ? channel()  # = asyncio.Protocol
+      + serialization ops encapsulation
+      + can be used to abstract transport between *mods*
+        for tight coupling -- transfer *rsp* directly, w/o serialization
+        ! socket can be replaced by pipe, but msg fmt remains the same
+      + abstracting the relation :: N -> 1
+        E.G. server for all external clients and tight coupling for internal client
+      - no access to any pr_ctx
+    ? executor()
+      + speed up conversion by thread pool
+      + access to more pr_ctx
+      - must not know rsp fmt -- as transport can change
+        ? => MAYBE embedding 'cid' into *cmd* isn't good idea ?
+          it will mix up transport metadata and actual rsp msg content
+      - queue of raw unparsed msg from server has no application/necessity
+        = offers only encapsulation, which can be achieved by channel api anyway
+  execute cmd
+    choose thread in charge
+    choose appropriate execution time
+    choose cmds execution order
+    block interval until cmd complete
+  encapsulate rsp
+    keep inside cmd
+      - hard to create incremental rsp update | cmd -> rsp :: 1 -> N
+    push to external queue directly from cmd
+      + external cmd don't need to know where to push
+      - all rsp always delayed by queue -- ctx class can't react to it
+    return immediately from execute
+      - ext cmd must know how to deal with this rsp type
+      + each obj may decide by itself what to do with rsp and preprocess it
+      + immediate reaction depending on
+    mixed: choose way to handle execution by diff api
+      cmd.execute_keep() => put(cmd)  # put into queue the cmd itself
+      cmd.execute_push()  # cmd places results inside itself by itself
+        MAYBE: use overloaded 'put()' api from BaseCmd class to encapsulate cmd serialization
+      rsp = cmd.execute_return() => put(wrapped(rsp))
+  serialize rsp
+    ? server() or executor() ?
+  send whole rsp
+    server()

@@ -343,6 +343,7 @@ Flow
         each accessor -- may be placed in subsets independently
         subsets formed due to available resources on each involved system
       ? how to (dis)assemble subsets in runtime ?
+        http://stackoverflow.com/questions/8792363/c-dlclose-doesnt-unload-the-shared-library
 
     << Corner cases
       broken/restored connection

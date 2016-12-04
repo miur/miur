@@ -134,7 +134,7 @@ TODO
       clean up 'hang up' cmds which not notified about their progress for long time
       on 'cancel' search and remove cmd, or ignore if not found
 
-  NEED: incapsulate global state changes
+  NEED: encapsulate global state changes
     ~ another msg bus to eliminate locks and keep definitive order ?
     ~ return {'state.path' = p} for registry hive, and apply changes in another executor
     ?? maybe directly send registry hive path with response ??
@@ -203,7 +203,7 @@ TODO
        https://msdn.microsoft.com/en-us/library/system.windows.input.commandbinding.aspx
        https://msdn.microsoft.com/en-us/library/system.windows.input.routedcommand.aspx
 
-  MAYBE: incapsulate even getters from globals
+  MAYBE: encapsulate even getters from globals
     create objects w/o arguments at all ?
       # OR: at least use it as default args
       <! gui has button to produce action, but gui has no need \
