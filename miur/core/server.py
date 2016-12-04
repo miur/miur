@@ -1,6 +1,7 @@
 import logging
 import asyncio
 import threading
+import functools
 
 from . import bus
 from miur.share import protocol
@@ -43,7 +44,7 @@ class ClientConnections(dict):
 
 
 class ClientProtocol(asyncio.Protocol):
-    """One instance of this class is created for each connected client"""
+    """Each client connection will create a new protocol instance"""
 
     def __init__(self, loop, conn):
         self.loop = loop
@@ -54,9 +55,11 @@ class ClientProtocol(asyncio.Protocol):
         self.transport = transport
         self.peer = self.transport.get_extra_info('peername')
         _log.info('Connection from {}'.format(self.peer))
-        # ALT: use first msg from client as its cid
-        # NOTE: adding to dict don't require lock (beside iterating that dict)
-        self.conn[self.peer] = self
+        # EXPL: ignore incoming connections when server is shutting down
+        if self.is_processing is True:
+            # NOTE: adding to dict don't require lock (beside iterating that dict)
+            self.conn[self.peer] = self
+            # ALT: use first msg from client as its cid
 
     def connection_lost(self, exc):
         _log.info('Connection lost {}'.format(self.peer))
@@ -74,6 +77,8 @@ class ClientProtocol(asyncio.Protocol):
         _log.info('Recv:{!r}: {!r}'.format(self.peer, obj))
 
         if self.is_processing is True:
+            # SEE self.srv.sockets -- to manipulate raw socket
+            #   :: like closing receiving end instead of ignoring incoming data
             if obj.get('cmd', '') == 'quit-all':
                 self.loop.create_task(bus.do_quit(self.loop))
                 self.is_processing = False
@@ -87,9 +92,29 @@ class ClientProtocol(asyncio.Protocol):
         # CHECK: if need '.drain()' ::: need only for streams
 
 
-async def sender(conn):
-    while True:
-        cid, (ofmt, rsp) = await bus.qout.get()
-        _log.debug('Response to: {!r}'.format(rsp['id']))
-        conn[cid].send(rsp, ofmt)
-        bus.qout.task_done()
+class Server:
+    def __init__(self, server_address, loop):
+        self.server_address = server_address
+        self.loop = loop
+        self._asyncio_server = None
+        self.conn = ClientConnections()
+
+    async def start(self):
+        self._asyncio_server = await self.loop.create_server(
+            functools.partial(ClientProtocol, self.loop, self.conn),
+            *self.server_address, reuse_address=True, reuse_port=True)
+        peer = self._asyncio_server.sockets[0].getsockname()
+        _log.info('Serving on {}'.format(peer))
+
+    async def stop(self):
+        self.conn.disconnectAll()
+        # CHECK: earlier loop.stop() in do_quit() must not obstruct this ops
+        self._asyncio_server.close()
+        await self._asyncio_server.wait_closed()
+
+    async def sender(self):
+        while True:
+            cid, (ofmt, rsp) = await bus.qout.get()
+            _log.debug('Response to: {!r}'.format(rsp['id']))
+            self.conn[cid].send(rsp, ofmt)
+            bus.qout.task_done()
