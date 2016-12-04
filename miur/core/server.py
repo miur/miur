@@ -8,16 +8,6 @@ from miur.share import protocol
 _log = logging.getLogger(__name__)
 
 
-# ALT: replace by coro handler
-#   http://stackoverflow.com/questions/37452039/how-to-correct-asyncio-yield-from-in-data-received
-#   BAD: there no 'connection_lost' callback beside polling on 'reader.at_eof()'
-#   ALT:USE: https://stackoverflow.com/questions/31077182/python-asyncio-streaming-api
-
-# https://github.com/python/asyncio/issues/95
-#   If you use drain() (like you should) you should see the exception, also
-#   whenever you call read() it will return b'' if it was a "clean" disconnect
-#   or raise an exception if not.
-
 class ClientProtocol(asyncio.Protocol):
     _clients = {}
     _lock = threading.Lock()
@@ -74,8 +64,6 @@ class ClientProtocol(asyncio.Protocol):
                 client.transport.close()
 
 
-# NOTE:FIND: seems like asyncio transports already has necessary queue
-# facilities for receive/send queues ? See 'coro' variant of ClientProtocol
 async def sender(send_rsp):
     while True:
         cid, (ifmt, rsp) = await bus.qout.get()
