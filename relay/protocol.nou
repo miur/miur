@@ -244,6 +244,9 @@ TODO
           chain of responsibility
             subscribers decide by themself what to do with msg
 
+  exceptions
+    send to clients all occured exc (inside rsp)
+    all cmds must ret at least status => each 'cmd' is paired with {1..N} 'rsp'
 
 
 

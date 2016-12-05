@@ -89,3 +89,28 @@
     ? server() or executor() ?
   send whole rsp
     server()
+
+
+%% Dispatcher
+# single shared bus -> while read + connection dispatcher -> convert rsp::msg -> convert msg::raw_data -> send
+  SEP mixed concepts of transport and protocol
+    single transport supports multiple protocols
+      plain, json, serialized, gzip, ...
+    single protocol can be carried by multiple transports
+      socket, pipe, memory mapped file, ...
+  only protocol knows how to convert *cmd* from bus into *rsp* msg
+    NOTE: ifmt, ofmt -- depends on protocol
+      * persistent fmt per connection
+      * individual fmt per message
+      * switchable fmt per sequence
+  dispatcher works with all conn lists
+    => all conn (despite transport) must be saved in global table for dispatching
+    'broadcast' -- to all
+    'group cast' -- explicit list
+    'loopback' -- to send cmds to itself throuth 'rsp' -> 'msg' loop
+  server transport protocol ClientProtocol controls stream of data packets itself
+    * low-level headers parsing, packet pieces combining
+      VIZ: length/delimiter, compression, decryption, ...
+    ! no parsing of logical struct of packet
+    ? generator-like piping long lists into cmd by frames is done by higher protocol ?
+      MAYBE: its too many of protocols nesting and I can remove some
