@@ -1,7 +1,7 @@
 import logging
 import asyncio
 
-from .executor import executor
+from . import bus
 from .server import Server
 
 _log = logging.getLogger(__name__)
@@ -19,8 +19,8 @@ def main_loop(server_address):
 
     srv = Server(server_address, loop)
     loop.create_task(srv.start())
-    loop.create_task(srv.sender())
-    loop.create_task(executor())
+    loop.create_task(bus.rsp_dispatcher(srv.conn))
+    loop.create_task(bus.cmd_executor())
 
     try:
         loop.run_forever()

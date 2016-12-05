@@ -1,6 +1,17 @@
 import logging
 import asyncio
 
+from miur.share import protocol
+
+from . import command
+
+# FIXME: don't use global var and save to class CommandDispatcher
+#   => so I could support multiple cmd sets (E.G. for online hot-update by
+#     replacing whole class instead of locks (in read-only haskell-like manner))
+# Register all entries __class__.cmd in dict when loading
+_cmdd = {v.cmd: v for v in vars(command).values()
+         if isinstance(v, type) and issubclass(v, command.BaseCommand)}
+
 _log = logging.getLogger(__name__)
 
 
@@ -11,6 +22,56 @@ _log = logging.getLogger(__name__)
 qin = asyncio.Queue()
 qout = asyncio.Queue()
 # qtransit = asyncio.Queue()
+
+
+# NOTE: adapted to bus, works in both dir, aggregates sep concepts of subsystems
+class Carrier:
+    def __init__(self, dst=None, cmd=None, rsp=None, fmt=None, uid=None):
+        self.dst = dst  # pair (sid, cid) -- listening server + accepted client
+        self.cmd = cmd
+        self.rsp = rsp  # THINK: 'rsp' can be 'cmd' if initiated from *core* to *client*
+        self.fmt = fmt  # MAYBE: excessive and must be removed
+        self.uid = uid  # unique message id
+
+
+# NOTE: there is sense in constructing cmds directly on receiving
+#   => so I can immediately construct QuitMsg and then decide when to execute it
+#       (immediately or after rest of queue -- to support quit_now and graceful_exit)
+#   =>> then executor() will be only calling '.execute()' method and qout.put()
+def put_cmd(dst, data_whole):
+    global qin
+    obj, ifmt = protocol.deserialize(data_whole)
+
+    # THINK:WTF: if no such cmd ? Client will hang in infinite loop
+    #   FIXME: BaseCommand => WrongCommand (generate exception and send back to client)
+    C = _cmdd.get(obj['cmd'], command.BaseCommand)
+    cmd = C(*obj['args'])
+    car = Carrier(dst, cmd, fmt=ifmt, uid=obj['id'])
+
+    qin.put_nowait(car)
+    return car
+
+
+# THINK: pass 'qin, qout' as args
+async def cmd_executor():
+    global qin, qout
+    while True:
+        car = await qin.get()
+        _log.debug('Command: {!r}'.format(car.cmd.cmd))
+        car.rsp = car.cmd.execute()
+        qout.put_nowait(car)
+        qin.task_done()
+
+
+async def rsp_dispatcher(all_conn):
+    global qout
+    while True:
+        car = await qout.get()
+        rsp = {'id': car.uid, 'rsp': car.rsp}
+        data = protocol.serialize(rsp, car.fmt)
+        _log.info('Response({:x}): {!r}'.format(car.uid, rsp['rsp']))
+        all_conn[car.dst].send(data)
+        qout.task_done()
 
 
 # USE run_forever() and schedule do_quit() on 'quit' cmd

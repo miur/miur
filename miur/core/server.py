@@ -4,7 +4,6 @@ import threading
 import functools
 
 from . import bus
-from miur.share import protocol
 
 _log = logging.getLogger(__name__)
 
@@ -31,16 +30,18 @@ class ClientConnections(dict):
     def __delitem__(self, cid):
         # BAD: crash if waits on _lock until disconnectAll() exits
         with self._lock:
-            _log.info('Client {} removed'.format(cid))
+            _log.info('Client {!r} removed'.format(cid))
             return super().__delitem__(cid)
 
     # ALT: overload generator :: [c.close() for c in conn.values()]
-    def disconnectAll(self):
+    def disconnectAll(self, sid_grp):
         # BAD: won't close any connection pending on _lock to in __setitem__
         with self._lock:
-            for cid, obj in self.items():
-                _log.info('Closing the client {!r}'.format(cid))
-                obj.close()
+            for dst, obj in self.items():
+                sid, cid = dst
+                if sid == sid_grp:
+                    _log.info('Closing the client {!r}'.format(cid))
+                    obj.close()
 
 
 class ClientProtocol(asyncio.Protocol):
@@ -54,40 +55,41 @@ class ClientProtocol(asyncio.Protocol):
     def connection_made(self, transport):
         self.transport = transport
         self.peer = self.transport.get_extra_info('peername')
+        self.dst = ('tcp', self.peer)
         _log.info('Connection from {}'.format(self.peer))
         # EXPL: ignore incoming connections when server is shutting down
         if self.is_processing is True:
             # NOTE: adding to dict don't require lock (beside iterating that dict)
-            self.conn[self.peer] = self
+            self.conn[self.dst] = self
             # ALT: use first msg from client as its cid
 
     def connection_lost(self, exc):
         _log.info('Connection lost {}'.format(self.peer))
         if exc is not None:
             raise exc
-        del self.conn[self.peer]
+        del self.conn[self.dst]
 
     def close(self):
         _log.info('Closing the client {!r}'.format(self.peer))
         self.transport.close()
 
+    # NEED:DEV: loop for long data -- save incomplete parts into self.buf
+    # RFC:FIX: SEP mixed concepts of transport and protocol
+    # SEE self.srv.sockets -- to manipulate raw socket
+    #   :: like closing receiving end instead of ignoring incoming data
     def data_received(self, data):
-        # NEED:DEV: loop for long data
-        obj, ifmt = protocol.deserialize(data)
-        _log.info('Recv:{!r}: {!r}'.format(self.peer, obj))
-
+        _log.debug('Recv:{!r}: {!r} bytes'.format(self.peer, len(data)))
         if self.is_processing is True:
-            # SEE self.srv.sockets -- to manipulate raw socket
-            #   :: like closing receiving end instead of ignoring incoming data
-            if obj.get('cmd', '') == 'quit-all':
+            # TODO: pass 'put_cmd' as arg
+            car = bus.put_cmd(self.dst, data)
+            # THINK:TODO: move into 'cmd_executor'
+            if type(car.cmd) == bus.command.QuitCmd:
                 self.loop.create_task(bus.do_quit(self.loop))
                 self.is_processing = False
-            bus.qin.put_nowait((self.peer, (ifmt, obj)))
 
-    def send(self, obj, ofmt=None):
-        _log.info('Send:{!r}: {!r}'.format(self.peer, obj))
-        data = protocol.serialize(obj, ofmt)
+    def send(self, data):
         # BAD: exc if client was already deleted when executor was suspended
+        # CHECK: if need to write multiple times for too big data
         self.transport.write(data)
         # CHECK: if need '.drain()' ::: need only for streams
 
@@ -107,14 +109,7 @@ class Server:
         _log.info('Serving on {}'.format(peer))
 
     async def stop(self):
-        self.conn.disconnectAll()
+        self.conn.disconnectAll('tcp')
         # CHECK: earlier loop.stop() in do_quit() must not obstruct this ops
         self._asyncio_server.close()
         await self._asyncio_server.wait_closed()
-
-    async def sender(self):
-        while True:
-            cid, (ofmt, rsp) = await bus.qout.get()
-            _log.debug('Response to: {!r}'.format(rsp['id']))
-            self.conn[cid].send(rsp, ofmt)
-            bus.qout.task_done()
