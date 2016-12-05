@@ -1,4 +1,5 @@
 import time
+import struct
 import logging
 import asyncio
 import threading
@@ -11,7 +12,6 @@ _log = logging.getLogger(__name__)
 _thread_loop = None
 is_initialized = threading.Semaphore(0)
 is_watching = True
-_DEFAULT_LIMIT = 2 ** 16
 
 _servers = {}  # task -> (reader, writer)
 active_srv = None
@@ -47,7 +47,9 @@ async def core_send(obj):
     (_, writer) = _servers[active_srv]
     _log.info('Sent: {!r}'.format(obj))
     data = protocol.serialize(obj)
-    writer.write(data)
+    # BAD: limitation to 4Gb messages
+    header = struct.pack('>I', len(data))
+    writer.write(header + data)
     await writer.drain()  # MAYBE: need only before 'writer.close()' ?
 
 
@@ -61,7 +63,12 @@ async def core_recv():
     #       => losing single frame diff one won't increase significantly total latency of command
     #   ALT: send size+delim+pickle and combine buf in 'while s < S: s += recv()'
     #       https://bytes.com/topic/python/answers/894052-sending-pickled-dictionary-over-socket
-    data = await reader.read(_DEFAULT_LIMIT)
+    header = await reader.read(4)
+    if not header:
+        raise
+        # return None
+    data_len = struct.unpack('>I', header)[0]
+    data = await reader.read(data_len)
     obj, _ = protocol.deserialize(data)
     _log.info('Recv: {!r}'.format(obj))
     return obj

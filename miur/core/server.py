@@ -1,3 +1,4 @@
+import struct
 import logging
 import asyncio
 import threading
@@ -51,12 +52,16 @@ class ClientProtocol(asyncio.Protocol):
         self.loop = loop
         self.conn = conn
         self.is_processing = True
+        self._len = None
+        self._buf = bytearray()
 
     def connection_made(self, transport):
         self.transport = transport
         self.peer = self.transport.get_extra_info('peername')
-        self.dst = ('tcp', self.peer)
         _log.info('Connection from {}'.format(self.peer))
+        # CHG:USE: self.dst = (type(self.__class__), server.peer, self.peer, protocol)
+        #   * NOTE: do support multiple instances of class: (self, (socket))
+        self.dst = ('tcp', self.peer)
         # EXPL: ignore incoming connections when server is shutting down
         if self.is_processing is True:
             # NOTE: adding to dict don't require lock (beside iterating that dict)
@@ -74,14 +79,36 @@ class ClientProtocol(asyncio.Protocol):
         self.transport.close()
 
     # NEED:DEV: loop for long data -- save incomplete parts into self.buf
+    #   SEE:(combine) http://code.activestate.com/recipes/408859-socketrecv-three-ways-to-turn-it-into-recvall/
     # RFC:FIX: SEP mixed concepts of transport and protocol
     # SEE self.srv.sockets -- to manipulate raw socket
     #   :: like closing receiving end instead of ignoring incoming data
     def data_received(self, data):
         _log.debug('Recv:{!r}: {!r} bytes'.format(self.peer, len(data)))
+        if not data:
+            raise
+        self._buf += data
+
+        # ENH:(inefficient) optimize loop with branches and slicing
+        while True:
+            if self._len is None:
+                if len(self._buf) < 4:
+                    break
+                size = self._buf[:4]
+                self._buf = self._buf[4:]
+                self._len = struct.unpack('>I', size)[0]
+            else:
+                if len(self._buf) < self._len:
+                    break
+                msg = self._buf[:self._len]
+                self._buf = self._buf[self._len:]
+                self._len = None
+                self.receive(msg)
+
+    def receive(self, msg):
         if self.is_processing is True:
             # TODO: pass 'put_cmd' as arg
-            car = bus.put_cmd(self.dst, data)
+            car = bus.put_cmd(self.dst, msg)
             # THINK:TODO: move into 'cmd_executor'
             if type(car.cmd) == bus.command.QuitCmd:
                 self.loop.create_task(bus.do_quit(self.loop))
@@ -90,7 +117,8 @@ class ClientProtocol(asyncio.Protocol):
     def send(self, data):
         # BAD: exc if client was already deleted when executor was suspended
         # CHECK: if need to write multiple times for too big data
-        self.transport.write(data)
+        header = struct.pack('>I', len(data))
+        self.transport.write(header + data)
         # CHECK: if need '.drain()' ::: need only for streams
 
 
