@@ -47,13 +47,15 @@ class ClientConnections(dict):
 
 class ClientProtocol(asyncio.Protocol):
     """Each client connection will create a new protocol instance"""
+    h_sz_len = 4
 
     def __init__(self, loop, conn):
         self.loop = loop
         self.conn = conn
         self.is_processing = True
-        self._len = None
+        self._n = ClientProtocol.h_sz_len
         self._buf = bytearray()
+        self._head = True
 
     def connection_made(self, transport):
         self.transport = transport
@@ -78,34 +80,37 @@ class ClientProtocol(asyncio.Protocol):
         _log.info('Closing the client {!r}'.format(self.peer))
         self.transport.close()
 
-    # NEED:DEV: loop for long data -- save incomplete parts into self.buf
-    #   SEE:(combine) http://code.activestate.com/recipes/408859-socketrecv-three-ways-to-turn-it-into-recvall/
+    # SEE:(combine) http://code.activestate.com/recipes/408859-socketrecv-three-ways-to-turn-it-into-recvall/
+    # * directly use inner unblocking sockets impl with timeout() instead of looping data_received()
+    #   SEE self.srv.sockets -- to manipulate raw socket
+    #   TRY :: closing recv end instead of ignoring incoming data with 'is_processing'
+    # * periodically send 'heartbeat' data and drop incomplete msg on each
+    #   heartbeat, raising error or requesting msg re-send from client
     # RFC:FIX: SEP mixed concepts of transport and protocol
-    # SEE self.srv.sockets -- to manipulate raw socket
-    #   :: like closing receiving end instead of ignoring incoming data
     def data_received(self, data):
         _log.debug('Recv:{!r}: {!r} bytes'.format(self.peer, len(data)))
         if not data:
             raise
-        self._buf += data
+        if self.is_processing is False:
+            return
+        # Accumulate data even if too small for both branches
+        self._buf = self.parse_msg(self._buf + data)
 
-        # ENH:(inefficient) optimize loop with branches and slicing
-        while True:
-            if self._len is None:
-                if len(self._buf) < 4:
-                    break
-                size = self._buf[:4]
-                self._buf = self._buf[4:]
-                self._len = struct.unpack('>I', size)[0]
+    def parse_msg(self, buf):
+        i = 0
+        # NOTE: used single cycle to process multiple msgs received at once
+        while (i + self._n) <= len(buf):
+            blob = buf[i:i + self._n]
+            i += self._n
+            if self._head:
+                self._n = struct.unpack('>I', blob)[0]
             else:
-                if len(self._buf) < self._len:
-                    break
-                msg = self._buf[:self._len]
-                self._buf = self._buf[self._len:]
-                self._len = None
-                self.receive(msg)
+                self._n = ClientProtocol.h_sz_len
+                self.process(blob)
+            self._head = not self._head
+        return buf[i:]
 
-    def receive(self, msg):
+    def process(self, msg):
         if self.is_processing is True:
             # TODO: pass 'put_cmd' as arg
             car = bus.put_cmd(self.dst, msg)
