@@ -5,13 +5,6 @@ from miur.share import protocol
 
 from . import command
 
-# FIXME: don't use global var and save to class CommandDispatcher
-#   => so I could support multiple cmd sets (E.G. for online hot-update by
-#     replacing whole class instead of locks (in read-only haskell-like manner))
-# Register all entries __class__.cmd in dict when loading
-_cmdd = {v.cmd: v for v in vars(command).values()
-         if isinstance(v, type) and issubclass(v, command.BaseCommand)}
-
 _log = logging.getLogger(__name__)
 
 
@@ -41,13 +34,9 @@ class Carrier:
 def put_cmd(dst, data_whole):
     global qin
     obj, ifmt = protocol.deserialize(data_whole)
-
-    # THINK:WTF: if no such cmd ? Client will hang in infinite loop
-    #   FIXME: BaseCommand => WrongCommand (generate exception and send back to client)
-    C = _cmdd.get(obj['cmd'], command.BaseCommand)
-    cmd = C(*obj['args'])
+    _log.debug('Packet({!r}b): {!r}'.format(len(data_whole), obj))
+    cmd = command.make_cmd(obj['cmd'], *obj['args'])
     car = Carrier(dst, cmd, fmt=ifmt, uid=obj['id'])
-
     qin.put_nowait(car)
     return car
 

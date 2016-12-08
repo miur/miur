@@ -1,7 +1,11 @@
 from ..base import BaseCommand
 import miur.core.fs as fs
 
-__all__ = ['NodeGetParentCmd', 'NodeGetChildCmd', 'ListNodeCmd']
+__all__ = [
+    'NodeGetParentCmd',
+    'NodeGetChildCmd',
+    'ListNodeCmd',
+]
 
 
 class NodeGetParentCmd(BaseCommand):

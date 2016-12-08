@@ -1,5 +1,12 @@
-__all__ = ['BaseCommand']
+__all__ = [
+    'BaseCommand',
+    'WrongCommand',
+]
 
 
 class BaseCommand:
-    cmd = 'base.command'
+    cmd = 'command.base'
+
+
+class WrongCommand:
+    cmd = 'command.wrong'
