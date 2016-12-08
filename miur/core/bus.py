@@ -16,6 +16,8 @@ qin = asyncio.Queue()
 qout = asyncio.Queue()
 # qtransit = asyncio.Queue()
 
+make_cmd = command.CommandMaker('miur.core.command.all').make
+
 
 # NOTE: adapted to bus, works in both dir, aggregates sep concepts of subsystems
 class Carrier:
@@ -35,7 +37,7 @@ def put_cmd(dst, data_whole):
     global qin
     obj, ifmt = protocol.deserialize(data_whole)
     _log.debug('Packet({!r}b): {!r}'.format(len(data_whole), obj))
-    cmd = command.make_cmd(obj['cmd'], *obj['args'])
+    cmd = make_cmd(obj['cmd'], *obj['args'])
     car = Carrier(dst, cmd, fmt=ifmt, uid=obj['id'])
     qin.put_nowait(car)
     return car
