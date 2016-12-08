@@ -106,18 +106,9 @@ class ClientProtocol(asyncio.Protocol):
                 self._n = struct.unpack('>I', blob)[0]
             else:
                 self._n = ClientProtocol.h_sz_len
-                self.process(blob)
+                bus.put_cmd(self.dst, blob, loop=self.loop)
             self._head = not self._head
         return buf[i:]
-
-    def process(self, msg):
-        if self.is_processing is True:
-            # TODO: pass 'put_cmd' as arg
-            car = bus.put_cmd(self.dst, msg)
-            # THINK:TODO: move into 'cmd_executor'
-            if type(car.cmd) == bus.command.QuitCmd:
-                self.loop.create_task(bus.do_quit(self.loop))
-                self.is_processing = False
 
     def send(self, data):
         # BAD: exc if client was already deleted when executor was suspended
