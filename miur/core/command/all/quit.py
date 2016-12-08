@@ -1,14 +1,14 @@
-from ..base import BaseCommand
-
-from ... import bus
-from ... import server
+from .. import base, policy
+from ... import bus, server
 
 __all__ = ['QuitCmd']
 
 
-class QuitCmd(BaseCommand):
+class QuitCmd(base.BaseCommand):
     """Exit from server only when all cmds in queues processed """
     cmd = 'quit-all'
+    # THINK: cmd policy must be per-class or per-instance
+    policy = policy.IMMEDIATE
 
     def __init__(self, *args):
         # EXPL: immediately ignore all incoming cmds when server is quitting

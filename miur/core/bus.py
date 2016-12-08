@@ -29,6 +29,8 @@ class Carrier:
         self.fmt = fmt  # MAYBE: excessive and must be removed
         self.uid = uid  # unique message id
 
+    # WTF if cmd will be executed second time ?
+    #   THINK: Allow or disable availability
     def execute(self, *args):
         self.rsp = self.cmd.execute(*args)
         return self
@@ -48,12 +50,13 @@ def put_cmd(dst, data_whole, **kw):
     cmd = make_cmd(obj['cmd'], *obj['args'])
     car = Carrier(dst, cmd, fmt=ifmt, uid=obj['id'])
 
-    # DEV:ENH: -- design sync cmds policy -- with immediate/queued execution
-    if type(car.cmd) == command.QuitCmd:
+    policy = getattr(car.cmd, 'policy', command.GENERAL)
+    if policy == command.GENERAL:
+        qin.put_nowait(car)
+    elif policy == command.IMMEDIATE:
         car.execute(kw['loop'])
         qout.put_nowait(car)
-    else:
-        qin.put_nowait(car)
+
     return car
 
 
