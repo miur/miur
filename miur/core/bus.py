@@ -8,10 +8,6 @@ from . import command
 _log = logging.getLogger(__name__)
 
 
-# FIX: must be passed from main() to ???
-make_cmd = command.CommandMaker('miur.core.command.all').make
-
-
 # NOTE: adapted to bus, works in both dir, aggregates sep concepts of subsystems
 class Carrier:
     def __init__(self, dst=None, cmd=None, rsp=None, fmt=None, uid=None):
@@ -38,7 +34,8 @@ class Carrier:
 # MAYBE: pass self.loop as main()->CommandMaker and there pass it to each cmds on __init__
 
 class Bus:
-    def __init__(self, ctx=None):
+    def __init__(self, make_cmd, ctx=None):
+        self.make_cmd = make_cmd  # factory
         self.ctx = ctx
         # Each queue has dedicated pool of worker task
         #   * Fastest independent relay of transit msgs
@@ -51,7 +48,7 @@ class Bus:
     def put_cmd(self, dst, data_whole):
         obj, ifmt = protocol.deserialize(data_whole)
         _log.debug('Packet({!r}b): {!r}'.format(len(data_whole), obj))
-        cmd = make_cmd(obj['cmd'], self.ctx, *obj['args'])
+        cmd = self.make_cmd(obj['cmd'], self.ctx, *obj['args'])
         car = Carrier(dst, cmd, fmt=ifmt, uid=obj['id'])
         self._push(car)
         return car

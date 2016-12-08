@@ -3,6 +3,7 @@ import asyncio
 
 from .bus import Bus
 from .server import Server
+from .command import CommandMaker
 
 _log = logging.getLogger(__name__)
 
@@ -14,6 +15,7 @@ async def cmd_executor(msg_bus):
         msg_bus.qin.task_done()
 
 
+# THINK: how to hide inner impl qin/qout from coro ? return task to wait on ?
 async def rsp_dispatcher(msg_bus, all_conn):
     while True:
         car = await msg_bus.qout.get()
@@ -36,7 +38,8 @@ class CoreProgramm:
     def init(self):
         self.loop = asyncio.get_event_loop()
         self.loop.set_debug(True)
-        self.bus = Bus(ctx=self)
+        self.make_cmd = CommandMaker('miur.core.command.all').make
+        self.bus = Bus(self.make_cmd, ctx=self)
         self.srv = Server(self.server_address, self.loop, self.bus)
         self.loop.create_task(self.srv.start())
         self.loop.create_task(rsp_dispatcher(self.bus, self.srv.conn))
