@@ -11,7 +11,7 @@ __all__ = [
 class NodeGetParentCmd(BaseCommand):
     cmd = 'get.node.parent'
 
-    def __init__(self, path):
+    def __init__(self, ctx, path):
         self.path = path
 
     def execute(self):
@@ -22,7 +22,7 @@ class NodeGetParentCmd(BaseCommand):
 class NodeGetChildCmd(BaseCommand):
     cmd = 'get.node.child'
 
-    def __init__(self, path, entry):
+    def __init__(self, ctx, path, entry):
         self.path = path
         self.entry = entry
 
@@ -33,7 +33,7 @@ class NodeGetChildCmd(BaseCommand):
 class ListNodeCmd(BaseCommand):
     cmd = 'list.node'
 
-    def __init__(self, path):
+    def __init__(self, ctx, path):
         self.path = path
 
     def execute(self):

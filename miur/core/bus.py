@@ -8,14 +8,6 @@ from . import command
 _log = logging.getLogger(__name__)
 
 
-# Each queue has dedicated pool of worker task
-#   * Fastest independent relay of transit msgs
-#   * Exhausting input queue as fast as possible
-#   * Send from qout by multiple senders -- if some 'send' socket becomes blocked
-qin = asyncio.Queue()
-qout = asyncio.Queue()
-# qtransit = asyncio.Queue()
-
 # FIX: must be passed from main() to ???
 make_cmd = command.CommandMaker('miur.core.command.all').make
 
@@ -32,6 +24,7 @@ class Carrier:
     # WTF if cmd will be executed second time ?
     #   THINK: Allow or disable availability
     def execute(self, *args):
+        _log.debug('Command: {!r}'.format(self.cmd.cmd))
         self.rsp = self.cmd.execute(*args)
         return self
 
@@ -43,40 +36,36 @@ class Carrier:
 
 # FIXME: design how to catch/distribute global ctx like self.loop to cmds ?
 # MAYBE: pass self.loop as main()->CommandMaker and there pass it to each cmds on __init__
-def put_cmd(dst, data_whole, **kw):
-    global qin
-    obj, ifmt = protocol.deserialize(data_whole)
-    _log.debug('Packet({!r}b): {!r}'.format(len(data_whole), obj))
-    cmd = make_cmd(obj['cmd'], *obj['args'])
-    car = Carrier(dst, cmd, fmt=ifmt, uid=obj['id'])
 
-    policy = getattr(car.cmd, 'policy', command.GENERAL)
-    if policy == command.GENERAL:
-        qin.put_nowait(car)
-    elif policy == command.IMMEDIATE:
-        car.execute(kw['loop'])
-        qout.put_nowait(car)
+class Bus:
+    def __init__(self, ctx=None):
+        self.ctx = ctx
+        # Each queue has dedicated pool of worker task
+        #   * Fastest independent relay of transit msgs
+        #   * Exhausting input queue as fast as possible
+        #   * Send from qout by multiple senders -- if some 'send' socket becomes blocked
+        self.qin = asyncio.Queue()
+        self.qout = asyncio.Queue()
+        # qtransit = asyncio.Queue()
 
-    return car
+    def put_cmd(self, dst, data_whole):
+        obj, ifmt = protocol.deserialize(data_whole)
+        _log.debug('Packet({!r}b): {!r}'.format(len(data_whole), obj))
+        cmd = make_cmd(obj['cmd'], self.ctx, *obj['args'])
+        car = Carrier(dst, cmd, fmt=ifmt, uid=obj['id'])
+        self._push(car)
+        return car
 
+    def _push(self, car):
+        policy = getattr(car.cmd, 'policy', command.GENERAL)
+        if policy == command.GENERAL:
+            self.qin.put_nowait(car)
+        elif policy == command.IMMEDIATE:
+            self.qout.put_nowait(car.execute())
 
-# THINK: pass 'qin, qout' as args
-async def cmd_executor():
-    global qin, qout
-    while True:
-        car = await qin.get()
-        _log.debug('Command: {!r}'.format(car.cmd.cmd))
-        car.execute()
-        qout.put_nowait(car)
-        qin.task_done()
-
-
-async def rsp_dispatcher(all_conn):
-    global qout
-    while True:
-        car = await qout.get()
+    # THINK? all_conn must be aggregated by Bus class or rsp_dispatcher coro ?
+    def pop_rsp(self, car, all_conn):
         rsp = {'id': car.uid, 'rsp': car.rsp}
         data = protocol.serialize(rsp, car.fmt)
         _log.info('Response({:x}): {!r}'.format(car.uid, rsp['rsp']))
-        all_conn[car.dst].send(data)
-        qout.task_done()
+        return all_conn[car.dst].send(data)

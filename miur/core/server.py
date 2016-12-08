@@ -4,8 +4,6 @@ import asyncio
 import threading
 import functools
 
-from . import bus
-
 _log = logging.getLogger(__name__)
 
 
@@ -16,8 +14,9 @@ _log = logging.getLogger(__name__)
 #   << if you create two separate servers -- one for TCP and another for UDP
 #       -- to support two diff clients lists
 class ClientConnections(dict):
-    def __init__(self):
+    def __init__(self, sid_grp=None):
         self._lock = threading.Lock()
+        self.sid_grp = sid_grp
 
     def __getitem__(self, cid):
         # THINK? items have refcount so calling their methods is threadsafe after getitem?
@@ -35,7 +34,9 @@ class ClientConnections(dict):
             return super().__delitem__(cid)
 
     # ALT: overload generator :: [c.close() for c in conn.values()]
-    def disconnectAll(self, sid_grp):
+    def disconnectAll(self, sid_grp=None):
+        if sid_grp is None:
+            sid_grp = self.sid_grp
         # BAD: won't close any connection pending on _lock to in __setitem__
         with self._lock:
             for dst, obj in self.items():
@@ -44,13 +45,23 @@ class ClientConnections(dict):
                     _log.info('Closing the client {!r}'.format(cid))
                     obj.close()
 
+    def ignoreRecvAll(self, sid_grp=None):
+        if sid_grp is None:
+            sid_grp = self.sid_grp
+        # BAD: won't close any connection pending on _lock to in __setitem__
+        with self._lock:
+            for dst, obj in self.items():
+                sid, cid = dst
+                if sid == sid_grp:
+                    obj.ignore_recv_end()
+
 
 class ClientProtocol(asyncio.Protocol):
     """Each client connection will create a new protocol instance"""
     h_sz_len = 4
 
-    def __init__(self, loop, conn):
-        self.loop = loop
+    def __init__(self, bus, conn):
+        self.bus = bus
         self.conn = conn
         self.is_processing = True
         self._n = ClientProtocol.h_sz_len
@@ -64,11 +75,15 @@ class ClientProtocol(asyncio.Protocol):
         # CHG:USE: self.dst = (type(self.__class__), server.peer, self.peer, protocol)
         #   * NOTE: do support multiple instances of class: (self, (socket))
         self.dst = ('tcp', self.peer)
+
         # EXPL: ignore incoming connections when server is shutting down
+        # BAD: must be placed inside Server() -- otherwise new conn accumulates
         if self.is_processing is True:
             # NOTE: adding to dict don't require lock (beside iterating that dict)
             self.conn[self.dst] = self
             # ALT: use first msg from client as its cid
+        else:
+            self.close()
 
     def connection_lost(self, exc):
         _log.info('Connection lost {}'.format(self.peer))
@@ -79,6 +94,10 @@ class ClientProtocol(asyncio.Protocol):
     def close(self):
         _log.info('Closing the client {!r}'.format(self.peer))
         self.transport.close()
+
+    def ignore_recv_end(self):
+        _log.info('Ignore client data {!r}'.format(self.peer))
+        self.is_processing = False
 
     # SEE:(combine) http://code.activestate.com/recipes/408859-socketrecv-three-ways-to-turn-it-into-recvall/
     # * directly use inner unblocking sockets impl with timeout() instead of looping data_received()
@@ -106,7 +125,7 @@ class ClientProtocol(asyncio.Protocol):
                 self._n = struct.unpack('>I', blob)[0]
             else:
                 self._n = ClientProtocol.h_sz_len
-                bus.put_cmd(self.dst, blob, loop=self.loop)
+                self.bus.put_cmd(self.dst, blob)
             self._head = not self._head
         return buf[i:]
 
@@ -119,15 +138,16 @@ class ClientProtocol(asyncio.Protocol):
 
 
 class Server:
-    def __init__(self, server_address, loop):
+    def __init__(self, server_address, loop, bus):
         self.server_address = server_address
         self.loop = loop
+        self.bus = bus
         self._asyncio_server = None
-        self.conn = ClientConnections()
+        self.conn = ClientConnections(sid_grp=self)
 
     async def start(self):
         self._asyncio_server = await self.loop.create_server(
-            functools.partial(ClientProtocol, self.loop, self.conn),
+            functools.partial(ClientProtocol, self.bus, self.conn),
             *self.server_address, reuse_address=True, reuse_port=True)
         peer = self._asyncio_server.sockets[0].getsockname()
         _log.info('Serving on {}'.format(peer))
