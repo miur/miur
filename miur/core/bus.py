@@ -4,6 +4,7 @@ import asyncio
 from miur.share import protocol
 
 from . import command
+from .server import Server
 
 _log = logging.getLogger(__name__)
 
@@ -121,12 +122,57 @@ class Channel:
 
 # NOTE: hub must aggregate both in/out bus to be able to exec sync cmds
 class Hub:
-    def __init__(self, loop):
+    def __init__(self, server_address, ctx=None, loop=None):
+        self.ctx = ctx
         self.loop = loop
         # NOTE: separate buses are necessary to support full-duplex
         self.bus_recv = None
         self.bus_send = None
         self.channels = {}
+        self.init(server_address)
+
+    def init(self, server_address):
+        make_cmd = command.CommandMaker('miur.core.command.all').make
+        self.bus = Bus(make_cmd, ctx=self.ctx)
+        self.srv = Server(server_address, self.loop, self.bus)
+        self.loop.create_task(self.srv.start())
+        self.loop.create_task(self.rsp_dispatcher(self.bus, self.srv.conn))
+        self.loop.create_task(self.cmd_executor(self.bus))
+
+    async def cmd_executor(self, msg_bus):
+        while True:
+            car = await msg_bus.qin.get()
+            # CHG: use global executor class for this
+            msg_bus.execute(car)
+            msg_bus.qin.task_done()
+
+    # THINK: how to hide inner impl qin/qout from coro ? return task to wait on ?
+    async def rsp_dispatcher(self, msg_bus, all_conn):
+        while True:
+            car = await msg_bus.qout.get()
+            msg_bus.pop_rsp(car, all_conn)
+            msg_bus.qout.task_done()
+
+    def quit_soon(self):
+        # EXPL: immediately ignore all incoming cmds when server is quitting
+        self.srv.conn.ignoreRecvAll()
+        self.loop.create_task(self._quit_clean())
+
+    async def _quit_clean(self):
+        # NOTE: qin is already exhausted -- shutdown message is always the last
+        # one -- and it triggers closing of executor()
+        await self.bus.qin.join()
+        # BAD! wait qout only after all executors done!
+        #   => qin.pop() is immediate, but qout.put() is often delayed until cmd finished
+        # TRY: use semaphore with timer ?
+        await self.bus.qout.join()
+        # THINK: place 'shutdown' into qout and wait again or send 'shutdown' immediately from server ?
+        #   => must traverse 'shutdown' through whole system to establish proper shutdown chain
+        # WARN! must be the last action !  No more async coro after this !
+        self.loop.stop()
+
+    async def stop(self):
+        return await self.srv.stop()
 
     def register(self, channel):
         channel.callback(self.put)
