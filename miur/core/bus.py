@@ -82,6 +82,21 @@ class DictProtocol:
     pass
 
 
+class TcpListeningServer:
+    async def start(self, server_address, all_conn, process_msg, loop):
+        self._asyncio_srv = await loop.create_server(
+            functools.partial(server.ClientProtocol, all_conn, process_msg),
+            *server_address, reuse_address=True, reuse_port=True)
+        peer = self._asyncio_srv.sockets[0].getsockname()
+        _log.info('Serving on {}'.format(peer))
+
+    def close(self):
+        return self._asyncio_srv.close()
+
+    async def wait_closed(self):
+        return await self._asyncio_srv.wait_closed()
+
+
 # NOTE: protocol negotiated between *mods*(uuid) on each *mods* topology change
 class Channel:
     def __init__(self):
@@ -109,24 +124,15 @@ class Hub:
         # NOTE: separate buses are necessary to support full-duplex
         self.bus_recv = Bus()
         self.bus_send = Bus()
-        self.srv = None
         # TEMP: only tcp conn instead of channels
         self.all_conn = server.ClientConnections(sid_grp='tcp')
+        self.srv = TcpListeningServer()
         self.channels = {}
         self.make_cmd = command.CommandMaker('miur.core.command.all').make  # factory
-        self.init(server_address)
 
-    def init(self, server_address):
-        self.loop.create_task(self.start_server(server_address))
+        self.loop.create_task(self.srv.start(server_address, self.all_conn, self.put_cmd, loop=loop))
         self.loop.create_task(self.rsp_dispatcher())
         self.loop.create_task(self.cmd_executor())
-
-    async def start_server(self, server_address):
-        self.srv = await self.loop.create_server(
-            functools.partial(server.ClientProtocol, self.put_cmd, self.all_conn),
-            *server_address, reuse_address=True, reuse_port=True)
-        peer = self.srv.sockets[0].getsockname()
-        _log.info('Serving on {}'.format(peer))
 
     def put_cmd(self, dst, data_whole):
         obj, ifmt = protocol.deserialize(data_whole)

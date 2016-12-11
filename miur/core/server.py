@@ -61,7 +61,7 @@ class ClientProtocol(asyncio.Protocol):
     """Each client connection will create a new protocol instance"""
     h_sz_len = 4
 
-    def __init__(self, process_msg, conn):
+    def __init__(self, conn, process_msg):
         self.process_msg = process_msg
         self.conn = conn
         self.is_processing = True
