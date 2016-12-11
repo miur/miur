@@ -33,6 +33,8 @@ class Carrier:
 # FIXME: design how to catch/distribute global ctx like self.loop to cmds ?
 # MAYBE: pass self.loop as main()->CommandMaker and there pass it to each cmds on __init__
 
+# THINK: split to BusInput and BusOutput to reuse separately
+#   BUT: this Bus encapsulates msg protocol -- is there sense to split then ?
 class Bus:
     def __init__(self, make_cmd, ctx=None):
         self.make_cmd = make_cmd  # factory
@@ -58,7 +60,11 @@ class Bus:
         if policy == command.GENERAL:
             self.qin.put_nowait(car)
         elif policy == command.IMMEDIATE:
-            self.qout.put_nowait(car.execute())
+            self.execute(car)
+
+    def execute(self, car):
+        rsp = car.execute()
+        self.qout.put_nowait(rsp)
 
     # THINK? all_conn must be aggregated by Bus class or rsp_dispatcher coro ?
     def pop_rsp(self, car, all_conn):

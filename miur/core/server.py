@@ -10,6 +10,7 @@ _log = logging.getLogger(__name__)
 # NOTE: mixing ClientProtocol with static vars is BAD idea
 # BETTER: re-impl loop.create_server(...) for deterministic order of accept/receive/lost
 #   => then parallelism will be controllable and broken lock may become unnecessary
+#   BUT: it's currently difficult -- too much to reimplement OR too long to reduce complexity
 # NOTE: list of connections must be sep entity
 #   << if you create two separate servers -- one for TCP and another for UDP
 #       -- to support two diff clients lists

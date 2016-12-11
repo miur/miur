@@ -11,7 +11,8 @@ _log = logging.getLogger(__name__)
 async def cmd_executor(msg_bus):
     while True:
         car = await msg_bus.qin.get()
-        msg_bus.qout.put_nowait(car.execute())
+        # CHG: use global executor class for this
+        msg_bus.execute(car)
         msg_bus.qin.task_done()
 
 
