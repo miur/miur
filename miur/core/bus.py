@@ -80,47 +80,73 @@ class DirectTransport(BaseTransport):
 
 
 class TcpTransport(BaseTransport):
-    def __init__(self, recv_cb=None, ctx=None):
+    def __init__(self, recv_cb=None, send_cb=None):
         self.recv_cb = recv_cb
-        self.ctx = ctx
-        self.make_cmd = command.CommandMaker('miur.core.command.all').make  # factory
+        self.send_cb = send_cb
 
     def recv(self, dst, data_whole):
-        obj, ifmt = protocol.deserialize(data_whole)
-        _log.debug('Packet({!r}b): {!r}'.format(len(data_whole), obj))
-        cmd = self.make_cmd(obj['cmd'], self.ctx, *obj['args'])
-        car = Carrier(dst, cmd, fmt=ifmt, uid=obj['id'])
-        return self.recv_cb(car)
+        packet = (dst, data_whole)
+        return self.recv_cb(packet)
 
-    def send(self, obj):
-        pass
+    def send(self, packet):
+        data = packet
+        return self.send_cb(data)
+
+
+class BaseProtocol:
+    def pack(self):
+        raise NotImplementedError
+
+    def unpack(self):
+        raise NotImplementedError
 
 
 # NOTE: can split single cmd into multiple msgs -- for streaming, etc
 class DictProtocol:
-    pass
+    def __init__(self, ctx=None):
+        self.make_cmd = command.CommandMaker('miur.core.command.all').make  # factory
+        self.ctx = ctx
+
+    def pack(self, car):
+        rsp = {'id': car.uid, 'rsp': car.rsp}
+        packet = protocol.serialize(rsp, car.fmt)
+        _log.info('Response({:x}): {!r}'.format(car.uid, car.rsp))
+        return packet
+
+    def unpack(self, packet):
+        dst, data_whole = packet
+        obj, ifmt = protocol.deserialize(data_whole)
+        _log.debug('Packet({!r}b): {!r}'.format(len(data_whole), obj))
+        cmd = self.make_cmd(obj['cmd'], self.ctx, *obj['args'])
+        car = Carrier(dst, cmd, fmt=ifmt, uid=obj['id'])
+        return car
 
 
 # NOTE: protocol negotiated between *mods*(uuid) on each *mods* topology change
+#   * supports different transport for recv and send
 class Channel:
     def __init__(self, recv_cb=None, ctx=None):
-        self.recv_cb = recv_cb  # transport1.recv
-        self.send_f = None  # transport2.send
-        self.transport = TcpTransport(recv_cb=self.recv, ctx=ctx)
-        self.protocol = None  # negotiated on connection, DFL depends on conn type
+        self.recv_cb = recv_cb
+        self.send_cb = None
+        # BAD:THINK:RFC: unsymmetrical passing of recv and send
+        self.transport = TcpTransport(recv_cb=self.recv)
+        # negotiated on connection, DFL depends on conn type
+        self.protocol = DictProtocol(ctx=ctx)
 
     # @property
     # def recv_point(self):
     #     return self.transport.recv
 
-    def set_transport(self, reader, writer=None):
-        pass
+    # def set_transport(self, reader, writer=None):
+    #     pass
 
-    def recv(self, obj):
+    def recv(self, packet):
+        obj = self.protocol.unpack(packet)
         return self.recv_cb(obj)
 
     def send(self, obj):
-        self.protocol.send(obj)
+        packet = self.protocol.pack(obj)
+        return self.transport.send(packet)
 
 
 class TcpListeningServer:
