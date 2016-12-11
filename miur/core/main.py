@@ -37,17 +37,16 @@ class CoreProgramm:
         #   * even when all *mods* are linked in single program !
         #   => that uuid is transfered in all forked/threaded *mods*
         #     => originally linked ones become disfunct and are deinitialized
-        self.uuid = uuid.uuid4().hex
-        self.server_address = server_address
-        self.init()
+        self.uuid = str(uuid.uuid4())
+        self.init(server_address)
         self.run()
 
-    def init(self):
+    def init(self, server_address):
         self.loop = asyncio.get_event_loop()
         self.loop.set_debug(True)
         self.make_cmd = CommandMaker('miur.core.command.all').make
         self.bus = Bus(self.make_cmd, ctx=self)
-        self.srv = Server(self.server_address, self.loop, self.bus)
+        self.srv = Server(server_address, self.loop, self.bus)
         self.loop.create_task(self.srv.start())
         self.loop.create_task(rsp_dispatcher(self.bus, self.srv.conn))
         self.loop.create_task(cmd_executor(self.bus))

@@ -33,25 +33,24 @@ class Carrier:
 # FIXME: design how to catch/distribute global ctx like self.loop to cmds ?
 # MAYBE: pass self.loop as main()->CommandMaker and there pass it to each cmds on __init__
 
-# THINK: split to BusInput and BusOutput to reuse separately
-#   BUT: this Bus encapsulates msg protocol -- is there sense to split then ?
+# NOTE: bus encapsulates cmds caching and ordering (priority, queue, pool, etc)
 class Bus:
     def __init__(self, make_cmd, ctx=None):
         self.make_cmd = make_cmd  # factory
         self.ctx = ctx
-        # Each queue has dedicated pool of worker task
-        #   * Fastest independent relay of transit msgs
-        #   * Exhausting input queue as fast as possible
-        #   * Send from qout by multiple senders -- if some 'send' socket becomes blocked
         self.qin = asyncio.Queue()
         self.qout = asyncio.Queue()
-        # qtransit = asyncio.Queue()
 
     def put_cmd(self, dst, data_whole):
         obj, ifmt = protocol.deserialize(data_whole)
         _log.debug('Packet({!r}b): {!r}'.format(len(data_whole), obj))
         cmd = self.make_cmd(obj['cmd'], self.ctx, *obj['args'])
         car = Carrier(dst, cmd, fmt=ifmt, uid=obj['id'])
+        # BETTER: instead 'car' resend directly incoming packet inside transport
+        #   => Lesser delay loop and no cpu load on re-encoding, better streaming
+        # if cmd['addressee'] != self:  # transit
+        #     self.qout.put_nowait(car)
+        # else:
         self._push(car)
         return car
 
@@ -62,6 +61,8 @@ class Bus:
         elif policy == command.IMMEDIATE:
             self.execute(car)
 
+    # MOVE: to the end of self-channel
+    # BUT: it's placed in-between in/out bus -- how to simulate imm policy?
     def execute(self, car):
         rsp = car.execute()
         self.qout.put_nowait(rsp)
@@ -72,3 +73,65 @@ class Bus:
         data = protocol.serialize(rsp, car.fmt)
         _log.info('Response({:x}): {!r}'.format(car.uid, rsp['rsp']))
         return all_conn[car.dst].send(data)
+
+
+class BaseTransport:
+    def recv_cb(self, obj):
+        raise NotImplementedError
+
+    def send(self, obj):
+        raise NotImplementedError
+
+
+# NOTE: loopback transport to inject cmds in backward direction
+class DirectTransport(BaseTransport):
+    def recv_cb(self, obj):
+        return obj
+
+    # XXX: what it must return ?
+    def send(self, obj):
+        self.recv_cb(obj)
+
+
+class TcpTransport(BaseTransport):
+    def recv_cb(self, obj):
+        pass
+
+    def send(self, obj):
+        pass
+
+
+# NOTE: protocol negotiated between *mods*(uuid) on each *mods* topology change
+class Channel:
+    def __init__(self):
+        self.transport = None
+        self.protocol = None  # negotiated on connection, DFL depends on conn type
+        self.recv_cb = None  # transport1.recv
+        self.send = None  # transport2.send
+
+    def set_transport(self, reader, writer=None):
+        pass
+
+    def recv_cb(self, obj):
+        pass
+
+    def send(self, obj):
+        self.protocol.send(obj)
+
+
+# NOTE: hub must aggregate both in/out bus to be able to exec sync cmds
+class Hub:
+    def __init__(self, loop):
+        self.loop = loop
+        # NOTE: separate buses are necessary to support full-duplex
+        self.bus_recv = None
+        self.bus_send = None
+        self.channels = {}
+
+    def register(self, channel):
+        channel.callback(self.put)
+        self.channels[channel.uuid] = channel.get
+
+    def deregister(self, channel):
+        del self.channels[channel.uuid]
+        channel.destroy()
