@@ -1,6 +1,12 @@
 %%% Data fmt channel path
 # raw_data -> protocol -> objects -> exec -> objects -> protocol -> raw_data
 
+MAYBE: use 'mesh' instead of 'bus' ?
+  each client registers in virtual pool
+    = so each partial *mod* knows about all other *mods*
+      + equality, easiness?,
+      - security and encapsulation
+
 ???_ where to embed queues (amortized delays) ???
   >>> queues must operate on *cmds* only for flexibility and encapsulation
     = so *bus* remains working the same way for all diff transports
@@ -114,3 +120,52 @@
     ! no parsing of logical struct of packet
     ? generator-like piping long lists into cmd by frames is done by higher protocol ?
       MAYBE: its too many of protocols nesting and I can remove some
+
+
+%% Channel Loop
+=_ OSI Levels
+| Application  | bus/mesh | accumulated msg, abstract addressee
+| Presentation | channel  | serialize, encode, compress, encrypt
+| Session      | protocol | whole seq of segments -- start, end, phys error
+| Transport    |          | segment / datagram
+| Network      |          | packet
+| Data link    |          | frame
+| Physical     |          | bit
+
+  app -- app | direct, the same lang (python -- python)
+    single thread for all *mods*
+    multithread -- single thread for each *mod* and _pool_ for cmds exec
+  app -- adapter -- app | one-way, link to other supported lang (python -- C++)
+  app -- srz -- desrz -- app | link unsupported lang through vm (python -- lua)
+    !! I must always support 'session' level !!
+      + hot load / unload of plugins
+      + hot relocating of plugin over another transport through fork
+        ! problems to re-establish and re-initialize session when changing transport
+      - 'presentation' and 'application' must always be disabled by flags ?
+        - overhead by excessive abstractions even for tight coupling mode
+  app -- srz/zip/enc <> _transport_ <> dec/unzip/desrz -- app | any 'transport' in-between
+
+
+main -> bus {recv,send,transit} OR bus {planned,processed,transit}
+  tight_coupling: send 'bus' for one *mod* can be recv 'bus' for another
+    ? how to combine those 'bus' into single one ?
+    ? OR use adapter to shift msgs between buses ?
+main -> (bus.dispatcher) -> channel -> transport {put,take}
+  * 'bus' passes callback to 'channel' to retrieve composed msg
+    ? who manages/aggregates channels, is owner main() ?
+      = Application Level
+  * register/unregister each 'channel' in 'bus' to dispatch msgs
+  * channel aggregates heterogeneous connections/transports for in/out
+    E.G. data preview in pipe or mmf and queries by simplex fifo
+address -- is address of channel
+  * channel associated with recipient
+  => recipient 'uid' must not be dependent on transport
+    ++ 'transport' can be switched keeping 'uid' between recv msg and send rsp
+    use unique 'uid' regenerated on each launch ?
+      => so each new instance -- has separate 'uid'
+      * previewer sends req to subscribe on curr file update preview when launched separately
+      * OR core initiates creating previewer and subscribes it itself, w/o waiting on req from previewer
+      * *core* re-sends data each time when file updated
+  ? BUT how to transit msgs ?
+    * distant recipients must know about each other id
+    ~ at least single one must know -- other's id comes with msg as embedded or transport's extra info
