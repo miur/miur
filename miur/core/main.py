@@ -1,5 +1,6 @@
 import logging
 import asyncio
+import uuid
 
 from .bus import Bus
 from .server import Server
@@ -32,6 +33,11 @@ async def rsp_dispatcher(msg_bus, all_conn):
 
 class CoreProgramm:
     def __init__(self, server_address):
+        # NOTE: each *mod* instance must have different uuid to address itself
+        #   * even when all *mods* are linked in single program !
+        #   => that uuid is transfered in all forked/threaded *mods*
+        #     => originally linked ones become disfunct and are deinitialized
+        self.uuid = uuid.uuid4().hex
         self.server_address = server_address
         self.init()
         self.run()
