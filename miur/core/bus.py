@@ -38,17 +38,27 @@ class Carrier:
 class Bus:
     def __init__(self):
         self._impl = asyncio.Queue()
+        self.running = True
 
     def put(self, obj):
+        # NOTE: raises QueueFull if can't put it now
         return self._impl.put_nowait(obj)
 
     async def join(self):
-        return await self._impl.join()
+        await self._impl.join()
+        self.running = False
 
     async def pop_apply(self, functor):
         car = await self._impl.get()
         functor(car)
         self._impl.task_done()
+
+    # BETTER: replace with 'async for' instead of 'while True' and move to Bus
+    #   https://www.python.org/dev/peps/pep-0492/#asynchronous-iterators-and-async-for
+    # TRY:(queues.py:164) try: [g.cancel() for g in _impl._getters]; except QueueEmpty: pass
+    async def for_each(self, functor):
+        while self.running:
+            await self.pop_apply(functor)
 
 
 class BaseTransport:
@@ -131,8 +141,8 @@ class Hub:
         self.make_cmd = command.CommandMaker('miur.core.command.all').make  # factory
 
         self.loop.create_task(self.srv.start(server_address, self.all_conn, self.put_cmd, loop=loop))
-        self.loop.create_task(self.rsp_dispatcher())
-        self.loop.create_task(self.cmd_executor())
+        self.loop.create_task(self.bus_send.for_each(self.pop_rsp))
+        self.loop.create_task(self.bus_recv.for_each(self.execute))
 
     def put_cmd(self, dst, data_whole):
         obj, ifmt = protocol.deserialize(data_whole)
@@ -167,14 +177,6 @@ class Hub:
         data = protocol.serialize(rsp, car.fmt)
         _log.info('Response({:x}): {!r}'.format(car.uid, car.rsp))
         return self.all_conn[car.dst].send(data)
-
-    async def cmd_executor(self):
-        while True:
-            await self.bus_recv.pop_apply(self.execute)
-
-    async def rsp_dispatcher(self):
-        while True:
-            await self.bus_send.pop_apply(self.pop_rsp)
 
     def quit_soon(self):
         # EXPL: listening server stops, but already established sockets continue to communicate
