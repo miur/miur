@@ -47,6 +47,7 @@ Coroutines
     ++ http://www.buzzcapture.com/en/2014/05/python-asyncio-inside/
     +++ http://stackoverflow.com/questions/26154125/why-is-the-asyncio-library-slower-than-threads-for-this-i-o-bound-operation
       # asyncio vs threading -- typical errors
+    !!! http://lucumr.pocoo.org/2016/10/30/i-dont-understand-asyncio/
     Two threads for two event-loops
       http://stackoverflow.com/questions/31623194/asyncio-two-loops-for-different-i-o-tasks
     ensure_future <vs> create_task
