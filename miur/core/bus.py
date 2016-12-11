@@ -36,44 +36,19 @@ class Carrier:
 
 # NOTE: bus encapsulates cmds caching and ordering (priority, queue, pool, etc)
 class Bus:
-    def __init__(self, make_cmd, ctx=None):
-        self.make_cmd = make_cmd  # factory
-        self.ctx = ctx
-        self.qin = asyncio.Queue()
-        self.qout = asyncio.Queue()
+    def __init__(self):
+        self._impl = asyncio.Queue()
 
-    def put_cmd(self, dst, data_whole):
-        obj, ifmt = protocol.deserialize(data_whole)
-        _log.debug('Packet({!r}b): {!r}'.format(len(data_whole), obj))
-        cmd = self.make_cmd(obj['cmd'], self.ctx, *obj['args'])
-        car = Carrier(dst, cmd, fmt=ifmt, uid=obj['id'])
-        # BETTER: instead 'car' resend directly incoming packet inside transport
-        #   => Lesser delay loop and no cpu load on re-encoding, better streaming
-        # if cmd['addressee'] != self:  # transit
-        #     self.qout.put_nowait(car)
-        # else:
-        self._push(car)
-        return car
+    def put(self, obj):
+        return self._impl.put_nowait(obj)
 
-    def _push(self, car):
-        policy = getattr(car.cmd, 'policy', command.GENERAL)
-        if policy == command.GENERAL:
-            self.qin.put_nowait(car)
-        elif policy == command.IMMEDIATE:
-            self.execute(car)
+    async def join(self):
+        return await self._impl.join()
 
-    # MOVE: to the end of self-channel
-    # BUT: it's placed in-between in/out bus -- how to simulate imm policy?
-    def execute(self, car):
-        rsp = car.execute()
-        self.qout.put_nowait(rsp)
-
-    # THINK? all_conn must be aggregated by Bus class or rsp_dispatcher coro ?
-    def pop_rsp(self, car, all_conn):
-        rsp = {'id': car.uid, 'rsp': car.rsp}
-        data = protocol.serialize(rsp, car.fmt)
-        _log.info('Response({:x}): {!r}'.format(car.uid, rsp['rsp']))
-        return all_conn[car.dst].send(data)
+    async def pop_apply(self, functor):
+        car = await self._impl.get()
+        functor(car)
+        self._impl.task_done()
 
 
 class BaseTransport:
@@ -102,6 +77,11 @@ class TcpTransport(BaseTransport):
         pass
 
 
+# NOTE: can split single cmd into multiple msgs -- for streaming, etc
+class DictProtocol:
+    pass
+
+
 # NOTE: protocol negotiated between *mods*(uuid) on each *mods* topology change
 class Channel:
     def __init__(self):
@@ -121,37 +101,64 @@ class Channel:
 
 
 # NOTE: hub must aggregate both in/out bus to be able to exec sync cmds
+#   THINK:MAYBE: hide both impl in/out queue with exec() under single Bus ?
 class Hub:
     def __init__(self, server_address, ctx=None, loop=None):
         self.ctx = ctx
         self.loop = loop
         # NOTE: separate buses are necessary to support full-duplex
-        self.bus_recv = None
-        self.bus_send = None
+        self.bus_recv = Bus()
+        self.bus_send = Bus()
         self.channels = {}
+        self.make_cmd = command.CommandMaker('miur.core.command.all').make  # factory
         self.init(server_address)
 
     def init(self, server_address):
-        make_cmd = command.CommandMaker('miur.core.command.all').make
-        self.bus = Bus(make_cmd, ctx=self.ctx)
-        self.srv = Server(server_address, self.loop, self.bus)
+        self.srv = Server(server_address, self.loop, self.put_cmd)
+        self.all_conn = self.srv.conn  # TEMP: only tcp conn instead of channels
         self.loop.create_task(self.srv.start())
-        self.loop.create_task(self.rsp_dispatcher(self.bus, self.srv.conn))
-        self.loop.create_task(self.cmd_executor(self.bus))
+        self.loop.create_task(self.rsp_dispatcher())
+        self.loop.create_task(self.cmd_executor())
 
-    async def cmd_executor(self, msg_bus):
-        while True:
-            car = await msg_bus.qin.get()
-            # CHG: use global executor class for this
-            msg_bus.execute(car)
-            msg_bus.qin.task_done()
+    def put_cmd(self, dst, data_whole):
+        obj, ifmt = protocol.deserialize(data_whole)
+        _log.debug('Packet({!r}b): {!r}'.format(len(data_whole), obj))
+        cmd = self.make_cmd(obj['cmd'], self.ctx, *obj['args'])
+        car = Carrier(dst, cmd, fmt=ifmt, uid=obj['id'])
+        # BETTER: instead 'car' resend directly incoming packet inside transport
+        #   => Lesser delay loop and no cpu load on re-encoding, better streaming
+        # if cmd['addressee'] != self:  # transit
+        #     self.qout.put_nowait(car)
+        # else:
+        policy = getattr(car.cmd, 'policy', command.GENERAL)
+        if policy == command.GENERAL:
+            self.bus_recv.put(car)
+        elif policy == command.IMMEDIATE:
+            self.execute(car)
+        return car
 
-    # THINK: how to hide inner impl qin/qout from coro ? return task to wait on ?
-    async def rsp_dispatcher(self, msg_bus, all_conn):
+    # MOVE: to the end of self-channel
+    # BUT: it's placed in-between in/out bus -- how to simulate imm policy?
+    # CHG: use global executor class for this
+    # TRY: regulate putting rsp into bus_send by cmd/rsp itself
+    #   => BUT who must decide it: command or context ?
+    def execute(self, car):
+        rsp = car.execute()
+        self.bus_send.put(rsp)
+
+    def pop_rsp(self, car):
+        rsp = {'id': car.uid, 'rsp': car.rsp}
+        data = protocol.serialize(rsp, car.fmt)
+        _log.info('Response({:x}): {!r}'.format(car.uid, car.rsp))
+        return self.all_conn[car.dst].send(data)
+
+    async def cmd_executor(self):
         while True:
-            car = await msg_bus.qout.get()
-            msg_bus.pop_rsp(car, all_conn)
-            msg_bus.qout.task_done()
+            await self.bus_recv.pop_apply(self.execute)
+
+    async def rsp_dispatcher(self):
+        while True:
+            await self.bus_send.pop_apply(self.pop_rsp)
 
     def quit_soon(self):
         # EXPL: immediately ignore all incoming cmds when server is quitting
@@ -161,11 +168,11 @@ class Hub:
     async def _quit_clean(self):
         # NOTE: qin is already exhausted -- shutdown message is always the last
         # one -- and it triggers closing of executor()
-        await self.bus.qin.join()
+        await self.bus_recv.join()
         # BAD! wait qout only after all executors done!
         #   => qin.pop() is immediate, but qout.put() is often delayed until cmd finished
         # TRY: use semaphore with timer ?
-        await self.bus.qout.join()
+        await self.bus_send.join()
         # THINK: place 'shutdown' into qout and wait again or send 'shutdown' immediately from server ?
         #   => must traverse 'shutdown' through whole system to establish proper shutdown chain
         # WARN! must be the last action !  No more async coro after this !

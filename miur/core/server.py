@@ -61,8 +61,8 @@ class ClientProtocol(asyncio.Protocol):
     """Each client connection will create a new protocol instance"""
     h_sz_len = 4
 
-    def __init__(self, bus, conn):
-        self.bus = bus
+    def __init__(self, process_msg, conn):
+        self.process_msg = process_msg
         self.conn = conn
         self.is_processing = True
         self._n = ClientProtocol.h_sz_len
@@ -126,7 +126,7 @@ class ClientProtocol(asyncio.Protocol):
                 self._n = struct.unpack('>I', blob)[0]
             else:
                 self._n = ClientProtocol.h_sz_len
-                self.bus.put_cmd(self.dst, blob)
+                self.process_msg(self.dst, blob)
             self._head = not self._head
         return buf[i:]
 
@@ -139,21 +139,23 @@ class ClientProtocol(asyncio.Protocol):
 
 
 class Server:
-    def __init__(self, server_address, loop, bus):
+    def __init__(self, server_address, loop, process_msg):
         self.server_address = server_address
         self.loop = loop
-        self.bus = bus
+        self.process_msg = process_msg
         self._asyncio_server = None
         self.conn = ClientConnections(sid_grp=self)
 
     async def start(self):
         self._asyncio_server = await self.loop.create_server(
-            functools.partial(ClientProtocol, self.bus, self.conn),
+            functools.partial(ClientProtocol, self.process_msg, self.conn),
             *self.server_address, reuse_address=True, reuse_port=True)
         peer = self._asyncio_server.sockets[0].getsockname()
         _log.info('Serving on {}'.format(peer))
 
     async def stop(self):
+        # FIXME: unnecessary here -- server may be stopped, but already
+        #   established sockets continue to work with recipients
         self.conn.disconnectAll('tcp')
         # CHECK: earlier loop.stop() in do_quit() must not obstruct this ops
         self._asyncio_server.close()
