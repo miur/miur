@@ -80,8 +80,17 @@ class DirectTransport(BaseTransport):
 
 
 class TcpTransport(BaseTransport):
-    def recv_cb(self, obj):
-        pass
+    def __init__(self, recv_cb=None, ctx=None):
+        self.recv_cb = recv_cb
+        self.ctx = ctx
+        self.make_cmd = command.CommandMaker('miur.core.command.all').make  # factory
+
+    def recv(self, dst, data_whole):
+        obj, ifmt = protocol.deserialize(data_whole)
+        _log.debug('Packet({!r}b): {!r}'.format(len(data_whole), obj))
+        cmd = self.make_cmd(obj['cmd'], self.ctx, *obj['args'])
+        car = Carrier(dst, cmd, fmt=ifmt, uid=obj['id'])
+        return self.recv_cb(car)
 
     def send(self, obj):
         pass
@@ -90,6 +99,28 @@ class TcpTransport(BaseTransport):
 # NOTE: can split single cmd into multiple msgs -- for streaming, etc
 class DictProtocol:
     pass
+
+
+# NOTE: protocol negotiated between *mods*(uuid) on each *mods* topology change
+class Channel:
+    def __init__(self, recv_cb=None, ctx=None):
+        self.recv_cb = recv_cb  # transport1.recv
+        self.send_f = None  # transport2.send
+        self.transport = TcpTransport(recv_cb=self.recv, ctx=ctx)
+        self.protocol = None  # negotiated on connection, DFL depends on conn type
+
+    # @property
+    # def recv_point(self):
+    #     return self.transport.recv
+
+    def set_transport(self, reader, writer=None):
+        pass
+
+    def recv(self, obj):
+        return self.recv_cb(obj)
+
+    def send(self, obj):
+        self.protocol.send(obj)
 
 
 class TcpListeningServer:
@@ -107,29 +138,10 @@ class TcpListeningServer:
         return await self._asyncio_srv.wait_closed()
 
 
-# NOTE: protocol negotiated between *mods*(uuid) on each *mods* topology change
-class Channel:
-    def __init__(self):
-        self.transport = None
-        self.protocol = None  # negotiated on connection, DFL depends on conn type
-        self.recv_cb = None  # transport1.recv
-        self.send = None  # transport2.send
-
-    def set_transport(self, reader, writer=None):
-        pass
-
-    def recv_cb(self, obj):
-        pass
-
-    def send(self, obj):
-        self.protocol.send(obj)
-
-
 # NOTE: hub must aggregate both in/out bus to be able to exec sync cmds
 #   THINK:MAYBE: hide both impl in/out queue with exec() under single Bus ?
 class Hub:
     def __init__(self, server_address, ctx=None, loop=None):
-        self.ctx = ctx
         self.loop = loop
         # NOTE: separate buses are necessary to support full-duplex
         self.bus_recv = Bus()
@@ -138,22 +150,19 @@ class Hub:
         self.all_conn = server.ClientConnections(sid_grp='tcp')
         self.srv = TcpListeningServer()
         self.channels = {}
-        self.make_cmd = command.CommandMaker('miur.core.command.all').make  # factory
+        self.chan = Channel(self.recv, ctx)
 
-        self.loop.create_task(self.srv.start(server_address, self.all_conn, self.put_cmd, loop=loop))
+        # FIXME:(encapsulate) self.chan.transport.recv
+        self.loop.create_task(self.srv.start(
+            server_address, self.all_conn, self.chan.transport.recv, loop=loop))
         self.loop.create_task(self.bus_send.for_each(self.pop_rsp))
         self.loop.create_task(self.bus_recv.for_each(self.execute))
 
-    def put_cmd(self, dst, data_whole):
-        obj, ifmt = protocol.deserialize(data_whole)
-        _log.debug('Packet({!r}b): {!r}'.format(len(data_whole), obj))
-        cmd = self.make_cmd(obj['cmd'], self.ctx, *obj['args'])
-        car = Carrier(dst, cmd, fmt=ifmt, uid=obj['id'])
-        # BETTER: instead 'car' resend directly incoming packet inside transport
-        #   => Lesser delay loop and no cpu load on re-encoding, better streaming
-        # if cmd['addressee'] != self:  # transit
-        #     self.qout.put_nowait(car)
-        # else:
+    # BETTER: instead 'car' resend directly incoming packet inside transport
+    #   => Lesser delay loop and no cpu load on re-encoding, better streaming
+    # if cmd['addressee'] != self:  # transit
+    #     self.qout.put_nowait(car)
+    def recv(self, car):
         policy = getattr(car.cmd, 'policy', command.GENERAL)
         if policy == command.GENERAL:
             self.bus_recv.put(car)
