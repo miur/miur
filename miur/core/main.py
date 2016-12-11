@@ -31,7 +31,7 @@ class CoreProgramm:
         try:
             self.loop.run_forever()
         finally:
-            self.loop.run_until_complete(self.hub.stop())
+            self.loop.run_until_complete(self.hub.quit_clean())
             self.loop.close()
 
 

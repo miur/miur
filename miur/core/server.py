@@ -2,7 +2,6 @@ import struct
 import logging
 import asyncio
 import threading
-import functools
 
 _log = logging.getLogger(__name__)
 
@@ -57,6 +56,7 @@ class ClientConnections(dict):
                     obj.ignore_recv_end()
 
 
+# THINK: accepted/dismissed clients can be passed to Hub through Bus as usual cmds
 class ClientProtocol(asyncio.Protocol):
     """Each client connection will create a new protocol instance"""
     h_sz_len = 4
@@ -79,6 +79,7 @@ class ClientProtocol(asyncio.Protocol):
 
         # EXPL: ignore incoming connections when server is shutting down
         # BAD: must be placed inside Server() -- otherwise new conn accumulates
+        # BETTER: power off whole listening server = conn will remain active anyway
         if self.is_processing is True:
             # NOTE: adding to dict don't require lock (beside iterating that dict)
             self.conn[self.dst] = self
@@ -136,27 +137,3 @@ class ClientProtocol(asyncio.Protocol):
         header = struct.pack('>I', len(data))
         self.transport.write(header + data)
         # CHECK: if need '.drain()' ::: need only for streams
-
-
-class Server:
-    def __init__(self, server_address, loop, process_msg):
-        self.server_address = server_address
-        self.loop = loop
-        self.process_msg = process_msg
-        self._asyncio_server = None
-        self.conn = ClientConnections(sid_grp=self)
-
-    async def start(self):
-        self._asyncio_server = await self.loop.create_server(
-            functools.partial(ClientProtocol, self.process_msg, self.conn),
-            *self.server_address, reuse_address=True, reuse_port=True)
-        peer = self._asyncio_server.sockets[0].getsockname()
-        _log.info('Serving on {}'.format(peer))
-
-    async def stop(self):
-        # FIXME: unnecessary here -- server may be stopped, but already
-        #   established sockets continue to work with recipients
-        self.conn.disconnectAll('tcp')
-        # CHECK: earlier loop.stop() in do_quit() must not obstruct this ops
-        self._asyncio_server.close()
-        await self._asyncio_server.wait_closed()

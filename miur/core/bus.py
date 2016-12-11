@@ -1,10 +1,10 @@
 import logging
 import asyncio
+import functools
 
 from miur.share import protocol
 
-from . import command
-from .server import Server
+from . import command, server
 
 _log = logging.getLogger(__name__)
 
@@ -109,16 +109,24 @@ class Hub:
         # NOTE: separate buses are necessary to support full-duplex
         self.bus_recv = Bus()
         self.bus_send = Bus()
+        self.srv = None
+        # TEMP: only tcp conn instead of channels
+        self.all_conn = server.ClientConnections(sid_grp='tcp')
         self.channels = {}
         self.make_cmd = command.CommandMaker('miur.core.command.all').make  # factory
         self.init(server_address)
 
     def init(self, server_address):
-        self.srv = Server(server_address, self.loop, self.put_cmd)
-        self.all_conn = self.srv.conn  # TEMP: only tcp conn instead of channels
-        self.loop.create_task(self.srv.start())
+        self.loop.create_task(self.start_server(server_address))
         self.loop.create_task(self.rsp_dispatcher())
         self.loop.create_task(self.cmd_executor())
+
+    async def start_server(self, server_address):
+        self.srv = await self.loop.create_server(
+            functools.partial(server.ClientProtocol, self.put_cmd, self.all_conn),
+            *server_address, reuse_address=True, reuse_port=True)
+        peer = self.srv.sockets[0].getsockname()
+        _log.info('Serving on {}'.format(peer))
 
     def put_cmd(self, dst, data_whole):
         obj, ifmt = protocol.deserialize(data_whole)
@@ -134,6 +142,8 @@ class Hub:
         if policy == command.GENERAL:
             self.bus_recv.put(car)
         elif policy == command.IMMEDIATE:
+            # THINK: place 'shutdown' into qout and wait again or send 'shutdown' immediately from server ?
+            #   => must traverse 'shutdown' through whole system to establish proper shutdown chain
             self.execute(car)
         return car
 
@@ -161,11 +171,15 @@ class Hub:
             await self.bus_send.pop_apply(self.pop_rsp)
 
     def quit_soon(self):
+        # EXPL: listening server stops, but already established sockets continue to communicate
+        self.srv.close()
         # EXPL: immediately ignore all incoming cmds when server is quitting
-        self.srv.conn.ignoreRecvAll()
-        self.loop.create_task(self._quit_clean())
+        self.all_conn.ignoreRecvAll()
+        self.loop.stop()  # EXPL: break main loop and await quit_clean() only
 
-    async def _quit_clean(self):
+    # WARN! must be the last task !  No more async coro after this !
+    async def quit_clean(self):
+        await self.srv.wait_closed()
         # NOTE: qin is already exhausted -- shutdown message is always the last
         # one -- and it triggers closing of executor()
         await self.bus_recv.join()
@@ -173,13 +187,7 @@ class Hub:
         #   => qin.pop() is immediate, but qout.put() is often delayed until cmd finished
         # TRY: use semaphore with timer ?
         await self.bus_send.join()
-        # THINK: place 'shutdown' into qout and wait again or send 'shutdown' immediately from server ?
-        #   => must traverse 'shutdown' through whole system to establish proper shutdown chain
-        # WARN! must be the last action !  No more async coro after this !
-        self.loop.stop()
-
-    async def stop(self):
-        return await self.srv.stop()
+        self.all_conn.disconnectAll()
 
     def register(self, channel):
         channel.callback(self.put)
