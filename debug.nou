@@ -1,0 +1,7 @@
+%%%% Debug facilities
+
+generate complete graph of all connected *mods* in runtime
+  E.G. file .gv/image, text outline, ascii art, gui graph/image preview
+  + TRY:DEV: visualize animation of cmds traversing by graph (like electrons running)
+
+monitor/statistics delays for cmds transferring/queues and cmds execution time
