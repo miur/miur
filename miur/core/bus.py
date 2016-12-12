@@ -229,15 +229,19 @@ class Hub:
         # NOTE: 'channels' is sep entity to support multiple independent buses with clients
         # WARN: not thread safe !!! BUT can't prove any until re-impl loop.create_server()
         self.channels = set()
-        self.srv = TcpListeningServer()
+        self.servers = set()
 
-        # XXX! i can set Channel.send_cb only after connection established !!!
-        make_channel = functools.partial(Channel, recv_cb=self.recv, ctx=ctx)
-        # FIXME:(encapsulate) self.chan.transport.recv
-        self.loop.create_task(self.srv.start(
-            server_address, self.channels, make_channel, loop=loop))
+        self.loop.create_task(self.mk_server_coro(TcpListeningServer, server_address, ctx))
         self.loop.create_task(self.bus_send.for_each(self.send))
         self.loop.create_task(self.bus_recv.for_each(self.execute))
+
+    def mk_server_coro(self, factory, server_address, ctx):
+        srv = factory()
+        # XXX! i can set Channel.send_cb only after connection established !!!
+        make_channel = functools.partial(Channel, recv_cb=self.recv, ctx=ctx)
+        coro = srv.start(server_address, self.channels, make_channel, loop=self.loop)
+        self.servers.add(srv)
+        return coro
 
     # BETTER: instead 'car' resend directly incoming packet inside transport
     #   => Lesser delay loop and no cpu load on re-encoding, better streaming
@@ -254,6 +258,8 @@ class Hub:
         return car
 
     def send(self, car):
+        # DEV: broadcast/multicast
+        #   THINK? is it attribute of command or of carrier ?
         # ATT: silent discard of 'car' if dst channel removed
         if car.dst in self.channels:
             return car.dst.send(car)
@@ -270,14 +276,14 @@ class Hub:
 
     def quit_soon(self):
         # EXPL: listening server stops, but already established sockets continue to communicate
-        self.srv.close()
+        [srv.close() for srv in self.servers]
         # EXPL: immediately ignore all incoming cmds when server is quitting
         [chan.close_recv() for chan in self.channels]
         self.loop.stop()  # EXPL: break main loop and await quit_clean() only
 
     # WARN! must be the last task !  No more async coro after this !
     async def quit_clean(self):
-        await self.srv.wait_closed()
+        await asyncio.gather(*[srv.wait_closed() for srv in self.servers])
         # NOTE: qin is already exhausted -- shutdown message is always the last
         # one -- and it triggers closing of executor()
         await self.bus_recv.join()
