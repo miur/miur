@@ -301,3 +301,16 @@ class Hub:
     def deregister(self, channel):
         del self.channels[channel.uuid]
         channel.destroy()
+
+# TODO:
+#   MOVE: rename channel hierarchy
+#     TcpProtocol->CommandPresentation
+#     TcpTransport->StreamProtocol
+#     ClientProtocol->TcpTransport
+#   ENH: self talk with bus by its own channel
+#   THINK:RFC: eliminate ref to channel in each carrier
+#       => ref is more lightweight but breaks encapsulation and makes system more coupled
+#   CHECK: closing recv end
+#   DEV: dynamic add/remove servers by cmds
+#   NEED: verify whole channel path till transport => fix encapsulation on ends
+#   FIXME: synchronous execution
