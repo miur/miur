@@ -123,7 +123,7 @@ MAYBE: use 'mesh' instead of 'bus' ?
 
 
 %% Channel Loop
-=_ OSI Levels
+=_ OSI Levels  # https://en.wikipedia.org/wiki/OSI_model
 | Application  | bus/mesh | accumulated msg, abstract addressee
 | Presentation | channel  | serialize, encode, compress, encrypt
 | Session      | protocol | whole seq of segments -- start, end, phys error
@@ -158,14 +158,86 @@ main -> (bus.dispatcher) -> channel -> transport {put,take}
   * channel aggregates heterogeneous connections/transports for in/out
     E.G. data preview in pipe or mmf and queries by simplex fifo
 address -- is address of channel
-  * channel associated with recipient
+  * channel associated with recipient 'uid' and then -- with channel itself
+  ! BUT from single channel may be received msgs with 'uids' from multiple recipients
+    = if some of them are transited through that node
+    ++ msg/rsp pathes may be different if req was sent as transit but rsp received directly
+    => if there no channel associated with that 'uid' -- send rsp back to same channel as msg
+      ALT: replace transit 'uid' by its node 'uid' and place origin 'uid' in extra info to resolve when its back
+        => BUT then msg/rsp path must always be the same
+        BETTER: allow such replacing as option when you _must_ force the same returning path
   => recipient 'uid' must not be dependent on transport
     ++ 'transport' can be switched keeping 'uid' between recv msg and send rsp
     use unique 'uid' regenerated on each launch ?
       => so each new instance -- has separate 'uid'
-      * previewer sends req to subscribe on curr file update preview when launched separately
-      * OR core initiates creating previewer and subscribes it itself, w/o waiting on req from previewer
-      * *core* re-sends data each time when file updated
   ? BUT how to transit msgs ?
     * distant recipients must know about each other id
     ~ at least single one must know -- other's id comes with msg as embedded or transport's extra info
+
+subscribe channel to server events
+  * previewer sends req to subscribe on curr file update preview when launched separately
+  * OR core initiates creating previewer and subscribes it itself, w/o waiting on req from previewer
+  * *core* re-sends data each time when file updated
+
+each *cmd* may be enveloped inside another *cmd*
+  * outer one when executed delivers inner *cmd* to appropriate 'ctx' to execute
+    => this enveloping allows to delay and schedule delivering to 'ctx'
+
+
+%% Hub
+  VIZ: manifold, slot, plug, connector
+
+Hub :: N : 1 : N
+  * aggregate all possible listening servers
+  * aggregate all connections and manage add/remove
+  * dispatch msgs from bus to conn
+  ? also aggregate all buses and manage shifting of-between
+      OR make buses separate concept ?
+
+Channel :: 2 : 2
+  Not each channel must construct cmds
+    * direct ones don't need it for shift in-between
+    * adapter uses its own cmds converter to/from
+    => 'make_cmd' must be aggregated by transport
+    ? share 'make_cmd' instances with identical cmds lists between channels ?
+  I may restrict allowed cmds per channel (per recipient)
+    BUT how about direct channel ?
+      < I will need to filter already constructed cmds
+    => filtering must be per channel and not per transport
+      * filter already constructed cmds in channel, but allow construction of any cmds
+        ! possible DDoS by constructing cmds exceeding system resources
+  MAYBE unite cmds 'serialization' with its controvert part of 'make_cmd'
+  On system start we must initialize only Bus and coro.
+    BUT: server must be started by cmds sent to itself -- as it would from external cmds.
+    Each *mod* connected to bus through channel
+    ALSO: 'self' is equal recipient as other channels but w/ channel reduced to none
+      = 'executor' is attached to the end of channel OR it may be 'dispatcher' to execute in appropriate contexts
+      + then 'self' node may be changed to any another channel into thread/fork
+        !! dynamic load/stability regulation
+          * new thread when delays in mux/asyncio become too big and remove thread again after that
+          * new fork if op robustness is questionable and can crash program
+      ? does it means self can be detouched from bus completely ?
+        => then this node can work as transit only (unrepairable)
+  All channels are synchoronous (sync by the end of cmd transmission)
+    ? How to be with data streaming/piping ?
+    !!! I need multiplexing to transport when streaming transit and sending rsp
+
+Bus :: 1 : 1
+  THINK: how to be with trinity queue recv/send/transit and dispatching ?
+    ? is it separate entities, or dispatching must be embedded into bus ?
+    ? must it be three separate Bus or single one with in/out and short transit loop ?
+        ? unidirectional Bus has any sense/usefulness
+        ? OR only combination of three ?
+        ? has any separate sense the transit Bus
+          ? OR its only abstraction for optimization of duplex Bus ?
+          + useful: to minimize transit delay if you have separate thread to re-send cmds
+
+
+%% Pool of working threads
+Each queue has dedicated pool of worker task
+  Recv
+    * fastest independent relay of transit msgs
+    * exhausting input queue as fast as possible
+  Send
+    * independent send to each type of connections
+    * multiple senders per type -- if some 'send' socket becomes blocked by some recipient
