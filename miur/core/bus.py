@@ -1,6 +1,7 @@
 import logging
 import asyncio
 import functools
+import struct
 
 from miur.share import protocol
 
@@ -79,17 +80,49 @@ class DirectTransport(BaseTransport):
         self.recv_cb(obj)
 
 
+# RFC: pack/unpack will be the same for all streams/pipes/fifo
+# BUT: for UDP unpack requires sending requests for repeating lost UDP packets
+# DEV: periodically send 'heartbeat' data and drop incomplete msg on each
+#   heartbeat, raising error or requesting msg re-send from client
+# MAYBE protocol is exactly this functionality for merging segments and heartbeat ?
+#     => then curr code in Protocol must be moved into Presentation
 class TcpTransport(BaseTransport):
+    h_sz_len = 4
+
     def __init__(self, recv_cb=None, send_cb=None):
         self.recv_cb = recv_cb
         self.send_cb = send_cb
 
-    def recv(self, dst, data_whole):
-        packet = (dst, data_whole)
-        return self.recv_cb(packet)
+        self._n = self.h_sz_len
+        self._buf = bytearray()
+        self._head = True
+
+    # BAD: broken chain of ret= value when accumulating
+    #   ~? ret 'None' when consumed and 'car' when fully converted
+    def recv(self, data):
+        # Accumulate data even if too small for both branches
+        self._buf = self._parse_msg(self._buf + data)
+
+    # BAD: packet dst set by the last chunk of data -- can be tampered up
+    def _parse_msg(self, buf):
+        i = 0
+        # NOTE: used single cycle to process multiple msgs received at once
+        while (i + self._n) <= len(buf):
+            blob = buf[i:i + self._n]
+            i += self._n
+            if self._head:
+                self._n = struct.unpack('>I', blob)[0]
+            else:
+                self._n = self.h_sz_len
+                _log.debug('_n({!r}b)'.format(self._n))
+                _log.debug('blob({!r}b)'.format(len(blob)))
+                self.recv_cb(blob)
+            self._head = not self._head
+        return buf[i:]
 
     def send(self, packet):
-        data = packet
+        header = struct.pack('>I', len(packet))
+        data = header + packet
         return self.send_cb(data)
 
 
@@ -107,29 +140,36 @@ class DictProtocol:
         self.make_cmd = command.CommandMaker('miur.core.command.all').make  # factory
         self.ctx = ctx
 
+    def unpack(self, packet):
+        obj, ifmt = protocol.deserialize(packet)
+        _log.debug('Packet({!r}b): {!r}'.format(len(packet), obj))
+        cmd = self.make_cmd(obj['cmd'], self.ctx, *obj['args'])
+        car = Carrier(None, cmd, fmt=ifmt, uid=obj['id'])
+        return car
+
     def pack(self, car):
+        _log.info('Response({:x}): {!r}'.format(car.uid, car.rsp))
         rsp = {'id': car.uid, 'rsp': car.rsp}
         packet = protocol.serialize(rsp, car.fmt)
-        _log.info('Response({:x}): {!r}'.format(car.uid, car.rsp))
         return packet
-
-    def unpack(self, packet):
-        dst, data_whole = packet
-        obj, ifmt = protocol.deserialize(data_whole)
-        _log.debug('Packet({!r}b): {!r}'.format(len(data_whole), obj))
-        cmd = self.make_cmd(obj['cmd'], self.ctx, *obj['args'])
-        car = Carrier(dst, cmd, fmt=ifmt, uid=obj['id'])
-        return car
 
 
 # NOTE: protocol negotiated between *mods*(uuid) on each *mods* topology change
 #   * supports different transport for recv and send
+# DEV: main dst key is ref to 'Channel' (direct pointer or new random uuid)
+#   * uuid is associated with channel only after recipient exchange first msg (according to protocol)
+#   * any consequent other uuid from same channel -- also registered and associated
+#     => if transit recipient relocates between nodes, all rsp sent to its old
+#       dst until it send at least one req from its new location
+#     ENH: if node says us that transit recipient is absent we can postpone rsp until it appears smwr again
+# BAD: channel identified by uuid can be tampered
+#   !! any recipient can forge cmd which rsp will be sent to another recipient (unexpecting that rsp!)
 class Channel:
-    def __init__(self, recv_cb=None, ctx=None):
+    def __init__(self, recv_cb=None, send_cb=None, ctx=None):
         self.recv_cb = recv_cb
         self.send_cb = None
         # BAD:THINK:RFC: unsymmetrical passing of recv and send
-        self.transport = TcpTransport(recv_cb=self.recv)
+        self.transport = TcpTransport(recv_cb=self.recv, send_cb=send_cb)
         # negotiated on connection, DFL depends on conn type
         self.protocol = DictProtocol(ctx=ctx)
 
@@ -142,6 +182,7 @@ class Channel:
 
     def recv(self, packet):
         obj = self.protocol.unpack(packet)
+        obj.dst = self
         return self.recv_cb(obj)
 
     def send(self, obj):
@@ -150,9 +191,9 @@ class Channel:
 
 
 class TcpListeningServer:
-    async def start(self, server_address, all_conn, process_msg, loop):
+    async def start(self, server_address, all_conn, make_channel, loop):
         self._asyncio_srv = await loop.create_server(
-            functools.partial(server.ClientProtocol, all_conn, process_msg),
+            functools.partial(server.ClientProtocol, all_conn, make_channel),
             *server_address, reuse_address=True, reuse_port=True)
         peer = self._asyncio_srv.sockets[0].getsockname()
         _log.info('Serving on {}'.format(peer))
@@ -176,12 +217,14 @@ class Hub:
         self.all_conn = server.ClientConnections(sid_grp='tcp')
         self.srv = TcpListeningServer()
         self.channels = {}
-        self.chan = Channel(self.recv, ctx)
+
+        # XXX! i can set Channel.send_cb only after connection established !!!
+        make_channel = functools.partial(Channel, recv_cb=self.recv, ctx=ctx)
 
         # FIXME:(encapsulate) self.chan.transport.recv
         self.loop.create_task(self.srv.start(
-            server_address, self.all_conn, self.chan.transport.recv, loop=loop))
-        self.loop.create_task(self.bus_send.for_each(self.pop_rsp))
+            server_address, self.all_conn, make_channel, loop=loop))
+        self.loop.create_task(self.bus_send.for_each(self.send))
         self.loop.create_task(self.bus_recv.for_each(self.execute))
 
     # BETTER: instead 'car' resend directly incoming packet inside transport
@@ -198,6 +241,11 @@ class Hub:
             self.execute(car)
         return car
 
+    def send(self, car):
+        if car.dst in self.all_conn:
+            return car.dst.send(car)
+            # return self.all_conn[car.dst].send(car)
+
     # MOVE: to the end of self-channel
     # BUT: it's placed in-between in/out bus -- how to simulate imm policy?
     # CHG: use global executor class for this
@@ -206,12 +254,6 @@ class Hub:
     def execute(self, car):
         rsp = car.execute()
         self.bus_send.put(rsp)
-
-    def pop_rsp(self, car):
-        rsp = {'id': car.uid, 'rsp': car.rsp}
-        data = protocol.serialize(rsp, car.fmt)
-        _log.info('Response({:x}): {!r}'.format(car.uid, car.rsp))
-        return self.all_conn[car.dst].send(data)
 
     def quit_soon(self):
         # EXPL: listening server stops, but already established sockets continue to communicate
