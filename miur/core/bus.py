@@ -89,9 +89,9 @@ class DirectTransport(BaseTransport):
 class TcpTransport(BaseTransport):
     h_sz_len = 4
 
-    def __init__(self, recv_cb=None, send_cb=None):
+    def __init__(self, recv_cb=None, conn=None):
         self.recv_cb = recv_cb
-        self.send_cb = send_cb
+        self.conn = conn
 
         self._n = self.h_sz_len
         self._buf = bytearray()
@@ -123,7 +123,13 @@ class TcpTransport(BaseTransport):
     def send(self, packet):
         header = struct.pack('>I', len(packet))
         data = header + packet
-        return self.send_cb(data)
+        return self.conn.send(data)
+
+    def close(self):
+        self.conn.close()
+
+    def close_recv(self):
+        self.conn.close_recv()
 
 
 class BaseProtocol:
@@ -165,11 +171,10 @@ class DictProtocol:
 # BAD: channel identified by uuid can be tampered
 #   !! any recipient can forge cmd which rsp will be sent to another recipient (unexpecting that rsp!)
 class Channel:
-    def __init__(self, recv_cb=None, send_cb=None, ctx=None):
+    def __init__(self, recv_cb=None, conn=None, ctx=None):
         self.recv_cb = recv_cb
-        self.send_cb = None
         # BAD:THINK:RFC: unsymmetrical passing of recv and send
-        self.transport = TcpTransport(recv_cb=self.recv, send_cb=send_cb)
+        self.transport = TcpTransport(recv_cb=self.recv, conn=conn)
         # negotiated on connection, DFL depends on conn type
         self.protocol = DictProtocol(ctx=ctx)
 
@@ -189,11 +194,19 @@ class Channel:
         packet = self.protocol.pack(obj)
         return self.transport.send(packet)
 
+    def close(self):
+        self.transport.close()
+
+    def close_recv(self):
+        self.transport.close_recv()
+
 
 class TcpListeningServer:
-    async def start(self, server_address, all_conn, make_channel, loop):
+    # BETTER: re-impl loop.create_server(...) for deterministic order of accept/receive/lost
+    #   => then parallelism will be controllable and no need for _lock in channels
+    async def start(self, server_address, channels, make_channel, loop):
         self._asyncio_srv = await loop.create_server(
-            functools.partial(server.ClientProtocol, all_conn, make_channel),
+            functools.partial(server.ClientProtocol, channels, make_channel),
             *server_address, reuse_address=True, reuse_port=True)
         peer = self._asyncio_srv.sockets[0].getsockname()
         _log.info('Serving on {}'.format(peer))
@@ -213,17 +226,16 @@ class Hub:
         # NOTE: separate buses are necessary to support full-duplex
         self.bus_recv = Bus()
         self.bus_send = Bus()
-        # TEMP: only tcp conn instead of channels
-        self.all_conn = server.ClientConnections(sid_grp='tcp')
+        # NOTE: 'channels' is sep entity to support multiple independent buses with clients
+        # WARN: not thread safe !!! BUT can't prove any until re-impl loop.create_server()
+        self.channels = set()
         self.srv = TcpListeningServer()
-        self.channels = {}
 
         # XXX! i can set Channel.send_cb only after connection established !!!
         make_channel = functools.partial(Channel, recv_cb=self.recv, ctx=ctx)
-
         # FIXME:(encapsulate) self.chan.transport.recv
         self.loop.create_task(self.srv.start(
-            server_address, self.all_conn, make_channel, loop=loop))
+            server_address, self.channels, make_channel, loop=loop))
         self.loop.create_task(self.bus_send.for_each(self.send))
         self.loop.create_task(self.bus_recv.for_each(self.execute))
 
@@ -242,9 +254,10 @@ class Hub:
         return car
 
     def send(self, car):
-        if car.dst in self.all_conn:
+        # ATT: silent discard of 'car' if dst channel removed
+        if car.dst in self.channels:
             return car.dst.send(car)
-            # return self.all_conn[car.dst].send(car)
+            # return self.channels[car.dst].send(car)
 
     # MOVE: to the end of self-channel
     # BUT: it's placed in-between in/out bus -- how to simulate imm policy?
@@ -259,7 +272,7 @@ class Hub:
         # EXPL: listening server stops, but already established sockets continue to communicate
         self.srv.close()
         # EXPL: immediately ignore all incoming cmds when server is quitting
-        self.all_conn.ignoreRecvAll()
+        [chan.close_recv() for chan in self.channels]
         self.loop.stop()  # EXPL: break main loop and await quit_clean() only
 
     # WARN! must be the last task !  No more async coro after this !
@@ -272,8 +285,9 @@ class Hub:
         #   => qin.pop() is immediate, but qout.put() is often delayed until cmd finished
         # TRY: use semaphore with timer ?
         await self.bus_send.join()
-        self.all_conn.disconnectAll()
+        [chan.close() for chan in self.channels]
 
+    # RFC: unused == try using instead of direct assing inside ClientProtocol
     def register(self, channel):
         channel.callback(self.put)
         self.channels[channel.uuid] = channel.get
