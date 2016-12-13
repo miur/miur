@@ -142,17 +142,19 @@ class BaseProtocol:
 
 # NOTE: can split single cmd into multiple msgs -- for streaming, etc
 class DictProtocol:
-    def __init__(self, ctx=None):
-        self.make_cmd = command.CommandMaker('miur.core.command.all').make  # factory
-        self.ctx = ctx
+    def __init__(self, make_cmd, make_car):
+        self.make_cmd = make_cmd
+        self.make_car = make_car
 
+    # RFC: remove intermediate 'dict' (if possible)
     def unpack(self, packet):
-        obj, ifmt = protocol.deserialize(packet)
+        obj, _ = protocol.deserialize(packet)
         _log.debug('Packet({!r}b): {!r}'.format(len(packet), obj))
-        cmd = self.make_cmd(obj['cmd'], self.ctx, *obj['args'])
-        car = Carrier(None, cmd, fmt=ifmt, uid=obj['id'])
+        cmd = self.make_cmd(obj['cmd'], *obj['args'])
+        car = self.make_car(cmd=cmd, uid=obj['id'])
         return car
 
+    # RFC: remove redundant 'ifmt/ofmt'
     def pack(self, car):
         _log.info('Response({:x}): {!r}'.format(car.uid, car.rsp))
         rsp = {'id': car.uid, 'rsp': car.rsp}
@@ -170,24 +172,28 @@ class DictProtocol:
 #     ENH: if node says us that transit recipient is absent we can postpone rsp until it appears smwr again
 # BAD: channel identified by uuid can be tampered
 #   !! any recipient can forge cmd which rsp will be sent to another recipient (unexpecting that rsp!)
+
+# TODO:ENH: make Channel contain two Chain, where Chain ~= 'compose()'
+# BAD: 'compose()' -- freezes order :: BUT chain must be reconfigured when topology changes
+# + https://docs.python.org/3.1/howto/functional.html
+#   http://stackoverflow.com/questions/16739290/composing-functions-in-python
+#   https://mathieularose.com/function-composition-in-python/
+# ALSO: Channel manages end-points to connect/replace buses and transports
 class Channel:
     def __init__(self, recv_cb=None, conn=None, ctx=None):
         self.recv_cb = recv_cb
         # BAD:THINK:RFC: unsymmetrical passing of recv and send
         self.transport = TcpTransport(recv_cb=self.recv, conn=conn)
+        _make_cmd = command.CommandMaker('miur.core.command.all').make  # factory
+        make_car = functools.partial(Carrier, dst=self, fmt=protocol.pickle)
+
+        def make_cmd(nm, *args):
+            return _make_cmd(nm, ctx, *args)
         # negotiated on connection, DFL depends on conn type
-        self.protocol = DictProtocol(ctx=ctx)
-
-    # @property
-    # def recv_point(self):
-    #     return self.transport.recv
-
-    # def set_transport(self, reader, writer=None):
-    #     pass
+        self.protocol = DictProtocol(make_cmd, make_car)
 
     def recv(self, packet):
         obj = self.protocol.unpack(packet)
-        obj.dst = self
         return self.recv_cb(obj)
 
     def send(self, obj):
@@ -259,6 +265,8 @@ class Hub:
         self.servers.add(srv)
         return coro
 
+    # NOTE: this is recv concentrator -- sole point for all channels to connect
+    #   ~~ ? BET: rename into Hub ?
     # BETTER: instead 'car' resend directly incoming packet inside transport
     #   => Lesser delay loop and no cpu load on re-encoding, better streaming
     # if cmd['addressee'] != self:  # transit
@@ -273,6 +281,8 @@ class Hub:
             self.handler.handle(car)
         return car
 
+    # RFC: there must not be any recv/send in Hub BUT where them must be ?
+    #   => smth aka "Door between Bus and Channel, Gatekeeper"
     def send(self, car):
         # DEV: broadcast/multicast
         #   THINK? is it attribute of command or of carrier ?
@@ -314,7 +324,9 @@ class Hub:
 #     TcpProtocol->CommandPresentation
 #     TcpTransport->StreamProtocol
 #     ClientProtocol->TcpTransport
-#   ENH: self talk with bus by its own channel
+#   ENH: self talk with bus by its own reverse channel
+#     ADD loopback channel for msg addressed to itself
+#       -- until it will be forked out from bus
 #   THINK:RFC: eliminate ref to channel in each carrier
 #       => ref is more lightweight but breaks encapsulation and makes system more coupled
 #   CHECK: closing recv end
