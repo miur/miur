@@ -218,6 +218,21 @@ class TcpListeningServer:
         return await self._asyncio_srv.wait_closed()
 
 
+# NOTE:TEMP: mix up 'load distributor' thread with 'executor' thread while N==1
+class Handler:
+    def __init__(self, sink):
+        self.sink = sink
+
+    # MOVE: to the end of self-channel
+    # BUT: it's placed in-between in/out bus -- how to simulate imm policy?
+    # CHG: use global executor class for this
+    # TRY: regulate putting rsp into bus_send by cmd/rsp itself
+    #   => BUT who must decide it: command or context ?
+    def handle(self, car):
+        rsp = car.execute()
+        self.sink(rsp)
+
+
 # NOTE: hub must aggregate both in/out bus to be able to exec sync cmds
 #   THINK:MAYBE: hide both impl in/out queue with exec() under single Bus ?
 class Hub:
@@ -230,10 +245,11 @@ class Hub:
         # WARN: not thread safe !!! BUT can't prove any until re-impl loop.create_server()
         self.channels = set()
         self.servers = set()
+        self.handler = Handler(self.bus_send.put)
 
         self.loop.create_task(self.mk_server_coro(TcpListeningServer, server_address, ctx))
         self.loop.create_task(self.bus_send.for_each(self.send))
-        self.loop.create_task(self.bus_recv.for_each(self.execute))
+        self.loop.create_task(self.bus_recv.for_each(self.handler.handle))
 
     def mk_server_coro(self, factory, server_address, ctx):
         srv = factory()
@@ -254,7 +270,7 @@ class Hub:
         elif policy == command.IMMEDIATE:
             # THINK: place 'shutdown' into qout and wait again or send 'shutdown' immediately from server ?
             #   => must traverse 'shutdown' through whole system to establish proper shutdown chain
-            self.execute(car)
+            self.handler.handle(car)
         return car
 
     def send(self, car):
@@ -264,15 +280,6 @@ class Hub:
         if car.dst in self.channels:
             return car.dst.send(car)
             # return self.channels[car.dst].send(car)
-
-    # MOVE: to the end of self-channel
-    # BUT: it's placed in-between in/out bus -- how to simulate imm policy?
-    # CHG: use global executor class for this
-    # TRY: regulate putting rsp into bus_send by cmd/rsp itself
-    #   => BUT who must decide it: command or context ?
-    def execute(self, car):
-        rsp = car.execute()
-        self.bus_send.put(rsp)
 
     def quit_soon(self):
         # EXPL: listening server stops, but already established sockets continue to communicate
