@@ -1,3 +1,6 @@
+__all__ = ['BaseChainLink']
+
+
 class BaseChainLink:
     def __call__(self, arg):
         raise NotImplementedError

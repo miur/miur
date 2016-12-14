@@ -1,6 +1,6 @@
 from .basechainlink import BaseChainLink
 
-__all__ = ['Anonymize', 'Deanonymize']
+__all__ = ['Deanonymize', 'Anonymize']
 
 
 class Deanonymize(BaseChainLink):
