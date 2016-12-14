@@ -180,35 +180,23 @@ class Hub(BaseChainLink):
 
 # NOTE: topology must aggregate both in/out bus to be able to exec sync cmds
 #   THINK:MAYBE: hide both impl in/out queue with exec() under single Bus ?
-class Topology:
-    def __init__(self, server_address, ctx=None, loop=None):
-        self.loop = loop
+class Ring:
+    def __init__(self, ctx):
         # NOTE: separate buses are necessary to support full-duplex
         self.bus_recv = Bus()
         self.bus_send = Bus()
-        self.servers = set()
         self.handler = Handler(sink=self.bus_send.put)
         self.hub = Hub(sink=self.bus_recv.put, handler=self.handler, ctx=ctx)
 
-        self.loop.create_task(self.mk_server_coro(TcpListeningServer, server_address))
-        self.loop.create_task(self.bus_send.for_each(self.hub))
-        self.loop.create_task(self.bus_recv.for_each(self.handler))
+    async def loop(self):
+        await asyncio.gather(self.bus_recv.for_each(self.handler),
+                             self.bus_send.for_each(self.hub))
 
-    def mk_server_coro(self, factory, server_address):
-        srv = factory()
-        self.servers.add(srv)
-        return srv.start(server_address, hub=self.hub, loop=self.loop)
-
-    def quit_soon(self):
-        # EXPL: listening server stops, but already established sockets continue to communicate
-        [srv.close() for srv in self.servers]
+    def close_recv(self):
         # EXPL: immediately ignore all incoming cmds when server is quitting
         self.hub.close_recv()
-        self.loop.stop()  # EXPL: break main loop and await quit_clean() only
 
-    # WARN! must be the last task !  No more async coro after this !
     async def quit_clean(self):
-        await asyncio.gather(*[srv.wait_closed() for srv in self.servers])
         # NOTE: qin is already exhausted -- shutdown message is always the last
         # one -- and it triggers closing of executor()
         await self.bus_recv.join()
@@ -217,6 +205,29 @@ class Topology:
         # TRY: use semaphore with timer ?
         await self.bus_send.join()
         self.hub.close()
+
+
+class Topology:
+    def __init__(self, server_address, ctx=None, loop=None):
+        self.loop = loop
+        self.ring = Ring(ctx=ctx)
+        self.loop.create_task(self.ring.loop())
+
+        self.servers = set()
+        srv = TcpListeningServer()
+        self.servers.add(srv)
+        self.loop.create_task(srv.start(server_address, hub=self.ring.hub, loop=self.loop))
+
+    def quit_soon(self):
+        # EXPL: listening server stops, but already established sockets continue to communicate
+        [srv.close() for srv in self.servers]
+        self.ring.close_recv()
+        self.loop.stop()  # EXPL: break main loop and await quit_clean() only
+
+    # WARN! must be the last task !  No more async coro after this !
+    async def quit_clean(self):
+        await asyncio.gather(*[srv.wait_closed() for srv in self.servers])
+        await self.ring.quit_clean()
 
 # TODO:
 #   MOVE: rename channel hierarchy
