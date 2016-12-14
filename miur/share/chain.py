@@ -30,16 +30,24 @@ def with_lock(method):
 #   -- add it to Chain between serializer and segmentor and it will simply work
 # ALT:BAD? we integrate segmentor into transport and process inside Chain only single-in-single-out msgs
 class Chain:
-    def __init__(self, functors, *, iterator=lambda x: x):
-        self._impl = list(functors)
+    def __init__(self, *args, **kw):
         self._lock = threading.Lock()
-        self._iter = iterator
+        self._impl = None
+        self.assign(*args, **kw)
+
+    @with_lock
+    def assign(self, functors, iterator=lambda x: x):
+        L = list(iterator(functors))
+        for i in range(len(L) - 1):
+            if not hasattr(L[i], 'sink'):  # ALT: isinstance(L[i], BaseChainLink)
+                raise AttributeError('sink')
+            L[i].sink = L[i+1]  # ALT: = L[i+1].__call__
+        self._impl = L
 
     @with_lock
     def __call__(self, arg):
-        for f in self._iter(self._impl):
-            arg = f(arg)
-        return arg
+        if self._impl:
+            self._impl[0](arg)
 
     # @with_lock
     # def __getitem__(self, k):

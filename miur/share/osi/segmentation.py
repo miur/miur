@@ -5,10 +5,12 @@
 
 import struct
 
+from .basechainlink import BaseChainLink
+
 __all__ = ['Desegmentate', 'Segmentate']
 
 
-class Desegmentate:
+class Desegmentate(BaseChainLink):
     h_sz_len = 4
 
     def __init__(self):
@@ -18,7 +20,9 @@ class Desegmentate:
 
     def __call__(self, data):
         """ Accumulate data even if too small for both branches """
-        buf = self._buf + data
+        self._buf = self._parse(self._buf + data)
+
+    def _parse(self, buf):
         i = 0
         # NOTE: used single cycle to process multiple msgs received at once
         while (i + self._n) <= len(buf):
@@ -28,14 +32,13 @@ class Desegmentate:
                 self._n = struct.unpack('>I', blob)[0]
             else:
                 self._n = self.h_sz_len
-                ret = yield blob
+                self.sink(blob)
             self._head = not self._head
-        self._buf = buf[i:]
-        return ret
+        return buf[i:]
 
 
 # NOTE: TCP.transport.write() supports arbitrary data length BUT may be necessary for UDP
-class Segmentate:
+class Segmentate(BaseChainLink):
     def __call__(self, data):
         header = struct.pack('>I', len(data))
-        return header + data
+        self.sink(header + data)

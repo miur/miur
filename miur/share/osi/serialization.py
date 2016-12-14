@@ -2,22 +2,24 @@
 
 import pickle
 
+from .basechainlink import BaseChainLink
+
 __all__ = ['Deserialize', 'Serialize']
 
 
-class Deserialize:
+class Deserialize(BaseChainLink):
     def __init__(self, factory):
         self._factory = factory
 
     def __call__(self, data):
         kv = pickle.loads(data)
         cmd = self._factory(kv['cmd'], *kv['args'])
-        return (kv['id'], cmd)
+        self.sink((kv['id'], cmd))
 
 
-class Serialize:
+class Serialize(BaseChainLink):
     def __call__(self, pair):
         uid, rsp = pair
         obj = {'id': uid, 'rsp': rsp}
         data = pickle.dumps(obj, protocol=pickle.HIGHEST_PROTOCOL)
-        return data
+        self.sink(data)
