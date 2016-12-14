@@ -4,6 +4,8 @@ import functools
 import struct
 
 from miur.share import protocol
+from miur.share.chain import Chain
+from miur.share.osi import *
 
 from . import command, server
 
@@ -12,7 +14,7 @@ _log = logging.getLogger(__name__)
 
 # NOTE: adapted to bus, works in both dir, aggregates sep concepts of subsystems
 class Carrier:
-    def __init__(self, dst=None, cmd=None, rsp=None, fmt=None, uid=None):
+    def __init__(self, *, dst=None, cmd=None, rsp=None, fmt=None, uid=None):
         self.dst = dst  # pair (sid, cid) -- listening server + accepted client
         self.cmd = cmd
         self.rsp = rsp  # THINK: 'rsp' can be 'cmd' if initiated from *core* to *client*
@@ -182,29 +184,34 @@ class DictProtocol:
 class Channel:
     def __init__(self, recv_cb=None, conn=None, ctx=None):
         self.recv_cb = recv_cb
-        # BAD:THINK:RFC: unsymmetrical passing of recv and send
-        self.transport = TcpTransport(recv_cb=self.recv, conn=conn)
+        self.conn = conn
         _make_cmd = command.CommandMaker('miur.core.command.all').make  # factory
         make_car = functools.partial(Carrier, dst=self, fmt=protocol.pickle)
 
         def make_cmd(nm, *args):
             return _make_cmd(nm, ctx, *args)
-        # negotiated on connection, DFL depends on conn type
         self.protocol = DictProtocol(make_cmd, make_car)
+
+        # TODO: negotiated both protocols on connect (plain_text, srz_dict, etc)
+        self.chain_recv = Chain([self.recv_cb, Deanonymize(make_car),
+                                 Deserialize(make_cmd), Desegmentate()],
+                                iterator=reversed)
+
+        self.chain_send = Chain([Anonymize(), Serialize(), Segmentate(), self.conn])
 
     def recv(self, packet):
         obj = self.protocol.unpack(packet)
         return self.recv_cb(obj)
 
-    def send(self, obj):
-        packet = self.protocol.pack(obj)
-        return self.transport.send(packet)
+    def send(self, car):
+        _log.info('Response({:x}): {!r}'.format(car.uid, car.rsp))
+        self.chain_send(car)
 
     def close(self):
-        self.transport.close()
+        self.conn.close()
 
     def close_recv(self):
-        self.transport.close_recv()
+        self.conn.close_recv()
 
 
 class TcpListeningServer:
@@ -234,9 +241,9 @@ class Handler:
     # CHG: use global executor class for this
     # TRY: regulate putting rsp into bus_send by cmd/rsp itself
     #   => BUT who must decide it: command or context ?
-    def handle(self, car):
-        rsp = car.execute()
-        self.sink(rsp)
+    def __call__(self, car):
+        car.execute()
+        self.sink(car)
 
 
 # NOTE: hub must aggregate both in/out bus to be able to exec sync cmds
@@ -255,7 +262,7 @@ class Hub:
 
         self.loop.create_task(self.mk_server_coro(TcpListeningServer, server_address, ctx))
         self.loop.create_task(self.bus_send.for_each(self.send))
-        self.loop.create_task(self.bus_recv.for_each(self.handler.handle))
+        self.loop.create_task(self.bus_recv.for_each(self.handler))
 
     def mk_server_coro(self, factory, server_address, ctx):
         srv = factory()
@@ -278,7 +285,7 @@ class Hub:
         elif policy == command.IMMEDIATE:
             # THINK: place 'shutdown' into qout and wait again or send 'shutdown' immediately from server ?
             #   => must traverse 'shutdown' through whole system to establish proper shutdown chain
-            self.handler.handle(car)
+            self.handler(car)
         return car
 
     # RFC: there must not be any recv/send in Hub BUT where them must be ?

@@ -2,12 +2,14 @@ import logging
 import asyncio
 import socket
 
+from miur.share.osi.basechainlink import BaseChainLink
+
 _log = logging.getLogger(__name__)
 
 
 # THINK: accepted/dismissed clients can be passed to Hub through Bus as usual cmds
 # TODO: rename to TCPListeningServerConnection to distinguish from outgoing TCPConnection ?
-class ClientProtocol(asyncio.Protocol):
+class ClientProtocol(asyncio.Protocol, BaseChainLink):
     """Each client connection will create a new protocol instance"""
 
     def __init__(self, channels, make_channel):
@@ -23,7 +25,7 @@ class ClientProtocol(asyncio.Protocol):
 
         # HACK: no encapsulation :: make channel.get_recv_pt() ?
         self.chan = self.make_channel(conn=self)
-        self.recv_cb = self.chan.transport.recv
+        self.recv_cb = self.chan.chain_recv
 
         # MAYBE: use backward dict [self] = channel :: so I can dismiss self.chan
         # NOTE: adding to dict don't require lock (beside iterating that dict)
@@ -61,4 +63,7 @@ class ClientProtocol(asyncio.Protocol):
     # CHECK: if need to write multiple times for too big data
     # CHECK:DONE: no need to '.drain()' (used only for streams)
     def send(self, data):
+        self.transport.write(data)
+
+    def __call__(self, data):
         self.transport.write(data)
