@@ -16,13 +16,14 @@ __all__ = ['CommandMaker']
 #   https://docs.python.org/3.5/library/modules.html
 
 class CommandMaker:
-    def __init__(self, pkg):
+    def __init__(self, pkg, ctx):
+        self.ctx = ctx
         mod = importlib.import_module(pkg)
         self.cmds = {v.cmd: v for v in vars(mod).values()
                      if isinstance(v, type) and issubclass(v, base.BaseCommand)}
 
-    def make(self, nm, ctx, *args):
+    def make(self, nm, *args):
         # THINK:WTF: if no such cmd ? Client will hang in infinite loop
         #   FIXME: BaseCommand => WrongCommand (generate exception and send back to client)
         ctor = self.cmds.get(nm, base.WrongCommand)
-        return ctor(ctx, *args)
+        return ctor(self.ctx, *args)

@@ -10,10 +10,10 @@ class QuitCmd(base.BaseCommand):
     policy = policy.IMMEDIATE
 
     def __init__(self, ctx, *args):
-        self.hub = ctx.hub
+        self._quit = ctx.top.quit_soon
 
     # TEMP:HACK: reflect 'quit' back to rotate cycle once more until false condition
     # NOTE: even if QuitCmd is destroyed, quit_soon coro continues to work
     def execute(self):
         # USE run_forever() and schedule do_quit() on 'quit' cmd
-        self.hub.quit_soon()
+        self._quit()

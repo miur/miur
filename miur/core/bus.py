@@ -1,9 +1,7 @@
 import logging
 import asyncio
 import functools
-import struct
 
-from miur.share import protocol
 from miur.share.chain import Chain
 from miur.share.osi import *
 
@@ -14,12 +12,11 @@ _log = logging.getLogger(__name__)
 
 # NOTE: adapted to bus, works in both dir, aggregates sep concepts of subsystems
 class Carrier:
-    def __init__(self, *, dst=None, cmd=None, rsp=None, fmt=None, uid=None):
-        self.dst = dst  # pair (sid, cid) -- listening server + accepted client
+    def __init__(self, *, sink=None, cmd=None, rsp=None, uid=None):
+        self.sink = sink
         self.cmd = cmd
         self.rsp = rsp  # THINK: 'rsp' can be 'cmd' if initiated from *core* to *client*
-        self.fmt = fmt  # MAYBE: excessive and must be removed
-        self.uid = uid  # unique message id
+        self.uid = uid  # THINK: unique message id -- remove ?
 
     # WTF if cmd will be executed second time ?
     #   THINK: Allow or disable availability
@@ -64,154 +61,24 @@ class Bus:
             await self.pop_apply(functor)
 
 
-class BaseTransport:
-    def recv_cb(self, obj):
-        raise NotImplementedError
-
-    def send(self, obj):
-        raise NotImplementedError
-
-
-# NOTE: loopback transport to inject cmds in backward direction
-class DirectTransport(BaseTransport):
-    def recv_cb(self, obj):
-        return obj
-
-    # XXX: what it must return ?
-    def send(self, obj):
-        self.recv_cb(obj)
-
-
-# RFC: pack/unpack will be the same for all streams/pipes/fifo
-# BUT: for UDP unpack requires sending requests for repeating lost UDP packets
-# DEV: periodically send 'heartbeat' data and drop incomplete msg on each
-#   heartbeat, raising error or requesting msg re-send from client
-# MAYBE protocol is exactly this functionality for merging segments and heartbeat ?
-#     => then curr code in Protocol must be moved into Presentation
-class TcpTransport(BaseTransport):
-    h_sz_len = 4
-
-    def __init__(self, recv_cb=None, conn=None):
-        self.recv_cb = recv_cb
-        self.conn = conn
-
-        self._n = self.h_sz_len
-        self._buf = bytearray()
-        self._head = True
-
-    # BAD: broken chain of ret= value when accumulating
-    #   ~? ret 'None' when consumed and 'car' when fully converted
-    def recv(self, data):
-        # Accumulate data even if too small for both branches
-        self._buf = self._parse_msg(self._buf + data)
-
-    # BAD: packet dst set by the last chunk of data -- can be tampered up
-    def _parse_msg(self, buf):
-        i = 0
-        # NOTE: used single cycle to process multiple msgs received at once
-        while (i + self._n) <= len(buf):
-            blob = buf[i:i + self._n]
-            i += self._n
-            if self._head:
-                self._n = struct.unpack('>I', blob)[0]
-            else:
-                self._n = self.h_sz_len
-                _log.debug('_n({!r}b)'.format(self._n))
-                _log.debug('blob({!r}b)'.format(len(blob)))
-                self.recv_cb(blob)
-            self._head = not self._head
-        return buf[i:]
-
-    def send(self, packet):
-        header = struct.pack('>I', len(packet))
-        data = header + packet
-        return self.conn.send(data)
-
-    def close(self):
-        self.conn.close()
-
-    def close_recv(self):
-        self.conn.close_recv()
-
-
-class BaseProtocol:
-    def pack(self):
-        raise NotImplementedError
-
-    def unpack(self):
-        raise NotImplementedError
-
-
-# NOTE: can split single cmd into multiple msgs -- for streaming, etc
-class DictProtocol:
-    def __init__(self, make_cmd, make_car):
-        self.make_cmd = make_cmd
-        self.make_car = make_car
-
-    # RFC: remove intermediate 'dict' (if possible)
-    def unpack(self, packet):
-        obj, _ = protocol.deserialize(packet)
-        _log.debug('Packet({!r}b): {!r}'.format(len(packet), obj))
-        cmd = self.make_cmd(obj['cmd'], *obj['args'])
-        car = self.make_car(cmd=cmd, uid=obj['id'])
-        return car
-
-    # RFC: remove redundant 'ifmt/ofmt'
-    def pack(self, car):
-        _log.info('Response({:x}): {!r}'.format(car.uid, car.rsp))
-        rsp = {'id': car.uid, 'rsp': car.rsp}
-        packet = protocol.serialize(rsp, car.fmt)
-        return packet
-
-
-# NOTE: protocol negotiated between *mods*(uuid) on each *mods* topology change
-#   * supports different transport for recv and send
-# DEV: main dst key is ref to 'Channel' (direct pointer or new random uuid)
-#   * uuid is associated with channel only after recipient exchange first msg (according to protocol)
-#   * any consequent other uuid from same channel -- also registered and associated
-#     => if transit recipient relocates between nodes, all rsp sent to its old
-#       dst until it send at least one req from its new location
-#     ENH: if node says us that transit recipient is absent we can postpone rsp until it appears smwr again
-# BAD: channel identified by uuid can be tampered
-#   !! any recipient can forge cmd which rsp will be sent to another recipient (unexpecting that rsp!)
-
-# TODO:ENH: make Channel contain two Chain, where Chain ~= 'compose()'
-# BAD: 'compose()' -- freezes order :: BUT chain must be reconfigured when topology changes
-# + https://docs.python.org/3.1/howto/functional.html
-#   http://stackoverflow.com/questions/16739290/composing-functions-in-python
-#   https://mathieularose.com/function-composition-in-python/
-# ALSO: Channel manages end-points to connect/replace buses and transports
+# TODO: negotiate both protocols on connect (plain_text, srz_dict, etc)
 class Channel:
-    def __init__(self, recv_cb=None, conn=None, ctx=None):
-        self.recv_cb = recv_cb
-        self.conn = conn
-        _make_cmd = command.CommandMaker('miur.core.command.all').make  # factory
-        make_car = functools.partial(Carrier, dst=self, fmt=protocol.pickle)
-
-        def make_cmd(nm, *args):
-            return _make_cmd(nm, ctx, *args)
-        self.protocol = DictProtocol(make_cmd, make_car)
-
-        # TODO: negotiated both protocols on connect (plain_text, srz_dict, etc)
-        self.chain_recv = Chain([self.recv_cb, Deanonymize(make_car),
+    def __init__(self, sink=None, src=None, dst=None, ctx=None):
+        make_cmd = command.CommandMaker('miur.core.command.all', ctx).make
+        make_car = functools.partial(Carrier, sink=self)
+        self.chain_recv = Chain([sink, Deanonymize(make_car),
                                  Deserialize(make_cmd), Desegmentate()],
                                 iterator=reversed)
+        self.chain_send = Chain([Anonymize(), Serialize(), Segmentate(), dst])
+        # HACK: try to insert this into Chain ALT self.get_src_slot()
+        src.sink = self.chain_recv
+        # BAD: dst isn't closed, ALSO how to close all when disassembling chain
+        self.close = src.close
+        self.close_recv = src.close_recv
 
-        self.chain_send = Chain([Anonymize(), Serialize(), Segmentate(), self.conn])
-
-    def recv(self, packet):
-        obj = self.protocol.unpack(packet)
-        return self.recv_cb(obj)
-
-    def send(self, car):
+    def __call__(self, car):
         _log.info('Response({:x}): {!r}'.format(car.uid, car.rsp))
         self.chain_send(car)
-
-    def close(self):
-        self.conn.close()
-
-    def close_recv(self):
-        self.conn.close_recv()
 
 
 class TcpListeningServer:
@@ -246,9 +113,9 @@ class Handler:
         self.sink(car)
 
 
-# NOTE: hub must aggregate both in/out bus to be able to exec sync cmds
+# NOTE: topology must aggregate both in/out bus to be able to exec sync cmds
 #   THINK:MAYBE: hide both impl in/out queue with exec() under single Bus ?
-class Hub:
+class Topology:
     def __init__(self, server_address, ctx=None, loop=None):
         self.loop = loop
         # NOTE: separate buses are necessary to support full-duplex
@@ -267,17 +134,16 @@ class Hub:
     def mk_server_coro(self, factory, server_address, ctx):
         srv = factory()
         # XXX! i can set Channel.send_cb only after connection established !!!
-        make_channel = functools.partial(Channel, recv_cb=self.recv, ctx=ctx)
+        make_channel = functools.partial(Channel, sink=self.recv, ctx=ctx)
         coro = srv.start(server_address, self.channels, make_channel, loop=self.loop)
         self.servers.add(srv)
         return coro
 
     # NOTE: this is recv concentrator -- sole point for all channels to connect
     #   ~~ ? BET: rename into Hub ?
-    # BETTER: instead 'car' resend directly incoming packet inside transport
-    #   => Lesser delay loop and no cpu load on re-encoding, better streaming
-    # if cmd['addressee'] != self:  # transit
-    #     self.qout.put_nowait(car)
+
+    # ALT:BET: transit whole packets stream directly w/o re-encoding
+    # if cmd['dst'] != self: self.bus_send.put(car)
     def recv(self, car):
         policy = getattr(car.cmd, 'policy', command.GENERAL)
         if policy == command.GENERAL:
@@ -294,8 +160,8 @@ class Hub:
         # DEV: broadcast/multicast
         #   THINK? is it attribute of command or of carrier ?
         # ATT: silent discard of 'car' if dst channel removed
-        if car.dst in self.channels:
-            return car.dst.send(car)
+        if car.sink in self.channels:
+            return car.sink(car)
             # return self.channels[car.dst].send(car)
 
     def quit_soon(self):

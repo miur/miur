@@ -15,17 +15,12 @@ class ClientProtocol(asyncio.Protocol, BaseChainLink):
     def __init__(self, channels, make_channel):
         self.channels = channels
         self.make_channel = make_channel
-        self.recv_cb = None
-        self.chan = None
 
     def connection_made(self, transport):
         self.transport = transport
         self.peer = self.transport.get_extra_info('peername')
         _log.info('Connection from {}'.format(self.peer))
-
-        # HACK: no encapsulation :: make channel.get_recv_pt() ?
-        self.chan = self.make_channel(conn=self)
-        self.recv_cb = self.chan.chain_recv
+        self.chan = self.make_channel(src=self, dst=self)
 
         # MAYBE: use backward dict [self] = channel :: so I can dismiss self.chan
         # NOTE: adding to dict don't require lock (beside iterating that dict)
@@ -57,13 +52,10 @@ class ClientProtocol(asyncio.Protocol, BaseChainLink):
         _log.debug('Recv:{!r}: {!r} bytes'.format(self.peer, len(data)))
         if not data:
             raise
-        self.recv_cb(data)
+        self.sink(data)
 
     # BAD: exc if client was already deleted when executor was suspended
     # CHECK: if need to write multiple times for too big data
     # CHECK:DONE: no need to '.drain()' (used only for streams)
-    def send(self, data):
-        self.transport.write(data)
-
     def __call__(self, data):
         self.transport.write(data)

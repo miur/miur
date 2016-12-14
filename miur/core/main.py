@@ -2,7 +2,7 @@ import logging
 import asyncio
 import uuid
 
-from .bus import Hub
+from . import bus
 
 _log = logging.getLogger(__name__)
 
@@ -24,14 +24,14 @@ class CoreProgramm:
         self.uuid = str(uuid.uuid4())
         self.loop = asyncio.get_event_loop()
         self.loop.set_debug(True)
-        self.hub = Hub(server_address, ctx=self, loop=self.loop)
+        self.top = bus.Topology(server_address, ctx=self, loop=self.loop)
         self.run()
 
     def run(self):
         try:
             self.loop.run_forever()
         finally:
-            self.loop.run_until_complete(self.hub.quit_clean())
+            self.loop.run_until_complete(self.top.quit_clean())
             self.loop.close()
 
 

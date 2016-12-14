@@ -1,7 +1,9 @@
-# BAD: broken chain of ret= value when accumulating
-#   ~? ret 'None' when consumed and 'car' when fully converted
-# ALT: can only be implemented with generators
-#   BUT: how to be in C++ ?
+# RFC: pack/unpack will be the same for all streams/pipes/fifo
+# BUT: for UDP unpack requires sending requests for repeating lost UDP packets
+# DEV: periodically send 'heartbeat' data and drop incomplete msg on each
+#   heartbeat, raising error or requesting msg re-send from client
+# MAYBE protocol is exactly this functionality for merging segments and heartbeat ?
+#     => then curr code in Protocol must be moved into Presentation
 
 import struct
 
@@ -22,9 +24,10 @@ class Desegmentate(BaseChainLink):
         """ Accumulate data even if too small for both branches """
         self._buf = self._parse(self._buf + data)
 
+    # NOTE: used single cycle to process multiple msgs received at once
+    # ALT: can only be implemented with generators BUT: how to be in C++ ?
     def _parse(self, buf):
         i = 0
-        # NOTE: used single cycle to process multiple msgs received at once
         while (i + self._n) <= len(buf):
             blob = buf[i:i + self._n]
             i += self._n

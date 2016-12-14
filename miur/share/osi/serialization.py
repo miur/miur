@@ -17,6 +17,8 @@ class Deserialize(BaseChainLink):
         self.sink((kv['id'], cmd))
 
 
+# NOTE: can split single cmd into multiple msgs -- for streaming, etc
+# RFC: remove intermediate 'dict' (if possible)
 class Serialize(BaseChainLink):
     def __call__(self, pair):
         uid, rsp = pair

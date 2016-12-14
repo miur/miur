@@ -1,9 +1,3 @@
-# USAGE: Channel:
-# from miur.share.chain import Chain
-# from miur.share.osi import *
-# self.chain_recv = Chain([Fasten, Deserialize, Desegmentate, _receive], iterator=reversed)
-# self.chain_send = Chain([Unfaste, Serialize, Segmentate, _send])
-
 import threading
 
 
@@ -29,6 +23,8 @@ def with_lock(method):
 # NOTE: generators are very sweet: we can implement protocol with heartbeat,
 #   -- add it to Chain between serializer and segmentor and it will simply work
 # ALT:BAD? we integrate segmentor into transport and process inside Chain only single-in-single-out msgs
+# ATT: chain N:M is one-way pipe and can't return anything back
+#   = 'None' when wholly consumed small packet, accumulated multiple 'car' for long data packet
 class Chain:
     def __init__(self, *args, **kw):
         self._lock = threading.Lock()
