@@ -12,28 +12,20 @@ _log = logging.getLogger(__name__)
 class ClientProtocol(asyncio.Protocol, BaseChainLink):
     """Each client connection will create a new protocol instance"""
 
-    def __init__(self, channels, make_channel):
-        self.channels = channels
-        self.make_channel = make_channel
+    def __init__(self, topology):
+        self.topology = topology
 
     def connection_made(self, transport):
         self.transport = transport
         self.peer = self.transport.get_extra_info('peername')
         _log.info('Connection from {}'.format(self.peer))
-        self.chan = self.make_channel(src=self, dst=self)
-
-        # MAYBE: use backward dict [self] = channel :: so I can dismiss self.chan
-        # NOTE: adding to dict don't require lock (beside iterating that dict)
-        # MAYBE: set() is enough BUT how to close _impl connection then ?
-        #   => cascade closing of Channel => BUT then you need: channel._impl_conn = self
-        #   BETTER: cascading :: allows to mid-close channel and replace transport
-        self.channels.add(self.chan)
+        self.chan = self.topology.register(self)
 
     def connection_lost(self, exc):
         _log.info('Connection lost {}'.format(self.peer))
         if exc is not None:
             raise exc
-        self.channels.remove(self.chan)
+        self.chan = self.topology.deregister(self.chan)
 
     def close(self):
         _log.info('Closing the client {!r}'.format(self.peer))

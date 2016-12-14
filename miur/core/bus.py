@@ -84,9 +84,9 @@ class Channel:
 class TcpListeningServer:
     # BETTER: re-impl loop.create_server(...) for deterministic order of accept/receive/lost
     #   => then parallelism will be controllable and no need for _lock in channels
-    async def start(self, server_address, channels, make_channel, loop):
+    async def start(self, server_address, topology, loop):
         self._asyncio_srv = await loop.create_server(
-            functools.partial(server.ClientProtocol, channels, make_channel),
+            functools.partial(server.ClientProtocol, topology),
             *server_address, reuse_address=True, reuse_port=True)
         peer = self._asyncio_srv.sockets[0].getsockname()
         _log.info('Serving on {}'.format(peer))
@@ -126,21 +126,19 @@ class Topology:
         self.channels = set()
         self.servers = set()
         self.handler = Handler(self.bus_send.put)
+        self.make_channel = functools.partial(Channel, sink=self.recv, ctx=ctx)
 
-        self.loop.create_task(self.mk_server_coro(TcpListeningServer, server_address, ctx))
+        self.loop.create_task(self.mk_server_coro(TcpListeningServer, server_address))
         self.loop.create_task(self.bus_send.for_each(self.send))
         self.loop.create_task(self.bus_recv.for_each(self.handler))
 
-    def mk_server_coro(self, factory, server_address, ctx):
+    def mk_server_coro(self, factory, server_address):
         srv = factory()
-        # XXX! i can set Channel.send_cb only after connection established !!!
-        make_channel = functools.partial(Channel, sink=self.recv, ctx=ctx)
-        coro = srv.start(server_address, self.channels, make_channel, loop=self.loop)
         self.servers.add(srv)
-        return coro
+        return srv.start(server_address, topology=self, loop=self.loop)
 
     # NOTE: this is recv concentrator -- sole point for all channels to connect
-    #   ~~ ? BET: rename into Hub ?
+    #   ~~ BET: rename into Hub, Tie, Knot ?
 
     # ALT:BET: transit whole packets stream directly w/o re-encoding
     # if cmd['dst'] != self: self.bus_send.put(car)
@@ -161,8 +159,7 @@ class Topology:
         #   THINK? is it attribute of command or of carrier ?
         # ATT: silent discard of 'car' if dst channel removed
         if car.sink in self.channels:
-            return car.sink(car)
-            # return self.channels[car.dst].send(car)
+            car.sink(car)
 
     def quit_soon(self):
         # EXPL: listening server stops, but already established sockets continue to communicate
@@ -183,14 +180,24 @@ class Topology:
         await self.bus_send.join()
         [chan.close() for chan in self.channels]
 
-    # RFC: unused == try using instead of direct assing inside ClientProtocol
-    def register(self, channel):
-        channel.callback(self.put)
-        self.channels[channel.uuid] = channel.get
+    # MAYBE: use backward dict [self] = channel :: so I can dismiss self.chan
+    # NOTE: adding to dict don't require lock (beside iterating that dict)
+    # MAYBE: set() is enough BUT how to close _impl connection then ?
+    #   => cascade closing of Channel => BUT then you need: channel._impl_conn = self
+    #   BETTER: cascading :: allows to mid-close channel and replace transport
+    # BAD: diff args to reg and unreg
+    def register(self, conn):
+        chan = self.make_channel(src=conn, dst=conn)
+        self.channels.add(chan)
+        return chan
+        # channel.callback(self.put)
+        # self.channels[channel.uuid] = channel.get
 
-    def deregister(self, channel):
-        del self.channels[channel.uuid]
-        channel.destroy()
+    def deregister(self, chan):
+        self.channels.remove(chan)
+        return None
+        # del self.channels[channel.uuid]
+        # channel.destroy()
 
 # TODO:
 #   MOVE: rename channel hierarchy
