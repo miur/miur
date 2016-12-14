@@ -61,7 +61,12 @@ class Bus:
             await self.pop_apply(functor)
 
 
-# TODO: negotiate both protocols on connect (plain_text, srz_dict, etc)
+# TODO: negotiate both protocols on connect
+#   * negotiate changing protocol at any time (plain_text, srz_dict, etc)
+#   * process errors and exceptions
+#   * regulate security/access/ability policy
+#   * unites recv/send chains over single homogeneous transport
+#   * provides STD access point to each client/recipient
 class Channel:
     def __init__(self, sink=None, src=None, dst=None, ctx=None):
         make_cmd = command.CommandMaker('miur.core.command.all', ctx).make
@@ -84,9 +89,9 @@ class Channel:
 class TcpListeningServer:
     # BETTER: re-impl loop.create_server(...) for deterministic order of accept/receive/lost
     #   => then parallelism will be controllable and no need for _lock in channels
-    async def start(self, server_address, topology, loop):
+    async def start(self, server_address, hub, loop):
         self._asyncio_srv = await loop.create_server(
-            functools.partial(server.ClientProtocol, topology),
+            functools.partial(server.ClientProtocol, hub),
             *server_address, reuse_address=True, reuse_port=True)
         peer = self._asyncio_srv.sockets[0].getsockname()
         _log.info('Serving on {}'.format(peer))
@@ -113,39 +118,25 @@ class Handler:
         self.sink(car)
 
 
-# NOTE: topology must aggregate both in/out bus to be able to exec sync cmds
-#   THINK:MAYBE: hide both impl in/out queue with exec() under single Bus ?
-class Topology:
-    def __init__(self, server_address, ctx=None, loop=None):
-        self.loop = loop
-        # NOTE: separate buses are necessary to support full-duplex
-        self.bus_recv = Bus()
-        self.bus_send = Bus()
+# NOTE: this is recv concentrator -- sole point for all channels to connect
+#   ~~ BET: rename into Hub, Tie, Knot ?
+class Hub(BaseChainLink):
+    def __init__(self, sink, handler, ctx):
+        self.sink = sink
+        self.handler = handler
         # NOTE: 'channels' is sep entity to support multiple independent buses with clients
         # WARN: not thread safe !!! BUT can't prove any until re-impl loop.create_server()
         self.channels = set()
-        self.servers = set()
-        self.handler = Handler(self.bus_send.put)
         self.make_channel = functools.partial(Channel, sink=self.recv, ctx=ctx)
-
-        self.loop.create_task(self.mk_server_coro(TcpListeningServer, server_address))
-        self.loop.create_task(self.bus_send.for_each(self.send))
-        self.loop.create_task(self.bus_recv.for_each(self.handler))
-
-    def mk_server_coro(self, factory, server_address):
-        srv = factory()
-        self.servers.add(srv)
-        return srv.start(server_address, topology=self, loop=self.loop)
-
-    # NOTE: this is recv concentrator -- sole point for all channels to connect
-    #   ~~ BET: rename into Hub, Tie, Knot ?
 
     # ALT:BET: transit whole packets stream directly w/o re-encoding
     # if cmd['dst'] != self: self.bus_send.put(car)
+    # NOTE:ENH: each blocking/transfer op must block only its own channel, not whole hub!
+    #   => MAYBE: impl 'recv()' as part of Channel ?
     def recv(self, car):
         policy = getattr(car.cmd, 'policy', command.GENERAL)
         if policy == command.GENERAL:
-            self.bus_recv.put(car)
+            self.sink(car)
         elif policy == command.IMMEDIATE:
             # THINK: place 'shutdown' into qout and wait again or send 'shutdown' immediately from server ?
             #   => must traverse 'shutdown' through whole system to establish proper shutdown chain
@@ -154,31 +145,12 @@ class Topology:
 
     # RFC: there must not be any recv/send in Hub BUT where them must be ?
     #   => smth aka "Door between Bus and Channel, Gatekeeper"
-    def send(self, car):
+    def __call__(self, car):
         # DEV: broadcast/multicast
         #   THINK? is it attribute of command or of carrier ?
         # ATT: silent discard of 'car' if dst channel removed
         if car.sink in self.channels:
             car.sink(car)
-
-    def quit_soon(self):
-        # EXPL: listening server stops, but already established sockets continue to communicate
-        [srv.close() for srv in self.servers]
-        # EXPL: immediately ignore all incoming cmds when server is quitting
-        [chan.close_recv() for chan in self.channels]
-        self.loop.stop()  # EXPL: break main loop and await quit_clean() only
-
-    # WARN! must be the last task !  No more async coro after this !
-    async def quit_clean(self):
-        await asyncio.gather(*[srv.wait_closed() for srv in self.servers])
-        # NOTE: qin is already exhausted -- shutdown message is always the last
-        # one -- and it triggers closing of executor()
-        await self.bus_recv.join()
-        # BAD! wait qout only after all executors done!
-        #   => qin.pop() is immediate, but qout.put() is often delayed until cmd finished
-        # TRY: use semaphore with timer ?
-        await self.bus_send.join()
-        [chan.close() for chan in self.channels]
 
     # MAYBE: use backward dict [self] = channel :: so I can dismiss self.chan
     # NOTE: adding to dict don't require lock (beside iterating that dict)
@@ -198,6 +170,53 @@ class Topology:
         return None
         # del self.channels[channel.uuid]
         # channel.destroy()
+
+    def close_recv(self):
+        [chan.close_recv() for chan in self.channels]
+
+    def close(self):
+        [chan.close() for chan in self.channels]
+
+
+# NOTE: topology must aggregate both in/out bus to be able to exec sync cmds
+#   THINK:MAYBE: hide both impl in/out queue with exec() under single Bus ?
+class Topology:
+    def __init__(self, server_address, ctx=None, loop=None):
+        self.loop = loop
+        # NOTE: separate buses are necessary to support full-duplex
+        self.bus_recv = Bus()
+        self.bus_send = Bus()
+        self.servers = set()
+        self.handler = Handler(sink=self.bus_send.put)
+        self.hub = Hub(sink=self.bus_recv.put, handler=self.handler, ctx=ctx)
+
+        self.loop.create_task(self.mk_server_coro(TcpListeningServer, server_address))
+        self.loop.create_task(self.bus_send.for_each(self.hub))
+        self.loop.create_task(self.bus_recv.for_each(self.handler))
+
+    def mk_server_coro(self, factory, server_address):
+        srv = factory()
+        self.servers.add(srv)
+        return srv.start(server_address, hub=self.hub, loop=self.loop)
+
+    def quit_soon(self):
+        # EXPL: listening server stops, but already established sockets continue to communicate
+        [srv.close() for srv in self.servers]
+        # EXPL: immediately ignore all incoming cmds when server is quitting
+        self.hub.close_recv()
+        self.loop.stop()  # EXPL: break main loop and await quit_clean() only
+
+    # WARN! must be the last task !  No more async coro after this !
+    async def quit_clean(self):
+        await asyncio.gather(*[srv.wait_closed() for srv in self.servers])
+        # NOTE: qin is already exhausted -- shutdown message is always the last
+        # one -- and it triggers closing of executor()
+        await self.bus_recv.join()
+        # BAD! wait qout only after all executors done!
+        #   => qin.pop() is immediate, but qout.put() is often delayed until cmd finished
+        # TRY: use semaphore with timer ?
+        await self.bus_send.join()
+        self.hub.close()
 
 # TODO:
 #   MOVE: rename channel hierarchy

@@ -12,20 +12,20 @@ _log = logging.getLogger(__name__)
 class ClientProtocol(asyncio.Protocol, BaseChainLink):
     """Each client connection will create a new protocol instance"""
 
-    def __init__(self, topology):
-        self.topology = topology
+    def __init__(self, hub):
+        self.hub = hub
 
     def connection_made(self, transport):
         self.transport = transport
         self.peer = self.transport.get_extra_info('peername')
         _log.info('Connection from {}'.format(self.peer))
-        self.chan = self.topology.register(self)
+        self.chan = self.hub.register(self)
 
     def connection_lost(self, exc):
         _log.info('Connection lost {}'.format(self.peer))
         if exc is not None:
             raise exc
-        self.chan = self.topology.deregister(self.chan)
+        self.chan = self.hub.deregister(self.chan)
 
     def close(self):
         _log.info('Closing the client {!r}'.format(self.peer))
