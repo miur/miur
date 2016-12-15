@@ -71,6 +71,17 @@ class Bus:
 #   * provides STD access point to each client/recipient
 # NEED: verify whole channel path till transport => fix encapsulation on ends
 # NOTE: Channel == deferred Chain :: cmd goes in call(), transmutates in another prg and returns to sink()
+# ??? Do I need '.drain()' before reconfiguring chain to check or push up all
+#   -- partial data stored in intermediate state of Links going to be detached ???
+
+# SUM: for symmetrical connection of channel based on callbacks, I need to have
+#   BaseChainLink ifc on both sides {Hub <=> Channel <=> Connection}
+
+# USE: impl abstract ifc IChainable based on 'abc', look at more formalized way of 'zope'
+#   https://habrahabr.ru/post/72757/
+#   https://zopetoolkit.readthedocs.io/en/latest/
+#   https://www.python.org/dev/peps/pep-3119/
+#   http://javascriptissexy.com/beautiful-javascript-easily-create-chainable-cascading-methods-for-expressiveness/
 class Channel(BaseChainLink):
     def __init__(self, sink=None, src=None, dst=None, ctx=None):
         self.sink = sink
@@ -125,6 +136,11 @@ class Handler:
 
 # NOTE: this is recv concentrator -- sole point for all channels to connect
 #   ~~ BET: rename into Hub, Tie, Knot ?
+# FIXME: hub not manages channels itself -- only registers them for dispatching
+#   => so self.channels != all_channels but only links to already registered ones
+# THINK: deny calling by BaseChainLink API from not registered channel which
+#   -- anyway bears callback link to Hub inside its .sink()
+#   -- likewise disconnected but not destroyed channel.
 class Hub(BaseChainLink):
     def __init__(self, sink, handler, ctx):
         self.sink = sink
@@ -185,6 +201,7 @@ class Hub(BaseChainLink):
 # NOTE: topology must aggregate both in/out bus to be able to exec sync cmds
 #   THINK:MAYBE: hide both impl in/out queue with exec() under single Bus ?
 # NOTE: actually whole ring is == Channel() BUT: deferred and with active coro
+# TODO: together both buses of Ring can be separated into DeferredChannel which Chains based on Queue
 class Ring:
     def __init__(self, ctx):
         # NOTE: separate buses are necessary to support full-duplex
