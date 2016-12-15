@@ -1,0 +1,41 @@
+digraph {
+  graph [splines=ortho]
+
+  node [style=filled fillcolor=white]
+  hub [label="Hub"]
+  bcmd [label="Bcmd"]
+  hdl  [label="Hanle"]
+  brsp [label="Brsp"]
+  conn [label="Connect"]
+  ch1, ch2 [label="Channel"]
+  cmd [label="Cmd" fillcolor=orange]
+
+  subgraph cluster_ring {
+    label="Ring"
+    style=filled
+    fillcolor=darkseagreen1
+
+    edge [color=blue]
+    hub -> bcmd [style=bold]
+    bcmd -> hdl [style=dashed]
+    hdl -> brsp [style=bold]
+    brsp -> hub [style=dashed]
+
+    { rank="same"; bcmd; hub; }
+    { rank="same"; hdl; brsp; }
+  }
+
+  subgraph cluster_self {
+    label="Channel self"
+    style=filled
+    fillcolor=lightyellow
+
+    ch2 -> conn -> ch2
+    conn -> ch1 -> conn // [dir=both]
+
+    { rank="same"; ch2; conn; ch1; }
+  }
+
+  hdl -> cmd -> ch2
+  ch1 -> hub // [constraint=false]
+}
