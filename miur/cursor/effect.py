@@ -7,7 +7,7 @@ import logging
 
 from . import state
 
-_log = logging.getLogger(__name__)
+_log = logging.getLogger(__name__.split('.', 2)[1])
 
 # Use more appropriate type for Path. BUT how to serialize in C ?
 

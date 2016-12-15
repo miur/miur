@@ -1,7 +1,7 @@
 import logging
 import pickle
 
-_log = logging.getLogger(__name__)
+_log = logging.getLogger(__name__.split('.', 2)[1])
 
 
 def serialize(obj, ofmt=None):

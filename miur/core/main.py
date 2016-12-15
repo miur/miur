@@ -4,7 +4,7 @@ import uuid
 
 from . import bus
 
-_log = logging.getLogger(__name__)
+_log = logging.getLogger(__name__.split('.', 2)[1])
 
 
 # NEED:DEV: arch to add/remove servers to event loop on the fly

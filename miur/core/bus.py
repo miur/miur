@@ -7,7 +7,7 @@ from miur.share.osi import *
 
 from . import command, server
 
-_log = logging.getLogger(__name__)
+_log = logging.getLogger(__name__.split('.', 2)[1])
 
 
 # NOTE: adapted to bus, works in both dir, aggregates sep concepts of subsystems

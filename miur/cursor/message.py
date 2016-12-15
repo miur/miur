@@ -2,7 +2,7 @@ import logging
 
 from . import state
 
-_log = logging.getLogger(__name__)
+_log = logging.getLogger(__name__.split('.', 2)[1])
 
 # BETTER: don't bind 'cmd' to class name (type(self).__name__)
 #   -- so you could freely rename classes by adding sfx/prf

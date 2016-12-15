@@ -4,7 +4,7 @@ import socket
 
 from miur.share.osi.basechainlink import BaseChainLink
 
-_log = logging.getLogger(__name__)
+_log = logging.getLogger(__name__.split('.', 2)[1])
 
 
 # THINK: accepted/dismissed clients can be passed to Hub through Bus as usual cmds

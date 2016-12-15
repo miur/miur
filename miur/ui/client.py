@@ -8,7 +8,7 @@ from miur.share import protocol
 from miur.cursor import effect
 
 
-_log = logging.getLogger(__name__)
+_log = logging.getLogger(__name__.split('.', 2)[1])
 _thread_loop = None
 is_initialized = threading.Semaphore(0)
 is_watching = True

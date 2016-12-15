@@ -18,8 +18,8 @@ def setup_log():
     logging.basicConfig(level=logging.DEBUG,
                         filename='/tmp/miur.log',
                         datefmt='%H:%M:%S',
-                        format="%(asctime)s %(levelname)s " +
-                        "[%(module)s:%(lineno)d] %(message)s")
+                        format="%(asctime)s %(name)8s %(levelname)s " +
+                        "[%(module)s:%(lineno)d]: %(message)s")
 
 
 if __name__ == '__main__':

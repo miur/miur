@@ -7,7 +7,7 @@ from miur.ui import client
 from miur.cursor import message
 
 dsp = Dispatcher()
-_log = logging.getLogger(__name__)
+_log = logging.getLogger(__name__.split('.', 2)[1])
 
 # SEE /ranger/api/commands.py:38
 _msgd = {v.cmd: v for v in vars(message).values()
