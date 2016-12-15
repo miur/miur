@@ -4,6 +4,7 @@
 #   heartbeat, raising error or requesting msg re-send from client
 # MAYBE protocol is exactly this functionality for merging segments and heartbeat ?
 #     => then curr code in Protocol must be moved into Presentation
+# ALT:(name): StreamProtocol
 
 import struct
 

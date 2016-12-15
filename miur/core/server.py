@@ -9,6 +9,7 @@ _log = logging.getLogger(__name__.split('.', 2)[1])
 
 # THINK: accepted/dismissed clients can be passed to Hub through Bus as usual cmds
 # TODO: rename to TCPListeningServerConnection to distinguish from outgoing TCPConnection ?
+# ALT:(name): TcpTransport
 class ClientProtocol(asyncio.Protocol, BaseChainLink):
     """Each client connection will create a new protocol instance"""
 
@@ -19,13 +20,15 @@ class ClientProtocol(asyncio.Protocol, BaseChainLink):
         self.transport = transport
         self.peer = self.transport.get_extra_info('peername')
         _log.info('Connection from {}'.format(self.peer))
-        self.chan = self.hub.register(self)
+        self.chan = self.hub.make_channel(src=self, dst=self)
+        self.hub.register(self.chan)
 
     def connection_lost(self, exc):
         _log.info('Connection lost {}'.format(self.peer))
         if exc is not None:
             raise exc
-        self.chan = self.hub.deregister(self.chan)
+        self.hub.deregister(self.chan)
+        self.chan = None
 
     def close(self):
         _log.info('Closing the client {!r}'.format(self.peer))

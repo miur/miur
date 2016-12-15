@@ -1,4 +1,5 @@
 # TODO: generalize for any object type by some 'unfactory()/accessor()' passed to Serialize
+# ALT:(name): CommandPresentation
 
 import pickle
 

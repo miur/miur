@@ -13,6 +13,8 @@ _log = logging.getLogger(__name__.split('.', 2)[1])
 # NOTE: adapted to bus, works in both dir, aggregates sep concepts of subsystems
 class Carrier:
     def __init__(self, *, sink=None, cmd=None, rsp=None, uid=None):
+        # THINK:RFC: eliminate 'sink' ref to channel in each carrier
+        #   => ref is more lightweight but breaks encapsulation and makes system more coupled
         self.sink = sink
         self.cmd = cmd
         self.rsp = rsp  # THINK: 'rsp' can be 'cmd' if initiated from *core* to *client*
@@ -67,11 +69,14 @@ class Bus:
 #   * regulate security/access/ability policy
 #   * unites recv/send chains over single homogeneous transport
 #   * provides STD access point to each client/recipient
-class Channel:
+# NEED: verify whole channel path till transport => fix encapsulation on ends
+# NOTE: Channel == deferred Chain :: cmd goes in call(), transmutates in another prg and returns to sink()
+class Channel(BaseChainLink):
     def __init__(self, sink=None, src=None, dst=None, ctx=None):
+        self.sink = sink
         make_cmd = command.CommandMaker('miur.core.command.all', ctx).make
         make_car = functools.partial(Carrier, sink=self)
-        self.chain_recv = Chain([sink, Deanonymize(make_car),
+        self.chain_recv = Chain([self.sink, Deanonymize(make_car),
                                  Deserialize(make_cmd), Desegmentate()],
                                 iterator=reversed)
         self.chain_send = Chain([Anonymize(), Serialize(), Segmentate(), dst])
@@ -129,10 +134,12 @@ class Hub(BaseChainLink):
         self.channels = set()
         self.make_channel = functools.partial(Channel, sink=self.recv, ctx=ctx)
 
+    # FIXME: synchronous execution
     # ALT:BET: transit whole packets stream directly w/o re-encoding
     # if cmd['dst'] != self: self.bus_send.put(car)
     # NOTE:ENH: each blocking/transfer op must block only its own channel, not whole hub!
     #   => MAYBE: impl 'recv()' as part of Channel ?
+    #   + by posting cmds to Hub through chan_self I can imm transfer/multicast them to their dst
     def recv(self, car):
         policy = getattr(car.cmd, 'policy', command.GENERAL)
         if policy == command.GENERAL:
@@ -157,17 +164,14 @@ class Hub(BaseChainLink):
     # MAYBE: set() is enough BUT how to close _impl connection then ?
     #   => cascade closing of Channel => BUT then you need: channel._impl_conn = self
     #   BETTER: cascading :: allows to mid-close channel and replace transport
-    # BAD: diff args to reg and unreg
-    def register(self, conn):
-        chan = self.make_channel(src=conn, dst=conn)
+    # ALT:(name): ++ attach/detach, ~~ connect/disconnect
+    def register(self, chan):
         self.channels.add(chan)
-        return chan
         # channel.callback(self.put)
         # self.channels[channel.uuid] = channel.get
 
     def deregister(self, chan):
         self.channels.remove(chan)
-        return None
         # del self.channels[channel.uuid]
         # channel.destroy()
 
@@ -180,6 +184,7 @@ class Hub(BaseChainLink):
 
 # NOTE: topology must aggregate both in/out bus to be able to exec sync cmds
 #   THINK:MAYBE: hide both impl in/out queue with exec() under single Bus ?
+# NOTE: actually whole ring is == Channel() BUT: deferred and with active coro
 class Ring:
     def __init__(self, ctx):
         # NOTE: separate buses are necessary to support full-duplex
@@ -213,10 +218,24 @@ class Topology:
         self.ring = Ring(ctx=ctx)
         self.loop.create_task(self.ring.loop())
 
+        # DEV: dynamic add/remove servers by cmds
         self.servers = set()
         srv = TcpListeningServer()
         self.servers.add(srv)
         self.loop.create_task(srv.start(server_address, hub=self.ring.hub, loop=self.loop))
+
+        # ENH: self talk with bus by its own reverse channel
+        # * Loopback chan must be added in general way through loopback listening server
+        #   ADD loopback channel for msg addressed to itself
+        #     -- until it will be forked out from bus
+        #     = all cmds posted to 'self' will rotate through Ring and rsp go back into chan_self
+
+        # ALT:(name): loopback
+        # ALSO:FIX: self Channel must have another set of ChainLinks (=empty)
+        #   TEMP: maybe both DFL chain factory are supposed to be embedded into
+        #   -- listening servers and passed through key 'factory=(f_recv, f_send)'
+        # self.chan_self = Channel(sink=self.recv, ctx=ctx, src=conn, dst=conn)
+        # self.ring.hub.register(self.chan_self)
 
     def quit_soon(self):
         # EXPL: listening server stops, but already established sockets continue to communicate
@@ -228,18 +247,3 @@ class Topology:
     async def quit_clean(self):
         await asyncio.gather(*[srv.wait_closed() for srv in self.servers])
         await self.ring.quit_clean()
-
-# TODO:
-#   MOVE: rename channel hierarchy
-#     TcpProtocol->CommandPresentation
-#     TcpTransport->StreamProtocol
-#     ClientProtocol->TcpTransport
-#   ENH: self talk with bus by its own reverse channel
-#     ADD loopback channel for msg addressed to itself
-#       -- until it will be forked out from bus
-#   THINK:RFC: eliminate ref to channel in each carrier
-#       => ref is more lightweight but breaks encapsulation and makes system more coupled
-#   CHECK: closing recv end
-#   DEV: dynamic add/remove servers by cmds
-#   NEED: verify whole channel path till transport => fix encapsulation on ends
-#   FIXME: synchronous execution
