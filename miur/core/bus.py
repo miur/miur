@@ -79,25 +79,54 @@ class Bus:
 # SUM: for symmetrical connection of channel based on callbacks, I need to have
 #   ILink ifc on both sides {Hub <=> Channel <=> Connection}
 
+# NOTE: Channel with plugged-in Transport works as deferred Chain with ILink ifc
+#   => MAYBE create sep entity encapsulating such ifc ?
+
 # ALT:(name): circuit
-class Channel(ILink):
+class Channel:
     # ALT:(name): src/emitter/producer, dst/collector/absorber
-    def __init__(self, sink=None, src=None, dst=None, ctx=None):
+    def __init__(self, sink=None, lhs=None, rhs=None, ctx=None):
         make_cmd = command.CommandMaker('miur.core.command.all', ctx).make
         make_car = functools.partial(Carrier, sink=self)
 
         # HACK: try insert 'src' into Chain as first and 'dst' as last
         #   => ++ I will get unified ifc: [0] to access 'src' and [-1] to access 'dst'
-        self.chain_recv = Chain(call=src, sink=sink)
-        self.chain_recv[:] = [Desegmentate(), Deserialize(make_cmd), Deanonymize(make_car)]
-        self.chain_send = Chain(call=self, sink=dst)
-        self.chain_send[:] = [Anonymize(), Serialize(), Segmentate()]
-        src.bind(self.chain_recv)
+        self.chain_to_left = Chain()  # producer=src, sink=sink
+        self.chain_to_left[:] = [Desegmentate(), Deserialize(make_cmd), Deanonymize(make_car)]
+        self.chain_to_right = Chain()  # producer=self, sink=dst
+        self.chain_to_right[:] = [Anonymize(), Serialize(), Segmentate()]
+        self.plug(lhs=lhs, rhs=rhs)
 
-        # self.__call__ = self.chain_send
+        # self.__call__ = self.chain_to_right
         # BAD: dst isn't closed, ALSO how to close all when disassembling chain
-        self.close = src.close
-        self.close_recv = src.close_recv
+        # BAD: no support for heterogeneous chains
+        self.close = rhs.close
+        self.close_recv = rhs.close_recv
+
+    def plug(self, lhs=None, rhs=None):
+        if lhs:
+            self.plug_lhs(both=lhs)
+        if rhs:
+            self.plug_rhs(both=rhs)
+
+    def plug_lhs(self, *args, **kw):
+        return self._plug(self.chain_to_left, self.chain_to_right, *args, **kw)
+
+    def plug_rhs(self, *args, **kw):
+        return self._plug(self.chain_to_right, self.chain_to_left, *args, **kw)
+
+    # recv/send, call/sink
+    def _plug(self, producer, consumer, both=None, *, src=None, dst=None):
+        if both and not src:
+            src = both
+        if both and not dst:
+            dst = both
+        if src:
+            src.bind(consumer)
+            # TODO: insert into super().bind() to be always called
+            _log.info('Bind {}'.format(consumer))
+        if dst:
+            producer.bind(dst)
 
 
 class TcpListeningServer:
@@ -138,6 +167,7 @@ class Handler:
 # THINK: deny calling by ILink API from not registered channel which
 #   -- anyway bears callback link to Hub inside its .sink()
 #   -- likewise disconnected but not destroyed channel.
+# ALT:(name): Mux, Dispatcher, Relay
 class Hub(ILink):
     def __init__(self, sink, handler, ctx):
         self._sink = sink
@@ -145,7 +175,25 @@ class Hub(ILink):
         # NOTE: 'channels' is sep entity to support multiple independent buses with clients
         # WARN: not thread safe !!! BUT can't prove any until re-impl loop.create_server()
         self.channels = set()
-        self.make_channel = functools.partial(Channel, sink=self.recv, ctx=ctx)
+        self.make_channel = functools.partial(Channel, lhs=self, ctx=ctx)
+
+    # MAYBE: use backward dict [self] = channel :: so I can dismiss self.chan
+    # NOTE: adding to dict don't require lock (beside iterating that dict)
+    # MAYBE: set() is enough BUT how to close _impl connection then ?
+    #   => cascade closing of Channel => BUT then you need: channel._impl_conn = self
+    #   BETTER: cascading :: allows to mid-close channel and replace transport
+    # ALT:(name): ++ attach/detach, ~~ connect/disconnect
+    def bind(self, chan: Channel):
+        super().bind(chan)
+        self.channels.add(chan)
+        # channel.callback(self.put)
+        # self.channels[channel.uuid] = channel.get
+
+    def unbind(self, chan):
+        self.channels.remove(chan)
+        super().unbind(chan)
+        # del self.channels[channel.uuid]
+        # channel.destroy()
 
     # FIXME: synchronous execution
     # ALT:BET: transit whole packets stream directly w/o re-encoding
@@ -153,7 +201,7 @@ class Hub(ILink):
     # NOTE:ENH: each blocking/transfer op must block only its own channel, not whole hub!
     #   => MAYBE: impl 'recv()' as part of Channel ?
     #   + by posting cmds to Hub through chan_self I can imm transfer/multicast them to their dst
-    def recv(self, car):
+    def __call__(self, car):
         policy = getattr(car.cmd, 'policy', command.GENERAL)
         if policy == command.GENERAL:
             self._sink(car)
@@ -165,28 +213,12 @@ class Hub(ILink):
 
     # RFC: there must not be any recv/send in Hub BUT where them must be ?
     #   => smth aka "Door between Bus and Channel, Gatekeeper"
-    def __call__(self, car):
+    def dispatch(self, car):
         # DEV: broadcast/multicast
         #   THINK? is it attribute of command or of carrier ?
         # ATT: silent discard of 'car' if dst channel removed
         if car.sink in self.channels:
             car.sink(car)
-
-    # MAYBE: use backward dict [self] = channel :: so I can dismiss self.chan
-    # NOTE: adding to dict don't require lock (beside iterating that dict)
-    # MAYBE: set() is enough BUT how to close _impl connection then ?
-    #   => cascade closing of Channel => BUT then you need: channel._impl_conn = self
-    #   BETTER: cascading :: allows to mid-close channel and replace transport
-    # ALT:(name): ++ attach/detach, ~~ connect/disconnect
-    def register(self, chan):
-        self.channels.add(chan)
-        # channel.callback(self.put)
-        # self.channels[channel.uuid] = channel.get
-
-    def deregister(self, chan):
-        self.channels.remove(chan)
-        # del self.channels[channel.uuid]
-        # channel.destroy()
 
     def close_recv(self):
         [chan.close_recv() for chan in self.channels]
@@ -209,7 +241,7 @@ class Ring:
 
     async def loop(self):
         await asyncio.gather(self.bus_recv.for_each(self.handler),
-                             self.bus_send.for_each(self.hub))
+                             self.bus_send.for_each(self.hub.dispatch))
 
     def close_recv(self):
         # EXPL: immediately ignore all incoming cmds when server is quitting

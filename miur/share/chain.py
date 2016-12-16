@@ -32,11 +32,11 @@ def with_lock(method):
 # ATT: chain N:M is one-way pipe and can't return anything back
 #   = 'None' when wholly consumed small packet, accumulated multiple 'car' for long data packet
 class Chain(Sequence, ILink):
-    def __init__(self, call=None, sink=None, links=None):
+    def __init__(self, links=None, *, producer=None, sink=None):
         self._lock = threading.Lock()
         self._chain = []
-        if call:
-            call.bind(self)
+        if producer:
+            producer.bind(self)
         if sink:
             self.bind(sink)
         if links:

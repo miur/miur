@@ -7,25 +7,41 @@ __all__ = ['ILink']
 # Unidirectional
 # ALT:(name): ISimplex
 class ILink:
-    def bind(self, link):
+    def __new__(cls, *p, **k):
+        # CHECK:WTF: when ILink used as mix-in ?
+        obj = object.__new__(cls)
+        obj._sink = cls.__sink
+        return obj
+
+    @staticmethod
+    def __sink(*p, **k):
+        """Private ref to next link"""
+        raise NotImplementedError
+
+    def bind(self, link, *, mutual=False):
         """Bind next link to this"""
+        # THINK? better order when exception
+        # THINK? where mutual linking may be useful ? Only short-circuit ?
+        if mutual:
+            link.bind(self)
+        self.unbind(link)
         self._sink = link
         return link
 
-    # THINK? better order when exception
-    def plug(self, channel):
-        """Mutually interconnect links"""
-        channel.bind(self)
-        return self.bind(channel)
+    def unbind(self, link, *, mutual=False):
+        """Safe unbind to override by dispatchers"""
+        if mutual:
+            link.unbind(self)
+        if self._sink != self.__sink:
+            assert self._sink == link
+            # CHECK: if this reassign works as expected
+            self._sink = self.__sink
+        return link
 
     def __call__(self, *args, **kwargs):
         """Push processed data into next link"""
         # ALT:FIND: directly assign self.__call__ = self._sink
         self._sink(*args, **kwargs)
-
-    def _sink(self, *args, **kwargs):
-        """Private ref to next link"""
-        raise NotImplementedError
 
 
 # USE: impl abstract ifc based on 'abc' OR look at more formalized way of 'zope'

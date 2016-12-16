@@ -26,14 +26,13 @@ class ClientProtocol(asyncio.Protocol, ILink):
         self.transport = transport
         self.peer = self.transport.get_extra_info('peername')
         _log.info('Connection from {}'.format(self.peer))
-        self.chan = self.hub.make_channel(src=self, dst=self)
-        self.hub.register(self.chan)
+        self.chan = self.hub.make_channel(rhs=self)
 
     def connection_lost(self, exc):
         _log.info('Connection lost {}'.format(self.peer))
         if exc is not None:
             raise exc
-        self.hub.deregister(self.chan)
+        self.hub.unbind(self.chan)
         self.chan = None
 
     def close(self):
