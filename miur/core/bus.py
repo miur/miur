@@ -3,6 +3,7 @@ import asyncio
 import functools
 
 from miur.share.chain import Chain
+from miur.share.ifc import ILink
 from miur.share.osi import *
 
 from . import command, server
@@ -22,10 +23,11 @@ class Carrier:
 
     # WTF if cmd will be executed second time ?
     #   THINK: Allow or disable availability
-    def execute(self, *args):
+    def execute(self, sink, *args):
         _log.debug('Command: {!r}'.format(self.cmd.cmd))
         self.rsp = self.cmd.execute(*args)
-        return self
+        # IDEA: 'sink' placed here to support ILink ifc in any cmd and allow data streaming
+        return sink(self)  # OR? return self
 
 
 # NOTE: there is sense in constructing cmds directly on receiving
@@ -75,31 +77,27 @@ class Bus:
 #   -- partial data stored in intermediate state of Links going to be detached ???
 
 # SUM: for symmetrical connection of channel based on callbacks, I need to have
-#   BaseChainLink ifc on both sides {Hub <=> Channel <=> Connection}
+#   ILink ifc on both sides {Hub <=> Channel <=> Connection}
 
-# USE: impl abstract ifc IChainable based on 'abc', look at more formalized way of 'zope'
-#   https://habrahabr.ru/post/72757/
-#   https://zopetoolkit.readthedocs.io/en/latest/
-#   https://www.python.org/dev/peps/pep-3119/
-#   http://javascriptissexy.com/beautiful-javascript-easily-create-chainable-cascading-methods-for-expressiveness/
-class Channel(BaseChainLink):
+# ALT:(name): circuit
+class Channel(ILink):
+    # ALT:(name): src/emitter/producer, dst/collector/absorber
     def __init__(self, sink=None, src=None, dst=None, ctx=None):
-        self.sink = sink
         make_cmd = command.CommandMaker('miur.core.command.all', ctx).make
         make_car = functools.partial(Carrier, sink=self)
-        self.chain_recv = Chain([self.sink, Deanonymize(make_car),
-                                 Deserialize(make_cmd), Desegmentate()],
-                                iterator=reversed)
-        self.chain_send = Chain([Anonymize(), Serialize(), Segmentate(), dst])
-        # HACK: try to insert this into Chain ALT self.get_src_slot()
-        src.sink = self.chain_recv
+
+        # HACK: try insert 'src' into Chain as first and 'dst' as last
+        #   => ++ I will get unified ifc: [0] to access 'src' and [-1] to access 'dst'
+        self.chain_recv = Chain(call=src, sink=sink)
+        self.chain_recv[:] = [Desegmentate(), Deserialize(make_cmd), Deanonymize(make_car)]
+        self.chain_send = Chain(call=self, sink=dst)
+        self.chain_send[:] = [Anonymize(), Serialize(), Segmentate()]
+        src.bind(self.chain_recv)
+
+        # self.__call__ = self.chain_send
         # BAD: dst isn't closed, ALSO how to close all when disassembling chain
         self.close = src.close
         self.close_recv = src.close_recv
-
-    def __call__(self, car):
-        _log.info('Response({:x}): {!r}'.format(car.uid, car.rsp))
-        self.chain_send(car)
 
 
 class TcpListeningServer:
@@ -130,20 +128,19 @@ class Handler:
     # TRY: regulate putting rsp into bus_send by cmd/rsp itself
     #   => BUT who must decide it: command or context ?
     def __call__(self, car):
-        car.execute()
-        self.sink(car)
+        car.execute(self.sink)
 
 
 # NOTE: this is recv concentrator -- sole point for all channels to connect
 #   ~~ BET: rename into Hub, Tie, Knot ?
 # FIXME: hub not manages channels itself -- only registers them for dispatching
 #   => so self.channels != all_channels but only links to already registered ones
-# THINK: deny calling by BaseChainLink API from not registered channel which
+# THINK: deny calling by ILink API from not registered channel which
 #   -- anyway bears callback link to Hub inside its .sink()
 #   -- likewise disconnected but not destroyed channel.
-class Hub(BaseChainLink):
+class Hub(ILink):
     def __init__(self, sink, handler, ctx):
-        self.sink = sink
+        self._sink = sink
         self.handler = handler
         # NOTE: 'channels' is sep entity to support multiple independent buses with clients
         # WARN: not thread safe !!! BUT can't prove any until re-impl loop.create_server()
@@ -159,7 +156,7 @@ class Hub(BaseChainLink):
     def recv(self, car):
         policy = getattr(car.cmd, 'policy', command.GENERAL)
         if policy == command.GENERAL:
-            self.sink(car)
+            self._sink(car)
         elif policy == command.IMMEDIATE:
             # THINK: place 'shutdown' into qout and wait again or send 'shutdown' immediately from server ?
             #   => must traverse 'shutdown' through whole system to establish proper shutdown chain

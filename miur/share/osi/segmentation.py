@@ -8,12 +8,12 @@
 
 import struct
 
-from .basechainlink import BaseChainLink
+from miur.share.ifc import ILink
 
 __all__ = ['Desegmentate', 'Segmentate']
 
 
-class Desegmentate(BaseChainLink):
+class Desegmentate(ILink):
     h_sz_len = 4
 
     def __init__(self):
@@ -36,13 +36,13 @@ class Desegmentate(BaseChainLink):
                 self._n = struct.unpack('>I', blob)[0]
             else:
                 self._n = self.h_sz_len
-                self.sink(blob)
+                self._sink(blob)
             self._head = not self._head
         return buf[i:]
 
 
 # NOTE: TCP.transport.write() supports arbitrary data length BUT may be necessary for UDP
-class Segmentate(BaseChainLink):
+class Segmentate(ILink):
     def __call__(self, data):
         header = struct.pack('>I', len(data))
-        self.sink(header + data)
+        self._sink(header + data)

@@ -1,4 +1,10 @@
 import threading
+from collections import Sequence
+
+from miur.share.ifc import ILink
+
+import logging
+_log = logging.getLogger(__name__.split('.', 2)[1])
 
 
 # http://stackoverflow.com/questions/13610654/how-to-make-built-in-containers-sets-dicts-lists-thread-safe
@@ -25,26 +31,42 @@ def with_lock(method):
 # ALT:BAD? we integrate segmentor into transport and process inside Chain only single-in-single-out msgs
 # ATT: chain N:M is one-way pipe and can't return anything back
 #   = 'None' when wholly consumed small packet, accumulated multiple 'car' for long data packet
-class Chain:
-    def __init__(self, *args, **kw):
+class Chain(Sequence, ILink):
+    def __init__(self, call=None, sink=None, links=None):
         self._lock = threading.Lock()
-        self._impl = None
-        self.assign(*args, **kw)
+        self._chain = []
+        if call:
+            call.bind(self)
+        if sink:
+            self.bind(sink)
+        if links:
+            self[:] = links
 
     @with_lock
-    def assign(self, functors, iterator=lambda x: x):
-        L = list(iterator(functors))
-        for i in range(len(L) - 1):
-            if not hasattr(L[i], 'sink'):  # ALT: isinstance(L[i], BaseChainLink)
-                raise AttributeError('sink')
-            L[i].sink = L[i+1]  # ALT: = L[i+1].__call__
-        self._impl = L
+    def bind(self, link):
+        super().bind(link)
+        self._invalidate()
+        return link
+
+    def __call__(self, *args, **kw):
+        return self._call(*args, **kw)
 
     @with_lock
-    def __call__(self, arg):
-        if self._impl:
-            self._impl[0](arg)
+    def __setitem__(self, k, v):
+        self._chain.__setitem__(k, v)
+        [l.bind(s) for l, s in zip(self._chain, self._chain[1:])]
+        self._invalidate()
+        _log.debug('Chain: {!r}'.format(self.__call__))
 
-    # @with_lock
-    # def __getitem__(self, k):
-    #     return self._impl.__getitem__(k)
+    def _invalidate(self):
+        if self._chain:
+            self._call = self._chain[0]
+            self._chain[-1].bind(self._sink)
+        else:
+            self._call = self._sink
+
+    def __getitem__(self, k):
+        return self._chain[k]
+
+    def __len__(self):
+        return len(self._chain)

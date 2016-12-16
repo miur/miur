@@ -2,7 +2,7 @@ import logging
 import asyncio
 import socket
 
-from miur.share.osi.basechainlink import BaseChainLink
+from miur.share.ifc import ILink
 
 _log = logging.getLogger(__name__.split('.', 2)[1])
 
@@ -10,7 +10,13 @@ _log = logging.getLogger(__name__.split('.', 2)[1])
 # THINK: accepted/dismissed clients can be passed to Hub through Bus as usual cmds
 # TODO: rename to TCPListeningServerConnection to distinguish from outgoing TCPConnection ?
 # ALT:(name): TcpTransport
-class ClientProtocol(asyncio.Protocol, BaseChainLink):
+# NOTE:ATT: actually, even connection is ILink ::: MOVE this desc into ifc.py
+#   * code body from call() till sink() is splitted apart into write() and data_received()
+#   * it even can be moved into two heterogeneous classes, keeping single ifc point in each
+#       -- however, you can inherit whole ifc and simply keep 2nd ifc point NotImplemented
+#   * execution is deffered by net delays when synchronously blocking
+#   * being asynchronous otherwise with its own thread/coro
+class ClientProtocol(asyncio.Protocol, ILink):
     """Each client connection will create a new protocol instance"""
 
     def __init__(self, hub):
@@ -47,7 +53,7 @@ class ClientProtocol(asyncio.Protocol, BaseChainLink):
         _log.debug('Recv:{!r}: {!r} bytes'.format(self.peer, len(data)))
         if not data:
             raise
-        self.sink(data)
+        self._sink(data)
 
     # BAD: exc if client was already deleted when executor was suspended
     # CHECK: if need to write multiple times for too big data
