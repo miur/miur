@@ -1,5 +1,5 @@
 import abc
-import collections.abc
+from collections.abc import Callable
 
 __all__ = ['ILink']
 
@@ -10,31 +10,59 @@ __all__ = ['ILink']
 #   * inn ifc is fixed by class spec
 #   * inn is always function
 #   * ext ifc is specified by class api
-#   * ext is always derived Connector object
+#   * ext is always derived Boundary object
 
 
 def _undefined(*p, **k):
     raise NotImplementedError
 
 
+# ATT: circular dependency of funcs arg types is impossible
+# class Slot: def bind(self, f: Plug) && class Plug: def bind(self, f: Slot)
+class IBind:
+    __metaclass__ = abc.ABCMeta
+
+    @abc.abstractmethod
+    def bind(self, outer):
+        """Couple two connectors"""
+
+    @abc.abstractmethod
+    def unbind(self, outer=None):
+        """Decouple two connectors"""
+
+
 # NOTE: connector allows chaining
 #   self.bind(obj1).bind(obj2) ...
 #   self.unbind(obj1).unbind(obj2) ...
 #   ++ Can overload __add__ to create chain by: Link1 + Link2 + ...
-class Connector(collections.abc.Callable):
-    # __metaclass__ = abc.ABCMeta
+class Boundary(Callable, IBind):
+    _inner = _undefined
+    _outer = _undefined
 
-    @abc.abstractmethod
-    def bind(self, connector):
-        """Couple two connectors"""
+    # MAYBE:USE: more fail-safe : don't unbind if outer=None
+    # WARN: w/o 'mutual' bind() is called triple instead of twice (+race cond)
+    # WARN: doesn't gurantee mutual bind()
+    #   = if outer is self._outer: return outer
+    #   = if self._outer is _undefined: return outer
+    def bind(self, outer: IBind, mutual=True):
+        self.unbind()
+        if outer is not None:
+            assert isinstance(outer, self._outer_t)
+            if mutual:
+                outer.bind(self, False)
+            self._outer = outer
+        return outer
 
-    @abc.abstractmethod
-    def unbind(self, connector=None):
-        """Decouple two connectors"""
+    def unbind(self, outer: IBind=None, mutual=True):
+        if outer is None and self._outer is not _undefined:
+            outer = self._outer
+        if outer is not None:
+            assert isinstance(outer, self._outer_t)
+        if mutual:
+            outer.unbind(self, False)
+        self._outer = _undefined
+        return outer
 
-
-# ATT: circular dependency of funcs arg types is impossible
-# class Slot: def bind(self, f: Plug) && class Plug: def bind(self, f: Slot)
 
 # NOTE: Same src, bind dst
 #   * any slot always produces carriers E.G.(wall socket, headphones, hdmi)
@@ -43,91 +71,45 @@ class Connector(collections.abc.Callable):
 #   * slot location is fixed
 #     - known to any connected inner generator: __call__() must never be reassigned
 #     - known to any plug possible to be inserted outside
-class Slot(Connector):
-    _plug = _undefined
-
-    def __init__(self, plug: Connector=None):
-        self.bind(plug)
+class Slot(Boundary):
+    def __init__(self, outer=None):
+        self._outer_t = Plug  # HACK: circular deps :: no declaration in Python
+        self.bind(outer)
 
     def __call__(self, args):
-        return self._plug(args)
-
-    # BAD: unsymmetrical -- must call plug.bind(self) to setup its _slot
-    def bind(self, plug: Connector):
-        if plug is not self._plug:
-            self.unbind()
-            if plug is not None:
-                assert issubclass(plug, Plug)
-                plug.bind(self)
-        if plug is not None:
-            self._plug = plug
-        return plug
-
-    def unbind(self, plug: Connector=None):
-        if plug is not None:
-            assert plug is self._plug
-        self._plug = _undefined
-        return plug
+        return self._outer(args)
 
 
 # NOTE: Bind src, same dst
 #   * any plug always consumes carriers E.G.(two-pin plug, phones jack plug)
 #   * slots must always have valid refs: __call__() must never be reassigned
-#       => however, if we always unbind() before bind()
-class Plug(Connector):
-    _slot = _undefined
-    _body = _undefined
+#       => however, if we always unbind() before bind() -- you can ?
+class Plug(Boundary):
+    def __init__(self, outer=None, inner=None):
+        self._outer_t = Slot  # HACK: circular deps :: no declaration in Python
+        self.bind(outer)
+        self.set_inner(inner)
 
-    def __init__(self, slot: Connector=None, *, body=None):
-        self.bind(slot)
-        self.set_body(body)
-
-    # THINK: instead of intermediator 'body', can I send to it directly ?
-    def set_body(self, body=None):
-        self._body = body if body is not None else _undefined
+    def set_inner(self, inner=None):
+        self._inner = inner if inner is not None else _undefined
 
     def __call__(self, args):
-        return self._body(args)
-
-    def bind(self, slot: Connector):
-        # MAYBE:USE: more fail-safe : don't unbind if slot=None
-        if slot is not self._slot:
-            self.unbind()
-            if slot is not None:
-                assert issubclass(slot, Slot)
-                slot.bind(self)
-        if slot is not None:
-            self._slot = slot
-        return slot
-
-    # DECIDE: save '_src' to be able to unbind() w/o args OR always demand 'f'
-    #   + useful when always doing unbind(f=self._src) before bind, as we need backref
-    def unbind(self, slot: Connector=None):
-        if slot is not None:
-            assert issubclass(slot, Slot)
-            slot.unbind(self)
-        elif self._slot is not _undefined:
-            slot = self._slot
-            slot.unbind(self)
-        self._slot = _undefined
-        return slot
+        return self._inner(args)
 
 
-class Link(collections.abc.Callable):
+class Link(Callable):
     def __init__(self, src=None, dst=None):
-        self._plug = Plug(body=self.__call__)
+        self._plug = Plug(inner=self.__call__)
         self._slot = Slot()
-        self.__call__ = self._plug.__call__
-        self._sink = self._slot.__call__
         self.bind(src, dst)
 
     def bind(self, src=None, dst=None):
-        # EXPL: backward init order : connect sink before generator
+        # EXPL: backward init order : dangling producer on exc is safer then consumer
         if dst is not None:
-            assert issubclass(dst, Link)
+            assert isinstance(dst, self.__class__)
             self._slot.bind(dst.plug)
         if src is not None:
-            assert issubclass(src, Link)
+            assert isinstance(src, self.__class__)
             self._plug.bind(src.slot)
 
     @property
@@ -184,8 +166,6 @@ class ILink:
 
 # USE: impl abstract ifc based on 'abc' OR look at more formalized way of 'zope'
 #   import abc
-#   __metaclass__ = abc.ABCMeta
-#   @abc.abstractmethod
 # SEE
 #   https://habrahabr.ru/post/72757/
 #   https://zopetoolkit.readthedocs.io/en/latest/
