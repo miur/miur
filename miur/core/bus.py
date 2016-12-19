@@ -3,7 +3,7 @@ import asyncio
 import functools
 
 from miur.share.chain import Chain
-from miur.share.ifc import ILink
+from miur.share import ifc
 from miur.share.osi import *
 
 from . import command, server
@@ -168,7 +168,7 @@ class Handler:
 #   -- anyway bears callback link to Hub inside its .sink()
 #   -- likewise disconnected but not destroyed channel.
 # ALT:(name): Mux, Dispatcher, Relay
-class Hub(ILink):
+class Hub(ifc.Link):
     def __init__(self, sink, handler, ctx):
         self._sink = sink
         self.handler = handler

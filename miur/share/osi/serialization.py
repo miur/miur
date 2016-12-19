@@ -3,26 +3,26 @@
 
 import pickle
 
-from miur.share.ifc import ILink
+from miur.share import ifc
 
 __all__ = ['Deserialize', 'Serialize']
 
 
-class Deserialize(ILink):
+class Deserialize(ifc.Link):
     def __init__(self, factory):
         self._factory = factory
 
     def __call__(self, data):
         kv = pickle.loads(data)
         cmd = self._factory(kv['cmd'], *kv['args'])
-        self._sink((kv['id'], cmd))
+        self._slot((kv['id'], cmd))
 
 
 # NOTE: can split single cmd into multiple msgs -- for streaming, etc
 # RFC: remove intermediate 'dict' (if possible)
-class Serialize(ILink):
+class Serialize(ifc.Link):
     def __call__(self, pair):
         uid, rsp = pair
         obj = {'id': uid, 'rsp': rsp}
         data = pickle.dumps(obj, protocol=pickle.HIGHEST_PROTOCOL)
-        self._sink(data)
+        self._slot(data)

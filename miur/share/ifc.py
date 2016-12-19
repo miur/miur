@@ -47,8 +47,9 @@ class Boundary(Callable, IBind):
     def bind(self, outer: IBind, mutual=True):
         self.unbind()
         if outer is not None:
-            assert isinstance(outer, self._outer_t)
             if mutual:
+                # EXPL: moved under 'mutual' to allow in Chain homogeneous connects
+                assert isinstance(outer, self._outer_t)
                 outer.bind(self, False)
             self._outer = outer
         return outer
@@ -57,9 +58,9 @@ class Boundary(Callable, IBind):
         if outer is None and self._outer is not _undefined:
             outer = self._outer
         if outer is not None:
-            assert isinstance(outer, self._outer_t)
-        if mutual:
-            outer.unbind(self, False)
+            if mutual:
+                assert isinstance(outer, self._outer_t)
+                outer.unbind(self, False)
         self._outer = _undefined
         return outer
 
@@ -76,8 +77,14 @@ class Slot(Boundary):
         self._outer_t = Plug  # HACK: circular deps :: no declaration in Python
         self.bind(outer)
 
-    def __call__(self, args):
-        return self._outer(args)
+    # THINK: how it can be used ? MAYBE in chain for {chain[-1].slot--slot} conn ?
+    def set_inner(self, inner=None):
+        if inner is not None:
+            assert isinstance(inner, self._outer_t)
+            inner.set_inner(self)
+
+    def __call__(self, *args, **kw):
+        return self._outer(*args, **kw)
 
 
 # NOTE: Bind src, same dst
@@ -93,14 +100,14 @@ class Plug(Boundary):
     def set_inner(self, inner=None):
         self._inner = inner if inner is not None else _undefined
 
-    def __call__(self, args):
-        return self._inner(args)
+    def __call__(self, *args, **kw):
+        return self._inner(*args, **kw)
 
 
 class Link(Callable):
     def __init__(self, src=None, dst=None):
-        self._plug = Plug(inner=self.__call__)
         self._slot = Slot()
+        self._plug = Plug(inner=self._slot)
         self.bind(src, dst)
 
     def bind(self, src=None, dst=None):
@@ -111,6 +118,14 @@ class Link(Callable):
         if src is not None:
             assert isinstance(src, self.__class__)
             self._plug.bind(src.slot)
+
+    def unbind(self, src=None, dst=None):
+        if src is not None:
+            assert isinstance(src, self.__class__)
+            self._plug.unbind(src.slot)
+        if dst is not None:
+            assert isinstance(dst, self.__class__)
+            self._slot.unbind(dst.plug)
 
     @property
     def plug(self):

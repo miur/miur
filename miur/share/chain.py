@@ -1,7 +1,7 @@
 import threading
 from collections import Sequence
 
-from miur.share.ifc import ILink
+from miur.share import ifc
 
 import logging
 _log = logging.getLogger(__name__.split('.', 2)[1])
@@ -31,25 +31,23 @@ def with_lock(method):
 # ALT:BAD? we integrate segmentor into transport and process inside Chain only single-in-single-out msgs
 # ATT: chain N:M is one-way pipe and can't return anything back
 #   = 'None' when wholly consumed small packet, accumulated multiple 'car' for long data packet
-class Chain(Sequence, ILink):
-    def __init__(self, links=None, *, producer=None, sink=None):
+class Chain(Sequence, ifc.Link):
+    def __init__(self, links=None, *, src=None, dst=None):
+        super().__init__()
         self._lock = threading.Lock()
         self._chain = []
-        if producer:
-            producer.bind(self)
-        if sink:
-            self.bind(sink)
-        if links:
-            self[:] = links
+        self[:] = links if links is not None else []
+        self.bind(src=src, dst=dst)
 
     @with_lock
-    def bind(self, link):
-        super().bind(link)
+    def bind(self, src=None, dst=None):
+        super().bind(src=src, dst=dst)
         self._invalidate()
-        return link
 
-    def __call__(self, *args, **kw):
-        return self._call(*args, **kw)
+    @with_lock
+    def unbind(self, src=None, dst=None):
+        super().unbind(src=src, dst=dst)
+        self._invalidate()
 
     @with_lock
     def __setitem__(self, k, v):
@@ -60,10 +58,13 @@ class Chain(Sequence, ILink):
 
     def _invalidate(self):
         if self._chain:
-            self._call = self._chain[0]
-            self._chain[-1].bind(self._sink)
+            self.plug.set_inner(self._chain[0].plug)
+            # BAD: we can't mutually unbind() last slot -- it will disconnect Chain.slot from sink
+            # ALT: use def __call__(...): self.slot(...) BUT assert __call__ will be failed
+            # THINK:USE self.slot.set_inner() or allow functors generally (remove asserts on isinstance)
+            self._chain[-1].slot.bind(self.slot, mutual=False)
         else:
-            self._call = self._sink
+            self.plug.set_inner(self._slot)
 
     def __getitem__(self, k):
         return self._chain[k]
