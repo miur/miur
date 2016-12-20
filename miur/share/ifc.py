@@ -12,6 +12,9 @@ __all__ = ['ILink']
 #   * ext ifc is specified by class api
 #   * ext is always derived Boundary object
 
+# http://stackoverflow.com/questions/14648374/python-function-calls-are-really-slow
+#   indirect calling :: ~100nS per call => Chain() may become slow (ALSO whole callback topology)
+
 
 def _undefined(*p, **k):
     raise NotImplementedError
@@ -111,13 +114,13 @@ class IConnector(Callable):
     def __init__(self, src=None, dst=None):
         self.bind(src, dst)
 
-    @abc.abstractmethod
     @property
+    @abc.abstractmethod
     def plug(self):
         """Read Input"""
 
-    @abc.abstractmethod
     @property
+    @abc.abstractmethod
     def slot(self):
         """Write Output"""
 
@@ -154,6 +157,9 @@ class Link(IConnector):
     @property
     def slot(self):
         return self._slot
+
+    def __call__(self, *args, **kw):
+        return self._slot(*args, **kw)
 
 
 # USE: sink/well, giver/taker, producer/consumer
@@ -197,7 +203,7 @@ class Chain(IConnector):
         for link in self._chain:
             src.bind(dst=link)
             src = link
-        src.bind(self._end)
+        src.bind(dst=self._end)
 
 
 # ALT:(name): Cord/Cabel/Socket
@@ -217,6 +223,7 @@ class Channel(IBind):
         return self._rhs
 
 
+# NOTE: half-hub == mux/demux are useful on their own -- like parts of Handler
 class Hub(IBind):
     def __init__(self, sink, handler, ctx):
         # THINK: allow heterogeneous conn circuits
