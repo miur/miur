@@ -31,7 +31,7 @@ def with_lock(method):
 # ALT:BAD? we integrate segmentor into transport and process inside Chain only single-in-single-out msgs
 # ATT: chain N:M is one-way pipe and can't return anything back
 #   = 'None' when wholly consumed small packet, accumulated multiple 'car' for long data packet
-class Chain(Sequence, ifc.Link):
+class Chain(Sequence, ifc.IBind):
     def __init__(self, links=None, *, src=None, dst=None):
         super().__init__()
         self._lock = threading.Lock()

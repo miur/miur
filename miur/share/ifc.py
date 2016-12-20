@@ -1,5 +1,5 @@
 import abc
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 
 __all__ = ['ILink']
 
@@ -35,6 +35,7 @@ class IBind:
 #   self.bind(obj1).bind(obj2) ...
 #   self.unbind(obj1).unbind(obj2) ...
 #   ++ Can overload __add__ to create chain by: Link1 + Link2 + ...
+# ALT:(name): Flow
 class Boundary(Callable, IBind):
     _inner = _undefined
     _outer = _undefined
@@ -72,6 +73,7 @@ class Boundary(Callable, IBind):
 #   * slot location is fixed
 #     - known to any connected inner generator: __call__() must never be reassigned
 #     - known to any plug possible to be inserted outside
+# ALT:(name): OutFlow, OutsideFlow
 class Slot(Boundary):
     def __init__(self, outer=None):
         self._outer_t = Plug  # HACK: circular deps :: no declaration in Python
@@ -91,6 +93,7 @@ class Slot(Boundary):
 #   * any plug always consumes carriers E.G.(two-pin plug, phones jack plug)
 #   * slots must always have valid refs: __call__() must never be reassigned
 #       => however, if we always unbind() before bind() -- you can ?
+# ALT:(name): InFlow, InsideFlow
 class Plug(Boundary):
     def __init__(self, outer=None, inner=None):
         self._outer_t = Slot  # HACK: circular deps :: no declaration in Python
@@ -104,28 +107,45 @@ class Plug(Boundary):
         return self._inner(*args, **kw)
 
 
-class Link(Callable):
+class IConnector(Callable):
     def __init__(self, src=None, dst=None):
-        self._slot = Slot()
-        self._plug = Plug(inner=self._slot)
         self.bind(src, dst)
+
+    @abc.abstractmethod
+    @property
+    def plug(self):
+        """Read Input"""
+
+    @abc.abstractmethod
+    @property
+    def slot(self):
+        """Write Output"""
 
     def bind(self, src=None, dst=None):
         # EXPL: backward init order : dangling producer on exc is safer then consumer
         if dst is not None:
             assert isinstance(dst, self.__class__)
-            self._slot.bind(dst.plug)
+            self.slot.bind(dst.plug)
         if src is not None:
             assert isinstance(src, self.__class__)
-            self._plug.bind(src.slot)
+            self.plug.bind(src.slot)
 
     def unbind(self, src=None, dst=None):
         if src is not None:
             assert isinstance(src, self.__class__)
-            self._plug.unbind(src.slot)
+            self.plug.unbind(src.slot)
         if dst is not None:
             assert isinstance(dst, self.__class__)
-            self._slot.unbind(dst.plug)
+            self.slot.unbind(dst.plug)
+
+
+# USE:(C++): private inheritance to hide impl (members _sink/_plug)
+# ALT:(name): LinkedFlow
+class Link(IConnector):
+    def __init__(self, src=None, dst=None, inner=None):
+        self._slot = Slot()
+        self._plug = Plug(inner=(inner if inner is not None else self._slot))
+        super().__init__(src=src, dst=dst)
 
     @property
     def plug(self):
@@ -134,6 +154,87 @@ class Link(Callable):
     @property
     def slot(self):
         return self._slot
+
+
+# USE: sink/well, giver/taker, producer/consumer
+# WTF: diff with 'Link' -- TRY using in Channel/Hub to understand
+# ALT:(name) Duplex/Latch/Lock/Clamp/Frame/Chassis/IO
+# ALT:(name): BidirectFlow
+class Socket(IConnector):
+    def __init__(self, src=None, dst=None, inner=None):
+        super().__init__(src=src, dst=dst, inner=inner)
+
+    @property
+    def plug(self):
+        return self._plug
+
+    @property
+    def slot(self):
+        return self._slot
+
+
+# ALT:(name): ChainedFlow
+class Chain(IConnector):
+    def __init__(self, chain: Iterable=None, *, src=None, dst=None):
+        self._chain = chain if chain is not None else []
+        # THINK: excessive specifying of args
+        self._beg = Link(src=src)
+        self._end = Link(dst=dst)
+        super().__init__(src=src, dst=dst)
+        self.invalidate()
+
+    @property
+    def plug(self):
+        return self._beg.plug
+
+    @property
+    def slot(self):
+        return self._end.slot
+
+    # ENH: split in three to update only necessary parts
+    def invalidate(self):
+        src = self._beg
+        for link in self._chain:
+            src.bind(dst=link)
+            src = link
+        src.bind(self._end)
+
+
+# ALT:(name): Cord/Cabel/Socket
+class Channel(IBind):
+    def __init__(self, lhs=None, rhs=None):
+        self._lhs = Socket()
+        self._rhs = Socket()
+        self._l2r = Chain()
+        self._r2l = Chain()
+
+    @property
+    def lhs(self):
+        return self._lhs
+
+    @property
+    def rhs(self):
+        return self._rhs
+
+
+class Hub(IBind):
+    def __init__(self, sink, handler, ctx):
+        # THINK: allow heterogeneous conn circuits
+        #   OR:BET: allow only 'Socket' conn and create special 'adapter' for heterogeneous ones
+        self._mux = None    # ALT:(name): multiplug = track all plugs to disconnect at once
+        self._demux = None  # ALT:(name): multislot
+
+    # NOTE: heterogeneous left and right sides
+    def bind(self, bus=None, sock=None):
+        pass
+
+    # HACK: we access rhs, create new Socket object per connection and return it to bind() with Channel
+    #   BUT: if bind wasn't successful :: how to remove from container and destroy this object ?
+    @property
+    def conn(self):
+        sock = Socket()
+        self._channels.add(sock)
+        return sock
 
 
 # NOTE: return passed obj for chaining : self.bind(obj1).bind(obj2)

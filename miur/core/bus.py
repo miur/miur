@@ -147,7 +147,7 @@ class TcpListeningServer:
 
 
 # NOTE:TEMP: mix up 'load distributor' thread with 'executor' thread while N==1
-class Handler:
+class Handler(ifc.Link):
     def __init__(self, sink):
         self.sink = sink
 
@@ -157,7 +157,7 @@ class Handler:
     # TRY: regulate putting rsp into bus_send by cmd/rsp itself
     #   => BUT who must decide it: command or context ?
     def __call__(self, car):
-        car.execute(self.sink)
+        car.execute(self.slot)
 
 
 # NOTE: this is recv concentrator -- sole point for all channels to connect
