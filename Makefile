@@ -10,3 +10,7 @@ main: test
 # py.test -s  # print() on screen
 test:
 	py.test -- $(shell pwd)
+
+DEPS := python-pytest python-pytest-cov python-pytest-mock
+deps-install:
+	sudo pacman -S $(DEPS:%='%') </dev/stdin >/dev/stdout

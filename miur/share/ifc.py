@@ -22,16 +22,15 @@ def _undefined(*p, **k):
 
 # ATT: circular dependency of funcs arg types is impossible
 # class Slot: def bind(self, f: Plug) && class Plug: def bind(self, f: Slot)
-class IBind:
-    __metaclass__ = abc.ABCMeta
-
+# ALT:(name): couple/decouple
+class IBind(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def bind(self, outer):
-        """Couple two connectors"""
+        raise NotImplementedError
 
     @abc.abstractmethod
     def unbind(self, outer=None):
-        """Decouple two connectors"""
+        raise NotImplementedError
 
 
 # NOTE: connector allows chaining
@@ -114,13 +113,11 @@ class IConnector(Callable):
     def __init__(self, src=None, dst=None):
         self.bind(src, dst)
 
-    @property
-    @abc.abstractmethod
+    @abc.abstractproperty
     def plug(self):
         """Read Input"""
 
-    @property
-    @abc.abstractmethod
+    @abc.abstractproperty
     def slot(self):
         """Write Output"""
 

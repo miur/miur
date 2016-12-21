@@ -1,3 +1,5 @@
+import pytest
+
 from miur.share import ifc
 
 # SEE:
@@ -13,17 +15,38 @@ from miur.share import ifc
 #   http://stackoverflow.com/questions/18736473/optimizing-python-performance-in-function-calls
 
 
-# USAGE: anywhere in test_*(): assert bps.parse("") ==
-#   @pytest.fixture; def bps(): return BudParser()
-#   with pytest.raises(BudSyntaxError): func(2)
+def concreted(abclass):
+    class concreteCls(abclass):
+        pass
+    concreteCls.__abstractmethods__ = frozenset()
+    return type('DummyConcrete' + abclass.__name__, (concreteCls,), {})
+
+
+def is_func_eq(f, g):
+    return f.__code__.co_code == g.__code__.co_code
+
+
+@pytest.fixture
+def makeBoundary():
+    cls = concreted(ifc.Boundary)
+    b = cls()
+    b._outer_t = cls
+    return b
+
+
+def test_undef():
+    with pytest.raises(NotImplementedError):
+        ifc._undefined()
 
 
 class TestBoundary:
-    def setup(self):
-        class TLink(ifc.Link):
-            def __call__(self):
-                raise NotImplementedError
-        self.link = TLink()
+    def test_initial(self):
+        self.a = makeBoundary()
+        assert is_func_eq(ifc.Boundary._inner, ifc._undefined)
+        assert is_func_eq(a._inner, ifc._undefined)
+        assert is_func_eq(a._outer, ifc._undefined)
 
-    def test_init(self):
-        assert ifc._undefined is ifc._undefined
+    def test_bind_ab(self):
+        a, b = makeBoundary(), makeBoundary()
+        a.bind(b)
+        assert a._inner is b._outer
