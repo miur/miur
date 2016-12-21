@@ -13,6 +13,7 @@ from miur.share import ifc
 #   http://stackoverflow.com/questions/1777556/alternatives-to-gprof/1779343#1779343
 #   http://stackoverflow.com/questions/4295799/how-to-improve-performance-of-this-code/4299378#4299378
 #   http://stackoverflow.com/questions/18736473/optimizing-python-performance-in-function-calls
+# NOTE: 'assert ...' skipped when <= '__debug__ == False' <= 'python -O'
 
 
 def concreted(abclass):
@@ -41,12 +42,19 @@ def test_undef():
 
 class TestBoundary:
     def test_initial(self):
-        self.a = makeBoundary()
+        a = makeBoundary()
         assert is_func_eq(ifc.Boundary._inner, ifc._undefined)
         assert is_func_eq(a._inner, ifc._undefined)
         assert is_func_eq(a._outer, ifc._undefined)
 
-    def test_bind_ab(self):
+    def test_bind_a_b(self):
         a, b = makeBoundary(), makeBoundary()
         a.bind(b)
-        assert a._inner is b._outer
+        assert is_func_eq(a._inner, b._outer)
+
+    def test_bind_a_f(self):
+        a, f = makeBoundary(), id
+        a.bind(f)
+        assert a._outer is f
+        with pytest.raises(AssertionError):
+            a.bind(1)

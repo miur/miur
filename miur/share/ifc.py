@@ -50,9 +50,9 @@ class Boundary(Callable, IBind):
     def bind(self, outer: IBind, mutual=True):
         self.unbind()
         if outer is not None:
-            if mutual:
-                # EXPL: moved under 'mutual' to allow in Chain homogeneous connects
-                assert isinstance(outer, self._outer_t)
+            assert callable(outer)
+            # EXPL: moved under 'mutual' to allow in Chain homogeneous connects
+            if mutual and isinstance(outer, self._outer_t):
                 outer.bind(self, False)
             self._outer = outer
         return outer
@@ -61,8 +61,8 @@ class Boundary(Callable, IBind):
         if outer is None and self._outer is not _undefined:
             outer = self._outer
         if outer is not None:
-            if mutual:
-                assert isinstance(outer, self._outer_t)
+            assert callable(outer)
+            if mutual and isinstance(outer, self._outer_t):
                 outer.unbind(self, False)
         self._outer = _undefined
         return outer
