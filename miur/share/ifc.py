@@ -1,7 +1,10 @@
+import logging
 import abc
 from collections.abc import Callable, Iterable
 
 __all__ = ['ILink']
+
+_log = logging.getLogger(__name__.split('.', 2)[1])
 
 # ATT: multidirectional dataflow needs two diff ifc
 #   * LhsBoundary = Plug : ext -> inn  # receiver : api controls 'src'
@@ -31,6 +34,21 @@ class IBind(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def unbind(self, outer=None):
         raise NotImplementedError
+
+    # ALT: hasbound
+    @abc.abstractmethod
+    def isbound(self, outer=True):
+        raise NotImplementedError
+
+
+class IJoint:
+    @abc.abstractproperty
+    def plug(self):
+        """Read Input"""
+
+    @abc.abstractproperty
+    def slot(self):
+        """Write Output"""
 
 
 # NOTE: connector allows chaining
@@ -66,6 +84,12 @@ class Boundary(Callable, IBind):
                 outer.unbind(self, False)
         self._outer = _undefined
         return outer
+
+    def isbound(self, outer=True):
+        if isinstance(outer, bool):
+            return outer == (self._outer != _undefined)
+        elif isinstance(outer, IBind):
+            return outer == self._outer
 
 
 # NOTE: Same src, bind dst
@@ -109,34 +133,35 @@ class Plug(Boundary):
         return self._inner(*args, **kw)
 
 
-class IConnector(Callable):
+class IConnector(Callable, IBind, IJoint):
     def __init__(self, src=None, dst=None):
         self.bind(src, dst)
-
-    @abc.abstractproperty
-    def plug(self):
-        """Read Input"""
-
-    @abc.abstractproperty
-    def slot(self):
-        """Write Output"""
 
     def bind(self, src=None, dst=None):
         # EXPL: backward init order : dangling producer on exc is safer then consumer
         if dst is not None:
-            assert isinstance(dst, self.__class__)
+            _log.info('Bind ({!r}) -> {!r}'.format(self.slot, dst))
+            assert isinstance(dst, IConnector)
             self.slot.bind(dst.plug)
         if src is not None:
-            assert isinstance(src, self.__class__)
+            _log.info('Bind {!r} -> ({!r})'.format(src, self.plug))
+            assert isinstance(src, IConnector)
             self.plug.bind(src.slot)
 
     def unbind(self, src=None, dst=None):
         if src is not None:
-            assert isinstance(src, self.__class__)
+            assert isinstance(src, IConnector)
             self.plug.unbind(src.slot)
+        else:
+            self.plug.unbind()
         if dst is not None:
-            assert isinstance(dst, self.__class__)
+            assert isinstance(dst, IConnector)
             self.slot.unbind(dst.plug)
+        else:
+            self.slot.unbind()
+
+    def isbound(self, plug=True, slot=True):
+        return self.plug.isbound(plug) and self.slot.isbound(slot)
 
 
 # USE:(C++): private inheritance to hide impl (members _sink/_plug)
@@ -177,9 +202,10 @@ class Socket(IConnector):
 
 
 # ALT:(name): ChainedFlow
+# BAD: slight discrepancy for isbound() using plug/slot instead of bet/end links
 class Chain(IConnector):
     def __init__(self, chain: Iterable=None, *, src=None, dst=None):
-        self._chain = chain if chain is not None else []
+        self.chain = chain
         # THINK: excessive specifying of args
         self._beg = Link(src=src)
         self._end = Link(dst=dst)
@@ -193,6 +219,24 @@ class Chain(IConnector):
     @property
     def slot(self):
         return self._end.slot
+
+    def __call__(self, *args, **kw):
+        fn = self.plug
+        return fn(*args, **kw)
+
+    @property
+    def chain(self):
+        return self._chain
+
+    @chain.setter
+    def chain(self, chain):
+        if chain is None:
+            self._chain = []
+        else:
+            for c in chain:
+                assert isinstance(c, IConnector)
+            self._chain = chain
+        return self._chain
 
     # ENH: split in three to update only necessary parts
     def invalidate(self):
@@ -208,8 +252,9 @@ class Channel(IBind):
     def __init__(self, lhs=None, rhs=None):
         self._lhs = Socket()
         self._rhs = Socket()
-        self._l2r = Chain()
-        self._r2l = Chain()
+        self._l2r = Chain(src=self._lhs, dst=self._rhs)
+        self._r2l = Chain(src=self._rhs, dst=self._lhs)
+        self.bind(lhs=lhs, rhs=rhs)
 
     @property
     def lhs(self):
@@ -218,6 +263,32 @@ class Channel(IBind):
     @property
     def rhs(self):
         return self._rhs
+
+    # THINK: isallowed() -- encapsulate assert isinstance(..., Socket)
+    # TRY: encapsulate whole patt 'bind() if not None'
+    def bind(self, lhs=None, rhs=None):
+        if lhs is not None:
+            assert isinstance(lhs, Socket)
+            self.lhs.bind(src=lhs.slot, dst=lhs.plug)
+        if rhs is not None:
+            assert isinstance(rhs, Socket)
+            self.rhs.bind(src=rhs.slot, dst=rhs.plug)
+
+    # def unbind(self, lhs=None, rhs=None):
+    #     if lhs is not None:
+    #         assert isinstance(lhs, Socket)
+    #         self.plug.unbind(lhs.slot)
+    #     else:
+    #         self.lhs.unbind(lhs)
+    #         self.rhs.unbind(rhs)
+    #     if rhs is not None:
+    #         assert isinstance(rhs, IConnector)
+    #         self.slot.unbind(rhs.plug)
+    #     else:
+    #         self.slot.unbind()
+
+    # def isbound(self, lhs=True, rhs=True):
+    #     return self.lhs.isbound(lhs) and self.rhs.isbound(rhs)
 
 
 # NOTE: half-hub == mux/demux are useful on their own -- like parts of Handler

@@ -58,3 +58,70 @@ class TestBoundary:
         assert a._outer is f
         with pytest.raises(AssertionError):
             a.bind(1)
+
+
+class TestPlugSlot:
+    def test_p_s(self):
+        p = ifc.Plug()
+        s = ifc.Slot()
+        s.bind(p)
+        assert p.isbound(s)
+        assert s.isbound(p)
+        s.unbind(p)
+        assert not p.isbound()
+        assert not s.isbound()
+        # Reverse bind
+        p.bind(s)
+        assert p.isbound(s)
+        assert s.isbound(p)
+        # Double bind
+        p.bind(s)
+        assert p.isbound(s)
+        assert s.isbound(p)
+        # Reverse unbind
+        p.unbind(s)
+        assert not p.isbound()
+        assert not s.isbound()
+        # Double unbind (alt syntax)
+        p.unbind(s)
+        assert p.isbound(False)
+        assert s.isbound(False)
+
+
+# NEED: mock to check __call__ redirection
+class TestLink:
+    def test_l(self):
+        m = ifc.Link()
+        n = ifc.Link()
+        n.bind(src=m)
+        assert m.isbound(plug=False, slot=n.plug)
+        assert n.isbound(plug=m.slot, slot=False)
+        n.unbind(src=m)
+        assert not m.isbound()
+        assert not n.isbound()
+        # Reverse bind
+        m.bind(dst=n)
+        assert m.isbound(plug=False, slot=n.plug)
+        assert n.isbound(plug=m.slot, slot=False)
+        # Reverse unbind (auto)
+        m.unbind()
+        assert not m.isbound()
+        assert not n.isbound()
+
+
+# NEED: mock to check callback traversing in chain
+class TestChain:
+    def test_chain(self):
+        b = ifc.Link()
+        e = ifc.Link()
+        c = ifc.Chain()
+        assert not c.isbound()
+
+        c.bind(src=b, dst=e)
+        assert c.isbound(plug=b.slot, slot=e.plug)
+        c.unbind()
+        assert not c.isbound()
+
+        c.bind(src=b, dst=e)
+        c.chain = [ifc.Link()]
+        assert c.isbound(plug=b.slot, slot=e.plug)

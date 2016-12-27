@@ -2,7 +2,7 @@ import logging
 import asyncio
 import functools
 
-from miur.share.chain import Chain
+# from miur.share.chain import Chain
 from miur.share import ifc
 from miur.share.osi import *
 
@@ -82,6 +82,11 @@ class Bus:
 # NOTE: Channel with plugged-in Transport works as deferred Chain with ILink ifc
 #   => MAYBE create sep entity encapsulating such ifc ?
 
+class Chain(ifc.Chain):
+    def __call__(self, *args):
+        raise NotImplementedError
+
+
 # ALT:(name): circuit
 class Channel:
     # ALT:(name): src/emitter/producer, dst/collector/absorber
@@ -91,42 +96,23 @@ class Channel:
 
         # HACK: try insert 'src' into Chain as first and 'dst' as last
         #   => ++ I will get unified ifc: [0] to access 'src' and [-1] to access 'dst'
-        self.chain_to_left = Chain()  # producer=src, sink=sink
-        self.chain_to_left[:] = [Desegmentate(), Deserialize(make_cmd), Deanonymize(make_car)]
-        self.chain_to_right = Chain()  # producer=self, sink=dst
-        self.chain_to_right[:] = [Anonymize(), Serialize(), Segmentate()]
-        self.plug(lhs=lhs, rhs=rhs)
+        self.r2l = Chain()  # producer=src, sink=sink
+        self.r2l.chain = [Desegmentate(), Deserialize(make_cmd), Deanonymize(make_car)]
+        self.l2r = Chain()  # producer=self, sink=dst
+        self.l2r.chain = [Anonymize(), Serialize(), Segmentate()]
+        self.bind(lhs=lhs, rhs=rhs)
 
-        # self.__call__ = self.chain_to_right
+        # self.__call__ = self.l2r
         # BAD: dst isn't closed, ALSO how to close all when disassembling chain
         # BAD: no support for heterogeneous chains
         self.close = rhs.close
         self.close_recv = rhs.close_recv
 
-    def plug(self, lhs=None, rhs=None):
-        if lhs:
-            self.plug_lhs(both=lhs)
-        if rhs:
-            self.plug_rhs(both=rhs)
-
-    def plug_lhs(self, *args, **kw):
-        return self._plug(self.chain_to_left, self.chain_to_right, *args, **kw)
-
-    def plug_rhs(self, *args, **kw):
-        return self._plug(self.chain_to_right, self.chain_to_left, *args, **kw)
-
-    # recv/send, call/sink
-    def _plug(self, producer, consumer, both=None, *, src=None, dst=None):
-        if both and not src:
-            src = both
-        if both and not dst:
-            dst = both
-        if src:
-            src.bind(consumer)
-            # TODO: insert into super().bind() to be always called
-            _log.info('Bind {}'.format(consumer))
-        if dst:
-            producer.bind(dst)
+    def bind(self, lhs=None, rhs=None, both=None):
+        if both is not None:
+            lhs = rhs = both
+        self.l2r.bind(src=lhs, dst=rhs)
+        self.r2l.bind(src=rhs, dst=lhs)
 
 
 class TcpListeningServer:
