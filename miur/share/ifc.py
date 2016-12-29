@@ -133,7 +133,7 @@ class Plug(Boundary):
         return self._inner(*args, **kw)
 
 
-class IConnector(Callable, IBind, IJoint):
+class IConnector(IBind, IJoint):
     def __init__(self, src=None, dst=None):
         self.bind(src, dst)
 
@@ -180,17 +180,20 @@ class Link(IConnector):
     def slot(self):
         return self._slot
 
+    # THINK: Is there need for __call__ ?
     def __call__(self, *args, **kw):
         return self._slot(*args, **kw)
 
 
 # USE: sink/well, giver/taker, producer/consumer
-# WTF: diff with 'Link' -- TRY using in Channel/Hub to understand
+# WTF: no visible diff with 'Link' -- TRY using in Channel/Hub to understand
 # ALT:(name) Duplex/Latch/Lock/Clamp/Frame/Chassis/IO
 # ALT:(name): BidirectFlow
 class Socket(IConnector):
     def __init__(self, src=None, dst=None, inner=None):
-        super().__init__(src=src, dst=dst, inner=inner)
+        self._slot = Slot()
+        self._plug = Plug(inner=(inner if inner is not None else self._slot))
+        super().__init__(src=src, dst=dst)
 
     @property
     def plug(self):

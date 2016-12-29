@@ -2,7 +2,7 @@ import logging
 import asyncio
 import socket
 
-from miur.share.ifc import ILink
+from miur.share import ifc
 
 _log = logging.getLogger(__name__.split('.', 2)[1])
 
@@ -16,16 +16,21 @@ _log = logging.getLogger(__name__.split('.', 2)[1])
 #       -- however, you can inherit whole ifc and simply keep 2nd ifc point NotImplemented
 #   * execution is deffered by net delays when synchronously blocking
 #   * being asynchronous otherwise with its own thread/coro
-class ClientProtocol(asyncio.Protocol, ILink):
+class ClientProtocol(ifc.Socket, asyncio.Protocol):
     """Each client connection will create a new protocol instance"""
 
     def __init__(self, hub):
         self.hub = hub
+        super().__init__(inner=self.send)
 
     def connection_made(self, transport):
         self.transport = transport
         self.peer = self.transport.get_extra_info('peername')
         _log.info('Connection from {}'.format(self.peer))
+
+        # TODO: don't make channel itself ! Don't keep ref to 'hub' !
+        #   * post msg in bus to create channel
+        #   * wait until channel connected to here
         self.chan = self.hub.make_channel(rhs=self)
 
     def connection_lost(self, exc):
@@ -52,10 +57,10 @@ class ClientProtocol(asyncio.Protocol, ILink):
         _log.debug('Recv:{!r}: {!r} bytes'.format(self.peer, len(data)))
         if not data:
             raise
-        self._sink(data)
+        self.slot(data)
 
     # BAD: exc if client was already deleted when executor was suspended
     # CHECK: if need to write multiple times for too big data
     # CHECK:DONE: no need to '.drain()' (used only for streams)
-    def __call__(self, data):
+    def send(self, data):
         self.transport.write(data)

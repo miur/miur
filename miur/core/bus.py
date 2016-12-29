@@ -82,11 +82,6 @@ class Bus:
 # NOTE: Channel with plugged-in Transport works as deferred Chain with ILink ifc
 #   => MAYBE create sep entity encapsulating such ifc ?
 
-class Chain(ifc.Chain):
-    def __call__(self, *args):
-        raise NotImplementedError
-
-
 # ALT:(name): circuit
 class Channel:
     # ALT:(name): src/emitter/producer, dst/collector/absorber
@@ -96,9 +91,9 @@ class Channel:
 
         # HACK: try insert 'src' into Chain as first and 'dst' as last
         #   => ++ I will get unified ifc: [0] to access 'src' and [-1] to access 'dst'
-        self.r2l = Chain()  # producer=src, sink=sink
+        self.r2l = ifc.Chain()  # producer=src, sink=sink
         self.r2l.chain = [Desegmentate(), Deserialize(make_cmd), Deanonymize(make_car)]
-        self.l2r = Chain()  # producer=self, sink=dst
+        self.l2r = ifc.Chain()  # producer=self, sink=dst
         self.l2r.chain = [Anonymize(), Serialize(), Segmentate()]
         self.bind(lhs=lhs, rhs=rhs)
 

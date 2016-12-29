@@ -1,9 +1,9 @@
 PR := ./miur.py
-.DEFAULT_GOAL = test
+.DEFAULT_GOAL = main
 
 .PHONY: main
 main: PYTHONASYNCIODEBUG=1
-main: test
+main:
 	@$(PR)
 
 .PHONY: test
