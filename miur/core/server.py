@@ -29,15 +29,16 @@ class ClientProtocol(ifc.Socket, asyncio.Protocol):
         _log.info('Connection from {}'.format(self.peer))
 
         # TODO: don't make channel itself ! Don't keep ref to 'hub' !
-        #   * post msg in bus to create channel
+        #   * post msg (with backref to self) in bus to create channel
         #   * wait until channel connected to here
-        self.chan = self.hub.make_channel(rhs=self)
+        self.chan = self.hub.register(self)
 
     def connection_lost(self, exc):
         _log.info('Connection lost {}'.format(self.peer))
         if exc is not None:
             raise exc
-        self.hub.unbind(self.chan)
+        # BAD: unsymmetrical
+        self.hub.deregister(self.chan)
         self.chan = None
 
     def close(self):

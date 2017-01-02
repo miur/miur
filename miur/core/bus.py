@@ -39,12 +39,13 @@ class Carrier:
 # MAYBE: pass self.loop as main()->CommandMaker and there pass it to each cmds on __init__
 
 # NOTE: bus encapsulates cmds caching and ordering (priority, queue, pool, etc)
-class Bus:
-    def __init__(self):
+class Bus(ifc.Link):
+    def __init__(self, src=None, dst=None):
         self._impl = asyncio.Queue()
         self.running = True
+        super().__init__(src=src, dst=dst, inner=self.__call__)
 
-    def put(self, obj):
+    def __call__(self, obj):
         # NOTE: raises QueueFull if can't put it now
         return self._impl.put_nowait(obj)
 
@@ -52,6 +53,7 @@ class Bus:
         await self._impl.join()
         self.running = False
 
+    # CHG: replace functor by 'self.slot(car)'
     async def pop_apply(self, functor):
         car = await self._impl.get()
         functor(car)
@@ -60,6 +62,7 @@ class Bus:
     # BETTER: replace with 'async for' instead of 'while True' and move to Bus
     #   https://www.python.org/dev/peps/pep-0492/#asynchronous-iterators-and-async-for
     # TRY:(queues.py:164) try: [g.cancel() for g in _impl._getters]; except QueueEmpty: pass
+    # ALT:(name): retransmit
     async def for_each(self, functor):
         while self.running:
             await self.pop_apply(functor)
@@ -81,34 +84,6 @@ class Bus:
 
 # NOTE: Channel with plugged-in Transport works as deferred Chain with ILink ifc
 #   => MAYBE create sep entity encapsulating such ifc ?
-
-# ALT:(name): circuit
-class Channel:
-    # ALT:(name): src/emitter/producer, dst/collector/absorber
-    def __init__(self, sink=None, lhs=None, rhs=None, ctx=None):
-        make_cmd = command.CommandMaker('miur.core.command.all', ctx).make
-        make_car = functools.partial(Carrier, sink=self)
-
-        # HACK: try insert 'src' into Chain as first and 'dst' as last
-        #   => ++ I will get unified ifc: [0] to access 'src' and [-1] to access 'dst'
-        self.r2l = ifc.Chain()  # producer=src, sink=sink
-        self.r2l.chain = [Desegmentate(), Deserialize(make_cmd), Deanonymize(make_car)]
-        self.l2r = ifc.Chain()  # producer=self, sink=dst
-        self.l2r.chain = [Anonymize(), Serialize(), Segmentate()]
-        self.bind(lhs=lhs, rhs=rhs)
-
-        # self.__call__ = self.l2r
-        # BAD: dst isn't closed, ALSO how to close all when disassembling chain
-        # BAD: no support for heterogeneous chains
-        self.close = rhs.close
-        self.close_recv = rhs.close_recv
-
-    def bind(self, lhs=None, rhs=None, both=None):
-        if both is not None:
-            lhs = rhs = both
-        self.l2r.bind(src=lhs, dst=rhs)
-        self.r2l.bind(src=rhs, dst=lhs)
-
 
 class TcpListeningServer:
     # BETTER: re-impl loop.create_server(...) for deterministic order of accept/receive/lost
@@ -149,30 +124,44 @@ class Handler(ifc.Link):
 #   -- anyway bears callback link to Hub inside its .sink()
 #   -- likewise disconnected but not destroyed channel.
 # ALT:(name): Mux, Dispatcher, Relay
-class Hub(ifc.Link):
-    def __init__(self, sink, handler, ctx):
-        self._sink = sink
+class Hub(ifc.Socket):
+    def __init__(self, handler, ctx, src=None, dst=None):
         self.handler = handler
         # NOTE: 'channels' is sep entity to support multiple independent buses with clients
         # WARN: not thread safe !!! BUT can't prove any until re-impl loop.create_server()
         self.channels = set()
-        self.make_channel = functools.partial(Channel, lhs=self, ctx=ctx)
+        self.make_cmd = command.CommandMaker('miur.core.command.all', ctx).make
+        super().__init__(src=src, dst=dst, inner=self.demux)
+
+    def make_channel(self, rhs=None):
+        chan = ifc.Channel(lhs=self, rhs=rhs)
+        lr = [Anonymize(), Serialize(), Segmentate()]
+        make_car = functools.partial(Carrier, sink=chan)
+        rl = [Desegmentate(), Deserialize(self.make_cmd), Deanonymize(make_car)]
+        chan.set_chain(lr=lr, rl=rl)
+        return chan
 
     # MAYBE: use backward dict [self] = channel :: so I can dismiss self.chan
     # NOTE: adding to dict don't require lock (beside iterating that dict)
     # MAYBE: set() is enough BUT how to close _impl connection then ?
     #   => cascade closing of Channel => BUT then you need: channel._impl_conn = self
     #   BETTER: cascading :: allows to mid-close channel and replace transport
-    # ALT:(name): ++ attach/detach, ~~ connect/disconnect
-    def bind(self, chan: Channel):
-        super().bind(chan)
+    # ALT:(name): ++ attach/detach | register/deregister, ~~ connect/disconnect
+    def register(self, conn: ifc.Socket=None):
+        sock = ifc.Socket(inner=self.mux)
+        chan = self.make_channel(lhs=sock, rhs=conn)
+        # THINK: add 'sock' instead of 'chan' into dict of [conn]
+        #   => so I could dispatch into actual 'sock'
+        #   BUT: where to store refs to 'chan' to gracefully close/reset it ?
         self.channels.add(chan)
+        return chan
         # channel.callback(self.put)
         # self.channels[channel.uuid] = channel.get
 
-    def unbind(self, chan):
+    # BAD: unsymmetrical
+    def deregister(self, chan):
+        # THINK: .reset()/.drain()/.close() whole channel before removing ?
         self.channels.remove(chan)
-        super().unbind(chan)
         # del self.channels[channel.uuid]
         # channel.destroy()
 
@@ -182,10 +171,18 @@ class Hub(ifc.Link):
     # NOTE:ENH: each blocking/transfer op must block only its own channel, not whole hub!
     #   => MAYBE: impl 'recv()' as part of Channel ?
     #   + by posting cmds to Hub through chan_self I can imm transfer/multicast them to their dst
-    def __call__(self, car):
+    def mux(self, car):
         policy = getattr(car.cmd, 'policy', command.GENERAL)
+        # THINK: decision of deferred/immediate must be taken in Bus itself !
+        #   => more encapsulation => can be imperceptibly replaced
+        #   BET: decision traversing short of full ring --> is prerogative of Ring
+        #   ALT: each Bus can be composed from multiple data streams
+        #       deferred == queue
+        #       immediate == callbacks
+        #     ++ allows cmds execution to be sync and sending results back -- async
+        #       => useful for sys cmds initiated from this module itself
         if policy == command.GENERAL:
-            self._sink(car)
+            self.slot(car)
         elif policy == command.IMMEDIATE:
             # THINK: place 'shutdown' into qout and wait again or send 'shutdown' immediately from server ?
             #   => must traverse 'shutdown' through whole system to establish proper shutdown chain
@@ -194,13 +191,18 @@ class Hub(ifc.Link):
 
     # RFC: there must not be any recv/send in Hub BUT where them must be ?
     #   => smth aka "Door between Bus and Channel, Gatekeeper"
-    def dispatch(self, car):
+    # ALT:(name): dispatch
+    def demux(self, car):
         # DEV: broadcast/multicast
         #   THINK? is it attribute of command or of carrier ?
         # ATT: silent discard of 'car' if dst channel removed
         if car.sink in self.channels:
             car.sink(car)
 
+    # BAD: dst isn't closed, ALSO how to close all when disassembling chain
+    # BAD: no support for heterogeneous chains
+    # chan.close = rhs.close
+    # chan.close_recv = rhs.close_recv
     def close_recv(self):
         [chan.close_recv() for chan in self.channels]
 
@@ -217,8 +219,8 @@ class Ring:
         # NOTE: separate buses are necessary to support full-duplex
         self.bus_recv = Bus()
         self.bus_send = Bus()
-        self.handler = Handler(sink=self.bus_send.put)
-        self.hub = Hub(sink=self.bus_recv.put, handler=self.handler, ctx=ctx)
+        self.handler = Handler(sink=self.bus_send)
+        self.hub = Hub(handler=self.handler, ctx=ctx, dst=self.bus_recv)
 
     async def loop(self):
         await asyncio.gather(self.bus_recv.for_each(self.handler),

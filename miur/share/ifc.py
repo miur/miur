@@ -18,6 +18,13 @@ _log = logging.getLogger(__name__.split('.', 2)[1])
 # http://stackoverflow.com/questions/14648374/python-function-calls-are-really-slow
 #   indirect calling :: ~100nS per call => Chain() may become slow (ALSO whole callback topology)
 
+# TODO:DEV: wrapper to convert any Callable into Plug/Slot/Link/Socket
+#   => so I could use wrapper over lambda/methods instead of inheritance
+#   => MAYBE I can replace inheritance by wrapper anywhere ?
+#   E.G.
+#     * in osi/* replace Link -> Callable
+#     * then inside Chain wrap each link in Link (if not Link already)
+
 
 def _undefined(*p, **k):
     raise NotImplementedError
@@ -56,7 +63,7 @@ class IJoint:
 #   self.unbind(obj1).unbind(obj2) ...
 #   ++ Can overload __add__ to create chain by: Link1 + Link2 + ...
 # ALT:(name): Flow
-class Boundary(Callable, IBind):
+class Boundary(IBind, Callable):
     _inner = _undefined
     _outer = _undefined
 
@@ -137,18 +144,28 @@ class IConnector(IBind, IJoint):
     def __init__(self, src=None, dst=None):
         self.bind(src, dst)
 
-    def bind(self, src=None, dst=None):
+    def bind(self, *args, src=None, dst=None):
+        if args:
+            dual = args[0]
+            if dual is not None:
+                src = src or dual
+                dst = dst or dual
         # EXPL: backward init order : dangling producer on exc is safer then consumer
         if dst is not None:
             _log.info('Bind ({!r}) -> {!r}'.format(self.slot, dst))
-            assert isinstance(dst, IConnector)
+            assert isinstance(dst, IConnector), "dst: {!r}".format(dst)
             self.slot.bind(dst.plug)
         if src is not None:
             _log.info('Bind {!r} -> ({!r})'.format(src, self.plug))
-            assert isinstance(src, IConnector)
+            assert isinstance(src, IConnector), "src: {!r}".format(dst)
             self.plug.bind(src.slot)
 
-    def unbind(self, src=None, dst=None):
+    def unbind(self, *args, src=None, dst=None):
+        if args:
+            dual = args[0]
+            if dual is not None:
+                src = src or dual
+                dst = dst or dual
         if src is not None:
             assert isinstance(src, IConnector)
             self.plug.unbind(src.slot)
@@ -166,6 +183,7 @@ class IConnector(IBind, IJoint):
 
 # USE:(C++): private inheritance to hide impl (members _sink/_plug)
 # ALT:(name): LinkedFlow
+# ALT:(name): src/emitter/producer, dst/collector/absorber
 class Link(IConnector):
     def __init__(self, src=None, dst=None, inner=None):
         self._slot = Slot()
@@ -192,7 +210,7 @@ class Link(IConnector):
 class Socket(IConnector):
     def __init__(self, src=None, dst=None, inner=None):
         self._slot = Slot()
-        self._plug = Plug(inner=(inner if inner is not None else self._slot))
+        self._plug = Plug(inner=inner)  # DFL: open circuit
         super().__init__(src=src, dst=dst)
 
     @property
@@ -206,6 +224,9 @@ class Socket(IConnector):
 
 # ALT:(name): ChainedFlow
 # BAD: slight discrepancy for isbound() using plug/slot instead of bet/end links
+# HACK: try insert 'src' into Chain as first and 'dst' as last
+#   => ++ I will get unified ifc: [0] to access 'src' and [-1] to access 'dst'
+#   BUT? beg/end links become unfixed, which may break func pointers
 class Chain(IConnector):
     def __init__(self, chain: Iterable=None, *, src=None, dst=None):
         self.chain = chain
@@ -236,6 +257,7 @@ class Chain(IConnector):
         if chain is None:
             self._chain = []
         else:
+            assert isinstance(chain, Iterable)
             for c in chain:
                 assert isinstance(c, IConnector)
             self._chain = chain
@@ -249,15 +271,30 @@ class Chain(IConnector):
             src = link
         src.bind(dst=self._end)
 
+    # USAGE: reset partial state after connection lost and reconnect
+    #   OR:MAYBE: discuss and continue from where was interrupted
+    def reset(self):
+        src = self._beg
+        for link in self._chain:
+            src.bind(dst=link)
+            src = link
+        src.bind(dst=self._end)
 
-# ALT:(name): Cord/Cabel/Socket
+
+# ALT:(name): Cord/Cabel/Socket/Circuit
 class Channel(IBind):
     def __init__(self, lhs=None, rhs=None):
         self._lhs = Socket()
         self._rhs = Socket()
-        self._l2r = Chain(src=self._lhs, dst=self._rhs)
-        self._r2l = Chain(src=self._rhs, dst=self._lhs)
+        self._lr = Chain(src=self.lhs, dst=self.rhs)
+        self._rl = Chain(src=self.rhs, dst=self.lhs)
         self.bind(lhs=lhs, rhs=rhs)
+
+    def set_chain(self, lr=None, rl=None):
+        if lr is not None:
+            self._lr.chain = lr
+        if rl is not None:
+            self._rl.chain = rl
 
     @property
     def lhs(self):
@@ -271,27 +308,19 @@ class Channel(IBind):
     # TRY: encapsulate whole patt 'bind() if not None'
     def bind(self, lhs=None, rhs=None):
         if lhs is not None:
-            assert isinstance(lhs, Socket)
-            self.lhs.bind(src=lhs.slot, dst=lhs.plug)
+            self.lhs.bind(dual=lhs)
         if rhs is not None:
-            assert isinstance(rhs, Socket)
-            self.rhs.bind(src=rhs.slot, dst=rhs.plug)
+            self.rhs.bind(dual=rhs)
 
-    # def unbind(self, lhs=None, rhs=None):
-    #     if lhs is not None:
-    #         assert isinstance(lhs, Socket)
-    #         self.plug.unbind(lhs.slot)
-    #     else:
-    #         self.lhs.unbind(lhs)
-    #         self.rhs.unbind(rhs)
-    #     if rhs is not None:
-    #         assert isinstance(rhs, IConnector)
-    #         self.slot.unbind(rhs.plug)
-    #     else:
-    #         self.slot.unbind()
+    def unbind(self, lhs=None, rhs=None):
+        # EXPL: don't unbind any, if both are None -- THINK: is it reasonable ?
+        if lhs is not None:
+            self.lhs.unbind(dual=lhs)
+        if rhs is not None:
+            self.rhs.unbind(dual=rhs)
 
-    # def isbound(self, lhs=True, rhs=True):
-    #     return self.lhs.isbound(lhs) and self.rhs.isbound(rhs)
+    def isbound(self, lhs=True, rhs=True):
+        return self.lhs.isbound(lhs) and self.rhs.isbound(rhs)
 
 
 # NOTE: half-hub == mux/demux are useful on their own -- like parts of Handler
