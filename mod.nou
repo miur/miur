@@ -79,6 +79,21 @@ Modular system
     http://www.curiousefficiency.org/posts/2016/09/python-packaging-ecosystem.html#my-core-software-ecosystem-design-philosophy
 
 
+User configuration
+! make user configuration also as mode
+  = VIZ. configs, small scripts, extensions, lists of plugins
+  >> analogue to "reasonable" vim config
+    vanilla vim is generally unusable
+  + support "typical" configs
+    E.G suckless, ultimate, ranger-like, mc-like, totalcmd-like
+    = can be improved over time
+  + user can create its own package like AUR
+    = conflicting with any other similar package
+    * share ready config with others
+    * install on new system by native pkg manager
+    * remove stale links / configs when installing new version
+
+
 Mods mgmt
   [_] TODO: investigate other plugin systems
       mc, sublime
