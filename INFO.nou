@@ -2,6 +2,8 @@
 *Ranger done right*
 Refactoring and evolution
 Microkernel relay in fm world
+++ Accessibility
+  add key hooks to TTS dirs content for blind people
 
 TODO
   [_] move ideas from 'term/ranger'
