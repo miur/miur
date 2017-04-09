@@ -8,6 +8,20 @@ Microkernel relay in fm world
 TODO
   [_] move ideas from 'term/ranger'
   [_] move ideas from 'nou.vim'
+  [_] IDEA:SEE Emacspeak's table browsing functionality (online docs)
+    = richest collection of end-user affordances for working with two-dimensional data.
+    + MAYBE useful for my graph representations
+  [_] THINK audio notions for working with text
+  [_] Combine skeleton from ready-to-use libs
+    * borrow ideas from neovim
+    * write glue in whatever hell there is
+    ! postpone more decisions for better arch, more drop-in replacements !
+    http://libuv.org/
+      https://github.com/libuv/libuv
+    https://github.com/ClusterLabs/libqb
+    https://habrahabr.ru/company/centosadmin/blog/323556/
+  [_] NEED: fault-tolerance for server part to continue to work
+  [_] NEED: ifc sep to impl audio ifc !
 
 Fork
   ? is there need for compatibility with python2 ?
