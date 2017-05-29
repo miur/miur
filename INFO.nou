@@ -6,6 +6,16 @@ Microkernel relay in fm world
   add key hooks to TTS dirs content for blind people
 
 TODO
+  [_] ALT: search file manager in Lisp
+    NOTE: lisp
+      + flexible language/domain boundary and REPL => useful for extending
+      - large deps, can't be easily ported to C for embedded pltf
+      ? How to postpone this arch decision to allow to introduce Lisp glue power in later stages ?
+    https://github.com/stacksmith/cl-fm
+    +? https://github.com/vozhyk-/minifileman
+    https://github.com/kostafey/flex-commander
+    https://github.com/lup777/emcfmgr
+    https://github.com/escherdragon/sunrise-commander
   [_] move ideas from 'term/ranger'
   [_] move ideas from 'nou.vim'
   [_] IDEA:SEE Emacspeak's table browsing functionality (online docs)
