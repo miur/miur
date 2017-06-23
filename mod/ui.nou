@@ -34,6 +34,15 @@ Frontend
       alternative shell language
         * allows to apply shell/etc commands to virtual lists/files DOM
         => ALT:USE: bash $ miur -H -t core -c '...'
+    query
+      cat necessary details from pipe in shell scripts
+      expose *miur* instance details similar to /sys or /proc of kernel VFS
+        +++ easy native ifc to any other *miur* instance
+          * you can copy current file under cursor from any instance
+          * go into the same directory
+          * ...
+        BUT:BAD: we need LKM to expose it directly into filesystem
+        BET:ALT: unroll single pipe into virtual tree view only inside *miur* (any other instance)
   cli
     interactive query-like fm (ls, zsh, fzf)
       * embed into zsh to interactively select files
