@@ -49,6 +49,8 @@ E.G.
       view in ranger's tree view
       mark 'unrestorable' actions in history view
       => 'undo' -- collect inverted commands pattern
+      IDEA: send history snippet to apply same operations on another machine
+        E.G. sorting music in directory tree
     its own keymap hierarchy
       entry: key -- description
       each key sequence -- nested dirs for each key
