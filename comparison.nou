@@ -2,6 +2,11 @@ FIND each and every file manager (Windows/Linux/Android)
   = SEE integration features with system/apps/services
   = THINK how tree-structure used in them
 
+Filesystem-like services
+  SEE Gopher
+    http://suckless.org/project_ideas
+    https://en.wikipedia.org/wiki/Gopher_%28protocol%29
+
 SEE
   https://wiki.archlinux.org/index.php/Category:File_managers
   Win
@@ -23,6 +28,13 @@ SEE
   https://vifm.info/
     https://github.com/vifm
     NOTE 'vifm' has 104k lines in C vs 'ranger' 15k in python
+    ++ Directly navigate inside archives (as TC)
+    + inner file associations
+
+!! noice -- very small suckless ranger-like fm in C
+  http://git.2f30.org/noice/files.html
+  (fork) https://github.com/jarun/nnn
+    https://github.com/jarun/nnn/wiki/nnn-vs.-noice
 
 !! mc
   https://www.midnight-commander.org/
