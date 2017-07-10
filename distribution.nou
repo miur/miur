@@ -4,3 +4,9 @@ habrahabr.ru
 linux.org.ru
 reddit.com
 news.ycombinator.com
+
+
+IDEA: compare "reasonable defaults" of users
+  ~ upload / fetch user configs and cross-examine them to form new defaults
+  ~ discussion which allows users to comment each setting separately
+    E.G. similar to commenting code in pull request
