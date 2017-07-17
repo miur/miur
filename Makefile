@@ -1,4 +1,5 @@
-PR := ./miur.py
+PR := ./alt.py
+# PR := ./miur.py
 .DEFAULT_GOAL = main
 
 .PHONY: main
