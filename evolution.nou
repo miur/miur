@@ -1,0 +1,36 @@
+IDEA
+  * linux tools :: as small as possible
+  * wayland design :: protocol as design core
+    => impl is anything by others
+
+
+Evolution
+  * independent tools
+  * maximum prototyping speed
+  * use 'multiprocess' model for communication
+    TODO:DEV: channel for events and channel for data
+  * develop tools one at a time
+    I can develop only what I'm interested right now and with a week timeframe at most
+  * reuse already existing tools
+    my strength is known tools and their application
+  * split tools to lesser ones
+    then some parts may be replaced by existing tools
+  * in the end == replace glue by something robust
+    glue may be replaced even in the process (E.G. bash -> python/lisp)
+
+
+Mods
+  ifc for graph navigation and operations submitting
+    ? may it be two different mods ?
+      + input may be used separately from output
+      + replace only output or input module when rewriting
+      - BUT: you need method to show current 'input' "selection" in 'output' module
+        ? use socket to pass nodes, which require highlighting ?
+        !!! 'input' requires *dom* for navigation, 'output' requires *dom* for displaying
+          BAD if 'input' and 'output' are separate modules they must duplicate *dom* and regularly sync
+          ALT shared *dom* on server, sending events to 'output' to refresh image
+    HACK: try to embed into zsh, using smth similar to 'completion list' instead of ncurses
+  preview current file under cursor
+    pipe / colorize => catch output and return to 'output'
+    gui image viewer => simply refresh currently viewed image
+  ...

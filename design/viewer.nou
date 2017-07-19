@@ -1,0 +1,104 @@
+%%%% Viewer
+DEV:TEMP: combined input/output/ui
+
+%%% Data Flow
+fs -> DOM  (caching everything due to slow access time to fs data, incremental sync)
+DOM -> reflection (lazy partial view of DOM (cached with timespan) -- only requested parts)
+  ATT: reflection is necessary only for client-server arch w/o full access to original DOM
+DOM/reflection -> proxy (lazy cache of visible preprocessed elements)
+  E.G. even lists may be partially sorted for current view and incrementally sorted only on cursor move
+  ALSO: some choosen entries of proxy may be replaced on update event from DOM change
+  NOTE: independent and incremental operations
+    * inc ops are on top of prev result => filtering accumulates destructive changes
+    * all destructive changes mark dataset as 'modified'
+    * independent ops check 'modified' flag and re-fetch data from DOM before ops
+    * any proxy may be restored to original dataset by fetching again from DOM/reflection
+
+
+IDEA:HACK: sync cursor position in different DOM / cache
+  ~ sync moves up / down
+  ~ sync entry index positions
+  ~ place on entries with same names
+
+Cursor == selection, selection == cursor
+  * represents keyboard focus
+  * can be controlled by keyboard
+  * marker which highlights to which objects the function will be applied
+  * cursor per tab => only one focused tab controlled at once
+  * cursor per tab => sync cursor positions or IDEA: different keys for controlling in two-panel mode
+  * selection == multiple cursors in single dir
+    !! you can _move_ individual entries of yankbuffer instead of toggle them by main cursor !!
+    IDEA: move complex selection at once => gaps between selections as invariants
+      !!! need *lock* for representation lock until moving operation ends
+        E.G. if file/selection was added/deleted => w/o lock result will be confusing for user
+  * tags/yankbuffer = multiple cursors in different dirs
+    IDEA choose entry from virtual list and focus/jump to it
+  * HACK: widget w/o cursor is cursor itself
+    such widget supports scrolling anyways
+    scrolling represented by beg/end indexes of lines => which is cursor
+    scroll allows to apply action to all currently visible elements
+  * HACK dataproxy itself is cursor
+    widget can scroll inside list of dataproxy data
+    dataproxy represent whole list of files being possible to display in that dir
+    => dataproxy is cursor to whole set of data
+
+*******************************
+
+NOTE: multiple possible *dom* state (undef cursor or entries)
+  * actual code hardcodes layout and reaction on each var value
+  * multiple funcs => multiple possible views
+  * small funcs => reuse in other variants of views
+  * desc format => combine resulting view from small funcs by text file spec
+
+
+WINDOW = DOM x PROJECTION
+  BUT:NEED: lazy PROJECTION <<< ncurses allows partial redraw
+    => no need to compose whole frame on redraw
+    => on event fetch and redraw only refreshed info
+      BUT: can't redraw on each event
+        => accumulate events between scheduled redraw
+        => immediately unconditionally redraw on subset of events
+          * user navigation (cursor) => immediate redraw
+          * external events => on timer
+          * BAD: too many external events accumulated => sluggish cursor movements
+            => never redraw all of them at once on user navigation
+            => split in batches by priority and date
+            => choose flexible sizes of batches (40+21 instead of 60+1)
+
+DEV:
+  store function returning iterable
+  pass widget limitations
+    E.G. distance between cursor and top entry depends on widget height => need loopback
+  pull info until widget saturated, then draw in one go
+    BET: if only several lines refreshed => pull only them => redraw only them
+    NEED:VAR control full or incremental update by arg
+      * initial always full
+      * consecutive are implicitly incremental (until explicit <C-L> redraw())
+  widget provides funcs to get different representations or incremental list
+    - solid text      (preformatted with newlines)
+    - line-based      (different length)
+    ? column-based    (bounded on height)
+    - char matrix     (bounding rect)
+
+
+%% Proxy
+NOTE: proxy represents access to some part of DOM
+
+decorating :: visible fast-jump labels
+metainfo :: hidden tags, inner attrs, intermediate caching, additional info
+  E.G. delimiters between entries combined with different sorting method
+    delimiter after each 10 entries
+    grouped files with same extension
+    thresholds of size groups
+post-processing :: DOM sorting, reordering, filtering (hiding from view, compactness optimizing)
+sorting :: THINK: large lists require caching => for fast view on cursor moving
+BUT:
+  cache grows => drop older caches
+  data change => invalidate cache
+  multiple views => multiple independent caches
+    => connect to same cache to get the same sorting (reuse for other purposes)
+        E.G. print to stdout list after filtering
+    => connect to same cursor to get synced cursors but different views/layouts
+    ?? maybe, this structure isn't hierarchical but composable ??
+      NOT: cursor is completely dependent on underlying cache DOM
+        ? BUT:MAYBE: sync cursors between DOM ?
