@@ -5,14 +5,34 @@ DEV:TEMP: combined input/output/ui
 fs -> DOM  (caching everything due to slow access time to fs data, incremental sync)
 DOM -> reflection (lazy partial view of DOM (cached with timespan) -- only requested parts)
   ATT: reflection is necessary only for client-server arch w/o full access to original DOM
-DOM/reflection -> proxy (lazy cache of visible preprocessed elements)
+DOM/reflection -> proxy (lazy cache of visible preprocessed elements and data-related metainfo)
+  HACK: optimization if no filtering => simply pass-through to directly access DOM/reflection
   E.G. even lists may be partially sorted for current view and incrementally sorted only on cursor move
+    + IDEA: renaming firstly affects proxy and only then propagates back to system
+      NEED: on renaming store prev names for back-propagation
+      NOTE: err if back propagation isn't possible anymore due to changes on system's fs
   ALSO: some choosen entries of proxy may be replaced on update event from DOM change
   NOTE: independent and incremental operations
     * inc ops are on top of prev result => filtering accumulates destructive changes
     * all destructive changes mark dataset as 'modified'
     * independent ops check 'modified' flag and re-fetch data from DOM before ops
     * any proxy may be restored to original dataset by fetching again from DOM/reflection
+  NOTE: caching full data in proxy is very normal => because screen/ncurses caches text until redraw anyways
+    => and reacquisition of info for alterating views will be slow
+proxy -> view (cursor and other display-related metainfo)
+  * stores immediate state (e.g. like registers)
+  * view tree exists in parallel to proxy tree and linked in nodes
+view -> widget (baking proxy+view to concrete size, style and formatting)
+  * widget also has 'view' which points to one of compatible data 'view' (E.G. dir view or tree view)
+  * widget has no w/h by default => it's only cursor for layout view with embedded behaviour
+widget -> layout
+  * its layout which enforces x/y/w/h on widget
+  * the same widget may be positioned in diff places in diff layouts under diff frontends and have diff sizes
+    BUT: it always shows the same info
+layout -> window
+  * single abstract widget => multiple fully-synced frontends
+window -> ncurses (copying / invalidating baked data)
+  ? colorscheme must be is shared for widget or individual per frontend ?
 
 
 IDEA:HACK: sync cursor position in different DOM / cache
@@ -20,8 +40,12 @@ IDEA:HACK: sync cursor position in different DOM / cache
   ~ sync entry index positions
   ~ place on entries with same names
 
+IDEA:DEV: reimplement small utils inside python code (E.G. path-compact)
+  ! provide for them outer interface in ./miur/bin/miur-* to call directly from shell if necessary
+
+
 Cursor == selection, selection == cursor
-  * represents keyboard focus
+  * cursor represents _keyboard_ focus, selection -- _action_ focus
   * can be controlled by keyboard
   * marker which highlights to which objects the function will be applied
   * cursor per tab => only one focused tab controlled at once
@@ -41,6 +65,29 @@ Cursor == selection, selection == cursor
     widget can scroll inside list of dataproxy data
     dataproxy represent whole list of files being possible to display in that dir
     => dataproxy is cursor to whole set of data
+  * cursor -- is completely independent entity
+    => it's up to widget to show it or not
+    ... and iteract with cursor or not (E.G. scroll position depending on cursor)
+  * each dir == has its own cursor == to restore when going back
+    widget is single instance on layout => shows each choosen dir with its own cursor
+    ? cursor is related to proxy and must be stored inside proxy
+  * single dir view => multiple cursors (E.G. vim split)
+    ! cursor is stored in 'view' metainfo
+      => 'view' can be detached from both "filtered underlying data" and from "concrete widget cursor"
+        E.G. TEMP:(share) OR:(sync) views from two different dirs
+
+NOTE: selection -- NOT attr of entry -> it's independent metainfo
+  * selection also can be shown as virtual tree graph
+  * you can manipulate by the selection itself (remove entries or add/rename them manually)
+
+
+Multiple selection groups -- different colors / tags
+  $ func {1} {2}
+  TRY: use the same specifiers as in 'parallel' instead of %f/%s as in 'ranger'
+
+Two-panel simultaneous mode
+  jk -- up/down, hl -- change tab, HL -- move file to another tab
+  OR: arr_up/dn -- move up/down in another tab
 
 *******************************
 
