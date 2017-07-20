@@ -2,9 +2,13 @@ import curses
 
 
 def run(argv):
-    print(argv)
-    state = {'cursor': 0, 'entries': None}
-    curses.wrapper(loop, state)
+    dom = Dom(numbers)
+    proxy = Proxy(dom.data)
+    view = View(proxy.data)
+    print(view)
+    # print(argv)
+    # state = {'cursor': 0, 'entries': None}
+    # curses.wrapper(loop, state)
 
 
 def prepare(stdscr):
@@ -77,30 +81,70 @@ def draw(stdscr, state):
 
 # NOTE: produce view cache
 def numbers():
-    return iter(range(1, 100))
+    return iter(range(1, 20))
 
 
-# VIZ. ListProxy, MatrixProxy, ScalarProxy, DictProxy, TableProxy, RawProxy, ImageProxy
-class DataProxy(object):
+class Dom(object):
     def __init__(self, accessor):
         self._accessor = accessor
 
-    def cut(self, h, w):
-        return self._accessor(h, w)[:h]
+    def __str__(self):
+        return '\n'.join(str(i) for i in self.data())
+
+    # TEMP:(assume list): get whole data
+    def data(self):
+        return self._accessor()
+
+
+# rename => View
+# VIZ. DataProxy, ListProxy, MatrixProxy, ScalarProxy, DictProxy, TableProxy, RawProxy, ImageProxy
+class Proxy(object):
+    def __init__(self, accessor):
+        self._accessor = accessor
+
+    def __str__(self):
+        return '\n'.join(str(i) for i in self.data())
+
+    # TEMP:(assume list):
+    def data(self):
+        return list(reversed(sorted(self._accessor())))[4:]
+
+
+# rename => Cursor/Focus/Slice
+class View(object):
+    def __init__(self, accessor):
+        self._accessor = accessor
+        # TEMP:(cursor==index): hardcoded relation
+        #   on delete file before cursor => decrease index
+        self.cursor = 3  # EXPL:(None): only on empty proxy
+        # WTF:NEED: cursor per each node
+
+    def __str__(self):
+        return '\n'.join((str(v) if i != self.cursor else str(v) + ' **')
+                         for i, v in enumerate(self.data(None, None)[1]))
+
+    def data(self, h, w):
+        return self.cursor, self._accessor()
 
 
 # NEED: notion of 'focus', 'cursor', 'groups' => THINK decorated widgets (? how to composite ?)
 # focus  :: dim unfocused widget, generate 'dying out' hi tail in list on cursor movement
 # cursor :: 'bubble cursor' uses more then single line of output, pushing apart top and bottom pieces
 # groups :: horiz delims between groups of files => special treatment, special fetcher to know where to place them
+# baking :: compact path names to fit into widget size
 class Widget(object):
-    def __init__(self, dataproxy):
-        self._dataproxy = dataproxy
+    def __init__(self, accessor):
+        self._accessor = accessor
 
-    def bake(self, h, w):
-        self._dataproxy.cut(h, w)
+    def __str__(self):
+        return '\n'.join((str(v) if i != self.cursor else str(v) + ' **')
+                         for i, v in enumerate(self.data(None, None)[1]))
+
+    def data(self, h, w):
+        curs, elems = self._accessor(h, w)
 
 
 # VIZ. horizontal, vertical, grid, etc
 class Layout(object):
-    pass
+    def __init__(self, widget):
+        self._widget = widget
