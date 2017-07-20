@@ -19,16 +19,27 @@ DOM/reflection -> proxy (lazy cache of visible preprocessed elements and data-re
     * any proxy may be restored to original dataset by fetching again from DOM/reflection
   NOTE: caching full data in proxy is very normal => because screen/ncurses caches text until redraw anyways
     => and reacquisition of info for alterating views will be slow
+  * combine nested single-entry java-like paths with single element in single entry
+    E.G:(github) ./com/java/module/ or ./some/dir/file.txt
 proxy -> view (cursor and other display-related metainfo)
   * stores immediate state (e.g. like registers)
   * view tree exists in parallel to proxy tree and linked in nodes
 view -> widget (baking proxy+view to concrete size, style and formatting)
   * widget also has 'view' which points to one of compatible data 'view' (E.G. dir view or tree view)
   * widget has no w/h by default => it's only cursor for layout view with embedded behaviour
+  ?? merge all data and metainfo trees here into single list of content with attributes
+    * filesystem
+    * mounts / binds
+    * tags
+    * selections
+    * virtual entries
 widget -> layout
   * its layout which enforces x/y/w/h on widget
   * the same widget may be positioned in diff places in diff layouts under diff frontends and have diff sizes
     BUT: it always shows the same info
+  ?? stack of opened in-place widgets
+    E.G. embedded {pager/editor/terminal} directly into widget's place, then returning back to widget
+    temporarily replace/overlay more specialized widgets in place of current navigational ones
 layout -> window
   * single abstract widget => multiple fully-synced frontends
 window -> ncurses (copying / invalidating baked data)
