@@ -1,82 +1,53 @@
 import curses
+import logging
+_log = logging.getLogger(__name__.split('.', 2)[1])
+
+keymap = {
+    'j': 'focus_node_next',
+    'k': 'focus_node_prev',
+    'q': 'quit',
+    '\n': 'quit',
+}
 
 
 def run(argv):
     dom = Dom(numbers)
     proxy = Proxy(dom.data)
-    view = View(proxy.data)
-    print(view)
-    # print(argv)
-    # state = {'cursor': 0, 'entries': None}
-    # curses.wrapper(loop, state)
+    cursor = Cursor(proxy)
+    view = View(proxy.data, cursor)
+    widget = Widget(view)
+    nc_input = NcursesInput(cursor)
+    frontend = NcursesFrontend(widget)
+    state = {'frontend': frontend,
+             'input': nc_input,
+             'keymap': keymap}
+    curses.wrapper(loop, state)
 
 
-def prepare(stdscr):
+def prepare(stdscr, state):
     curses.init_pair(1, curses.COLOR_WHITE, curses.COLOR_BLACK)
     curses.init_pair(2, curses.COLOR_BLACK, curses.COLOR_CYAN)
     stdscr.attron(curses.color_pair(1))
     stdscr.nodelay(False)
+    state['colorscheme'] = {'Line': curses.color_pair(1),
+                            'Cursor': curses.color_pair(2)}
 
 
 def loop(stdscr, state):
-    prepare(stdscr)
+    prepare(stdscr, state)
     while True:
         stdscr.clear()
-        draw(stdscr, state)
+        state['frontend'].draw(stdscr, state['colorscheme'])
         stdscr.refresh()
-        # key = stdscr.getkey()
+        key = stdscr.getkey()
+        _log.info('Key: {}'.format(key))
 
-
-def draw(stdscr, state):
-    curs, lines = state['cursor'], state['entries']
-    if curs is None or lines is None:
-        return
-
-    x, y = 1, 0
-    h, w = stdscr.getmaxyx()
-
-    st = int(h/2)
-    sb = int(h/2)
-
-    # DEV: sep func 'crop list by area'
-    # DEV: sep func 'draw list in area'
-    #   ? how to do it bias-independent (~glPushMatrix()~)
-
-    # WTF:(crash): list redraw when screen is shrinking
-    #   ? check screen height before each line draw ?
-    #   FIND: if ncurses supports 'virtual canvas' to draw on
-    #   FIND: how ncurses treats content when screen shrinks -- cuts it w/o restoring ?
-    if len(lines) < h:
-        top = 0
-    elif curs < st:
-        top = 0
-    elif curs > len(lines) - sb - 1:
-        top = len(lines) - h
-    else:
-        top = curs - st
-
-    # FIXME: slice is slow on large set
-    vlst = lines[top:(top + h)]
-    vpos = curs - top
-
-    for i, e in enumerate(vlst):
-        yt = y + i
-        xt = x
-        rx = w - xt
-
-        # WARN: don't call addstr at all if there is no place even for 1 char
-        if rx > 0:
-            if rx < len(e):
-                e = e[:rx]
-
-            # ALT:(faster) draw whole list -- then redraw line for cursor
-            #   => BUT: if we choose individual colors -- no sense in optimization
-            if i == vpos:
-                stdscr.addstr(yt, xt, e, curses.color_pair(2),)
-            else:
-                stdscr.addstr(yt, xt, e)
-
-    stdscr.move(vpos, 0)
+        cmd = state['keymap'].get(key, None)
+        if cmd is None:
+            continue  # wrong key
+        if cmd == 'quit':
+            break  # TEMP:HACK:(asymmetrical) quit
+        state['input'].dispatch(cmd)
 
 
 # NOTE: produce view cache
@@ -110,21 +81,73 @@ class Proxy(object):
         return list(reversed(sorted(self._accessor())))[4:]
 
 
-# rename => Cursor/Focus/Slice
-class View(object):
-    def __init__(self, accessor):
-        self._accessor = accessor
+class Cursor(object):
+    def __init__(self, proxy):
+        self._proxy = proxy
         # TEMP:(cursor==index): hardcoded relation
         #   on delete file before cursor => decrease index
-        self.cursor = 3  # EXPL:(None): only on empty proxy
         # WTF:NEED: cursor per each node
+        self._index = 3  # EXPL:(None): only on empty list
 
     def __str__(self):
-        return '\n'.join((str(v) if i != self.cursor else str(v) + ' **')
-                         for i, v in enumerate(self.data(None, None)[1]))
+        return '\n'.join(str(i) for i in self.data())
+
+    def data(self):
+        return self._proxy.data()
+
+    def focus_node_next(self):
+        if self._index is not None and self.data() is not None:
+            self._index = min(self._index + 1, len(self.data()) - 1)
+
+    def focus_node_prev(self):
+        if self._index is not None and self.data() is not None:
+            self._index = max(self._index - 1, 0)
+
+
+# rename => Slice / Projection
+# NOTE: combines Cursor and Proxy to get Slice
+# * acquires certain data type from DOM around cursor
+#   +/- entries of list
+#   elements of before/after path
+# DEV: sep func 'crop list by area'
+# DEV: sep func 'draw list in area'
+#   ? how to do it bias-independent (~glPushMatrix()~)
+#   TRY: impl by curses.newwin(height, width, begin_y, begin_x)
+class View(object):
+    def __init__(self, accessor, cursor):
+        self._accessor = accessor
+        self.cursor = cursor
+
+    # DEBUG
+    def __str__(self):
+        return '\n'.join((str(v) if i != self.cursor._index else str(v) + ' **')
+                         for i, v in enumerate(self.data(None, None)))
+
+    # NOTE: evaluate scroll window indexes
+    def top(self, h):
+        lnum = len(self._accessor())
+        cur_pos = self.cursor._index
+        thr_low = h // 4
+        thr_high = h * 3 // 4
+        if lnum < h:
+            top = 0
+        elif cur_pos < thr_low:
+            top = 0
+        elif cur_pos > lnum - thr_high - 1:
+            top = lnum - h
+        else:
+            top = cur_pos - thr_low
+        return top
 
     def data(self, h, w):
-        return self.cursor, self._accessor()
+        top = self.top(h)
+        # FIXME: slice is slow on large set
+        return (str(s)[:w] for s in self._accessor()[top:(top + h)])
+
+
+class Grapheme(object):
+    def __init__(self, type, data, x=None, y=None, depth=None):
+        [setattr(self, k, v) for k, v in locals().items()]
 
 
 # NEED: notion of 'focus', 'cursor', 'groups' => THINK decorated widgets (? how to composite ?)
@@ -133,18 +156,75 @@ class View(object):
 # groups :: horiz delims between groups of files => special treatment, special fetcher to know where to place them
 # baking :: compact path names to fit into widget size
 class Widget(object):
-    def __init__(self, accessor):
-        self._accessor = accessor
+    def __init__(self, view):
+        self._view = view
 
     def __str__(self):
-        return '\n'.join((str(v) if i != self.cursor else str(v) + ' **')
-                         for i, v in enumerate(self.data(None, None)[1]))
+        ci = self._view.cursor._index
+        return '\n'.join((str(v) if i != ci else str(v) + ' **')
+                         for i, v in enumerate(self.data(None, None)))
 
+    # DEV: must return abstract graphics stack tree
+    #   ? THINK: Graphemes must be sorted by depth
+    #     => draw as generator produces them
+    #     -- impossible pre-sorting for 3D
+    #     -- frontends may prefer different order of drawing
     def data(self, h, w):
-        curs, elems = self._accessor(h, w)
+        for i, e in enumerate(self._view.data(h, w)):
+            if i == self._view.cursor._index:
+                # vpos = cur_pos - top
+                yield Grapheme('Cursor', e, x=0, y=i, depth=1)
+            else:
+                yield Grapheme('Line', e, x=0, y=i, depth=0)
 
 
 # VIZ. horizontal, vertical, grid, etc
 class Layout(object):
     def __init__(self, widget):
         self._widget = widget
+
+
+# rename => Scene
+# ALT:BAD: .draw() inside Widget()
+#   BUT then you need links to all frontends inside widget itself
+# WTF:(crash): list redraw when screen is shrinking
+#   ? check screen height before each line draw ?
+#   FIND: if ncurses supports 'virtual canvas' to draw on
+#   FIND: how ncurses treats content when screen shrinks -- cuts it w/o restoring ?
+# ALT:(faster) draw whole list -- then redraw line for cursor
+#   => BUT: if we choose individual colors for entries -- no sense in optimization
+class NcursesFrontend(object):
+    def __init__(self, widget):
+        self._widget = widget
+
+    # ENH: supply layout as 'graphemes tree' to 'frontend conveyor' => REM ._widget
+    def draw(self, stdscr, colorscheme):
+        h, w = stdscr.getmaxyx()
+
+        # DEV:CHG: derive from layout
+        wx, wy = 1, 0
+        wh, ww = h - wx, w - wy
+        assert wh > 0 and ww > 0
+
+        # THINK: use 'class' for g.type => isinstance()
+        #   +++ inheritance for fallbacks -- replace specialized selection by regular one if not defined in colorscheme
+        #   ++ compiler will chech imported class names for us
+        #   -- can't create dispatch table
+        graphemes = self._widget.data(wh, ww)
+        for g in sorted(graphemes, key=lambda g: (g.depth, g.y)):
+            if g.type == 'Line':
+                stdscr.addstr(wy + g.y, wx + g.x, g.data, colorscheme[g.type])
+            elif g.type == 'Cursor':
+                stdscr.addstr(wy + g.y, wx + g.x, g.data, colorscheme[g.type])
+                stdscr.move(wy + g.y, wx + g.x - 1)
+
+
+# TEMP: hardcoded :: input => cursor
+class NcursesInput(object):
+    def __init__(self, cursor):
+        self._cursor = cursor
+
+    def dispatch(self, cmd, *args):
+        _log.info('Cmd: {}'.format(cmd))
+        f = getattr(self._cursor, cmd, '_err_wrong_cmd')
+        return f(*args)
