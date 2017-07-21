@@ -24,6 +24,16 @@ DOM/reflection -> proxy (lazy cache of visible preprocessed elements and data-re
 proxy -> view (cursor and other display-related metainfo)
   * stores immediate state (e.g. like registers)
   * view tree exists in parallel to proxy tree and linked in nodes
+  * history of order: visited dirs, selected files (jumps)
+    => tightly linked to *cursor/input* metainfo == history of cursor movements
+    !!! can't be shared between cursors >>> otherwise order will be messed up !!!
+      BUT: can be cloned from another cursor OR created anew from default config
+  * last cursor positions in visited dirs
+    => tightly linked to cursor history
+    ALSO may be treated as selection == [all visited dirs * 'cursor selection']
+  RENAME: to "session" ?
+    * new session == clean visited history and cursor positions
+    MAYBE: also clean selections ?
 view -> widget (baking proxy+view to concrete size, style and formatting)
   * widget also has 'view' which points to one of compatible data 'view' (E.G. dir view or tree view)
   * widget has no w/h by default => it's only cursor for layout view with embedded behaviour
@@ -33,6 +43,16 @@ view -> widget (baking proxy+view to concrete size, style and formatting)
     * tags
     * selections
     * virtual entries
+  * multiple cursors
+    - control multiple cursors one-by-one
+    - ... as single group with fixed gaps
+    - control each by different keys
+    - show ghost cursors from different widgets pointing into single dir
+      << similar to google excel tables
+      ?? use single shared view per dir or view per widget ??
+        => cursor must be per widget => for independent split screen
+    - show ghost cursors from other instances of *miur*
+      == sync view metainfo back through server *dom*
 widget -> layout
   * its layout which enforces x/y/w/h on widget
   * the same widget may be positioned in diff places in diff layouts under diff frontends and have diff sizes
@@ -40,8 +60,16 @@ widget -> layout
   ?? stack of opened in-place widgets
     E.G. embedded {pager/editor/terminal} directly into widget's place, then returning back to widget
     temporarily replace/overlay more specialized widgets in place of current navigational ones
+  NOTE: tabs impl
+    ~ each tab has its own clone of layout with widgets (even if identical)
+      different dataset linked to different widget clones
+    ~ shared instance of layout + widgets
+      only links to data and states replaced inside widgets
+        BUT: then widget state must be separated from widget itself
 layout -> window
   * single abstract widget => multiple fully-synced frontends
+  ? isn't window is widget itself ?
+    => some input streams with focus may be associated with whole background window
 window -> ncurses (copying / invalidating baked data)
   ? colorscheme must be is shared for widget or individual per frontend ?
 
@@ -54,13 +82,127 @@ IDEA:HACK: sync cursor position in different DOM / cache
 IDEA:DEV: reimplement small utils inside python code (E.G. path-compact)
   ! provide for them outer interface in ./miur/bin/miur-* to call directly from shell if necessary
 
+IDEA: different keys for controlling tabs in two-panel mode by both hands
 
-Cursor == selection, selection == cursor
-  * cursor represents _keyboard_ focus, selection -- _action_ focus
-  * can be controlled by keyboard
-  * marker which highlights to which objects the function will be applied
-  * cursor per tab => only one focused tab controlled at once
-  * cursor per tab => sync cursor positions or IDEA: different keys for controlling in two-panel mode
+IDEA: show paths as list and preview as tree in 2nd panel
+  /tmp/path/to/file | path
+  ...               | └── to
+                    |     └── file
+
+IDEA: navigation in multi-edge graph in 2D/3D
+  mark each edge with hint letter
+  pressing keys moves you along its corresponding edge
+
+
+IDEA: edit current widgets/layout in the same way as any other graph
+  = show virtual fs for windows/layout/widgets
+  = each widget contains params (files) or another widgets (dirs)
+  HACK: each param == slider entry as in ncmpcpp to control value
+    position, color, size, behaviour
+  ALT: open widget as text file in vim and change values manually
+    ALSO: open whole widgets tree as yaml
+
+
+IDEA: when renaming entry == connect LineWidget to bkgr neovim
+  +++ textobj navigation
+  batch rename => send to neovim multiple entries at once
+
+IDEA: populate $MIUR_* env vars from current *view* for forked processes
+  file under cursor
+  whole dir content after sorting and filtering
+  current selection / tagging
+    + with choosen attrs of current selection (E.G. mtime, readlink)
+  NOTE: seamless reusage of selected files inside shell
+    ! no need to yank paths
+    ! no need to write complex cmdlines E.G. :shell r.cmd -u %s
+
+
+Input
+  each have associated "Cursor/Focus" object
+  multiple inputs may control the same *cursor*
+    E.G. navigation in same panel through keyboard and fifo
+  single input may be sent to multiple *cursors*
+  VIZ.
+    keyboard is only one of possible streams
+    cli/fifo pipe may control some side-widget
+    info may be acquired back from satellite programs
+      E.G. image preview
+        => pressing keys
+        => passing them into *miur* though additional input stream
+        => control hidden tab cursor when keyboard itself controls foreground tab
+
+
+Cursor / Focus
+  !!! two different cursors == dom cursor and ui cursor !!!
+    *cursor* == each widget has link to 'dom cursor' == observes data
+    *focus* == each layout has link to 'ui cursor'
+      ? is there need to switch 'ui cursor' when in fifo ?
+        ::: !YES! you choose data repr func to print in stdout before calling func
+          == it's equivalent to choosing widget beforehand (though pipe/fifo-widget)
+      !!! you can control multiple navigational views through one input !!!
+        E.G. tabs in different windows
+        OR: two-panel file manager
+      switch 'ui cursor'
+        diff input translation table for diff widgets
+          * keymap for keyboard charwise input
+          * switches/names for cli linewise input
+        diff destination => focus diff 'dom cursor' to control
+          widget attached to 'dom cursor' (observes / stalks)
+      nested tree with history for 'ui cursor'
+        same principle as with 'dom cursor', but independent hierarchy
+        use history to toggle between E.G. two last tabs OR between "Status" / "Navigation"
+    ui cursor allowed to have no history
+  separate independent object "Cursor/Focus"
+    associated with concrete input device/stream
+    E.G. two keyboards control the same widget in window => multiple cursors per widget
+  switches {input stream / control focus} between objects
+    there is no rule for single focus point only
+    all focused areas receive the same input simultaneously
+      keymap can be filtered to split keyboard between focus groups
+    multiple keyboards => independently controllable input focuses
+  allows simple incremental ops to accumulate inner state \
+    == in contrast to 'pass all arguments at once' == no inner state
+    == cursor is tightly coupled to metainfo state
+      * however multiple cursors may modify single metainfo
+    * choose files/destinations one-by-one
+    * compose operation from pieces and apply
+    * reuse parts of prev ops
+    NOTE: each keypress is exactly such 'simple incremental op'
+  no relation to widget => cursor isn't required to be shown
+    E.G. off screen, hidden tab
+    * WatchWidget == frozen/dynamic preview
+      for single directory or file
+      no showing cursor
+      no kbd focus
+    * PagerWidget == scrollable pager, but no cursor
+    * NodeWidget == for list/tree repr as in FM
+      == PagerWidget + sync to cursor
+  # sync different widgets shown data on the same cursor
+  #   listing, status, preview
+  have associated 'cursor selection' per item
+    highlights single item
+    unrelated to general fixed-position selection
+    all active 'cursor selections' can be shown at once as metainfo list on virtual tree
+    when switching cursor to controlling 'group selection'
+      => previous 'cursor selection' will be drawn as 'ghost' to show where \
+         cursor will jump when switching back to cursor selection
+
+Selection / Group
+  incapsulates objects/lists to which actions applied (E.G. vim textobj)
+    == action focus => marks/selects objs in widgets
+  all selections must be tagged by their creator (cursor)
+    I.E. use all files selected by _current_ widget
+      and not by all widgets connected to same metainfo
+  'cursor selection'
+    ??? belongs to *view* == with accumulated inner state ?
+    single cursor per widget (multiple -- per each input stream)
+      collaborative editing (E.G. google excel tables)
+    sync cursor positions between tabs \
+      == unite disconnected selections under single focus/cursor
+      * by relative movements +1 / -1
+        ? extend focus and send controls to multiple selections at once
+      * by absolute index
+      * by names
   * selection == multiple cursors in single dir
     !! you can _move_ individual entries of yankbuffer instead of toggle them by main cursor !!
     IDEA: move complex selection at once => gaps between selections as invariants
@@ -90,6 +232,7 @@ Cursor == selection, selection == cursor
 NOTE: selection -- NOT attr of entry -> it's independent metainfo
   * selection also can be shown as virtual tree graph
   * you can manipulate by the selection itself (remove entries or add/rename them manually)
+  * convert between index-based and name-based selections
 
 
 Multiple selection groups -- different colors / tags
@@ -99,6 +242,18 @@ Multiple selection groups -- different colors / tags
 Two-panel simultaneous mode
   jk -- up/down, hl -- change tab, HL -- move file to another tab
   OR: arr_up/dn -- move up/down in another tab
+
+Widget
+  List
+    Single item == LineWidget / MultilineWidget / InputWidget
+      renaming => replacing widget in-place by InputWidget
+  Scroll
+    simplistic +/- indicators as in Wheechat
+  OR: Tree
+    openable menu with +/- and pseudographics
+  * syncs to *cursor* position with hysteresis
+    == has inner state for scroll
+
 
 *******************************
 
@@ -160,3 +315,12 @@ BUT:
     ?? maybe, this structure isn't hierarchical but composable ??
       NOT: cursor is completely dependent on underlying cache DOM
         ? BUT:MAYBE: sync cursors between DOM ?
+
+
+% Evolution
+WTF: how to describe arch evolution steps for inc impl ?
+  proxy -> view
+  widget -> ncurses
+    + window == widgets list + layout (horizontal, vertical, grid, etc)
+    + nested windows
+    + tabs

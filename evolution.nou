@@ -33,4 +33,11 @@ Mods
   preview current file under cursor
     pipe / colorize => catch output and return to 'output'
     gui image viewer => simply refresh currently viewed image
+  generalized sync -- server *dom* with client's *reflection*
+    works simply through sockets >> maybe unix domain as in neovim
+    sends data streams and events
+    can sync client-specific metainfo back into server client's representation
+      => sync/fetch metainfo/data between clients
+      => restore client's state after its exit
+    SEE: ideas in `mosh`, `rsync`, `syncthing`
   ...
