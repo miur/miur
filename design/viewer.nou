@@ -72,6 +72,8 @@ layout -> window
     => some input streams with focus may be associated with whole background window
 window -> ncurses (copying / invalidating baked data)
   ? colorscheme must be is shared for widget or individual per frontend ?
+    BET: translation tables 'grapheme type' => 'its color'
+      * can be completely shared between frontends or individual
 
 
 IDEA:HACK: sync cursor position in different DOM / cache
@@ -116,12 +118,18 @@ IDEA: populate $MIUR_* env vars from current *view* for forked processes
     ! no need to yank paths
     ! no need to write complex cmdlines E.G. :shell r.cmd -u %s
 
+IDEA: preview four (multiple) dirs / elements at once
+  * sync movements of 'preview selection' with cursor
+  * draw ghost 'preview selection' behind 'cursor selection'
+  * draw ascii lines from entries of 'preview selection' to respective "PreviewWidget"`s
 
-Input
+
+Input / Control
   each have associated "Cursor/Focus" object
   multiple inputs may control the same *cursor*
     E.G. navigation in same panel through keyboard and fifo
   single input may be sent to multiple *cursors*
+  cmds may be splitted and each part controlled by its associated keyboard
   VIZ.
     keyboard is only one of possible streams
     cli/fifo pipe may control some side-widget
@@ -130,6 +138,16 @@ Input
         => pressing keys
         => passing them into *miur* though additional input stream
         => control hidden tab cursor when keyboard itself controls foreground tab
+
+
+NOTE: two variants :: widget -> cursor
+  ~ data incapsulated in cursor
+    full-fledged "Cursor"
+    pseudo-cursor -- only to point to dst for "WatchWidget"
+      + also provides access to data for widget
+  ~ data independently supplied to widgets
+    = cursor only provides position, nothing more
+    ? is there any advantage ?
 
 
 Cursor / Focus
@@ -324,3 +342,5 @@ WTF: how to describe arch evolution steps for inc impl ?
     + window == widgets list + layout (horizontal, vertical, grid, etc)
     + nested windows
     + tabs
+  TRY: strict composition first
+    => RFC to general lazy accessor
