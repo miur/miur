@@ -5,6 +5,7 @@ _log = logging.getLogger(__name__.split('.', 2)[1])
 keymap = {
     'j': 'focus_node_next',
     'k': 'focus_node_prev',
+    '^L': 'redraw_all_now',
     'q': 'quit',
     '\n': 'quit',
 }
@@ -16,38 +17,20 @@ def run(argv):
     cursor = Cursor(proxy)
     view = View(proxy.data, cursor)
     widget = Widget(view)
-    nc_input = NcursesInput(cursor)
-    frontend = NcursesFrontend(widget)
-    state = {'frontend': frontend,
-             'input': nc_input,
-             'keymap': keymap}
-    curses.wrapper(loop, state)
+
+    state = {'keymap': keymap}
+    nc_frmwk = NcursesFramework(state)
+    nc_front = NcursesFrontend(nc_frmwk, widget)
+    nc_input = NcursesInput(nc_frmwk, cursor)
+    state['frontend'] = nc_front
+    state['input'] = nc_input
+    nc_frmwk.run(nc_input.loop)
 
 
-def prepare(stdscr, state):
-    curses.init_pair(1, curses.COLOR_WHITE, curses.COLOR_BLACK)
-    curses.init_pair(2, curses.COLOR_BLACK, curses.COLOR_CYAN)
-    stdscr.attron(curses.color_pair(1))
-    stdscr.nodelay(False)
-    state['colorscheme'] = {'Line': curses.color_pair(1),
-                            'Cursor': curses.color_pair(2)}
-
-
-def loop(stdscr, state):
-    prepare(stdscr, state)
-    while True:
-        stdscr.clear()
-        state['frontend'].draw(stdscr, state['colorscheme'])
-        stdscr.refresh()
-        key = stdscr.getkey()
-        _log.info('Key: {}'.format(key))
-
-        cmd = state['keymap'].get(key, None)
-        if cmd is None:
-            continue  # wrong key
-        if cmd == 'quit':
-            break  # TEMP:HACK:(asymmetrical) quit
-        state['input'].dispatch(cmd)
+def send_event(event, state):
+    if event == 'redraw':
+        # DEV: skip some draw requests to limit fps
+        state['frontend'].draw(state)
 
 
 # NOTE: produce view cache
@@ -194,13 +177,19 @@ class Layout(object):
 # ALT:(faster) draw whole list -- then redraw line for cursor
 #   => BUT: if we choose individual colors for entries -- no sense in optimization
 class NcursesFrontend(object):
-    def __init__(self, widget):
+    def __init__(self, frmwk, widget):
+        self._frmwk = frmwk
         self._widget = widget
 
     # ENH: supply layout as 'graphemes tree' to 'frontend conveyor' => REM ._widget
-    def draw(self, stdscr, colorscheme):
+    def draw(self, state):
+        stdscr, colorscheme = state['stdscr'], state['colorscheme']
         h, w = stdscr.getmaxyx()
+        stdscr.clear()
+        self.fill(stdscr, colorscheme, h, w)
+        stdscr.refresh()
 
+    def fill(self, stdscr, colorscheme, h, w):
         # DEV:CHG: derive from layout
         wx, wy = 1, 0
         wh, ww = h - wx, w - wy
@@ -221,10 +210,55 @@ class NcursesFrontend(object):
 
 # TEMP: hardcoded :: input => cursor
 class NcursesInput(object):
-    def __init__(self, cursor):
+    def __init__(self, frmwk, cursor):
+        self._frmwk = frmwk
         self._cursor = cursor
 
     def dispatch(self, cmd, *args):
         _log.info('Cmd: {}'.format(cmd))
         f = getattr(self._cursor, cmd, '_err_wrong_cmd')
         return f(*args)
+
+    def loop(self, stdscr, state):
+        while True:
+            key = stdscr.getkey()
+            _log.info('Key: {}'.format(key))
+
+            cmd = state['keymap'].get(key, None)
+            if cmd is None:
+                continue  # wrong key
+            if cmd == 'quit':
+                break  # TEMP:HACK:(asymmetrical) quit
+
+            # TEMP:
+            if cmd == 'redraw_all_now':
+                send_event('redraw_all_now', state)
+
+            state['input'].dispatch(cmd)
+            send_event('redraw', state)
+
+
+class NcursesFramework(object):
+    def __init__(self, state):
+        self._state = state
+
+    def prepare(self):
+        curses.init_pair(1, curses.COLOR_WHITE, curses.COLOR_BLACK)
+        curses.init_pair(2, curses.COLOR_BLACK, curses.COLOR_CYAN)
+
+        stdscr = self._state['stdscr']
+        stdscr.attron(curses.color_pair(1))
+        stdscr.nodelay(False)
+        self._state['colorscheme'] = {
+            'Line': curses.color_pair(1),
+            'Cursor': curses.color_pair(2),
+        }
+
+    def loop(self, stdscr, loop):
+        self._state['stdscr'] = stdscr
+        self.prepare()
+        send_event('redraw', self._state)
+        loop(stdscr, self._state)
+
+    def run(self, loop):
+        curses.wrapper(self.loop, loop)
