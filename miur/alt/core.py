@@ -1,3 +1,5 @@
+import uuid
+import random
 import curses
 import logging
 _log = logging.getLogger(__name__.split('.', 2)[1])
@@ -5,6 +7,8 @@ _log = logging.getLogger(__name__.split('.', 2)[1])
 keymap = {
     'j': 'focus_node_next',
     'k': 'focus_node_prev',
+    'h': 'shift_node_parent',
+    'l': 'shift_node_current',
     '^L': 'redraw_all_now',
     'q': 'quit',
     '\n': 'quit',
@@ -12,10 +16,11 @@ keymap = {
 
 
 def run(argv):
-    dom = Dom(numbers)
-    proxy = Proxy(dom.data)
-    cursor = Cursor(proxy)
-    view = View(proxy.data, cursor)
+    dom = Dom()
+    proxy = Proxy(dom)
+    _log.info(proxy)
+    cursor = Cursor(proxy, dom.uuid)
+    view = View(cursor)
     widget = Widget(view)
 
     state = {'keymap': keymap}
@@ -33,62 +38,110 @@ def send_event(event, state):
         state['frontend'].draw(state)
 
 
-# NOTE: produce view cache
-def numbers():
-    return iter(range(1, 20))
+def flat_tree(dom, parent, n=0):
+    edges = set(uuid.uuid4() for _ in range(random.randint(10, 20)))
+    dom[parent] = edges | set([parent])
+    if n > 0:
+        for e in edges:
+            flat_tree(dom, e, n - 1)
 
 
 class Dom(object):
-    def __init__(self, accessor):
-        self._accessor = accessor
+    def __init__(self):
+        self.uuid = uuid.uuid4()
+        self._data = {}
+        flat_tree(self._data, self.uuid, 1)
 
     def __str__(self):
         return '\n'.join(str(i) for i in self.data())
 
     # TEMP:(assume list): get whole data
     def data(self):
-        return self._accessor()
+        return self._data
 
 
 # rename => View
 # VIZ. DataProxy, ListProxy, MatrixProxy, ScalarProxy, DictProxy, TableProxy, RawProxy, ImageProxy
+# ??? DEV Proxy per Node OR general one (NEED: ProxyNode anyways) ?
+#   BET: general one => allows applying ops to whole tree (filtered)
 class Proxy(object):
-    def __init__(self, accessor):
-        self._accessor = accessor
+    def __init__(self, dom):
+        self._dom = dom
 
     def __str__(self):
-        return '\n'.join(str(i) for i in self.data())
+        return '\n'.join(str(i) for i in sorted(self.data()))
 
     # TEMP:(assume list):
     def data(self):
-        return list(reversed(sorted(self._accessor())))[4:]
+        return {pos: list(reversed(sorted(nodes)))[4:]
+                for pos, nodes in self._dom.data().items()}
 
 
 class Cursor(object):
-    def __init__(self, proxy):
+    def __init__(self, proxy, init_node):
         self._proxy = proxy
         # TEMP:(cursor==index): hardcoded relation
         #   on delete file before cursor => decrease index
-        # WTF:NEED: cursor per each node
+        # WTF:NEED: history cursor per each node
         self._index = 3  # EXPL:(None): only on empty list
 
-    def __str__(self):
-        return '\n'.join(str(i) for i in self.data())
+        # WARN.path is history-like
+        #   * random jump will be pushed despite being nonadjacent
+        #   => moving back returns "back" and not "one-level-up"
+        self.node = None
+        # self.current = None
+        self.path = []
+        self.path_set = set()
+        self.push(init_node)
 
-    def data(self):
-        return self._proxy.data()
+    # NOTE: nodes in path may become invalid
+    def push(self, node):
+        if self.node is not None:
+            self.path.append(self.node)
+            self.path_set.add(self.node)
+        self.node = node
+
+    def pop(self):
+        if not self.path:
+            return
+        old = self.node
+        self.node = self.path.pop()
+        self.path_set.remove(self.node)
+        return old
+
+    @property
+    def edges(self):
+        return self._proxy.data().get(self.node)
+
+    @property
+    def current(self):
+        _log.debug('Current: {}'.format(self._index))
+        return self.edges[self._index]
 
     def focus_node_next(self):
-        if self._index is not None and self.data() is not None:
-            self._index = min(self._index + 1, len(self.data()) - 1)
+        if self._index is not None and self.edges is not None:
+            self._index = min(self._index + 1, len(self.edges) - 1)
 
     def focus_node_prev(self):
-        if self._index is not None and self.data() is not None:
+        if self._index is not None and self.edges is not None:
             self._index = max(self._index - 1, 0)
+
+    def shift_node_parent(self):
+        self.pop()
+        self._index = 0 if self.edges else None
+
+    def shift_node_current(self):
+        node = self.current
+        if node in self.path_set:
+            return  # cycle in-place
+        if node not in self._proxy.data():
+            return  # invalid node / leaf
+        self.push(node)
+        self._index = 0 if self.edges else None
 
 
 # rename => Slice / Projection
-# NOTE: combines Cursor and Proxy to get Slice
+# NOTE: combines Cursor, Size and Proxy to get Slice
 # * acquires certain data type from DOM around cursor
 #   +/- entries of list
 #   elements of before/after path
@@ -96,19 +149,15 @@ class Cursor(object):
 # DEV: sep func 'draw list in area'
 #   ? how to do it bias-independent (~glPushMatrix()~)
 #   TRY: impl by curses.newwin(height, width, begin_y, begin_x)
+# HACK: generated on demand
+#   * DOM may be flat list of undirected edges (pairs)
+#   * View will bake() it to list of nodes centered around cursor
 class View(object):
-    def __init__(self, accessor, cursor):
-        self._accessor = accessor
+    def __init__(self, cursor):
         self.cursor = cursor
 
-    # DEBUG
-    def __str__(self):
-        return '\n'.join((str(v) if i != self.cursor._index else str(v) + ' **')
-                         for i, v in enumerate(self.data(None, None)))
-
     # NOTE: evaluate scroll window indexes
-    def top(self, h):
-        lnum = len(self._accessor())
+    def top(self, lnum, h):
         cur_pos = self.cursor._index
         thr_low = h // 4
         thr_high = h * 3 // 4
@@ -123,9 +172,10 @@ class View(object):
         return top
 
     def data(self, h, w):
-        top = self.top(h)
+        items = self.cursor.edges
+        top = self.top(len(items), h)
         # FIXME: slice is slow on large set
-        return (str(s)[:w] for s in self._accessor()[top:(top + h)])
+        return {'edges': (s for s in items[top:(top + h)])}
 
 
 class Grapheme(object):
@@ -133,32 +183,35 @@ class Grapheme(object):
         [setattr(self, k, v) for k, v in locals().items()]
 
 
-# NEED: notion of 'focus', 'cursor', 'groups' => THINK decorated widgets (? how to composite ?)
-# focus  :: dim unfocused widget, generate 'dying out' hi tail in list on cursor movement
-# cursor :: 'bubble cursor' uses more then single line of output, pushing apart top and bottom pieces
-# groups :: horiz delims between groups of files => special treatment, special fetcher to know where to place them
-# baking :: compact path names to fit into widget size
+# THINK: who must convert objects to strings ?
+#   * view => crop on width BAD: converts to string preliminary
+#   * widget => does what it wants BAD: hardcoded to input obj classes
+#       HACK: "View" may be reused to select all items on screen / visible in widget
 class Widget(object):
     def __init__(self, view):
         self._view = view
 
-    def __str__(self):
-        ci = self._view.cursor._index
-        return '\n'.join((str(v) if i != ci else str(v) + ' **')
-                         for i, v in enumerate(self.data(None, None)))
-
-    # DEV: must return abstract graphics stack tree
+    # DEV: must return abstract graphics stack tree (in terms of abstract frontend)
     #   ? THINK: Graphemes must be sorted by depth
     #     => draw as generator produces them
     #     -- impossible pre-sorting for 3D
     #     -- frontends may prefer different order of drawing
     def data(self, h, w):
-        for i, e in enumerate(self._view.data(h, w)):
-            if i == self._view.cursor._index:
+        data = self._view.data(h, w)
+        edges = list(data['edges'])
+        curs = self._view.cursor.current
+        yield Grapheme(
+            'Line',
+            '{:d} {:d}'.format(len(self._view.cursor.path), len(edges)),
+            x=0, y=0, depth=0)
+        yield Grapheme('Cursor', str(curs)[:w-5], x=5, y=0, depth=0)
+        for i, e in enumerate(edges, 2):
+            text = str(e)[:w]
+            if e == curs:
                 # vpos = cur_pos - top
-                yield Grapheme('Cursor', e, x=0, y=i, depth=1)
+                yield Grapheme('Cursor', text, x=0, y=i, depth=1)
             else:
-                yield Grapheme('Line', e, x=0, y=i, depth=0)
+                yield Grapheme('Line', text, x=0, y=i, depth=0)
 
 
 # VIZ. horizontal, vertical, grid, etc
@@ -197,6 +250,7 @@ class NcursesFrontend(object):
 
         # THINK: use 'class' for g.type => isinstance()
         #   +++ inheritance for fallbacks -- replace specialized selection by regular one if not defined in colorscheme
+        #       => use collections.ChainMap
         #   ++ compiler will chech imported class names for us
         #   -- can't create dispatch table
         graphemes = self._widget.data(wh, ww)
