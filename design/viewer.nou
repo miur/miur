@@ -221,6 +221,7 @@ Selection / Group
         ? extend focus and send controls to multiple selections at once
       * by absolute index
       * by names
+      * by uuid
   * selection == multiple cursors in single dir
     !! you can _move_ individual entries of yankbuffer instead of toggle them by main cursor !!
     IDEA: move complex selection at once => gaps between selections as invariants
@@ -272,6 +273,11 @@ Widget
   * syncs to *cursor* position with hysteresis
     == has inner state for scroll
 
+Layout
+  Transition table between layouts (declarative)
+    widget size => fixed 12c / proportional 20%
+    if window shrinks to (20% < 12c) => replace current layout by simplified
+      !! otherwise ncurses will crush
 
 *******************************
 

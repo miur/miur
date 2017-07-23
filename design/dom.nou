@@ -1,0 +1,51 @@
+*dom*
+
+Identifiers:
+  NEED: uid (as in git)
+    REF https://stackoverflow.com/questions/1210458/how-can-i-generate-a-unique-id-in-python/15741983#15741983
+      ++ http://pubs.opengroup.org/onlinepubs/9629399/apdxa.htm
+    TUT http://www.minvolai.com/blog/2009/10/Creating-Universally-Unique-ID-in-Python/creating-universally-unique-id-in-python/
+      https://eager.io/blog/how-long-does-an-id-need-to-be/
+    WARN:(collisions): https://softwareengineering.stackexchange.com/a/299338
+      ? ignore it => you need to generate 2^61 entries for any significant probability of collision
+      https://blogs.msdn.microsoft.com/oldnewthing/20160114-00/?p=92851
+        uuid1 > uuid4 ERR:(hardware): may generate identical uuid
+      BUG! if collision => you will apply ops to wrong file and overwrite valid one
+        ? detect collision => performance impact ?
+    => so I could flatten dir and show only basenames anambigously
+      ! actual path becomes only one of attrs for filtering
+
+  THINK: uuid4() is not always appropriate
+    * parsing graphviz .dot => same quoted name must produce same uuid
+    * filesystem => depending on MAC and <path>
+    * ro media files --> BET: using SHA1 on content
+    ??? [_] use different uuid for different cases ???
+    !!! [_] collision between diff ALG !!!
+
+  ATT: by using uuid we loose typeinfo => all objs are abstract nodes
+    - using sep nodes per each attr of file is inefficient
+    ~ anyways, attrs may be represented in the same uniform way as nodes
+      BET: generate such virtual subgraphs only on demand
+      IDEA:(DOM performance): compromise between MEM and CPU
+        * store original/orthogonal/important data
+        * generate derivative data structs only on demand
+
+
+ALSO: G: urn -- Uniform Resource Name
+  https://ru.wikipedia.org/wiki/URN
+  urn:uuid:6e8bc430-9c3a-11d9-9669-0800200c9a66
+
+
+!!! IDEA hash whole node attrs into SHA1 as in git :: same hash => same node
+  * read-only filesystem :: replace node completely instead of changing
+  * immediately detect changes w/o comparing fields between nodes
+  * easy sync for cached nodes => simply discard old ones and update xrefs
+  https://stackoverflow.com/questions/2434931/python-why-use-anything-other-than-uuid4-for-unique-strings
+
+
+NOTE: single node may point to multiple (virtual) views simultaneously
+  dir -> {files, xattrs, hex view on disk, ...}
+  file -> {text preview, xattrs, hex preview, virtual data structure, ...}
+  BUT: you can move cursor only to single variant structure
+    ? there is no menu to choose OR provide diff keybindings ?
+      = default view (Cursor), preview for each variant, list menu to choose

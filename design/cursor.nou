@@ -1,0 +1,52 @@
+SEP: *dom* traversing
+  *dom* -- only access to adjacent / random node (hide inner impl)
+  *cursor* -- walk methods -- depth, breadth, etc
+  SEE: std::map::iterator -- whom belongs traversing
+
+
+DFL: initial (default) position
+  TEMP: self.uuid
+  PARTOF: *cursor*
+    * diff DFL per *cursor*
+    * diff DFL per *dom* instance
+      - mostly meaningful only for 'tree'
+      - no sense for unordered cyclic graph
+  VIZ.
+    * 'default/root' location for current kind of graph
+    * other 'special' nodes from which traversing can be started
+    * clone current position from another cursor
+
+  conversion :: path <-> node (fast eval alg to convert)
+    mark DFL as 'dst node' and move cursor along path in its direction
+    [_] IDEA: if you mark any other dir as 'dst node'
+      => you can move by simply 'h/l' to and from it
+
+
+IMPL: uniform list of 'src/dst' edges (no diff)
+  Multiple parents
+    => use plain list for all nodes in *dom* (even for parents)
+    => only *cursor* must store from were it had walked
+    => hide cursor.prev_node inside *view* to not cycle in-place
+    [_] IDEA: generate _virtual node_ in dir if you random-jump directly to another node
+  Cyclic paths
+    => in cyclic graph path may cross single node multiple times
+      !! different 'old_pos' in each case !!
+  History of cursor positions
+    => going back-forth along path must restore pos in node
+    => cache old cursor positions per node _AND_ per path
+      self.all_visited = set()
+    ?? [_] who stores history of curs positions per node
+
+
+DECIDE: multiple parents
+  VIZ.
+    * general cyclic graph
+    * symlinks => multiple parents
+    * combined preview from several files
+    * united directories
+    * augmented generated data from several files in preview
+    ...
+
+
+IMPL:
+  BAD: efficient only in py>=3.5 :: next(reversed(OrderedDict[]))

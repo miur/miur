@@ -1,0 +1,17 @@
+
+Essence-Entity: *widget* -- placements of elements, prescribed by 'contract'
+  * only corresponding *view* provides all data and positions
+    ? [_] WTF if diff widget height in tui and gui ?
+  * lacking data replaced by placeholders
+  * data exceeding 'contract' isn't queued
+
+
+Elements:
+  focus  :: dim unfocused widget, generate 'dying out' hi tail in list on cursor movement
+  cursor :: 'bubble cursor' uses more then single line of output, pushing apart top and bottom pieces
+  groups :: horiz delims between groups of files => special treatment, special fetcher to know where to place them
+  baking :: compact path names to fit into widget size
+
+
+IDEA:THINK: widgets decorated by elements (?how to compose?)
+  NEED: notion of 'focus', 'cursor', 'groups'
