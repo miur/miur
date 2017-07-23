@@ -2,6 +2,9 @@ import uuid
 import random
 import curses
 import logging
+
+from . import trace
+
 _log = logging.getLogger(__name__.split('.', 2)[1])
 
 keymap = {
@@ -9,6 +12,9 @@ keymap = {
     'k': 'focus_node_prev',
     'h': 'shift_node_parent',
     'l': 'shift_node_current',
+    '1': lambda: trace.setloglevel(trace.TRACE),
+    '2': lambda: trace.setloglevel(logging.DEBUG),
+    '3': lambda: trace.setloglevel(logging.INFO),
     '^L': 'redraw_all_now',
     'q': 'quit',
     '\n': 'quit',
@@ -255,11 +261,14 @@ class NcursesFrontend(object):
         #   -- can't create dispatch table
         graphemes = self._widget.data(wh, ww)
         for g in sorted(graphemes, key=lambda g: (g.depth, g.y)):
-            if g.type == 'Line':
-                stdscr.addstr(wy + g.y, wx + g.x, g.data, colorscheme[g.type])
-            elif g.type == 'Cursor':
-                stdscr.addstr(wy + g.y, wx + g.x, g.data, colorscheme[g.type])
-                stdscr.move(wy + g.y, wx + g.x - 1)
+            try:
+                if g.type == 'Line':
+                    stdscr.addstr(wy + g.y, wx + g.x, g.data, colorscheme[g.type])
+                elif g.type == 'Cursor':
+                    stdscr.addstr(wy + g.y, wx + g.x, g.data, colorscheme[g.type])
+                    stdscr.move(wy + g.y, wx + g.x - 1)
+            except curses.error:
+                _log.error('{}: small screen'.format(self.__class__.__name__))
 
 
 # TEMP: hardcoded :: input => cursor
@@ -270,7 +279,10 @@ class NcursesInput(object):
 
     def dispatch(self, cmd, *args):
         _log.info('Cmd: {}'.format(cmd))
-        f = getattr(self._cursor, cmd, '_err_wrong_cmd')
+        if callable(cmd):
+            f = cmd
+        elif isinstance(cmd, str):
+            f = getattr(self._cursor, cmd, '_err_wrong_cmd')
         return f(*args)
 
     def loop(self, stdscr, state):
