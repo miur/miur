@@ -28,12 +28,13 @@ def run(argv):
     cursor = Cursor(proxy, dom.uuid)
     view = View(cursor)
     widget = Widget(view)
+    layout = Layout(widget)
 
-    state = {'keymap': keymap}
+    state = {'keymap': keymap, 'layout': layout}
     nc_frmwk = NcursesFramework(state)
-    nc_front = NcursesFrontend(nc_frmwk, widget)
+    nc_rendr = NcursesRenderer(nc_frmwk, state)
     nc_input = NcursesInput(nc_frmwk, cursor)
-    state['frontend'] = nc_front
+    state['render'] = nc_rendr
     state['input'] = nc_input
     nc_frmwk.run(nc_input.loop)
 
@@ -41,7 +42,9 @@ def run(argv):
 def send_event(event, state):
     if event == 'redraw':
         # DEV: skip some draw requests to limit fps
-        state['frontend'].draw(state)
+        rendr = state['render']
+        scene = state['layout'].bake(*rendr.size)
+        rendr.draw(scene, state)
 
 
 def flat_tree(dom, parent, n=0):
@@ -206,7 +209,7 @@ class Widget(object):
     #     => draw as generator produces them
     #     -- impossible pre-sorting for 3D
     #     -- frontends may prefer different order of drawing
-    def data(self, h, w):
+    def graphemes(self, h, w):
         x, y = 0, 2
         data = self._view.data(h-x, w-y)
         edges = list(data['edges'])
@@ -230,8 +233,17 @@ class Layout(object):
     def __init__(self, widget):
         self._widget = widget
 
+    def bake(self, h, w):
+        wx, wy = 2, 1
+        wh, ww = h - wx, w - wy
+        assert wh > 0 and ww > 0
+        for g in self._widget.graphemes(wh, ww):
+            g.x += wx
+            g.y += wy
+            yield g
 
-# rename => Scene
+
+# rename => Scene / Frontend
 # ALT:BAD: .draw() inside Widget()
 #   BUT then you need links to all frontends inside widget itself
 # WTF:(crash): list redraw when screen is shrinking
@@ -240,38 +252,36 @@ class Layout(object):
 #   FIND: how ncurses treats content when screen shrinks -- cuts it w/o restoring ?
 # ALT:(faster) draw whole list -- then redraw line for cursor
 #   => BUT: if we choose individual colors for entries -- no sense in optimization
-class NcursesFrontend(object):
-    def __init__(self, frmwk, widget):
+# NOTE:TEMP: (scene == layout) completely fill window screen
+#   ? how tmux fills up only part of screen ? => may be useful
+class NcursesRenderer(object):
+    def __init__(self, frmwk, state):
         self._frmwk = frmwk
-        self._widget = widget
+        self._state = state
+
+    @property
+    def size(self):
+        return self._state['stdscr'].getmaxyx()
 
     # ENH: supply layout as 'graphemes tree' to 'frontend conveyor' => REM ._widget
-    def draw(self, state):
+    def draw(self, graphemes, state):
         stdscr, colorscheme = state['stdscr'], state['colorscheme']
-        h, w = stdscr.getmaxyx()
         stdscr.clear()
-        self.fill(stdscr, colorscheme, h, w)
+        self.render(stdscr, graphemes, colorscheme)
         stdscr.refresh()
 
-    def fill(self, stdscr, colorscheme, h, w):
-        # DEV:CHG: derive from layout
-        wx, wy = 1, 0
-        wh, ww = h - wx, w - wy
-        assert wh > 0 and ww > 0
-
-        # THINK: use 'class' for g.type => isinstance()
-        #   +++ inheritance for fallbacks -- replace specialized selection by regular one if not defined in colorscheme
-        #       => use collections.ChainMap
-        #   ++ compiler will chech imported class names for us
-        #   -- can't create dispatch table
-        graphemes = self._widget.data(wh, ww)
-        for g in sorted(graphemes, key=lambda g: (g.depth, g.y)):
+    # THINK: use 'class' for g.type => isinstance()
+    #   +++ inheritance for fallbacks -- replace specialized selection by regular one if not defined in colorscheme
+    #   ++ compiler will check imported class names for us
+    #   -- can't create dispatch table
+    def render(self, stdscr, graphemes, colorscheme):
+        for g in sorted(graphemes, key=lambda g: (g.depth, g.y, g.x)):
             try:
                 if g.type == 'Line':
-                    stdscr.addstr(wy + g.y, wx + g.x, g.data, colorscheme[g.type])
+                    stdscr.addstr(g.y, g.x, g.data, colorscheme[g.type])
                 elif g.type == 'Cursor':
-                    stdscr.addstr(wy + g.y, wx + g.x, g.data, colorscheme[g.type])
-                    stdscr.move(wy + g.y, wx + g.x - 1)
+                    stdscr.addstr(g.y, g.x, g.data, colorscheme[g.type])
+                    stdscr.move(g.y, g.x - 1)
             except curses.error:
                 _log.error('{}: small screen'.format(self.__class__.__name__))
 
