@@ -12,6 +12,10 @@ main:
 test:
 	py.test -- $(shell pwd)
 
-DEPS := python-pytest python-pytest-cov python-pytest-mock
+DEPS := python-pytest python-pytest-cov python-pytest-mock python-pycallgraph
 deps-install:
 	sudo pacman -S $(DEPS:%='%') </dev/stdin >/dev/stdout
+
+call-graph:
+	pycallgraph graphviz --output-file="/tmp/pycallgraph.png" -- $(PR)
+	feh "/tmp/pycallgraph.png"
