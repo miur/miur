@@ -56,7 +56,7 @@ class Dom(object):
     def __init__(self):
         self.uuid = uuid.uuid4()
         self._data = {}
-        flat_tree(self._data, self.uuid, 1)
+        flat_tree(self._data, self.uuid, 2)
 
     def __str__(self):
         return '\n'.join(str(i) for i in self.data())
@@ -83,13 +83,16 @@ class Proxy(object):
                 for pos, nodes in self._dom.data().items()}
 
 
+# IDEA: filter-out (un)visited nodes in current dir
+#   ALT: generate virtual view instead of filtering proxy
+#   * focus only on several dirs picked by hands
+#   * or hide dir after it was visited once
 class Cursor(object):
     def __init__(self, proxy, init_node):
         self._proxy = proxy
         # TEMP:(cursor==index): hardcoded relation
-        #   on delete file before cursor => decrease index
-        # WTF:NEED: history cursor per each node
-        self._index = 3  # EXPL:(None): only on empty list
+        #   on delete => search valid file before cursor => decrease index in cycle
+        self._index = None
 
         # WARN.path is history-like
         #   * random jump will be pushed despite being nonadjacent
@@ -98,30 +101,35 @@ class Cursor(object):
         # self.current = None
         self.path = []
         self.path_set = set()
-        self.push(init_node)
+        self.pos_path = []      # store parent positions for backward (loops in path)
+        self.pos_visited = {}   # store last positions for forward
+        self.move_forward(init_node)
 
-    # NOTE: nodes in path may become invalid
-    def push(self, node):
+    def move_forward(self, node):
         if self.node is not None:
             self.path.append(self.node)
             self.path_set.add(self.node)
         self.node = node
+        self.pos_path.append(self._index)
+        # EXPL:(None): if empty list in next node
+        self._index = self.pos_visited.get(node, 0) if self.edges else None
 
-    def pop(self):
-        if not self.path:
-            return
+    # FIXME: old nodes in path may become invalid => skip until valid ones
+    def hist_back(self):
         old = self.node
         self.node = self.path.pop()
         self.path_set.remove(self.node)
+        self.pos_visited[old] = self._index
+        # EXPL:(None): if prev node deleted or its list emptied
+        self._index = self.pos_path.pop() if self.edges else None
         return old
 
     @property
     def edges(self):
-        return self._proxy.data().get(self.node)
+        return [e for e in self._proxy.data().get(self.node) if e != self.node]
 
     @property
     def current(self):
-        _log.debug('Current: {}'.format(self._index))
         return self.edges[self._index]
 
     def focus_node_next(self):
@@ -133,8 +141,9 @@ class Cursor(object):
             self._index = max(self._index - 1, 0)
 
     def shift_node_parent(self):
-        self.pop()
-        self._index = 0 if self.edges else None
+        if not self.path:
+            return
+        self.hist_back()
 
     def shift_node_current(self):
         node = self.current
@@ -142,8 +151,7 @@ class Cursor(object):
             return  # cycle in-place
         if node not in self._proxy.data():
             return  # invalid node / leaf
-        self.push(node)
-        self._index = 0 if self.edges else None
+        self.move_forward(node)
 
 
 # rename => Slice / Projection
@@ -189,10 +197,6 @@ class Grapheme(object):
         [setattr(self, k, v) for k, v in locals().items()]
 
 
-# THINK: who must convert objects to strings ?
-#   * view => crop on width BAD: converts to string preliminary
-#   * widget => does what it wants BAD: hardcoded to input obj classes
-#       HACK: "View" may be reused to select all items on screen / visible in widget
 class Widget(object):
     def __init__(self, view):
         self._view = view
@@ -203,21 +207,22 @@ class Widget(object):
     #     -- impossible pre-sorting for 3D
     #     -- frontends may prefer different order of drawing
     def data(self, h, w):
-        data = self._view.data(h, w)
+        x, y = 0, 2
+        data = self._view.data(h-x, w-y)
         edges = list(data['edges'])
         curs = self._view.cursor.current
-        yield Grapheme(
-            'Line',
-            '{:d} {:d}'.format(len(self._view.cursor.path), len(edges)),
-            x=0, y=0, depth=0)
-        yield Grapheme('Cursor', str(curs)[:w-5], x=5, y=0, depth=0)
-        for i, e in enumerate(edges, 2):
-            text = str(e)[:w]
+        status = '{:d}: {:d}/{:d}'.format(
+            1 + len(self._view.cursor.path),
+            1 + self._view.cursor._index,
+            len(edges))
+        yield Grapheme('Cursor', status, x=0, y=0, depth=0)
+        for i, e in enumerate(edges):
+            text = str(e)[:w-x]
             if e == curs:
                 # vpos = cur_pos - top
-                yield Grapheme('Cursor', text, x=0, y=i, depth=1)
+                yield Grapheme('Cursor', text, x=x, y=y+i, depth=1)
             else:
-                yield Grapheme('Line', text, x=0, y=i, depth=0)
+                yield Grapheme('Line', text, x=x, y=y+i, depth=0)
 
 
 # VIZ. horizontal, vertical, grid, etc
@@ -278,7 +283,6 @@ class NcursesInput(object):
         self._cursor = cursor
 
     def dispatch(self, cmd, *args):
-        _log.info('Cmd: {}'.format(cmd))
         if callable(cmd):
             f = cmd
         elif isinstance(cmd, str):
@@ -288,9 +292,9 @@ class NcursesInput(object):
     def loop(self, stdscr, state):
         while True:
             key = stdscr.getkey()
-            _log.info('Key: {}'.format(key))
-
             cmd = state['keymap'].get(key, None)
+            _log.info('{} :: {}'.format(key, cmd))
+
             if cmd is None:
                 continue  # wrong key
             if cmd == 'quit':
@@ -309,8 +313,8 @@ class NcursesFramework(object):
         self._state = state
 
     def prepare(self):
-        curses.init_pair(1, curses.COLOR_WHITE, curses.COLOR_BLACK)
-        curses.init_pair(2, curses.COLOR_BLACK, curses.COLOR_CYAN)
+        curses.init_pair(1, 7, 8)
+        curses.init_pair(2, 8, 4)
 
         stdscr = self._state['stdscr']
         stdscr.attron(curses.color_pair(1))
