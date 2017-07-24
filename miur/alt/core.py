@@ -28,9 +28,10 @@ def run(argv):
     cursor = Cursor(proxy, dom.uuid)
     view = View(cursor)
     widget = Widget(view)
-    layout = Layout(widget)
+    layout = BoxLayout([widget])
+    scene = Scene(layout, None)
 
-    state = {'keymap': keymap, 'layout': layout}
+    state = {'keymap': keymap, 'scene': scene}
     nc_frmwk = NcursesFramework(state)
     nc_rendr = NcursesRenderer(nc_frmwk, state)
     nc_input = NcursesInput(nc_frmwk, cursor)
@@ -43,7 +44,7 @@ def send_event(event, state):
     if event == 'redraw':
         # DEV: skip some draw requests to limit fps
         rendr = state['render']
-        scene = state['layout'].bake(*rendr.size)
+        scene = state['scene'].bake(*rendr.size)
         rendr.draw(scene, state)
 
 
@@ -69,6 +70,16 @@ class Dom(object):
         return self._data
 
 
+class Transformation(object):
+    def __init__(self):
+        self.chain = [sorted, reversed, list, lambda o: o[4:]]
+
+    def __call__(self, obj):
+        for c in self.chain:
+            obj = c(obj)
+        return obj
+
+
 # rename => View
 # VIZ. DataProxy, ListProxy, MatrixProxy, ScalarProxy, DictProxy, TableProxy, RawProxy, ImageProxy
 # ??? DEV Proxy per Node OR general one (NEED: ProxyNode anyways) ?
@@ -76,14 +87,14 @@ class Dom(object):
 class Proxy(object):
     def __init__(self, dom):
         self._dom = dom
+        self.transf = Transformation()
 
     def __str__(self):
         return '\n'.join(str(i) for i in sorted(self.data()))
 
     # TEMP:(assume list):
     def data(self):
-        return {pos: list(reversed(sorted(nodes)))[4:]
-                for pos, nodes in self._dom.data().items()}
+        return {p: self.transf(edges) for p, edges in self._dom.data().items()}
 
 
 # IDEA: filter-out (un)visited nodes in current dir
@@ -157,7 +168,7 @@ class Cursor(object):
         self.move_forward(node)
 
 
-# rename => Slice / Projection
+# rename => Slice / Projection / Camera
 # NOTE: combines Cursor, Size and Proxy to get Slice
 # * acquires certain data type from DOM around cursor
 #   +/- entries of list
@@ -195,6 +206,9 @@ class View(object):
         return {'edges': (s for s in items[top:(top + h)])}
 
 
+# rename => Primitive
+# BAD: namedtuple unmutable => can't add offset in layout
+# Grapheme = collections.namedtuple('Grapheme', 'type data x y depth')
 class Grapheme(object):
     def __init__(self, type, data, x=None, y=None, depth=None):
         [setattr(self, k, v) for k, v in locals().items()]
@@ -229,18 +243,47 @@ class Widget(object):
 
 
 # VIZ. horizontal, vertical, grid, etc
-class Layout(object):
-    def __init__(self, widget):
-        self._widget = widget
+class BoxLayout(object):
+    def __init__(self, widgets, direc=1):
+        self._widgets = widgets
+        self._direc = direc
+
+    def rect_i(self, h, w, i):
+        x, y = 2, 1  # margin / padding
+        h, w = h-y, w-x
+        n = len(self._widgets)
+        _log.info([x, y, h, w, n])
+        ww = (w // n) if self._direc == 0 else w
+        wh = (h // n) if self._direc == 1 else h
+        wx = (w * i // n) if self._direc == 0 else 0
+        wy = (h * i // n) if self._direc == 1 else 0
+        _log.info([wx, wy, wh, ww])
+        assert wh > 0 and ww > 0
+        return x + wx, y + wy, wh, ww
 
     def bake(self, h, w):
-        wx, wy = 2, 1
-        wh, ww = h - wx, w - wy
-        assert wh > 0 and ww > 0
-        for g in self._widget.graphemes(wh, ww):
-            g.x += wx
-            g.y += wy
-            yield g
+        for i, widget in enumerate(self._widgets):
+            wx, wy, wh, ww = self.rect_i(h, w, i)
+            for g in widget.graphemes(wh, ww):
+                g.x += wx
+                g.y += wy
+                yield g
+
+
+# NOTE: incapsulates nested layouts composition (scaled)
+#   + flat list of all widgets
+#   + focus cursor
+#   + cache data
+#   * multiple independent windows => TabbedLayout
+#     => usable even for replacing single widget in-place by any other layout
+class Scene(object):
+    def __init__(self, layout, focus):
+        self._layout = layout
+        self._focus = focus
+
+    def bake(self, h, w):
+        # self._layout.resize(h, w)
+        return self._layout.bake(h, w)
 
 
 # rename => Scene / Frontend
