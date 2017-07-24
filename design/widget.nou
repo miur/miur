@@ -6,6 +6,14 @@ Essence-Entity: *widget* -- placements of elements, prescribed by 'contract'
   * data exceeding 'contract' isn't queued
 
 
+PARTOF: who must convert objects to strings ?
+PARTOF: (crop to size) ?
+  ! tui/gui windows => diff size / font => diff h/w text quantity
+  * view => crop on width BAD: converts to string preliminary
+  * widget => does what it wants BAD: hardcoded to input obj classes
+      HACK: "View" may be reused to select all items on screen / visible in widget
+
+
 Elements:
   focus  :: dim unfocused widget, generate 'dying out' hi tail in list on cursor movement
   cursor :: 'bubble cursor' uses more then single line of output, pushing apart top and bottom pieces

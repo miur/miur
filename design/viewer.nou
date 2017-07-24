@@ -76,6 +76,31 @@ window -> ncurses (copying / invalidating baked data)
       * can be completely shared between frontends or individual
 
 
+!5 [_] IDEA: generalize composition instead of strict hierarchy
+  = outer combine instead of direct composition
+  ~~ some func to aplly/bind one to another only temporarily to produce result
+    = ALSO: cache can be treated in the same way
+      => generalized cached decoupled from its actual content
+    == generalized 'applier' of (object + transformation + cache + ...)
+    !! any of intermediate classes => transformations !!
+  VIZ. transformations -- incapsulate access to lower layers
+    dom + filter => proxy ~dom~         # TODO: apply multiple small filters (hide, sort, ...)
+    proxy + cursor => view ~dict~       # IDEA: apply multiple cursors (vert,horiz,history)
+    view + widget => model ~graphemes~  # IDEA: generate incremental update for render
+    model + layout => scene ~graphemes~  # NEED: distinguish incremental or complete scene
+    scene + render => <ui>
+
+
+IDEA: targeted modal keymap
+  * navigation :: ranger tree with preview
+  * reordering tree :: single ascii graphics tree view
+    <h/l> close/open [+] node dir
+  * sorting files :: two panel with preview
+    <h/l> switch panel left/right
+    <d/f> move file under cursor -- always left/right despite focused tab
+  IMPL: general fallback for other keys => use collections.ChainMap
+
+
 IDEA:HACK: sync cursor position in different DOM / cache
   ~ sync moves up / down
   ~ sync entry index positions
