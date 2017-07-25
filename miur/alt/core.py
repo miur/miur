@@ -242,10 +242,10 @@ class Widget(object):
         data = self._view.data(h-x, w-y)
         edges = list(data['edges'])
         curs = self._view.cursor.current
-        status = '{:d}: {:d}/{:d}'.format(
+        status = '{:d}: {:2d}/{:02d} | {}'.format(
             1 + len(self._view.cursor.path),
             1 + self._view.cursor._index,
-            len(edges))
+            len(edges), self._view.cursor.node)
         yield Grapheme('Cursor', status, x=0, y=0, depth=0)
         for i, e in enumerate(edges):
             text = self._dom._names.get(e, e)
