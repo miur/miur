@@ -24,7 +24,7 @@ keymap = {
 def run(argv):
     dom = Dom()
     proxy = Proxy(dom)
-    _log.info(proxy)
+    # _log.info(proxy)
     cursor = Cursor(proxy, dom.uuid)
     view = View(cursor)
     widget = Widget(view)
@@ -72,7 +72,7 @@ class Dom(object):
 
 class Transformation(object):
     def __init__(self):
-        self.chain = [sorted, reversed, list, lambda o: o[4:]]
+        self.chain = [sorted, reversed, list]  # , lambda o: o[4:]
 
     def __call__(self, obj):
         for c in self.chain:
@@ -252,12 +252,12 @@ class BoxLayout(object):
         x, y = 2, 1  # margin / padding
         h, w = h-y, w-x
         n = len(self._widgets)
-        _log.info([x, y, h, w, n])
+        _log.debug([x, y, h, w, n])
         ww = (w // n) if self._direc == 0 else w
         wh = (h // n) if self._direc == 1 else h
         wx = (w * i // n) if self._direc == 0 else 0
         wy = (h * i // n) if self._direc == 1 else 0
-        _log.info([wx, wy, wh, ww])
+        _log.debug([wx, wy, wh, ww])
         assert wh > 0 and ww > 0
         return x + wx, y + wy, wh, ww
 
