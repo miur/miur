@@ -1,0 +1,47 @@
+ag
+  each search query inside dir adds virtual entry inside that dir ("query")
+    * look cached value by <l>
+      NEED: time-space compromise for cache
+    * repeat search anew by <Enter>
+  view of "query"
+    mixed with dir content
+    DFL hidden -- but still mixed
+    sep view for all virtual nodes
+    sep view for "query" only (per each programm)
+  "query" results may be passed as-is into 'vim -q'
+    == open "query" itself
+  "query" may be further viewed as structured graph by *miur*
+    group tree in single widget
+     /path/to/file
+     ├121─ line1
+     ├ ...
+     └332─ lineN
+     ...
+    two synced list widgets
+      "query" -> | file:pos | preview |
+  each entry is clickable => goes to actual file:pos
+    embed lambda funcs with direct jumps into entries
+    !! actual data (lambda) is different from displayed data (line) !!
+  IDEA: insert 'mtime/date' into generated entries subsystem
+    ++ looks more like file -- entries and node itself have 'mtime'
+    MAYBE: useful for sorting multiple consequietive runs on everchanging dataset
+
+
+cmd list
+  list == cmdlines
+  NEED: parser in general format per cmdline
+    may reuse generalized parsers E.G. parse lines
+    OR specialized E.G. ag --vimgrep
+  <Enter> -> execute cmdline -> show results in next pane
+
+
+vim embedded in layout
+  NEED: embedded terminal emulator
+    TRY libvte from neovim
+  NEED: key to return focus from vim to *miur*
+  ~ replaces current navigational widget in-place
+  ~ open file in pre-determined widget E.G. inplace of preview
+  ~ open fullscreen libvte in sep window
+  ~ open as in ranger => suspend *miur* and provide access to outer terminal
+    BAD: no outer terminal when in *gui* => libvte required
+      ~ outer terminal can be conditionally replaced by libvte for *gui*

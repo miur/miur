@@ -1,4 +1,9 @@
 
+IDEA: use 'tmux' for tui layout and xmonad for 'gui' layout
+  USE single widget per instance
+  BAD widgets need status lines, etc => NEED layout anyways
+
+
 Essence-Entity: *widget* -- placements of elements, prescribed by 'contract'
   * only corresponding *view* provides all data and positions
     ? [_] WTF if diff widget height in tui and gui ?
