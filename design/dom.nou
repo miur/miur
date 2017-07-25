@@ -1,5 +1,35 @@
 *dom*
 
+Arch:
+  ENH: map of views
+    * real nodes => copied/synced from data
+    * virtual nodes => generated and cached
+    * generator nodes => executes command and creates nodes graph on access
+      CHG: 'flat' list impossible => read generator nodes from other src
+  ALT: flat list of nodes => filter list by {real/virtual/generator} on each access
+    ++ reasonable if too many kinds of entries beside those three
+    = use *proxy* to cache certain kind of entries
+  BET: use intermediate node instead of map
+    ++ isotropic representation and navigation
+    NEED: skip path links => jump to predetermined node
+    IDEA: generate intermediate node on demand
+      NEED: access to 'edges' only through api
+        => so I could substitute real content by virtual menu of choices \
+          for entries {real,virtual,generated...}
+
+  BET: api to access nodes (or lists of nodes -- for performance)
+    => hides impl of multiple lists instead of 'flat' one
+    => transparently generates data when necessary
+    => single point to manage cached nodes
+
+  IDEA: convert virtual/generated nodes into actual fs inodes
+    * files with cmdline names and cached content
+    * symlinks for virtual links
+    * dirs for more complex content
+      ~ E.G. ag results distributed in dirs
+      ~ readelf => split ELF binary structure by dirs
+
+
 Identifiers:
   NEED: uid (as in git)
     REF https://stackoverflow.com/questions/1210458/how-can-i-generate-a-unique-id-in-python/15741983#15741983
