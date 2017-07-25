@@ -3,7 +3,7 @@ import random
 import curses
 import logging
 
-from . import trace
+from . import trace, proto
 
 _log = logging.getLogger(__name__.split('.', 2)[1])
 
@@ -27,7 +27,7 @@ def run(argv):
     # _log.info(proxy)
     cursor = Cursor(proxy, dom.uuid)
     view = View(cursor)
-    widget = Widget(view)
+    widget = Widget(dom, view)
     layout = BoxLayout([widget])
     scene = Scene(layout, None)
 
@@ -61,6 +61,19 @@ class Dom(object):
         self.uuid = uuid.uuid4()
         self._data = {}
         flat_tree(self._data, self.uuid, 2)
+
+        # TEMP: only names metainfo subsystem
+        # TEMP: combine nodes with cmd results
+        # TODO: self._cmds => to execute cmd on-demand when opening cmd
+        #   => then impl cmd caching to re-execute it only on <Enter> and use cache by default
+        #   NEED: single point api to access edges of node
+        self._names = {}
+        cmd = 'ls'
+        node, edges, metainfo = proto.cmd2dom('ls', parent=self.uuid)
+        self._data[node] = edges
+        self._data[self.uuid].add(node)
+        self._names[node] = cmd
+        self._names.update(metainfo)
 
     def __str__(self):
         return '\n'.join(str(i) for i in self.data())
@@ -215,7 +228,8 @@ class Grapheme(object):
 
 
 class Widget(object):
-    def __init__(self, view):
+    def __init__(self, dom, view):
+        self._dom = dom
         self._view = view
 
     # DEV: must return abstract graphics stack tree (in terms of abstract frontend)
@@ -234,7 +248,8 @@ class Widget(object):
             len(edges))
         yield Grapheme('Cursor', status, x=0, y=0, depth=0)
         for i, e in enumerate(edges):
-            text = str(e)[:w-x]
+            text = self._dom._names.get(e, e)
+            text = str(text)[:w-x]
             if e == curs:
                 # vpos = cur_pos - top
                 yield Grapheme('Cursor', text, x=x, y=y+i, depth=1)
