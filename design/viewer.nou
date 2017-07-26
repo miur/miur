@@ -231,6 +231,7 @@ Cursor / Focus
          cursor will jump when switching back to cursor selection
 
 Selection / Group
+  !5 [_] TODO: seize ideas of generalized selections from 'vis=>0.4'
   incapsulates objects/lists to which actions applied (E.G. vim textobj)
     == action focus => marks/selects objs in widgets
   all selections must be tagged by their creator (cursor)

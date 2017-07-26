@@ -45,3 +45,6 @@ vim embedded in layout
   ~ open as in ranger => suspend *miur* and provide access to outer terminal
     BAD: no outer terminal when in *gui* => libvte required
       ~ outer terminal can be conditionally replaced by libvte for *gui*
+
+
+mpd controls

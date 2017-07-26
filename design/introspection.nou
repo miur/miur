@@ -1,0 +1,24 @@
+%%%% Introspection
+Inner struct to navigate through virtual graphs
+  multichoices for nodes
+    * what aspect to show as edges
+    * which editor use to open
+    * possible previews for same format
+    ...
+  transformation chains for nodes
+    list/manipulate coveyour before showing edges in dir
+    HACK: copy-paste selection of manipulation primitives between nodes
+  cursors
+    for all tabs / inputs
+  history
+    previously visited nodes
+  selections
+    all the different selections with diff uuid and color
+  tags
+    all tags groups
+  cache
+    list all cached generated views from flat list
+  undo
+    tree with branches
+  tui menu
+    labels / buttons / switches / sliders
