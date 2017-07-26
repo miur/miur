@@ -23,9 +23,9 @@ keymap = {
 
 def run(argv):
     dom = Dom()
-    proxy = Proxy(dom)
+    # proxy = Proxy(dom)
     # _log.info(proxy)
-    cursor = Cursor(proxy, dom.uuid)
+    cursor = Cursor(dom, dom.uid)
     view = View(cursor)
     widget = Widget(dom, view)
     layout = BoxLayout([widget])
@@ -56,35 +56,96 @@ def flat_tree(dom, parent, n=0):
             flat_tree(dom, e, n - 1)
 
 
+# NOTE: even Dom must encapsulate all access to elements
+#   => so it could sync with fs immediately on demand in blocking ops
 class Dom(object):
     def __init__(self):
-        self.uuid = uuid.uuid4()
-        self._data = {}
-        flat_tree(self._data, self.uuid, 2)
+        self.uid = uuid.uuid4()
+        self._edges = {}
+        # BAD: nodes may have different names depending on location
+        #   E.G. instead of hiding -- use name '..' for parent node in each dir
+        #   ?? add dicts per node for local names -- as they are viewed ??
+        #     << each node may have its own conception/names about all other nodes
+        self._names = {}
+        self._shellcommands = {}
+        flat_tree(self._edges, self.uid, 2)
 
+        # TRY
+        self._shnode('ls -l')
+
+        # TEMP: insert individual transformations
+        #   BET:RFC: allow shared/inherited transf between multiple w/o explicit assign
+        transf = Transformation()
+        self._transfs = {e: transf for e in self}
+
+    # FIXME: allow multiple parents at once
+    def _shnode(self, cmd, parent=None):
+        if parent is None:
+            parent = self.uid
+        node = uuid.uuid4()
+        self._edges[node] = None            # accumulate results into virt node
+        self._edges[parent].add(node)       # connect to root node
+        self._shellcommands[node] = cmd     # name for virtual node itself
+
+    def _shexec(self, node):
         # TEMP: only names metainfo subsystem
         # TEMP: combine nodes with cmd results
         # TODO: self._cmds => to execute cmd on-demand when opening cmd
         #   => then impl cmd caching to re-execute it only on <Enter> and use cache by default
+        #   !5 [_] IDEA: seize ideas from Unite.vim -- to combine lists with commands
         #   NEED: single point api to access edges of node
-        self._names = {}
-        cmd = 'ls'
-        node, edges, metainfo = proto.cmd2dom('ls', parent=self.uuid)
-        self._data[node] = edges
-        self._data[self.uuid].add(node)
-        self._names[node] = cmd
-        self._names.update(metainfo)
+        edges, lines = proto.cmd2dom(self._shellcommands[node], parent=self.uid)
+        self._edges[node] = edges           # cache cmd results
+        self._edges[node].add(self.uid)     # insert parent to edges
+        self._names.update(lines)
+        return edges
+
+    def __len__(self):
+        return len(self._edges)
+
+    def __iter__(self):
+        for uid in self._edges:
+            yield uid
+
+    def __contains__(self, uid):
+        return uid in self._edges
+
+    # DEV: generate complete node with fieds pointing to each metainfo subsystem
+    # def __getitem__(self, uid):
+    #     return self._edges[uid]
 
     def __str__(self):
-        return '\n'.join(str(i) for i in self.data())
+        return '\n'.join(str(uid) for uid in self)
 
-    # TEMP:(assume list): get whole data
-    def data(self):
-        return self._data
+    # SECU: only allowed attrs
+    def metainfo(self, meta):
+        if meta in ['edges', 'names', 'transfs']:
+            return getattr(self, '_' + meta, None)
+
+    # TRY: depending on kw 'real=True' choose from several impl dicts
+    #   THINK: copy edges for read-only access
+    def edgesof(self, uid, dfl=None):
+        if dfl is not None and uid not in self:
+            return dfl
+        edges = self._edges[uid]
+        # TEMP: evaluate shellcommand each time
+        #   => BUG: cursor looses position, keeping pointing to nonexistent edge
+        if uid in self._shellcommands and edges is None:
+            edges = self._shexec(uid)
+        transf = self._transfs.get(uid)
+        return edges if transf is None else transf(edges)
+
+    def nameof(self, uid):
+        for ns in [self._names, self._shellcommands]:
+            if uid in ns:
+                return str(ns[uid])
+        return str(uid)
 
 
+# NOTE: all inc ops add funcs to transf chain
 class Transformation(object):
     def __init__(self):
+        # BAD: for sorting by name you need access to Dom.nameof() ALSO slow
         self.chain = [sorted, reversed, list]  # , lambda o: o[4:]
 
     def __call__(self, obj):
@@ -93,10 +154,15 @@ class Transformation(object):
         return obj
 
 
-# rename => View
+# UNUSED:
+# rename => View / DomAccessor
 # VIZ. DataProxy, ListProxy, MatrixProxy, ScalarProxy, DictProxy, TableProxy, RawProxy, ImageProxy
 # ??? DEV Proxy per Node OR general one (NEED: ProxyNode anyways) ?
 #   BET: general one => allows applying ops to whole tree (filtered)
+# TEMP: embed caching into proxy
+# NEED: inherit same interface as "Dom" for transparent access
+# BAD: too much call levels => BAD: meaningless slow data-driven development arch
+#   E.G. nesting / overriding __iter__
 class Proxy(object):
     def __init__(self, dom):
         self._dom = dom
@@ -115,8 +181,8 @@ class Proxy(object):
 #   * focus only on several dirs picked by hands
 #   * or hide dir after it was visited once
 class Cursor(object):
-    def __init__(self, proxy, init_node):
-        self._proxy = proxy
+    def __init__(self, dom, init_node):
+        self._dom = dom
         # TEMP:(cursor==index): hardcoded relation
         #   on delete => search valid file before cursor => decrease index in cycle
         self._index = None
@@ -153,7 +219,9 @@ class Cursor(object):
 
     @property
     def edges(self):
-        return [e for e in self._proxy.data().get(self.node) if e != self.node]
+        if not self.path:
+            return self._dom.edgesof(self.node)
+        return [e for e in self._dom.edgesof(self.node) if e != self.path[-1]]
 
     @property
     def current(self):
@@ -176,7 +244,7 @@ class Cursor(object):
         node = self.current
         if node in self.path_set:
             return  # cycle in-place
-        if node not in self._proxy.data():
+        if node not in self._dom:
             return  # invalid node / leaf
         self.move_forward(node)
 
@@ -248,8 +316,8 @@ class Widget(object):
             len(edges), self._view.cursor.node)
         yield Grapheme('Cursor', status, x=0, y=0, depth=0)
         for i, e in enumerate(edges):
-            text = self._dom._names.get(e, e)
-            text = str(text)[:w-x]
+            text = self._dom.nameof(e)
+            text = text[:w-x]
             if e == curs:
                 # vpos = cur_pos - top
                 yield Grapheme('Cursor', text, x=x, y=y+i, depth=1)
@@ -285,7 +353,7 @@ class BoxLayout(object):
                 yield g
 
 
-# NOTE: incapsulates nested layouts composition (scaled)
+# NOTE: encapsulates nested layouts composition (scaled)
 #   + flat list of all widgets
 #   + focus cursor
 #   + cache data
@@ -312,6 +380,8 @@ class Scene(object):
 #   => BUT: if we choose individual colors for entries -- no sense in optimization
 # NOTE:TEMP: (scene == layout) completely fill window screen
 #   ? how tmux fills up only part of screen ? => may be useful
+# TODO: primitives to renderer must be supplied in independent format
+#   => so I could re-implement renderer in any lang and load *.so on demand
 class NcursesRenderer(object):
     def __init__(self, frmwk, state):
         self._frmwk = frmwk

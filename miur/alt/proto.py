@@ -4,7 +4,7 @@ from subprocess import check_output, CalledProcessError
 
 def execute(cmd):
     try:
-        out = check_output(cmd)
+        out = check_output(cmd, shell=isinstance(cmd, str))
     except CalledProcessError:
         return None
     else:
@@ -15,12 +15,11 @@ def execute(cmd):
 #   insert items into satellite
 #   use satellite info
 def list2dom(items, parent=None):
-    metainfo = {uuid.uuid4(): e for e in items}
-    edges = set(metainfo.keys())
+    results = {uuid.uuid4(): e for e in items}
+    edges = set(results.keys())
     if parent is not None:
         edges.add(parent)
-    node = uuid.uuid4()
-    return (node, edges, metainfo)
+    return (edges, results)
 
 
 def cmd2dom(cmd, parent=None):
