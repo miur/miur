@@ -37,6 +37,20 @@ Arch:
       ~ readelf => split ELF binary structure by dirs
 
 
+API
+  IDEA:HACK: desc api instead of planning *dom* inner layout
+    * api == protocol == testcase / usage example
+    * api + constraints / requirements => optimize inner layout / caching
+  IMPL: encapsulate behind api
+    * postpone arch decision for impl
+    * choose preffered horiz/vert arch (OOP or DDD) after clearing up usage patterns
+    * return dynamic iterators over impl instead of actually constructed structures
+  NOTE!(insight): my DDD subsystems are equivalent to column-based db (E.G. J-lang DB)
+    E.G. OOP vs DDD === row- vs column-based DB
+    * HACK: I can even use any relational DB for this -- to store all nodes with all their history!
+    * HACK: hotplug different DB engines for *dom* behind api
+
+
 Identifiers:
   NEED: uid (as in git)
     REF https://stackoverflow.com/questions/1210458/how-can-i-generate-a-unique-id-in-python/15741983#15741983

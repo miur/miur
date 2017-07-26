@@ -1,4 +1,5 @@
 %%%% Introspection
+
 Inner struct to navigate through virtual graphs
   multichoices for nodes
     * what aspect to show as edges
@@ -22,3 +23,37 @@ Inner struct to navigate through virtual graphs
     tree with branches
   tui menu
     labels / buttons / switches / sliders
+  layout as tree
+    change order, widgets sizes, colors, etc
+
+
+Multichoice
+  Treat attrs as standalone part of graph
+    rootnode -> multichoice -> [edgesnode -> multichoice] ...
+  Use special algorithmic cursor
+    * ALG: choosen per node per cursor
+      ~ prefer edges for dir, open per file, results per cmd
+      ~ always prefer inode metainfo
+    * MENTAL: reduced navigation graph over underlying graph
+      == choose specific attr per multichoice to move into on <L>/<Enter>
+      == pick single history node to visualize
+    * cursor may point to multichoice menu itself => open whole menu on <L>
+
+
+History
+  Blend history in graph itself
+    * ro graph => disable changes in nodes itself => stores all graph's past history
+        => discard too old cached states when cache size exceeded
+        HACK track list of discarded uids to notify user about obsolete access
+    * ALSO store changes in real fs graph as similar history
+        ? USE when external change to fs ?
+        => however, 'undo history' will be more effective and less space-consuming
+        ALT: use incremental history and reconstruct virtual nodes on demand
+    * edges -- is only a history cursor for whole graph
+        => I.E. bunch of per node history cursors
+    * share nodes between similar histories to reduce space consumption
+        => ref count before deleting
+        ? when generating node with same content => return same node
+            => NEED copy-on-write for this type of sharing
+  Independent history nodes
+    HACK: diff edges between history nodes => to ascertain changes
