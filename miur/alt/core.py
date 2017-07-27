@@ -3,6 +3,7 @@ import random
 import curses
 import logging
 import itertools
+import datetime
 from collections import Iterable
 
 from . import trace, proto
@@ -18,8 +19,9 @@ keymap = {
     '2': lambda: trace.setloglevel(logging.DEBUG),
     '3': lambda: trace.setloglevel(logging.INFO),
     '^L': 'redraw_all_now',
+    '\n': ['regenerate_now', 'shift_node_current'],
     'q': 'quit',
-    '\n': 'quit',
+    '\033': 'quit',
 }
 
 
@@ -76,9 +78,13 @@ class ShellProvider(object):
     def __call__(self):
         # TEMP:(hardcoded): linewise
         edges, lines = proto.cmd2dom(self.cmd)
+        # WTF: how to generate Dom effectively ?
         g = Dom()
         g._edges = {g.uid: edges}
         g._names = lines
+        # datetime.datetime.utcfromtimestamp(timestamp).strftime("%A, %d. %B %Y %I:%M%p")
+        # ALT: time.time() == datetime.datetime.utcnow().timestamp()
+        g._names[g.uid] = datetime.datetime.now()
         return g
 
 
@@ -98,6 +104,10 @@ class Dom(object):
     def __init__(self):
         # Wrap uuid into simple "Node" class to hide impl
         #   ALSO: default ctor gens new uuid ALT=(from uuid import uuid4 as Node)
+        #   NOT: {uid != Node} => because Node contains all its attributes (or accessors to attributes)
+        #     ALT: treat {Node == uid} for abstract graph and use some other obj
+        #     name for all node attrs -- like "Desc/Cell/Object/NodeProxy/Avatar"
+        #     * embed accessors attr(dom, uid) as properties OR preeval values
         self.uid = uuid.uuid4()  # ENH:TEMP: using .uid means all *dom* are tree
         self._edges = {}
         self._providers = {}
@@ -120,13 +130,17 @@ class Dom(object):
     #   ~~ cursor must somehow know uids of those separate graphs
     def insert(self, g, conn):
         assert isinstance(g, self.__class__)
-        assert conn
         for attr in vars(g).keys():
             if not attr.startswith('_') or attr.startswith('__'):
                 continue
             vals = getattr(g, attr)
             # if not callable(vals) and isinstance(vals, dict):
             getattr(self, attr).update(vals)
+        if conn is not None:
+            self.connect(conn)
+
+    def connect(self, conn):
+        assert conn
         if isinstance(conn, tuple):
             conn = [conn]
         for fs, ts in conn:
@@ -210,6 +224,11 @@ class Dom(object):
         if meta in ['edges', 'names', 'transfs']:
             return getattr(self, '_' + meta, None)
 
+    def regenerate(self, node):
+        g = self._providers[node]()
+        self.insert(g, conn=(node, g.uid))
+        _log.info(g)
+
     # TRY: depending on kw 'real=True' choose from several impl dicts
     #   THINK: copy edges for read-only access
     def edgesof(self, node, dfl=None):
@@ -218,12 +237,10 @@ class Dom(object):
         # TEMP: evaluate shellcommand each time
         #   => BUG: cursor looses position, keeping pointing to nonexistent edge
         edges = self._edges[node]
-        # FIXME: reexec cmd only on '<l>' => MOVE sep function
+        # FIXME: reexec cmd only on '<Enter>' => MOVE sep function
         # CHG currently caches only if multichoice empty NEED exec if never exec
         if not edges and node in self._providers:
-            g = self._providers[node]()
-            self.insert(g, conn=(node, g.uid))
-            _log.info(edges)
+            self.regenerate(node)
         if edges:
             transf = self._transfs.get(node)
             return edges if transf is None else transf(edges)
@@ -271,6 +288,10 @@ class Proxy(object):
 
 # NOTE: containedin cursor to tweak traversing strategy
 #   ALSO: deterministic jump over multichoice
+# NOTE: no need to chg cursor arch for multichoice
+#   * has strategy to choose choice => store jump target in .path
+#   * moving back => to place from where jump was done
+#   * if no hiding => all OK => return back to multichoice
 class Strategy(object):
     pass
 
@@ -347,6 +368,9 @@ class Cursor(object):
         if node not in self._dom:
             return  # invalid node / leaf
         self.move_forward(node)
+
+    def regenerate_now(self):
+        return self._dom.regenerate(self.current)
 
 
 # rename => Slice / Projection / Camera
@@ -520,12 +544,19 @@ class NcursesInput(object):
         self._frmwk = frmwk
         self._cursor = cursor
 
-    def dispatch(self, cmd, *args):
-        if callable(cmd):
-            f = cmd
-        elif isinstance(cmd, str):
-            f = getattr(self._cursor, cmd, '_err_wrong_cmd')
-        return f(*args)
+    def dispatch(self, cmd):
+        if not isinstance(cmd, list):
+            cmd = [cmd]
+        # TEMP: chain => use last result
+        #   ALT: pipe => pass results to next command
+        #   SEE: haskell monads for these cases
+        for c in cmd:
+            if callable(c):
+                f = c
+            elif isinstance(c, str):
+                f = getattr(self._cursor, c, '_err_wrong_cmd')
+            r = f()
+        return r
 
     def loop(self, stdscr, state):
         while True:
