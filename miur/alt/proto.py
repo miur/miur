@@ -1,5 +1,12 @@
 import uuid
 from subprocess import check_output, CalledProcessError
+import os
+import psutil
+
+process = psutil.Process(os.getpid())
+
+def meminfo():
+    return process.memory_info().rss
 
 
 def execute(cmd):
