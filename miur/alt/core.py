@@ -29,8 +29,9 @@ keymap = {
 
 
 def run(argv):
-    dom = Dom()
-    flat_tree(dom._edges, dom.uid, 2)
+    dom = Dom(name='root')
+    fs = TestGraphProvider()()
+    dom.insert(fs, conn=(dom.uid, fs.uid))
     dom.update_node(cmd='ls -l', parents=dom.uid)
 
     # proxy = Proxy(dom)
@@ -66,6 +67,16 @@ def flat_tree(dom, parent, n=0):
             flat_tree(dom, e, n - 1)
 
 
+# ATT: can't inherit "Provider" from "Dom"
+#   << because "Dom" is joined _cache_ of immediate results from "Providers"
+class TestGraphProvider(object):
+    def __call__(self):
+        dom = Dom(name='test')
+        flat_tree(dom._edges, dom.uid, 2)
+        _log.info(dom)
+        return dom
+
+
 # NOTE: individual per each multichoice aspect to regenerate it
 # * ShellProvider == shellexec + cmdline
 # * NativeProvider == os.listdirs()
@@ -87,7 +98,7 @@ class ShellProvider(object):
         g._names = lines
         # datetime.datetime.utcfromtimestamp(timestamp).strftime("%A, %d. %B %Y %I:%M%p")
         # ALT: time.time() == datetime.datetime.utcnow().timestamp()
-        g._names[g.uid] = datetime.datetime.now()
+        g._names[g.uid] = 'edges ' + str(datetime.datetime.now())
         return g
 
 
@@ -104,7 +115,7 @@ class Attribute(object):
 #   * BUT: after replacing it will be inserted back into original *dom*
 #   * BAD: recursive process => each time walks through already generated nodes
 class Dom(object):
-    def __init__(self):
+    def __init__(self, name=None):
         # Wrap uuid into simple "Node" class to hide impl
         #   ALSO: default ctor gens new uuid ALT=(from uuid import uuid4 as Node)
         #   NOT: {uid != Node} => because Node contains all its attributes (or accessors to attributes)
@@ -113,13 +124,18 @@ class Dom(object):
         #     * embed accessors attr(dom, uid) as properties OR preeval values
         self.uid = uuid.uuid4()  # ENH:TEMP: using .uid means all *dom* are tree
         self._edges = {}
+        # HACK: add itself => because "Dom" is "Node" itself
+        self._edges[self.uid] = set()
         self._providers = {}
         # BAD: nodes may have different names depending on location
         #   E.G. instead of hiding -- use name '..' for parent node in each dir
         #   ?? add dicts per node for local names -- as they are viewed ??
         #     << each node may have its own conception/names about all other nodes
         #     IMPL: self._alias = {uid: {uid: alias, ...}}
+        #     ALT:ALG: name = cursor==node ? '..' : dom.nameof(node)
         self._names = {}
+        if name is not None:
+            self._names[self.uid] = name
 
         # TEMP: insert individual transformations
         #   BET:RFC: allow shared/inherited transf between multiple w/o explicit assign
@@ -193,18 +209,6 @@ class Dom(object):
         self.conn_node(node, parents)
         return node
 
-    def _shexec(self, node):
-        # TEMP: only names metainfo subsystem
-        # TEMP: combine nodes with cmd results
-        # TODO: self._cmds => to execute cmd on-demand when opening cmd
-        #   => then impl cmd caching to re-execute it only on <Enter> and use cache by default
-        #   NEED: single point api to access edges of node
-        edges, lines = proto.cmd2dom(self._shellcommands[node], parent=self.uid)
-        self._edges[node] = edges           # cache cmd results
-        self._edges[node].add(self.uid)     # insert parent to edges
-        self._names.update(lines)  # XXX how to combine with add_node() ?
-        return edges
-
     def __len__(self):
         return len(self._edges)
 
@@ -245,7 +249,8 @@ class Dom(object):
         if not edges and node in self._providers:
             self.regenerate(node)
         if edges:
-            transf = self._transfs.get(node)
+            # transf = self._transfs.get(node)
+            transf = Transformation()
             return edges if transf is None else transf(edges)
 
     def nameof(self, node):
@@ -259,7 +264,7 @@ class Dom(object):
 class Transformation(object):
     def __init__(self):
         # BAD: for sorting by name you need access to Dom.nameof() ALSO slow
-        self.chain = [sorted, reversed, list]  # , lambda o: o[4:]
+        self.chain = [sorted]  # , reversed, list, lambda o: o[4:]
 
     def __call__(self, obj):
         for f in self.chain:
@@ -268,6 +273,8 @@ class Transformation(object):
 
 
 # UNUSED:
+# RFC: .edges required very often => cache results inside proxy
+#   << dom.edgesof() requires too much func calls
 # rename => View / DomAccessor
 # VIZ. DataProxy, ListProxy, MatrixProxy, ScalarProxy, DictProxy, TableProxy, RawProxy, ImageProxy
 # ??? DEV Proxy per Node OR general one (NEED: ProxyNode anyways) ?
