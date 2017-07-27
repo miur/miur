@@ -108,9 +108,38 @@ NOTE: single node may point to multiple (virtual) views simultaneously
     -- multiple steps to filter by multiple features
     ?? easy to add new subsystems
     ++ more granular encapsulated access to individual attributes of nodes
+    ++8 distribute encapsulated subsystems through conveyor
+      * keep *dom* as real-data-only mirror
+      * virtual nodes -> "Overlay"
+      * generated nodes -> "Query"
+      * _transf -> "Proxy"
+      BAD: hard to delete all Node details from all distributed subsystems
+        slow, cpuload, impractical, send_event
+    +++ independent value fallback strategies for each subsystem
+      * shareable strategies
+      * dynamically replaceable
+    +++ IDEA: Ray Tracing -- aquire/render only visible data
+      *widget* == viewport
+      *cursor* == ray/camera
+      *fontsize/style/columns_list* == perspective matrix
+      HACK: each ray traverses only until subsystem which can generate value
+        !! no need to generate whole "Node" and traverse deep into underlying *dom*
     ~~ each multichoice IMPL
       ~~ flat list of blended history, commands, etc
         => store nodes in _types = {}
         => show certain category by filtering by _types
         BUT: how to distinguish last 'edges' from everything else when rendering ?
       -- nested list => predefined nodes => must be distributed by names (too slow)
+  flat of Nodes
+    -- all attrs are gathered in one place
+      despite them are necessary only in diff subsystems on diff stages of conveyor
+      +++ easy to completely delete Node
+
+  !!! IDEA: instead of flat united dom allow dom of doms
+    * keep encapsulation of each dom to add/remove it as complete entity
+    * treat each dom itself as node
+    !!! similar to meridia enclosures idea
+    ++ uid must be unique only inside single partial dom
+      BUT then each nested node will have composite uid = <dom_uid, node_uid>
+    --- can't access any node by uid in one go => need searching all doms
+    -- need to search concreate dom to modify -- on add/remove individual nodes
