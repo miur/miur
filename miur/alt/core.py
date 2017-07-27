@@ -5,10 +5,12 @@ import logging
 import itertools
 import datetime
 from collections import Iterable
+from memory_profiler import profile
 
 from . import trace, proto
 
 _log = logging.getLogger(__name__.split('.', 2)[1])
+_memprof = open('/tmp/miur-memory.log', 'w+')
 
 keymap = {
     'j': 'focus_node_next',
@@ -28,6 +30,7 @@ keymap = {
 }
 
 
+@profile(stream=_memprof)
 def run(argv):
     dom = Dom(name='root')
     fs = TestGraphProvider()()
