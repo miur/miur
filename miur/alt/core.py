@@ -13,6 +13,9 @@ _log = logging.getLogger(__name__.split('.', 2)[1])
 keymap = {
     'j': 'focus_node_next',
     'k': 'focus_node_prev',
+    'g': 'focus_node_first',
+    'M': 'focus_node_middle',
+    'G': 'focus_node_last',
     'h': 'shift_node_parent',
     'l': 'shift_node_current',
     '1': lambda: trace.setloglevel(trace.TRACE),
@@ -356,6 +359,18 @@ class Cursor(object):
         if self._index is not None and self.edges is not None:
             self._index = max(self._index - 1, 0)
 
+    def focus_node_first(self):
+        if self._index is not None and self.edges is not None:
+            self._index = 0
+
+    def focus_node_middle(self):
+        if self._index is not None and self.edges is not None:
+            self._index = (len(self.edges) - 1) // 2
+
+    def focus_node_last(self):
+        if self._index is not None and self.edges is not None:
+            self._index = len(self.edges) - 1
+
     def shift_node_parent(self):
         if not self.path:
             return
@@ -554,7 +569,7 @@ class NcursesInput(object):
             if callable(c):
                 f = c
             elif isinstance(c, str):
-                f = getattr(self._cursor, c, '_err_wrong_cmd')
+                f = getattr(self._cursor, c)
             r = f()
         return r
 
