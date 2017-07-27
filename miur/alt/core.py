@@ -2,6 +2,8 @@ import uuid
 import random
 import curses
 import logging
+import itertools
+from collections import Iterable
 
 from . import trace, proto
 
@@ -23,6 +25,9 @@ keymap = {
 
 def run(argv):
     dom = Dom()
+    flat_tree(dom._edges, dom.uid, 2)
+    dom.update_node(cmd='ls -l', parents=dom.uid)
+
     # proxy = Proxy(dom)
     # _log.info(proxy)
     cursor = Cursor(dom, dom.uid)
@@ -56,48 +61,131 @@ def flat_tree(dom, parent, n=0):
             flat_tree(dom, e, n - 1)
 
 
+# NOTE: individual per each multichoice aspect to regenerate it
+# * ShellProvider == shellexec + cmdline
+# * NativeProvider == os.listdirs()
+# THINK:(suggestion): if provider == None => cache is unique and non-regenerable
+# DEV: must generate detached *dom* => for structured cmds like 'ag'
+#   NEED: special parsers per each shell cmd output type
+class ShellProvider(object):
+    def __init__(self, cmd):
+        self.cmd = cmd
+
+    # NOTE return list of nodes to include in *dom*
+    #   * generated from expression
+    def __call__(self):
+        # TEMP:(hardcoded): linewise
+        edges, lines = proto.cmd2dom(self.cmd)
+        g = Dom()
+        g._edges = {g.uid: edges}
+        g._names = lines
+        return g
+
+
+# TODO: encapsulate each dict of "Dom" into vector "Attribute"
+#   => then keep them in C++ but drop in python (as all objects are dicts anyways)
+class Attribute(object):
+    pass
+
+
 # NOTE: even Dom must encapsulate all access to elements
 #   => so it could sync with fs immediately on demand in blocking ops
+# BAD:(flat model): force generators caching => repeats
+#   * force caching == traverse all nodes and replace edges=None by gen lists
+#   * BUT: after replacing it will be inserted back into original *dom*
+#   * BAD: recursive process => each time walks through already generated nodes
 class Dom(object):
     def __init__(self):
-        self.uid = uuid.uuid4()
+        # Wrap uuid into simple "Node" class to hide impl
+        #   ALSO: default ctor gens new uuid ALT=(from uuid import uuid4 as Node)
+        self.uid = uuid.uuid4()  # ENH:TEMP: using .uid means all *dom* are tree
         self._edges = {}
+        self._providers = {}
         # BAD: nodes may have different names depending on location
         #   E.G. instead of hiding -- use name '..' for parent node in each dir
         #   ?? add dicts per node for local names -- as they are viewed ??
         #     << each node may have its own conception/names about all other nodes
+        #     IMPL: self._alias = {uid: {uid: alias, ...}}
         self._names = {}
-        self._shellcommands = {}
-        flat_tree(self._edges, self.uid, 2)
-
-        # TRY
-        self._shnode('ls -l')
 
         # TEMP: insert individual transformations
         #   BET:RFC: allow shared/inherited transf between multiple w/o explicit assign
-        transf = Transformation()
-        self._transfs = {e: transf for e in self}
+        # transf = Transformation()
+        # self._transfs = {e: transf for e in self}
+        self._transfs = {}
 
-    # FIXME: allow multiple parents at once
-    def _shnode(self, cmd, parent=None):
-        if parent is None:
-            parent = self.uid
-        node = uuid.uuid4()
-        self._edges[node] = None            # accumulate results into virt node
-        self._edges[parent].add(node)       # connect to root node
-        self._shellcommands[node] = cmd     # name for virtual node itself
+    # NOTE: allowed unlinked graphs => cursor directly jumps to uid
+    #   BAD: listing all separate unlinked graphs is impossibly slow operation
+    #     (need to traverse whole graph and trace all edges)
+    #   ~~ cursor must somehow know uids of those separate graphs
+    def insert(self, g, conn):
+        assert isinstance(g, self.__class__)
+        assert conn
+        for attr in vars(g).keys():
+            if not attr.startswith('_') or attr.startswith('__'):
+                continue
+            vals = getattr(g, attr)
+            # if not callable(vals) and isinstance(vals, dict):
+            getattr(self, attr).update(vals)
+        if isinstance(conn, tuple):
+            conn = [conn]
+        for fs, ts in conn:
+            if not isinstance(fs, Iterable):
+                fs = [fs]
+            if not isinstance(ts, Iterable):
+                ts = [ts]
+            for f, t in itertools.product(fs, ts):
+                self._edges[f].add(t)
+                self._edges[t].add(f)
+
+    def add_node(self, *, node=None, edges=None):
+        if node is None:
+            node = uuid.uuid4()  # CHG= Node()
+        # always add at least empty virt node
+        self._edges[node] = edges or set()  # TEMP:FIXED: empty multichoice per node
+        return node
+
+    def conn_node(self, node, parents):
+        assert node
+        # assert parents
+        # if parents is None:
+        #     return
+        # if not isinstance(parents, collections.Iterable):
+        #     parents = [parents]
+        for p in parents:
+            self._edges[p].add(node)  # silently ignore adding same node
+
+    # NOTE: this func is actually provider and *dom* is immediate cache of everything
+    #   => on demand -- provide already cached value or query/rebuild it (and store to history)
+    def update_node(self, *, node=None, edges=None, name=None, cmd=None, parents=None):
+        if parents is not None and not isinstance(parents, Iterable):
+            parents = [parents]
+        node = self.add_node(node=node, edges=edges)
+        # TEMP:FIXME?XXX insert parent to edges
+        if edges is not None and parents:
+            self._edges[node].update(parents)
+
+        # name for virtual node itself
+        if name is None and cmd is not None:
+            name = cmd
+        if name is not None:
+            self._names[node] = name
+        if cmd is not None:
+            self._providers[node] = ShellProvider(cmd)
+        # connect to root node ATT: last cmd
+        self.conn_node(node, parents)
+        return node
 
     def _shexec(self, node):
         # TEMP: only names metainfo subsystem
         # TEMP: combine nodes with cmd results
         # TODO: self._cmds => to execute cmd on-demand when opening cmd
         #   => then impl cmd caching to re-execute it only on <Enter> and use cache by default
-        #   !5 [_] IDEA: seize ideas from Unite.vim -- to combine lists with commands
         #   NEED: single point api to access edges of node
         edges, lines = proto.cmd2dom(self._shellcommands[node], parent=self.uid)
         self._edges[node] = edges           # cache cmd results
         self._edges[node].add(self.uid)     # insert parent to edges
-        self._names.update(lines)
+        self._names.update(lines)  # XXX how to combine with add_node() ?
         return edges
 
     def __len__(self):
@@ -124,22 +212,27 @@ class Dom(object):
 
     # TRY: depending on kw 'real=True' choose from several impl dicts
     #   THINK: copy edges for read-only access
-    def edgesof(self, uid, dfl=None):
-        if dfl is not None and uid not in self:
+    def edgesof(self, node, dfl=None):
+        if dfl is not None and node not in self:
             return dfl
-        edges = self._edges[uid]
         # TEMP: evaluate shellcommand each time
         #   => BUG: cursor looses position, keeping pointing to nonexistent edge
-        if uid in self._shellcommands and edges is None:
-            edges = self._shexec(uid)
-        transf = self._transfs.get(uid)
-        return edges if transf is None else transf(edges)
+        edges = self._edges[node]
+        # FIXME: reexec cmd only on '<l>' => MOVE sep function
+        # CHG currently caches only if multichoice empty NEED exec if never exec
+        if not edges and node in self._providers:
+            g = self._providers[node]()
+            self.insert(g, conn=(node, g.uid))
+            _log.info(edges)
+        if edges:
+            transf = self._transfs.get(node)
+            return edges if transf is None else transf(edges)
 
-    def nameof(self, uid):
-        for ns in [self._names, self._shellcommands]:
-            if uid in ns:
-                return str(ns[uid])
-        return str(uid)
+    def nameof(self, node):
+        for ns in [self._names]:
+            if node in ns:
+                return str(ns[node])
+        return str(node)
 
 
 # NOTE: all inc ops add funcs to transf chain
@@ -149,8 +242,8 @@ class Transformation(object):
         self.chain = [sorted, reversed, list]  # , lambda o: o[4:]
 
     def __call__(self, obj):
-        for c in self.chain:
-            obj = c(obj)
+        for f in self.chain:
+            obj = f(obj)
         return obj
 
 
@@ -174,6 +267,12 @@ class Proxy(object):
     # TEMP:(assume list):
     def data(self):
         return {p: self.transf(edges) for p, edges in self._dom.data().items()}
+
+
+# NOTE: containedin cursor to tweak traversing strategy
+#   ALSO: deterministic jump over multichoice
+class Strategy(object):
+    pass
 
 
 # IDEA: filter-out (un)visited nodes in current dir
@@ -219,9 +318,10 @@ class Cursor(object):
 
     @property
     def edges(self):
-        if not self.path:
-            return self._dom.edgesof(self.node)
-        return [e for e in self._dom.edgesof(self.node) if e != self.path[-1]]
+        edges = list(self._dom.edgesof(self.node))
+        if not edges or not self.path:
+            return edges
+        return [e for e in edges if e != self.path[-1]]
 
     @property
     def current(self):
