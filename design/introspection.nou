@@ -25,6 +25,9 @@ Inner struct to navigate through virtual graphs
     labels / buttons / switches / sliders
   layout as tree
     change order, widgets sizes, colors, etc
+  comment
+    USE: per each cmdline leave what it does in human-readable words
+    ++ comment can be used in Unite-like searching => E.G. in oneliners cheatsheet
 
 
 Multichoice
@@ -57,3 +60,12 @@ History
             => NEED copy-on-write for this type of sharing
   Independent history nodes
     HACK: diff edges between history nodes => to ascertain changes
+  WARN: other nodes continue to point into old edges
+    * NEED: port xrefs to new edges (MAYBE together with xrefs)
+      + if node was deleted => keep xref pointing to old edges
+    * NEED: keep brefs to node to update xrefs in all related nodes on node delete
+
+
+!5 [_] IDEA: seize ideas from Unite.vim
+  [_] combine lists with commands
+  [_] fast filtering uix

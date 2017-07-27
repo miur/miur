@@ -33,6 +33,9 @@ cmd list
     may reuse generalized parsers E.G. parse lines
     OR specialized E.G. ag --vimgrep
   <Enter> -> execute cmdline -> show results in next pane
+  store cmd in flat node attrs (multichoice)
+    for file => show only inside multichoice
+    for dir => show as flat list both cmds and dir content
 
 
 vim embedded in layout

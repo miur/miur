@@ -100,3 +100,17 @@ NOTE: single node may point to multiple (virtual) views simultaneously
   BUT: you can move cursor only to single variant structure
     ? there is no menu to choose OR provide diff keybindings ?
       = default view (Cursor), preview for each variant, list menu to choose
+
+
+!!! [_] DECIDE dict of flats or flat of Nodes ?
+  dict of flats
+    -- two steps to filter by one feature but yield another
+    -- multiple steps to filter by multiple features
+    ?? easy to add new subsystems
+    ++ more granular encapsulated access to individual attributes of nodes
+    ~~ each multichoice IMPL
+      ~~ flat list of blended history, commands, etc
+        => store nodes in _types = {}
+        => show certain category by filtering by _types
+        BUT: how to distinguish last 'edges' from everything else when rendering ?
+      -- nested list => predefined nodes => must be distributed by names (too slow)
