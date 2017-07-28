@@ -538,6 +538,12 @@ class BoxLayout(object):
 #   + cache data
 #   * multiple independent windows => TabbedLayout
 #     => usable even for replacing single widget in-place by any other layout
+# IDEA: bake scene in graph and add to root nodes to actually view in *miur*
+#   => format for intermediate lang is the same as *dom*
+#   http://baikalweb.jinr.ru/doc/cern_doc/asdoc/gks_html3/node6.html
+#   CHECK: you can't view scene graph realtime => recursion
+#   BUT: all node attributes must be encapsulated in single grapheme ?
+#       => convert horiz/vert *dom* impl
 class Scene(object):
     def __init__(self, layout, focus):
         self._layout = layout
