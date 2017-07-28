@@ -28,6 +28,15 @@ Inner struct to navigate through virtual graphs
   comment
     USE: per each cmdline leave what it does in human-readable words
     ++ comment can be used in Unite-like searching => E.G. in oneliners cheatsheet
+  deleted files
+    don't delete files immediately -- only mark them deleted and hide -- as in mutt
+      == 'deletion selection'
+      * hiding is necessary => for mental perception and refocusing
+    show list of deleted edges per node or total combined graph
+    actually delete only on user explicit command, ask to delete on change curr dir or *miur* exit
+      prompt with 'deletion selection' to review changes
+    after batch deletion => keep old (removed) list in history
+      replace current cursor by new empty selection
 
 
 Multichoice

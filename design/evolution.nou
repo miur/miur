@@ -1,0 +1,47 @@
+% Evolution
+WTF: how to describe arch evolution steps for inc impl ?
+  proxy -> view
+  widget -> ncurses
+    + window == widgets list + layout (horizontal, vertical, grid, etc)
+    + nested windows
+    + tabs
+  TRY: strict composition first
+    => RFC to general lazy accessor
+
+
+% Motivation order
+Configs
+  NEED: *
+  << options == ambivalent decisions -> more then one value
+Dom
+  NEED: primitive widget and cursor
+  << diff data types and ops
+Plugins :: ag, nvim, ...
+  NEED: commands and providers
+  << extract pure compact core
+  SEE: weechat plugins system
+  NOTE: place ./<plugin>.cfg with loading conditions to register lazy loading
+    => otherwise load immediately on startup
+Widgets
+  << simultaneous data viewing
+Layouts
+  << layouts == preffered views per task
+Modes == per single widget
+  VIZ.
+    insert/delete edge/node
+    select (visual)
+    edit :: rename, modify attrs
+    ...
+Tasks
+  NEED: layout + keymap + modes
+  << optimizing routine repeatable tasks
+  VIZ.
+   * file sorting/moving
+   * dirs investigation
+   * programming / project sources manipulation
+   ...
+FrontEnds (Input/Output) :: ncurses, slang, termbox, qt, gtk, opengl, pipe
+  NEED: navigation + commands
+  << when I want to learn particular frontent
+  << new ideas for representation (opengl/SDL2) >> NEED cursor for layout panning == camera
+  << polish arch by generalizing concepts between gui

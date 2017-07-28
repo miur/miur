@@ -365,14 +365,3 @@ BUT:
     ?? maybe, this structure isn't hierarchical but composable ??
       NOT: cursor is completely dependent on underlying cache DOM
         ? BUT:MAYBE: sync cursors between DOM ?
-
-
-% Evolution
-WTF: how to describe arch evolution steps for inc impl ?
-  proxy -> view
-  widget -> ncurses
-    + window == widgets list + layout (horizontal, vertical, grid, etc)
-    + nested windows
-    + tabs
-  TRY: strict composition first
-    => RFC to general lazy accessor
