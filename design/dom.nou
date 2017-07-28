@@ -59,6 +59,8 @@ Identifiers:
       https://eager.io/blog/how-long-does-an-id-need-to-be/
     WARN:(collisions): https://softwareengineering.stackexchange.com/a/299338
       ? ignore it => you need to generate 2^61 entries for any significant probability of collision
+        !!! https://github.com/ramsey/uuid/issues/80
+          => CRIT: bugged uuid impl may generate too many collisions
       https://blogs.msdn.microsoft.com/oldnewthing/20160114-00/?p=92851
         uuid1 > uuid4 ERR:(hardware): may generate identical uuid
       BUG! if collision => you will apply ops to wrong file and overwrite valid one
