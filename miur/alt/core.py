@@ -1,3 +1,4 @@
+import os
 import uuid
 import random
 import curses
@@ -34,12 +35,13 @@ keymap = {
 def run(argv):
     dom = Dom(name='root')
     fs = TestGraphProvider()()
-    dom.insert(fs, conn=(dom.uid, fs.uid))
-    dom.update_node(cmd='ls -l', parents=dom.uid)
+    dom.insert(fs, conn=(dom.roots(), fs.roots()))
+    dom.update_node(cmd='ls -l', parents=dom.roots())
+    dom.update_node(name='inc', provider=IncrementalProvider('/'), parents=dom.roots())
 
     # proxy = Proxy(dom)
     # _log.info(proxy)
-    cursor = Cursor(dom, dom.uid)
+    cursor = Cursor(dom, dom.roots())
     view = View(cursor)
     widget = Widget(dom, view)
     layout = BoxLayout([widget])
@@ -75,7 +77,7 @@ def flat_tree(dom, parent, n=0):
 class TestGraphProvider(object):
     def __call__(self):
         dom = Dom(name='test')
-        flat_tree(dom._edges, dom.uid, 2)
+        flat_tree(dom._edges, dom.roots(), 2)
         _log.info(dom)
         return dom
 
@@ -97,11 +99,30 @@ class ShellProvider(object):
         edges, lines = proto.cmd2dom(self.cmd)
         # WTF: how to generate Dom effectively ?
         g = Dom()
-        g._edges = {g.uid: edges}
+        g._edges = {g.roots(): edges}
         g._names = lines
         # datetime.datetime.utcfromtimestamp(timestamp).strftime("%A, %d. %B %Y %I:%M%p")
         # ALT: time.time() == datetime.datetime.utcnow().timestamp()
-        g._names[g.uid] = 'edges ' + str(datetime.datetime.now())
+        g._names[g.roots()] = 'edges ' + str(datetime.datetime.now())
+        return g
+
+
+class IncrementalProvider(object):
+    def __init__(self, path):
+        self.path = path
+        _log.info(path)
+
+    def __call__(self):
+        pwd, dirs, files = next(os.walk(self.path), (None, [], []))
+        results = {uuid.uuid4(): e for e in itertools.chain(dirs, files)}
+        g = Dom()
+        g._edges = {g.roots(): set(results.keys())}
+        g._names = results
+        g._providers = {k: IncrementalProvider(pwd + '/' + v)
+                        for k, v in results.items()}
+
+        g._names[g.roots()] = 'exec dir ' + str(datetime.datetime.now())
+        # g._providers[g.roots()] = self
         return g
 
 
@@ -125,10 +146,11 @@ class Dom(object):
         #     ALT: treat {Node == uid} for abstract graph and use some other obj
         #     name for all node attrs -- like "Desc/Cell/Object/NodeProxy/Avatar"
         #     * embed accessors attr(dom, uid) as properties OR preeval values
+        # BUG: can't name ._uid because of merging doms in .insert()
         self.uid = uuid.uuid4()  # ENH:TEMP: using .uid means all *dom* are tree
         self._edges = {}
         # HACK: add itself => because "Dom" is "Node" itself
-        self._edges[self.uid] = set()
+        self._edges[self.roots()] = set()
         self._providers = {}
         # BAD: nodes may have different names depending on location
         #   E.G. instead of hiding -- use name '..' for parent node in each dir
@@ -138,13 +160,18 @@ class Dom(object):
         #     ALT:ALG: name = cursor==node ? '..' : dom.nameof(node)
         self._names = {}
         if name is not None:
-            self._names[self.uid] = name
+            self._names[self.roots()] = name
 
         # TEMP: insert individual transformations
         #   BET:RFC: allow shared/inherited transf between multiple w/o explicit assign
         # transf = Transformation()
         # self._transfs = {e: transf for e in self}
         self._transfs = {}
+
+    # TEMP: return list of special points of graph
+    #   :: tree => root, cyclic_graph => node[0], empty => None
+    def roots(self):
+        return self.uid
 
     # NOTE: allowed unlinked graphs => cursor directly jumps to uid
     #   BAD: listing all separate unlinked graphs is impossibly slow operation
@@ -193,7 +220,7 @@ class Dom(object):
 
     # NOTE: this func is actually provider and *dom* is immediate cache of everything
     #   => on demand -- provide already cached value or query/rebuild it (and store to history)
-    def update_node(self, *, node=None, edges=None, name=None, cmd=None, parents=None):
+    def update_node(self, *, node=None, edges=None, name=None, cmd=None, provider=None, parents=None):
         if parents is not None and not isinstance(parents, Iterable):
             parents = [parents]
         node = self.add_node(node=node, edges=edges)
@@ -208,6 +235,8 @@ class Dom(object):
             self._names[node] = name
         if cmd is not None:
             self._providers[node] = ShellProvider(cmd)
+        elif provider is not None:
+            self._providers[node] = provider
         # connect to root node ATT: last cmd
         self.conn_node(node, parents)
         return node
@@ -236,7 +265,7 @@ class Dom(object):
 
     def regenerate(self, node):
         g = self._providers[node]()
-        self.insert(g, conn=(node, g.uid))
+        self.insert(g, conn=(node, g.roots()))
         _log.info(g)
 
     # TRY: depending on kw 'real=True' choose from several impl dicts
@@ -253,7 +282,7 @@ class Dom(object):
             self.regenerate(node)
         if edges:
             # transf = self._transfs.get(node)
-            transf = Transformation()
+            transf = Transformation(self)
             return edges if transf is None else transf(edges)
 
     def nameof(self, node):
@@ -265,9 +294,10 @@ class Dom(object):
 
 # NOTE: all inc ops add funcs to transf chain
 class Transformation(object):
-    def __init__(self):
+    def __init__(self, dom):
         # BAD: for sorting by name you need access to Dom.nameof() ALSO slow
-        self.chain = [sorted]  # , reversed, list, lambda o: o[4:]
+        sort = (lambda a: sorted(a, key=lambda x: dom.nameof(x)))  # TEMP:RFC
+        self.chain = [sort]  # , reversed, list, lambda o: o[4:]
 
     def __call__(self, obj):
         for f in self.chain:
