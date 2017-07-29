@@ -83,6 +83,17 @@ Identifiers:
         * store original/orthogonal/important data
         * generate derivative data structs only on demand
 
+  ALT: id from monotonous counter for session <<< (because uuid isn't unique anyways)
+    IF: ro- graph with history => counter only grows => nodes keys never deleted (only values)
+      * effective direct memory access by index
+          vector[id] = pointer to attribute data
+      ~ deleting old cached node by removing pointer value
+          vector[id] = nullptr
+        BUT:BAD: memory cell will never become really freed
+          ?? not much memory lost: 8 MB per million nodes on x64
+          ??? [_] TEST how long it will take to generate million nodes by normal workflow ???
+    NOTE: even TESIV uses 32b vals per world as uids
+
 
 ALSO: G: urn -- Uniform Resource Name
   https://ru.wikipedia.org/wiki/URN
