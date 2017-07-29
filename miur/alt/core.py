@@ -78,7 +78,7 @@ class TestGraphProvider(object):
     def __call__(self):
         dom = Dom(name='test')
         flat_tree(dom._edges, dom.roots(), 2)
-        _log.info(dom)
+        # _log.info(dom)
         return dom
 
 
@@ -112,14 +112,22 @@ class IncrementalProvider(object):
         self.path = path
         _log.info(path)
 
+    def __str__(self):
+        return 'P[{}]'.format(self.path)
+
     def __call__(self):
         pwd, dirs, files = next(os.walk(self.path), (None, [], []))
-        results = {uuid.uuid4(): e for e in itertools.chain(dirs, files)}
+        dirs = {uuid.uuid4(): e for e in dirs}
+        files = {uuid.uuid4(): e for e in files}
         g = Dom()
-        g._edges = {g.roots(): set(results.keys())}
-        g._names = results
+        g._names = dict(itertools.chain(dirs.items(), files.items()))
+        g._edges = {g.roots(): set(g._names.keys())}
+        # HACK: insert dirs as lazy nodes => to trigger 'regenerate' in dom on access
+        #   ATT:TEMP: use 'set()' instead of 'None' for .connect() to work correctly
+        g._edges.update({k: set() for k in dirs})
         g._providers = {k: IncrementalProvider(pwd + '/' + v)
-                        for k, v in results.items()}
+                        for k, v in g._names.items()}
+        # _log.debug('\n'.join('{!s}: {!s}'.format(k, v) for k, v in g._providers.items()))
 
         g._names[g.roots()] = 'exec dir ' + str(datetime.datetime.now())
         # g._providers[g.roots()] = self
@@ -198,6 +206,7 @@ class Dom(object):
             if not isinstance(ts, Iterable):
                 ts = [ts]
             for f, t in itertools.product(fs, ts):
+                _log.debug('{} <=> {}'.format(f, t))
                 self._edges[f].add(t)
                 self._edges[t].add(f)
 
@@ -276,10 +285,12 @@ class Dom(object):
         # TEMP: evaluate shellcommand each time
         #   => BUG: cursor looses position, keeping pointing to nonexistent edge
         edges = self._edges[node]
+        # _log.critical('{} ::: {}'.format(node, len(edges)))
         # FIXME: reexec cmd only on '<Enter>' => MOVE sep function
         # CHG currently caches only if multichoice empty NEED exec if never exec
         if not edges and node in self._providers:
             self.regenerate(node)
+            # edges = self._edges[node]
         if edges:
             # transf = self._transfs.get(node)
             transf = Transformation(self)
@@ -421,6 +432,7 @@ class Cursor(object):
         if node in self.path_set:
             return  # cycle in-place
         if node not in self._dom:
+            _log.debug('Leaf node (end) :: {}'.format(node))
             return  # invalid node / leaf
         self.move_forward(node)
 
@@ -486,7 +498,7 @@ class Widget(object):
     #     -- frontends may prefer different order of drawing
     def graphemes(self, h, w):
         x, y = 0, 2
-        data = self._view.data(h-x, w-y)
+        data = self._view.data(h-y, w-x)
         edges = list(data['edges'])
         curs = self._view.cursor.current
         status = '{:d}: {:2d}/{:02d} | {} | {:d}kiB'.format(
@@ -514,12 +526,12 @@ class BoxLayout(object):
         x, y = 2, 1  # margin / padding
         h, w = h-y, w-x
         n = len(self._widgets)
-        _log.debug([x, y, h, w, n])
+        # _log.debug([x, y, h, w, n])
         ww = (w // n) if self._direc == 0 else w
         wh = (h // n) if self._direc == 1 else h
         wx = (w * i // n) if self._direc == 0 else 0
         wy = (h * i // n) if self._direc == 1 else 0
-        _log.debug([wx, wy, wh, ww])
+        # _log.debug([wx, wy, wh, ww])
         assert wh > 0 and ww > 0
         return x + wx, y + wy, wh, ww
 
@@ -635,6 +647,7 @@ class NcursesInput(object):
                 send_event('redraw_all_now', state)
 
             state['input'].dispatch(cmd)
+            _log.debug('current :: {}'.format(self._cursor.current))
             send_event('redraw', state)
 
 
