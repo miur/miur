@@ -37,6 +37,24 @@ Inner struct to navigate through virtual graphs
       prompt with 'deletion selection' to review changes
     after batch deletion => keep old (removed) list in history
       replace current cursor by new empty selection
+  attributes
+    keymap for inner structure of node in *dom*
+      E.G. edges, name, mtime, xattr, etc
+    +++ history even for attributes
+      => only uid is invariant => binded to path/content/mtime(gencmd)
+    +++ all attrs are 1st order objects
+      => xrefs are allowed between any type of nodes
+        ??? is there usecase ???
+        * partial update of node -- if only single attr was changed
+        * ref to certain attr -- jump directly into inner repr of file
+          BET:NEED: key-value repr in graph
+            ??? global flat map of all possible node types ???
+              => so I could use {key_name = str(node.type)}
+    [_] TRY: no need for separate named dicts in *dom*
+      [_] BUT!!! how to distinguish attributes from edges ?
+        ??? global flat map of types ???
+        NEED: id to access certain
+      [_] how to query name/etc of certain node ?
 
 
 Multichoice
