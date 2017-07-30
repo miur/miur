@@ -1,0 +1,44 @@
+History
+
+  Blend history in graph itself
+    * ro graph => disable changes in nodes itself => stores all graph's past history
+        => discard too old cached states when cache size exceeded
+        HACK track list of discarded uids to notify user about obsolete access
+    * ALSO store changes in real fs graph as similar history
+        ? USE when external change to fs ?
+        => however, 'undo history' will be more effective and less space-consuming
+        ALT: use incremental history and reconstruct virtual nodes on demand
+    * edges -- is only a history cursor for whole graph
+        => I.E. bunch of per node history cursors
+    * share nodes between similar histories to reduce space consumption
+        => ref count before deleting
+        ? when generating node with same content => return same node
+            => NEED copy-on-write for this type of sharing
+
+  Independent history nodes
+    HACK: diff edges between history nodes => to ascertain changes
+  WARN: other nodes continue to point into old edges
+    * NEED: port xrefs to new edges (MAYBE together with xrefs)
+      + if node was deleted => keep xref pointing to old edges
+    * NEED: keep brefs to node to update xrefs in all related nodes on node delete
+
+  THINK: history per attr instead of total history for whole dict
+    => NEED generalized history to connect to groups or individ objs as you wish
+    !! NEED free convert between simple dict and graph repr
+    IDEA: even whole content of node (all edges,cmds,attrs,etc) can be placed under history
+      == hist of changes of node itself
+      ? [_] TRY: history of subpart of node -- picked subset of cmds/attrs under sep hist
+
+  history as sep node in subsystem
+    type == history --> jump to one of nodes in "List"
+      .type == history
+      _history = {node: [nodes..]}
+    otherwise --> node is immanent itself
+    !_ "history" is extension of any node
+      node with type "History" === proxy to actual node
+    NEED: deque :: bidirectional iter, direct access to beg/end
+      * add new nodes to end -- works as stack
+      * remove old nodes from beg -- works as fifo
+      ALT:(super flat): sort hist nodes by timestamp and delete oldest one
+      BUT at the same time each hist point must have uid to refer old
+        ? OrderedDict => to remove item from front/back ?

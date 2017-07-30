@@ -365,3 +365,8 @@ BUT:
     ?? maybe, this structure isn't hierarchical but composable ??
       NOT: cursor is completely dependent on underlying cache DOM
         ? BUT:MAYBE: sync cursors between DOM ?
+
+IDEA: filtered view of node attrs
+  * only latest nodes of each kind (relative to history)
+    * only choosen subset of nodes for peculiar user-friendly view
+  * only single kind of node with whole history
