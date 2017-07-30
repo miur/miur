@@ -477,7 +477,9 @@ class Cursor(object):
 
     @property
     def current(self):
-        return self.edges[self._index]
+        if self._index is not None:
+            # BUG: exception on empty dir << _index=None
+            return self.edges[self._index]
 
     def focus_node_next(self):
         if self._index is not None and self.edges is not None:
@@ -578,9 +580,9 @@ class Widget(object):
         data = self._view.data(h-y, w-x)
         edges = list(data['edges'])
         curs = self._view.cursor.current
+        idx = 1 + (self._view.cursor._index or -1)
         status = '{:d}: {:2d}/{:02d} | {} | {:d}kiB'.format(
-            1 + len(self._view.cursor.path),
-            1 + self._view.cursor._index,
+            1 + len(self._view.cursor.path), idx,
             len(edges), self._view.cursor.node, proto.meminfo()//1024)
         yield Grapheme('Cursor', status, x=0, y=0, depth=0)
         for i, e in enumerate(edges):
