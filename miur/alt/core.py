@@ -13,6 +13,7 @@ from . import trace, proto
 _log = logging.getLogger(__name__.split('.', 2)[1])
 _memprof = open('/tmp/miur-memory.log', 'w+')
 
+# TODO:(Lisp-style): supply cmd with args as tuple ('name', arg1, ...)
 keymap = {
     'j': 'focus_node_next',
     'k': 'focus_node_prev',
@@ -146,6 +147,9 @@ class Edges(object):
     def __contains__(self, item):
         return item in self._container
 
+    def __len__(self):
+        return len(self._container)
+
     def __iter__(self):
         return iter(self._container)
 
@@ -185,6 +189,8 @@ class Dom(object):
         #     * embed accessors attr(dom, uid) as properties OR preeval values
         # BUG: can't name ._uid because of merging doms in .insert()
         self.uid = uuid.uuid4()  # ENH:TEMP: using .uid means all *dom* are tree
+        # FIXME:ADD:(self._uids): leaf nodes don't have edges at all
+        #   << BUT I need single place of truth for 'uid in dom' and gen new 'uid'
         self._edges = {}
         # HACK: add itself => because "Dom" is "Node" itself
         self._edges[self.roots()] = Edges()
@@ -298,9 +304,9 @@ class Dom(object):
         return '\n'.join(str(uid) for uid in self)
 
     # SECU: only allowed attrs
-    def metainfo(self, meta):
-        if meta in ['edges', 'names', 'transfs']:
-            return getattr(self, '_' + meta, None)
+    # def metainfo(self, meta):
+    #     if meta in ['edges', 'names', 'transfs']:
+    #         return getattr(self, '_' + meta, None)
 
     def regenerate(self, uid):
         g = self._providers[uid]()
@@ -330,6 +336,22 @@ class Dom(object):
                 # edges = self._edges[uid]
         return edges
 
+    # TEMP:CHG: returns single possible view per node (BAD)
+    def viewof(self, uid):
+        try:
+            view = self.node_byattr(uid, 'view')
+        except KeyError:
+            edges = self.edgesof(uid)
+            transf = Transformation(self)  # self._transfs.get(uid)
+            view_uid = uuid.uuid4()
+            # NOTE: 'view' is ordered list
+            view = list(transf(edges) if transf else edges)
+            self._types[view_uid] = 'view'
+            self._edges[view_uid] = view
+            self._edges[view_uid].append(uid)
+            self._edges[uid].add(view_uid)
+        return view
+
     def nameof(self, uid):
         for ns in [self._names]:
             if uid in ns:
@@ -349,6 +371,7 @@ class Transformation(object):
     def __init__(self, dom):
         # BAD: for sorting by name you need access to Dom.nameof() ALSO slow
         sort = (lambda a: sorted(a, key=lambda x: dom.nameof(x)))  # TEMP:RFC
+        # sort = (lambda a: sorted(a, key=lambda x: x.name))  # ALT for NodeProxy
         self.chain = [sort]  # , reversed, list, lambda o: o[4:]
 
     def __call__(self, obj):
@@ -358,6 +381,8 @@ class Transformation(object):
 
 
 # NOTE: abstract cached lazy accessor to node attrs
+#   => _only_ for gathering all attrs together in horiz/vert model
+#   !! NOT for sorting/trimming
 # ALT:DEV: direct access to underlying data by Dom.attrof(self, node, attr)
 # USE: invalidate() on event "node in dom has changed"
 class NodeProxy(object):
@@ -374,17 +399,19 @@ class NodeProxy(object):
 
     @proto.cached_property
     def edges(self):
-        _log.debug('regen')
-        # FIXME: replace by access to name prop in Transformation
-        # BAD: two cursors may require different sortings in View
-        #   ??? WTF: where and when to apply transf ?
-        transf = Transformation(self._dom)
-        return list(transf(self._dom.edgesof(self._uid)))
+        _log.debug('gen edges')
+        return self._dom.edgesof(self._uid)
+
+    # TEMP:CHG: caches single possible view per node (BAD)
+    #   NEED: supply external Transformation and store results it as new node
+    #   with ref in types to this supplied Transformation to gen peculiar view
+    @proto.cached_property
+    def view(self):
+        return self._dom.viewof(self._uid)
 
 
-# UNUSED:
-# RFC: .edges required very often => cache results inside proxy
-#   << dom.edgesof() requires too much func calls
+# RFC: .edges required very often => cache results directly inside proxy
+#   << otherwise chain of nested dom.edgesof() requires too much func calls
 # rename => View / DomAccessor
 # VIZ. DataProxy, ListProxy, MatrixProxy, ScalarProxy, DictProxy, TableProxy, RawProxy, ImageProxy
 # ??? DEV Proxy per Node OR general one (NEED: ProxyNode anyways) ?
@@ -402,12 +429,20 @@ class DomProxy(object):
         return '\n'.join(str(i) for i in sorted(self.data()))
 
     def __contains__(self, uid):
+        # if isinstance(uid, NodeProxy):
+        #     uid = uid.uid
         return uid in self._dom
 
     def __getitem__(self, uid):
         if uid not in self._nodescache:
             self._nodescache[uid] = NodeProxy(self._dom, uid)
         return self._nodescache[uid]
+
+    # USAGE: list(dom.asnodes(dom[uid].edges))
+    # OR: return list(transf(NodeProxy(self._dom, e) for e in self._dom.edgesof(self._uid)))
+    # def asnodes(self, uids):
+    #     for uid in uids:
+    #         yield NodeProxy(self._dom, uid)
 
     # TEMP:REM: intermediate accessor
     def regenerate(self, uid):
@@ -445,6 +480,7 @@ class Cursor(object):
         self.pos_path = []      # store parent positions for backward (loops in path)
         self.pos_visited = {}   # store last positions for forward
         self.move_forward(init_node)
+        self.view_visited = {}  # points to view used by this Cursor
 
     def move_forward(self, uid):
         if self.cur_node is not None:
@@ -473,6 +509,9 @@ class Cursor(object):
         if not edges or not self.path:
             return edges
         # NOTE: additional Transformation for Cursor
+        # BAD: slow filtering on each access
+        #   BUT: can't cache as view in *dom*
+        #     => if multiple cursor walked here from multiple links
         return [e for e in edges if e != self.path[-1]]
 
     @property
