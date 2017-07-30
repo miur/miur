@@ -51,3 +51,8 @@ vim embedded in layout
 
 
 mpd controls
+
+
+git / hg
+  * list 'git status' as flat/nested graph to nodes --> for immitent edit
+  * provide hunks as inner repr of file --> direct jump to hunk
