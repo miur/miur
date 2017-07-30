@@ -39,11 +39,10 @@ def run(argv):
     dom.update_node(cmd='ls -l', parents=dom.roots())
     dom.update_node(name='inc', provider=IncrementalProvider('/'), parents=dom.roots())
 
-    # proxy = Proxy(dom)
-    # _log.info(proxy)
-    cursor = Cursor(dom, dom.roots())
+    proxy = DomProxy(dom)
+    cursor = Cursor(proxy, dom.roots())
     view = View(cursor)
-    widget = Widget(dom, view)
+    widget = Widget(proxy, view)
     layout = BoxLayout([widget])
     scene = Scene(layout, None)
 
@@ -113,7 +112,7 @@ class ShellProvider(object):
 class IncrementalProvider(object):
     def __init__(self, path):
         self.path = path
-        _log.info(path)
+        # _log.info(path)
 
     def __str__(self):
         return 'P[{}]'.format(self.path)
@@ -306,10 +305,12 @@ class Dom(object):
     def regenerate(self, node):
         g = self._providers[node]()
         self.insert(g, conn=(node, g.roots()))
-        _log.info(g)
+        # _log.info(g)
 
     # TRY: depending on kw 'real=True' choose from several impl dicts
     #   THINK: copy edges for read-only access
+    # WARN: keep this method => regeneration must be inside Dom NOT Proxy
+    #   DEV: combine methods to attrof(uid, attr)
     def edgesof(self, node, dfl=None):
         if dfl is not None and node not in self:
             return dfl
@@ -359,6 +360,31 @@ class Transformation(object):
         return obj
 
 
+# NOTE: abstract cached lazy accessor to node attrs
+# ALT:DEV: direct access to underlying data by Dom.attrof(self, node, attr)
+# USE: invalidate() on event "node in dom has changed"
+class NodeProxy(object):
+    def __init__(self, dom, uid):
+        self._dom = dom
+        self._uid = uid
+
+    def invalidate(self):
+        del self.edges  # mark edges to be reevaled on next access
+
+    @proto.cached_property
+    def name(self):
+        return self._dom.nameof(self._uid)
+
+    @proto.cached_property
+    def edges(self):
+        _log.debug('regen')
+        # FIXME: replace by access to name prop in Transformation
+        # BAD: two cursors may require different sortings in View
+        #   ??? WTF: where and when to apply transf ?
+        transf = Transformation(self._dom)
+        return list(transf(self._dom.edgesof(self._uid)))
+
+
 # UNUSED:
 # RFC: .edges required very often => cache results inside proxy
 #   << dom.edgesof() requires too much func calls
@@ -370,17 +396,25 @@ class Transformation(object):
 # NEED: inherit same interface as "Dom" for transparent access
 # BAD: too much call levels => BAD: meaningless slow data-driven development arch
 #   E.G. nesting / overriding __iter__
-class Proxy(object):
+class DomProxy(object):
     def __init__(self, dom):
         self._dom = dom
-        self.transf = Transformation()
+        self._nodescache = {}  # TEMP:ENH: generalize caching BAD: never freed
 
     def __str__(self):
         return '\n'.join(str(i) for i in sorted(self.data()))
 
-    # TEMP:(assume list):
-    def data(self):
-        return {p: self.transf(edges) for p, edges in self._dom.data().items()}
+    def __contains__(self, uid):
+        return uid in self._dom
+
+    def __getitem__(self, uid):
+        if uid not in self._nodescache:
+            self._nodescache[uid] = NodeProxy(self._dom, uid)
+        return self._nodescache[uid]
+
+    # TEMP:REM: intermediate accessor
+    def regenerate(self, uid):
+        return self._dom.regenerate(uid)
 
 
 # NOTE: containedin cursor to tweak traversing strategy
@@ -436,7 +470,7 @@ class Cursor(object):
 
     @property
     def edges(self):
-        edges = list(self._dom.edgesof(self.node))
+        edges = self._dom[self.node].edges
         if not edges or not self.path:
             return edges
         return [e for e in edges if e != self.path[-1]]
@@ -550,7 +584,7 @@ class Widget(object):
             len(edges), self._view.cursor.node, proto.meminfo()//1024)
         yield Grapheme('Cursor', status, x=0, y=0, depth=0)
         for i, e in enumerate(edges):
-            text = self._dom.nameof(e)
+            text = self._dom[e].name
             text = text[:w-x]
             if e == curs:
                 # vpos = cur_pos - top
