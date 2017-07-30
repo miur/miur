@@ -100,11 +100,13 @@ class ShellProvider(object):
         edges, lines = proto.cmd2dom(self.cmd)
         # WTF: how to generate Dom effectively ?
         g = Dom()
-        g._edges = {g.roots(): edges}
+        m = g.roots()
+        g._edges = {m: edges}
+        g._types = {m: 'edges'}
         g._names = lines
         # datetime.datetime.utcfromtimestamp(timestamp).strftime("%A, %d. %B %Y %I:%M%p")
         # ALT: time.time() == datetime.datetime.utcnow().timestamp()
-        g._names[g.roots()] = 'edges ' + str(datetime.datetime.now())
+        g._names[m] = 'edges ' + str(datetime.datetime.now())
         return g
 
 
@@ -121,8 +123,10 @@ class IncrementalProvider(object):
         dirs = {uuid.uuid4(): e for e in dirs}
         files = {uuid.uuid4(): e for e in files}
         g = Dom()
+        m = g.roots()
         g._names = dict(itertools.chain(dirs.items(), files.items()))
-        g._edges = {g.roots(): Edges(g._names.keys())}
+        g._edges = {m: Edges(g._names.keys())}
+        g._types = {m: 'edges'}
         # HACK: insert dirs as lazy nodes => to trigger 'regenerate' in dom on access
         #   ATT:TEMP: use 'Edges()' instead of 'None' for .connect() to work correctly
         g._edges.update({k: Edges() for k in dirs})
@@ -130,8 +134,8 @@ class IncrementalProvider(object):
                         for k, v in g._names.items()}
         # _log.debug('\n'.join('{!s}: {!s}'.format(k, v) for k, v in g._providers.items()))
 
-        g._names[g.roots()] = 'exec dir ' + str(datetime.datetime.now())
-        # g._providers[g.roots()] = self
+        g._names[m] = 'exec dir ' + str(datetime.datetime.now())
+        # g._providers[m] = self
         return g
 
 
@@ -185,6 +189,7 @@ class Dom(object):
         self._edges = {}
         # HACK: add itself => because "Dom" is "Node" itself
         self._edges[self.roots()] = Edges()
+        self._types = {}
         self._providers = {}
         # BAD: nodes may have different names depending on location
         #   E.G. instead of hiding -- use name '..' for parent node in each dir
@@ -314,12 +319,14 @@ class Dom(object):
         # _log.critical('{} ::: {}'.format(node, len(edges)))
         # FIXME: reexec cmd only on '<Enter>' => MOVE sep function
         # CHG currently caches only if multichoice empty NEED exec if never exec
-
-        # FIXME!!!(not edges): check group exists => uidof('edges') not in edges
-        #   << because set() may have virtual nodes added before generating real ones
-        if not edges and node in self._providers:
-            self.regenerate(node)
-            # edges = self._edges[node]
+        if node in self._providers:
+            try:
+                # NOTE: Edges() may have virtual nodes even befor real were generated
+                self.node_byattr(node, 'edges')
+            except KeyError:
+                self.regenerate(node)
+                # UNUSED:HACK: works w/o reassign if edges != None
+                # edges = self._edges[node]
         if edges:
             # transf = self._transfs.get(node)
             transf = Transformation(self)
@@ -330,6 +337,13 @@ class Dom(object):
             if node in ns:
                 return str(ns[node])
         return str(node)
+
+    def node_byattr(self, node, attrtype):
+        # TEMP: match very first node with type
+        for e in self._edges[node]:
+            if self._types.get(e) == attrtype:
+                return e
+        raise KeyError  # TEMP: if not found -- work as hasattr()
 
 
 # NOTE: all inc ops add funcs to transf chain
