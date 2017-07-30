@@ -65,8 +65,9 @@ def send_event(event, state):
 
 
 def flat_tree(dom, parent, n=0):
-    edges = set(uuid.uuid4() for _ in range(random.randint(10, 20)))
-    dom[parent] = edges | set([parent])
+    edges = Edges(uuid.uuid4() for _ in range(random.randint(10, 20)))
+    dom[parent] = edges
+    dom[parent].add(parent)
     if n > 0:
         for e in edges:
             flat_tree(dom, e, n - 1)
@@ -121,10 +122,10 @@ class IncrementalProvider(object):
         files = {uuid.uuid4(): e for e in files}
         g = Dom()
         g._names = dict(itertools.chain(dirs.items(), files.items()))
-        g._edges = {g.roots(): set(g._names.keys())}
+        g._edges = {g.roots(): Edges(g._names.keys())}
         # HACK: insert dirs as lazy nodes => to trigger 'regenerate' in dom on access
-        #   ATT:TEMP: use 'set()' instead of 'None' for .connect() to work correctly
-        g._edges.update({k: set() for k in dirs})
+        #   ATT:TEMP: use 'Edges()' instead of 'None' for .connect() to work correctly
+        g._edges.update({k: Edges() for k in dirs})
         g._providers = {k: IncrementalProvider(pwd + '/' + v)
                         for k, v in g._names.items()}
         # _log.debug('\n'.join('{!s}: {!s}'.format(k, v) for k, v in g._providers.items()))
@@ -132,6 +133,31 @@ class IncrementalProvider(object):
         g._names[g.roots()] = 'exec dir ' + str(datetime.datetime.now())
         # g._providers[g.roots()] = self
         return g
+
+
+# NOTE: reduced api to abstract the container
+class Edges(object):
+    def __init__(self, iterator=None):
+        self._container = set(iterator) if iterator else set()
+
+    def __contains__(self, item):
+        return item in self._container
+
+    def __iter__(self):
+        return iter(self._container)
+
+    # SEE https://stackoverflow.com/questions/5288990/in-python-what-operator-to-override-for-if-object
+    def __bool__(self):
+        return bool(self._container)
+
+    def add(self, item):
+        self._container.add(item)
+
+    def remove(self, item):
+        self._container.remove(item)
+
+    def update(self, iterator):
+        self._container.update(iterator)
 
 
 # TODO: encapsulate each dict of "Dom" into vector "Attribute"
@@ -158,7 +184,7 @@ class Dom(object):
         self.uid = uuid.uuid4()  # ENH:TEMP: using .uid means all *dom* are tree
         self._edges = {}
         # HACK: add itself => because "Dom" is "Node" itself
-        self._edges[self.roots()] = set()
+        self._edges[self.roots()] = Edges()
         self._providers = {}
         # BAD: nodes may have different names depending on location
         #   E.G. instead of hiding -- use name '..' for parent node in each dir
@@ -214,7 +240,7 @@ class Dom(object):
         if node is None:
             node = uuid.uuid4()  # CHG= Node()
         # always add at least empty virt node
-        self._edges[node] = edges or set()  # TEMP:FIXED: empty multichoice per node
+        self._edges[node] = edges or Edges()  # TEMP:FIXED: empty multichoice per node
         return node
 
     def conn_node(self, node, parents):
@@ -288,6 +314,9 @@ class Dom(object):
         # _log.critical('{} ::: {}'.format(node, len(edges)))
         # FIXME: reexec cmd only on '<Enter>' => MOVE sep function
         # CHG currently caches only if multichoice empty NEED exec if never exec
+
+        # FIXME!!!(not edges): check group exists => uidof('edges') not in edges
+        #   << because set() may have virtual nodes added before generating real ones
         if not edges and node in self._providers:
             self.regenerate(node)
             # edges = self._edges[node]
