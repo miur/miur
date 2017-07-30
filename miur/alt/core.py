@@ -41,8 +41,8 @@ def run(argv):
 
     proxy = DomProxy(dom)
     cursor = Cursor(proxy, dom.roots())
-    view = View(cursor)
-    widget = Widget(proxy, view)
+    proj = Projection(cursor)
+    widget = Widget(proxy, proj)
     layout = BoxLayout([widget])
     scene = Scene(layout, None)
 
@@ -247,15 +247,15 @@ class Dom(object):
         self._edges[node] = edges or Edges()  # TEMP:FIXED: empty multichoice per node
         return node
 
-    def conn_node(self, node, parents):
-        assert node
+    def conn_node(self, uid, parents):
+        assert uid
         # assert parents
         # if parents is None:
         #     return
         # if not isinstance(parents, collections.Iterable):
         #     parents = [parents]
         for p in parents:
-            self._edges[p].add(node)  # silently ignore adding same node
+            self._edges[p].add(uid)  # silently ignore adding same uid
 
     # NOTE: this func is actually provider and *dom* is immediate cache of everything
     #   => on demand -- provide already cached value or query/rebuild it (and store to history)
@@ -302,46 +302,43 @@ class Dom(object):
         if meta in ['edges', 'names', 'transfs']:
             return getattr(self, '_' + meta, None)
 
-    def regenerate(self, node):
-        g = self._providers[node]()
-        self.insert(g, conn=(node, g.roots()))
+    def regenerate(self, uid):
+        g = self._providers[uid]()
+        self.insert(g, conn=(uid, g.roots()))
         # _log.info(g)
 
     # TRY: depending on kw 'real=True' choose from several impl dicts
     #   THINK: copy edges for read-only access
     # WARN: keep this method => regeneration must be inside Dom NOT Proxy
     #   DEV: combine methods to attrof(uid, attr)
-    def edgesof(self, node, dfl=None):
-        if dfl is not None and node not in self:
+    def edgesof(self, uid, dfl=None):
+        if dfl is not None and uid not in self:
             return dfl
         # TEMP: evaluate shellcommand each time
         #   => BUG: cursor looses position, keeping pointing to nonexistent edge
-        edges = self._edges[node]
-        # _log.critical('{} ::: {}'.format(node, len(edges)))
+        edges = self._edges[uid]
+        # _log.critical('{} ::: {}'.format(uid, len(edges)))
         # FIXME: reexec cmd only on '<Enter>' => MOVE sep function
         # CHG currently caches only if multichoice empty NEED exec if never exec
-        if node in self._providers:
+        if uid in self._providers:
             try:
                 # NOTE: Edges() may have virtual nodes even befor real were generated
-                self.node_byattr(node, 'edges')
+                self.node_byattr(uid, 'edges')
             except KeyError:
-                self.regenerate(node)
+                self.regenerate(uid)
                 # UNUSED:HACK: works w/o reassign if edges != None
-                # edges = self._edges[node]
-        if edges:
-            # transf = self._transfs.get(node)
-            transf = Transformation(self)
-            return edges if transf is None else transf(edges)
+                # edges = self._edges[uid]
+        return edges
 
-    def nameof(self, node):
+    def nameof(self, uid):
         for ns in [self._names]:
-            if node in ns:
-                return str(ns[node])
-        return str(node)
+            if uid in ns:
+                return str(ns[uid])
+        return str(uid)
 
-    def node_byattr(self, node, attrtype):
-        # TEMP: match very first node with type
-        for e in self._edges[node]:
+    def node_byattr(self, uid, attrtype):
+        # TEMP: match very first uid with type
+        for e in self._edges[uid]:
             if self._types.get(e) == attrtype:
                 return e
         raise KeyError  # TEMP: if not found -- work as hasattr()
@@ -441,28 +438,30 @@ class Cursor(object):
         # WARN.path is history-like
         #   * random jump will be pushed despite being nonadjacent
         #   => moving back returns "back" and not "one-level-up"
-        self.node = None
-        # self.current = None
+        self.cur_node = None
+        # self.cur_edge = None
         self.path = []
         self.path_set = set()
         self.pos_path = []      # store parent positions for backward (loops in path)
         self.pos_visited = {}   # store last positions for forward
         self.move_forward(init_node)
 
-    def move_forward(self, node):
-        if self.node is not None:
-            self.path.append(self.node)
-            self.path_set.add(self.node)
-        self.node = node
+    def move_forward(self, uid):
+        if self.cur_node is not None:
+            # NOTE: don't store nodes directly in path
+            #   => nodes must be allowed to disappear on delete
+            self.path.append(self.cur_node)
+            self.path_set.add(self.cur_node)
+        self.cur_node = uid
         self.pos_path.append(self._index)
         # EXPL:(None): if empty list in next node
-        self._index = self.pos_visited.get(node, 0) if self.edges else None
+        self._index = self.pos_visited.get(uid, 0) if self.edges else None
 
     # FIXME: old nodes in path may become invalid => skip until valid ones
     def hist_back(self):
-        old = self.node
-        self.node = self.path.pop()
-        self.path_set.remove(self.node)
+        old = self.cur_node
+        self.cur_node = self.path.pop()
+        self.path_set.remove(self.cur_node)
         self.pos_visited[old] = self._index
         # EXPL:(None): if prev node deleted or its list emptied
         self._index = self.pos_path.pop() if self.edges else None
@@ -470,13 +469,14 @@ class Cursor(object):
 
     @property
     def edges(self):
-        edges = self._dom[self.node].edges
+        edges = self._dom[self.cur_node].view
         if not edges or not self.path:
             return edges
+        # NOTE: additional Transformation for Cursor
         return [e for e in edges if e != self.path[-1]]
 
     @property
-    def current(self):
+    def cur_edge(self):
         if self._index is not None:
             # BUG: exception on empty dir << _index=None
             return self.edges[self._index]
@@ -507,16 +507,16 @@ class Cursor(object):
         self.hist_back()
 
     def shift_node_current(self):
-        node = self.current
-        if node in self.path_set:
+        uid = self.cur_edge
+        if uid in self.path_set:
             return  # cycle in-place
-        if node not in self._dom:
-            _log.debug('Leaf node (end) :: {}'.format(node))
-            return  # invalid node / leaf
-        self.move_forward(node)
+        if uid not in self._dom:
+            _log.debug('Leaf[END] :: {}'.format(uid))
+            return  # invalid uid / leaf
+        self.move_forward(uid)
 
     def regenerate_now(self):
-        return self._dom.regenerate(self.current)
+        return self._dom.regenerate(self.cur_edge)
 
 
 # rename => Slice / Projection / Camera
@@ -530,8 +530,8 @@ class Cursor(object):
 #   TRY: impl by curses.newwin(height, width, begin_y, begin_x)
 # HACK: generated on demand
 #   * DOM may be flat list of undirected edges (pairs)
-#   * View will bake() it to list of nodes centered around cursor
-class View(object):
+#   * Projection will bake() it to list of nodes centered around cursor
+class Projection(object):
     def __init__(self, cursor):
         self.cursor = cursor
 
@@ -566,9 +566,9 @@ class Grapheme(object):
 
 
 class Widget(object):
-    def __init__(self, dom, view):
+    def __init__(self, dom, proj):
         self._dom = dom
-        self._view = view
+        self._proj = proj
 
     # DEV: must return abstract graphics stack tree (in terms of abstract frontend)
     #   ? THINK: Graphemes must be sorted by depth
@@ -577,18 +577,18 @@ class Widget(object):
     #     -- frontends may prefer different order of drawing
     def graphemes(self, h, w):
         x, y = 0, 2
-        data = self._view.data(h-y, w-x)
+        data = self._proj.data(h-y, w-x)
         edges = list(data['edges'])
-        curs = self._view.cursor.current
-        idx = 1 + (self._view.cursor._index or -1)
+        cedge = self._proj.cursor.cur_edge
+        idx = 1 + (self._proj.cursor._index or -1)
         status = '{:d}: {:2d}/{:02d} | {} | {:d}kiB'.format(
-            1 + len(self._view.cursor.path), idx,
-            len(edges), self._view.cursor.node, proto.meminfo()//1024)
+            1 + len(self._proj.cursor.path), idx,
+            len(edges), self._proj.cursor.cur_node, proto.meminfo()//1024)
         yield Grapheme('Cursor', status, x=0, y=0, depth=0)
         for i, e in enumerate(edges):
             text = self._dom[e].name
             text = text[:w-x]
-            if e == curs:
+            if e == cedge:
                 # vpos = cur_pos - top
                 yield Grapheme('Cursor', text, x=x, y=y+i, depth=1)
             else:
@@ -726,7 +726,7 @@ class NcursesInput(object):
                 send_event('redraw_all_now', state)
 
             state['input'].dispatch(cmd)
-            _log.debug('current :: {}'.format(self._cursor.current))
+            _log.debug('current :: {}'.format(self._cursor.cur_edge))
             send_event('redraw', state)
 
 
