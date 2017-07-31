@@ -67,12 +67,21 @@
 
 % api % ?accessors?
   encapsulate node -- postpone arch decision
+  == Actually, inner struct of node may be anything above
+    !! only api methods matter
   NEED:
     * generate one-timed nested virtual node views
     BAD: can't ref to individual nodes in those views
       => OR:REQ create and cache the same uids per virtual view nodes
     BAD: can't copy-paste virtual nodes between one-timed views
       => otherwise REQ propagate inserted node into underlying impl data
+
+
+IDEA:HACK: use parent/hub uid as type of gen node
+  => so each history node will have its hub uid as type
+    "history" => "{hub_uid}"
+  ++ each history will have its unique type
+  ++ no need to create names for types in global map
 
 
 %%% Multichoice

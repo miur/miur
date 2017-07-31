@@ -48,5 +48,11 @@ DECIDE: multiple parents
     ...
 
 
+TODO: generate virtual node with ordered list of visited nodes
+  NEED: embed time of each visit by this cursor
+      -- to sort by time instead of order by list
+  DEV: generate "Dom" from cursor's inner data
+
+
 IMPL:
   BAD: efficient only in py>=3.5 :: next(reversed(OrderedDict[]))
