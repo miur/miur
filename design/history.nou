@@ -44,13 +44,28 @@ History
         ? OrderedDict => to remove item from front/back ?
 
 
-INSIGHT: *dom* is combined space-time graph
+INSIGHT: *dom* is a combined space-time graph
   * flattened along 'time' axis
     => therefore all history nodes are stacked as edges into same space nodes
     sorting by ctime => time axis becomes embedded into each individual node
     ++ compact memory for history -- only for necessary nodes
     -- BAD: all ops must be node-localized
     -- BAD:HACK: create virtual 'grouping branch' and provide history graph for it
+    -- NEED mechanics for grouping
+      +++ single time point added on time tree at once
+        => no need for grouping of time nodes => no need for immediate access
+        => no need for immediate space access
+      --- lost grouping in space (cmd localization)
+      Assumption: each cmd produces graph of changes but only _single point_ of time
+        BUT: cmds may also produce time graphs
+      == zero-point localized space
+      ! HACK you don't know about exitence of anything until you have connection with it
+        * adding new edge leading to before nonexistent node -- allows it to be accessed by space graph (and us)
+          => all nodes are eternal -- exist before even graph exists and keep existing after graph destroy
+        * on node update you must also update all nodes having connection to it
+        * distant nodes have only _memory/recollection_ about existence of node in the past
+          - you may update them as well
+          - OR you may keep them as is -- and update only on demand by heuristics searching the updated node version
     == CVS style
 
   * OR: flatten along 'space' axis
@@ -60,6 +75,9 @@ INSIGHT: *dom* is combined space-time graph
     -- hard to derive history for individual node
     -- BAD: can't undo and branch history for single node
     -- BAD: can't view history for single node, keeping remaining graph intact
+    -- NEED synchronized global states
+      ! REQ immediate access to all data in plane/slice at axis time -- to fixate global data change
+      == zero thickness on time axis
     == GIT style SEE gitfs, pygit2
       https://lwn.net/Articles/654075/
         https://www.presslabs.com/gitfs/
