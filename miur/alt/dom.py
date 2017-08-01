@@ -14,7 +14,7 @@ def run(argv):
     attr_uid = dom.add_node(AttributeNode({'name': 'myname'}))
     dom[root_uid].add(attr_uid)
 
-    topo_node = TopologyNode(dom.add_node(None) for i in range(5))
+    topo_node = TopologyNode(dom.add_node(None) for i in range(3))
     topo_uid = dom.add_node(topo_node)
     dom[root_uid].add(topo_uid)
 
@@ -28,6 +28,13 @@ def run(argv):
 
 class BaseNode(object):
     pass
+
+
+# NOTE: used to contain virtual graphs data (w/o converting to *dom* real nodes)
+class GraphNode(BaseNode):
+    def __init__(self, iterator=None):
+        # TRY: rename Dom() -> graph() -- DEV/FIND general graph() container
+        self._dom = Dom() if iterator is None else Dom(iterator)
 
 
 class TopologyNode(BaseNode):
@@ -68,8 +75,11 @@ class ViewNode(BaseNode):
             entries = list(transf(iterator))
         self._entries = entries
 
+    def __iter__(self):
+        return iter(self._entries)
+
     def __str__(self):
-        return '\n'.join(' - {}'.format(e) for e in self._entries)
+        return '\n'.join(' - {}'.format(e) for e in self)
 
 
 # NOTE:VIZ. visible name, node adding timestamp, etc
@@ -96,11 +106,17 @@ class HistoryNode(BaseNode):
 
 
 class GeneratorNode(BaseNode):
-    def __init__(self, dst_uid, as_edges):
-        pass
+    def __init__(self, provider, dst_uid, as_edges):
+        self._provider = provider
+        self._node
+
+    # NOTE: on access to underlying data => generate them
+    def __iter__(self):
+        return iter(self._entries)
 
 
 # NOTE: on access node is replaced by its dedicated type (only once)
+#   HACK: lazy -- is partial case of GeneratorNode(once=True)
 class LazyNode(GeneratorNode):
     def __init__(self, dst_uid, as_edges):
         super().__init__(self.uid)
@@ -114,7 +130,7 @@ class Dom(object):
         self._maxuid = 0
 
     def __str__(self):
-        return '\n'.join('{}\n:: {}\n{}\n'.format(uid, node.__class__.__name__, node)
+        return '\n'.join('{} :: {}\n{}\n'.format(uid, node.__class__.__name__, node)
                          for uid, node in sorted(self._nodes.items()))
 
     def __iter__(self):
@@ -130,6 +146,9 @@ class Dom(object):
     #     return uid
 
     # NOTE: monotonous counter WARN: guard inc for multithread
+    #   ++ can compare node creation order by cmp their uids
+    #     * it must be enough for ro- graph
+    #     * for rw- graph you also need node-specific 'mtime' beside 'ctime'
     def new_uid(self):
         self._maxuid += 1
         return self._maxuid
