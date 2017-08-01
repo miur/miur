@@ -42,3 +42,34 @@ History
       ALT:(super flat): sort hist nodes by timestamp and delete oldest one
       BUT at the same time each hist point must have uid to refer old
         ? OrderedDict => to remove item from front/back ?
+
+
+INSIGHT: *dom* is combined space-time graph
+  * flattened along 'time' axis
+    => therefore all history nodes are stacked as edges into same space nodes
+    sorting by ctime => time axis becomes embedded into each individual node
+    ++ compact memory for history -- only for necessary nodes
+    -- BAD: all ops must be node-localized
+    -- BAD:HACK: create virtual 'grouping branch' and provide history graph for it
+    == CVS style
+
+  * OR: flatten along 'space' axis
+    => each time point contains copy of whole graph
+    -- memory overuse -- saves whole graph at each point
+      SEE how git/hg resolve this problem
+    -- hard to derive history for individual node
+    -- BAD: can't undo and branch history for single node
+    -- BAD: can't view history for single node, keeping remaining graph intact
+    == GIT style SEE gitfs, pygit2
+      https://lwn.net/Articles/654075/
+        https://www.presslabs.com/gitfs/
+        https://github.com/PressLabs/gitfs
+      ALSO https://github.com/Microsoft/GVFS
+        https://news.ycombinator.com/item?id=13559662
+
+  * BET:NOT flattening -- 'time' axis is also graph
+    = if you rewind history and generate again -- you obtain 'undo graph'
+    !!! too complex :: nonuniform/anisotropic space-time continuum
+      => cause-effect relations can be localized in space or time BUT:NOT: both
+    ++ history graph branching per node/group
+    ~ xrefs between past nodes and present

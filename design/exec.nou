@@ -1,0 +1,93 @@
+%%%% Executable
+
+generator = ( provider + src + dst )
+  + action __call__() or run()
+generator = partial case of executable
+executable = ( graph (content) + interpreter + src + dst)
+  DFL dst == /dev/stdout CASE:(caching): dst == itself as "TopologyNode"
+
+Reverse applying :: combine funcs first, apply later
+  IDEA: set active cmd (as in "Task/Mode") and apply to choosen files on <Enter>
+    :: like using 'ag' with certain pattern
+    * add node with results into pool
+    => provider must be switchable => cursor for possible providers
+  BAD: single provider per node => BUT results are placed in subnode
+    * on <Enter> edges must be regenerated
+    BUT:WTF about history ? Add to parent ? XXX who is parent in graph ?
+
+
+IMPL:
+  NOTE: generates any type of other nodes on access -- even another GeneratorNode
+    optionally may have its own edges -- as shortcut to one of previosly generated nodes
+      * may point to history node or directly to one of subnodes
+      => therefore on each eval() it refreshes its own edges
+    ~~ use generator as mix-in to any other node OR embed into BaseNode
+      + BaseNode = generate new node
+        ~ regenerate itself in-place (replace provider function)
+      + TopologyNode = regenerate edges in-place
+        ~ generate new node with edges and insert shortcut as edges
+      + HistoryNode = generate new node and insert intermediary accessor
+    WARN: different matter -- "ExecutableNode" itself and shortcut access to its generated content
+      ?? USE "ShortcutNode" for shortcuts to cached / last generated data ??
+      NOTE: real content of "ExecutableNode" is script text
+
+  TEMP:ARCH:(limitation):BAD: single node "knows" about single destination
+    => you can't change dst depending on provider function
+    ? provider can't have multiple dst at once
+      ... but it can generate whole graphs, no ?
+      ... and it must generate bunch of _edges_ at once ?
+    ?? who decides where results will be placed ??
+      - provider itself => BUT it doesn't know possible dst uids !
+      - caller node => BUT provider _depends_ on src which must be choosen !
+        E.G. 'path' in AttributeNode OR edges in TopologyNode
+    ? 'src' must be fixed per node OR supplied into run() OR arbitrary ?
+      -- arbitrary seems impossible => we don't know uids in *dom*
+    ?? pass 'dst' into run() OR keep inside "GeneratorNode" OR allow arbitrary dst from *provider* ??
+
+
+  THINK: it must be able to 'add' to topology edges or to 'replace' them all
+    ?? what other ops may be essential ??
+
+
+%% Insights
+
+exec node is data -- it has its own real topology
+  BUT: not each data node is exec (as in homoiconicity)
+
+Executable "GeneratorNode" -- is like script/binary
+  * explicitly marked as executable (has *provider*)
+  * has dedicated interpreter (embedded as ref into *provider*)
+    E.G. ShellInterpreter -- for str/list cmdline
+    OR JLangInterpreter -- for embedded J bindings cmd
+  * has ordered content to pass to interpreter
+    ~ lines/AST-tree of script file
+      = can be further viewed as graph
+    ATT: data can be repr as 'id interpreter' returning its own content
+      BUT:(not recommended): as it's only one possible way picked
+  * knows its environment (uids for path, name, cwd, args)
+    => list of possible uids to operate on
+  * has access to syscalls for fs/dom manipulation (pass *dom* into provider)
+  * can traverse fs/dom and search suitable src args
+  * contains embedded knowledge about choosen special paths -- w/o necessity to traverse fs/dom
+    BAD: those 'choosen paths' must be the same between sessions
+      BUT: *dom* is recreated anew each time => uids itself have no sense
+        ?? USE only search patterns
+  * can overwrite/replace itself or generate new file with random/templated name by *dom* api
+  * beside real fs inodes, dedicated output of print() -- passed to spec file /dev/stdout
+    == virtual file == virtual nodes
+    actually, generated content must be allowed to be anything -- beside plain text
+      E.G. complete graphs
+    but those graphs must be still saved as single content
+      = virtual graph
+    content exists only as data buffers in each link of pipe
+      * it disappears when pipe traversing is finished
+      * it may be cached partially/completely in some nodes
+      * cached view can be displayed as separate virtual graph
+      * as *miur* works as shell itself -- it can cache/redirect output into specific node
+    HACK pipe itself may be impl as ramified stream graph to repr data flow
+      * you manually select multiple nodes (dirs/files/cmds) as sources
+        sources + args ==> input graph
+        HACK: you can use multiple historic nodes of same node for E.G. diff
+      * build some directed graph directly under some node step-by-step
+        ==> transformational exec graph
+      * you aquire results on call ==> output graph

@@ -38,6 +38,7 @@ Inner struct to navigate through virtual graphs
       prompt with 'deletion selection' to review changes
     after batch deletion => keep old (removed) list in history
       replace current cursor by new empty selection
+  unionfs :: view multiple dirs at once
   attributes
     keymap for inner structure of node in *dom*
       E.G. edges, name, mtime, xattr, etc

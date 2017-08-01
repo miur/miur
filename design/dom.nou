@@ -156,13 +156,3 @@ NOTE: single node may point to multiple (virtual) views simultaneously
       BUT then each nested node will have composite uid = <dom_uid, node_uid>
     --- can't access any node by uid in one go => need searching all doms
     -- need to search concreate dom to modify -- on add/remove individual nodes
-
-
-Providers
-  IDEA: set active cmd (as in "Task/Mode") and apply to choosen files on <Enter>
-    :: like using 'ag' with certain pattern
-    * add node with results into pool
-    => provider must be switchable => cursor for possible providers
-  BAD: single provider per node => BUT results are placed in subnode
-    * on <Enter> edges must be regenerated
-    BUT:WTF about history ? Add to parent ? XXX who is parent in graph ?
