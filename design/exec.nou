@@ -53,6 +53,8 @@ IMPL:
 
 exec node is data -- it has its own real topology
   BUT: not each data node is exec (as in homoiconicity)
+  ALT:(chiken-egg problem): every data can be represented as 'id exec' returning itself (or doing nothing)
+  ! every exec has attribute of interpreter
 
 Executable "GeneratorNode" -- is like script/binary
   * explicitly marked as executable (has *provider*)
