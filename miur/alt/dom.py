@@ -100,9 +100,18 @@ class AttributeNode(BaseNode):
 
 
 # NOTE: group diff variants of same node
+#   BAD: linear instead of tree at least
+#   BAD: CVS-style with history per node
+#     BUT: if node is subgraph itself -- becomes partial case of GIT-style
 class HistoryNode(BaseNode):
     def __init__(self, iterator=None):
         self._history = deque() if iterator is None else deque(iterator)
+
+
+# class Provider(object):
+#     def __init__(self, data, interpreter):
+#         self._data = data
+#         self._interpreter
 
 
 class GeneratorNode(BaseNode):
