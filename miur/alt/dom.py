@@ -1,5 +1,6 @@
 import logging
 from collections import deque
+from . import proto
 
 # NOTE:
 #   * main static graph composed from [TopologyNode]
@@ -14,7 +15,9 @@ def run(argv):
     attr_uid = dom.add_node(AttributeNode({'name': 'myname'}))
     dom[root_uid].add(attr_uid)
 
-    topo_node = TopologyNode(lambda: (dom.add_node(None) for i in range(3)))
+    topo_node = TopologyNode(ShellNodeProvider(dom, 'ls'))
+    # topo_node = TopologyNode(TestProvider())
+    # topo_node = TopologyNode(lambda: (dom.add_node(None) for i in range(3)))
     topo_uid = dom.add_node(topo_node)
     dom[root_uid].add(topo_uid)
 
@@ -38,6 +41,20 @@ class Provider(object):
 class TestProvider(Provider):
     def __init__(self):
         super().__init__(range, 5)
+
+
+class ShellProvider(Provider):
+    def __init__(self, cmd):
+        super().__init__(proto.execute, cmd)
+
+
+class ShellNodeProvider(ShellProvider):
+    def __init__(self, dom, cmd):  # FIXME: actually, dom ops must be Mix-in
+        self._dom = dom
+        super().__init__(cmd)
+
+    def __call__(self):
+        return (self._dom.add_node(e) for e in super().__call__())
 
 
 # ATT: never assept iter/container => too much headache for multi-pass iter
@@ -86,7 +103,6 @@ class ContainerCached(BaseCached):
     def __getattr__(self, attr):
         return getattr(self.data, attr)
 
-    # BUG: iter not redirected to getattr -- common for any __func__ ?
     def __iter__(self):
         return iter(self.data)
 
@@ -99,7 +115,28 @@ class ContainerCached(BaseCached):
 
 
 class BaseNode(object):
-    pass
+    def __init__(self, data):
+        self._data = data
+
+    def __iter__(self):
+        return iter(self._data)
+
+    def __contains__(self, attr):
+        return attr in self._data
+
+    def __getitem__(self, attr):
+        return self._data[attr]
+
+
+class CachedNode(BaseNode):
+    def __init__(self, container, provider):
+        super().__init__(ContainerCached(container, provider))
+
+    def refresh(self):
+        return self.refresh()
+
+    def invalidate(self):
+        return self.invalidate()
 
 
 # NOTE: used to contain virtual graphs data (w/o converting to *dom* real nodes)
@@ -109,18 +146,15 @@ class GraphNode(BaseNode):
         self._dom = Dom() if iterator is None else Dom(iterator)
 
 
-class TopologyNode(BaseNode):
+class TopologyNode(CachedNode):
     def __init__(self, provider):
-        self._edges = ContainerCached(set, provider)
+        super().__init__(set, provider)
 
     def __str__(self):
         return '\n'.join(' * {}'.format(uid) for uid in sorted(self))
 
-    def __iter__(self):
-        return iter(self._edges)
-
     def add(self, uid):
-        self._edges.add(uid)
+        self._data.add(uid)
 
 
 # TEMP: sep type (despite being same as TopologyNode) until I decide about superflat
