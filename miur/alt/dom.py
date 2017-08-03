@@ -28,6 +28,10 @@ def run(argv):
     print(dom)
     print(dom.nameof(root_uid))
 
+    curs = Cursor(dom, view_uid)
+
+    print(curs)
+
 
 class Provider(object):
     def __init__(self, interpreter, code):
@@ -260,7 +264,7 @@ class Dom(object):
     #     * for rw- graph you also need node-specific 'mtime' beside 'ctime'
     def new_uid(self):
         self._maxuid += 1
-        return self._maxuid
+        return '#{:02d}'.format(self._maxuid)
 
     def add_node(self, node):
         uid = self.new_uid()
@@ -285,3 +289,14 @@ class Dom(object):
         if not name:
             name = str(uid)
         return name
+
+
+class Cursor(object):
+    def __init__(self, dom, init_uid):
+        self._dom = dom
+        self.cur_uid = init_uid
+
+    def __str__(self):
+        text = 'Cursor: {}\n'.format(self.cur_uid)
+        text += '\n'.join('. {}'.format(self._dom[e]) for e in self._dom[self.cur_uid])
+        return text
