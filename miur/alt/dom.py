@@ -9,12 +9,12 @@ _log = logging.getLogger(__name__.split('.', 2)[1])
 
 def run(argv):
     dom = Dom()
-    root_uid = dom.add_node(RealNode())
+    root_uid = dom.add_node(RealNode(lambda: None))
 
     attr_uid = dom.add_node(AttributeNode({'name': 'myname'}))
     dom[root_uid].add(attr_uid)
 
-    topo_node = TopologyNode(dom.add_node(None) for i in range(3))
+    topo_node = TopologyNode(lambda: (dom.add_node(None) for i in range(3)))
     topo_uid = dom.add_node(topo_node)
     dom[root_uid].add(topo_uid)
 
@@ -24,6 +24,78 @@ def run(argv):
 
     print(dom)
     print(dom.nameof(root_uid))
+
+
+class Provider(object):
+    def __init__(self, interpreter, code):
+        self._interpreter = interpreter
+        self._code = code
+
+    def __call__(self):
+        return self._interpreter(self._code)
+
+
+class TestProvider(Provider):
+    def __init__(self):
+        super().__init__(range, 5)
+
+
+# ATT: never assept iter/container => too much headache for multi-pass iter
+# HACK:TUT: multi-pass iterator
+#   https://stackoverflow.com/questions/36810794/standard-way-to-convert-iterator-returning-function-into-proper-iterable-retur
+class BaseCached(object):
+    def __init__(self, provider):
+        assert callable(provider)
+        self._provider = provider
+        self._data = None
+        self._outdated = True
+
+    def refresh(self):
+        self.data = self._provider()
+
+    def invalidate(self):
+        self.outdated = True
+
+    @property
+    def outdated(self):
+        return self._outdated
+
+    @outdated.setter
+    def outdated(self, value):
+        assert isinstance(value, bool)
+        self._outdated = value  # WARN: multithreading
+
+    @property
+    def data(self):
+        if self.outdated:
+            self.refresh()
+        return self._data
+
+    @data.setter
+    def data(self, value):
+        self._data = value
+        self.outdated = False
+
+
+# NOTE: hides .data() calls behind interface, pretending being real data
+class ContainerCached(BaseCached):
+    def __init__(self, container, provider):
+        self._container = container
+        super().__init__(provider)
+
+    def __getattr__(self, attr):
+        return getattr(self.data, attr)
+
+    # BUG: iter not redirected to getattr -- common for any __func__ ?
+    def __iter__(self):
+        return iter(self.data)
+
+    def refresh(self):
+        data = self._provider()
+        if data is None:
+            self.data = self._container()
+        else:
+            self.data = self._container(data)
 
 
 class BaseNode(object):
@@ -38,8 +110,8 @@ class GraphNode(BaseNode):
 
 
 class TopologyNode(BaseNode):
-    def __init__(self, iterator=None):
-        self._edges = set() if iterator is None else set(iterator)
+    def __init__(self, provider):
+        self._edges = ContainerCached(set, provider)
 
     def __str__(self):
         return '\n'.join(' * {}'.format(uid) for uid in sorted(self))
@@ -106,12 +178,6 @@ class AttributeNode(BaseNode):
 class HistoryNode(BaseNode):
     def __init__(self, iterator=None):
         self._history = deque() if iterator is None else deque(iterator)
-
-
-# class Provider(object):
-#     def __init__(self, data, interpreter):
-#         self._data = data
-#         self._interpreter
 
 
 class GeneratorNode(BaseNode):
