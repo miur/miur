@@ -45,3 +45,16 @@ FrontEnds (Input/Output) :: ncurses, slang, termbox, qt, gtk, opengl, pipe
   << when I want to learn particular frontent
   << new ideas for representation (opengl/SDL2) >> NEED cursor for layout panning == camera
   << polish arch by generalizing concepts between gui
+
+
+% Split
+!! Let's split graph navigator and graph modifier !!
+  ! "navigator" don't have history of changes -- only navigation
+    >> history graph is too complex and uncertain
+      -- I will stuck there eternally, being not too much interested in results
+  ! graph with history is supplied through "observer"
+    >> it only generates snapshots of history
+    + merges them into static graph, nothing more
+    ! diff "observers" may generate diff graphs
+  ! changes applied to graph by "manipulator"
+    ! it can even be replaced by standard graphviz tools
