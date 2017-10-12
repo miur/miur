@@ -1,4 +1,5 @@
 import logging
+from collections import defaultdict
 
 _log = logging.getLogger(__name__.split('.', 2)[1])
 
@@ -22,12 +23,10 @@ _log = logging.getLogger(__name__.split('.', 2)[1])
 
 
 def run(argv):
-    g = BaseGraph()
-    g.add_node(1)
-    g.add_node(2)
-    g.add_node(3)
+    g = ObjectGraph()
+    g.add_objects_from("abc")
     for n in g:
-        print(n)
+        print(g[n])
     # n = g.getRoot()
     # NOTE: don't return edges container directly -- wrap in iterator
     #   <= because list may change any time
@@ -48,7 +47,7 @@ def run(argv):
 
 # NOTE: addr of each node is pair (graph, uid)
 #   ALT: uid unique through all graphs for cross-references
-def g_new_uid(self):
+def g_new_uid():
     g_new_uid._maxuid += 1
     return g_new_uid._maxuid
 
@@ -125,7 +124,7 @@ class BaseGraph(object):
         #     => nr_edges ~>= nr_nodes - 1
         #     => traversing nodes one-by-one => need adjacency info
         self._nodes = {}
-        self._neighbors = {}  # cached adjacency
+        self._neighbors = defaultdict(set)  # cached adjacency
         ## NEED: for edges pointing to non-existent uids
         #   ALSO: traversing/filtering list of all nodes
         #       -- currently not in priority
@@ -136,33 +135,28 @@ class BaseGraph(object):
         #       independent from node/edge object in graph itself
         #   => has sense if graph embodies network/media of some kind
 
-    def add_node(self, uid):
+    def add_node(self, uid, obj=None):
         if uid in self._nodes:
             raise
-        self._nodes[uid] = None
-        self._neighbors[uid] = set()  # USE: = .setdefault(uid, set())
+        self._nodes[uid] = obj
+        # self._neighbors[uid] = set()  # USE: = .setdefault(uid, set())
         # NOTE: if there are dangling edges which pointed to this uid
         #   => find them and insert into _neighbors
         # BET? prohibit dangling edges => easier ALG, lesser overhead
-
-    def set_node_value(self, uid, obj):
-        self._nodes[uid] = obj
-
-    # high-level api -- relocate in its own ObjectGraph superstructure
-    def add_object(self, obj):
-        uid = g_new_uid()
-        self.add_node(uid)
-        self.set_node_value(uid, obj)
-        return uid
+        #   BET! always keep edges "placeholder" by _neighbors but don't insert into _nodes to test existence
 
     def add_edge(self, uid1, uid2):
-        uid = self._new_uid()
+        # uid = ObjectGraph._new_uid()
         # BAD: custom chosen data struct
         #   => may discard _edges altogether and keep only _neighbors
         #   BUT: you can generate whole node / graph on the other side simply by
         #   accessing dangling (lazy) edge -- you don't know where you point to
         #   until generation succeeds
-        self._edges[uid] = (uid1, uid2)
+        #   ALT: dangling ends of edges may point to special node with uid=None or uid=0
+        #       => it allows to enumerate all free edges and delay acquiring actual uid for other end
+        #       => then edges pointing to nonexistent nodes are truly dangling and are system errors
+        #   Actually, _neighbors may contain node to enlist connections, but _nodes won't contain even =None
+        # self._edges[uid] = (uid1, uid2)
         # BAD: directly saves neighbor uid instead of intermediate 'edge'
         #   => must save ptrs to 'edge' to be able to be replaced by 'graph'
         # BAD: how to connect each neighbor with its own point in GraphNode ?
@@ -177,25 +171,40 @@ class BaseGraph(object):
         self._neighbors[uid1].add(uid2)
         self._neighbors[uid2].add(uid1)
         # NEED: cache added node in adjacency set of each node
-        return uid
+        # return uid
 
-    def __str__(self):
-        return "graph"
-
+    ## Convenience methods
     # Prefer nodes for default operations
     def __iter__(self):
         return iter(self._nodes)
 
-    def __getitem__(self, uid):
-        return self._nodes[uid]
+    def __len__(self):
+        return len(self._nodes)
 
     def __contains__(self, uid):
         return uid in self._nodes
 
+    def __getitem__(self, uid):
+        return self._nodes[uid]
+
+    def __setitem__(self, uid, obj):
+        self._nodes[uid] = obj
+
 
 # API accepts id (instead of objects) and returns objects itself
-class IdGraph(BaseGraph):
-    pass
+class ObjectGraph(BaseGraph):
+    _new_uid = g_new_uid
+
+    # high-level api -- relocate in its own ObjectGraph superstructure
+    #   MAYBE: aggregate instead of inherit ?
+    def add_object(self, obj):
+        uid = ObjectGraph._new_uid()
+        self.add_node(uid)
+        self[uid] = obj
+        return uid
+
+    def add_objects_from(self, iterable):
+        return [self.add_object(obj) for obj in iterable]
 
 
 # API accepts/returns proxy instance of accessors to IdGraph
@@ -203,7 +212,7 @@ class IdGraph(BaseGraph):
 #   == weak_ptr == actual object inside Graph may be destroyed any time
 class ProxyGraph(object):
     def __init__(self):
-        self._g = IdGraph()
+        self._g = ObjectGraph()
 
     def get_node(self, uid):
         return INode(self._g, uid)
