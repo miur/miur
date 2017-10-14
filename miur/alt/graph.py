@@ -24,9 +24,13 @@ _log = logging.getLogger(__name__.split('.', 2)[1])
 
 def run(argv):
     g = ObjectGraph()
-    g.add_objects_from("abc")
-    for n in g:
-        print(g[n])
+    uids = g.add_objects_from("abc")
+    g.add_edge(uids[0], uids[1])
+    gp = GraphProxy(g)
+    for np in gp:
+        s = str(np.get()) + ' -- ' + ' '.join(n.get() for n in np)
+        print(s)
+
     # n = g.getRoot()
     # NOTE: don't return edges container directly -- wrap in iterator
     #   <= because list may change any time
@@ -113,6 +117,7 @@ class IEdge(object):
 #   * layer of graph / relations
 #   * layer of object values
 #   * layer of proxy accessors to virtual/generated graphs and values
+# CHG: rename => GraphContainer (uid -> uid)
 class BaseGraph(object):
     # nodes + attrs
     # edges + attrs
@@ -145,6 +150,11 @@ class BaseGraph(object):
         # BET? prohibit dangling edges => easier ALG, lesser overhead
         #   BET! always keep edges "placeholder" by _neighbors but don't insert into _nodes to test existence
 
+    # NOTE: I need edges -- because there is no place to embed edge value
+    #   => it may be emulated by two edges and node
+    #   * values may affect network traversing algs itself
+    #   * _edges with values may be added postfactum when necessary
+    #       node1 -> _neighbors -> euid1-2 -> edge1-2 -> uid2 -> node2
     def add_edge(self, uid1, uid2):
         # uid = ObjectGraph._new_uid()
         # BAD: custom chosen data struct
@@ -173,8 +183,11 @@ class BaseGraph(object):
         # NEED: cache added node in adjacency set of each node
         # return uid
 
+    def neighbors(self, uid):
+        return iter(self._neighbors[uid])
+
     ## Convenience methods
-    # Prefer nodes for default operations
+    # Prefer uids of nodes for default operations
     def __iter__(self):
         return iter(self._nodes)
 
@@ -192,6 +205,8 @@ class BaseGraph(object):
 
 
 # API accepts id (instead of objects) and returns objects itself
+# CHG: rename => GraphAdapter (because it pairs interface with container)
+#   (uid -> obj)
 class ObjectGraph(BaseGraph):
     _new_uid = g_new_uid
 
@@ -206,23 +221,53 @@ class ObjectGraph(BaseGraph):
     def add_objects_from(self, iterable):
         return [self.add_object(obj) for obj in iterable]
 
+    ## WARN: don't return objects instead uid -> it mutilates API
+    # def __iter__(self):
+    #     return iter(self._nodes)
+
+
+# NOTE:
+# * weak_ptr => may become nonexistent => exception | ret node.val itself
+# * may directly provide INode interface, locking node object on access
+#   => BUT: need specialized proxy per each INode ifc => can't be general
+# * provide directly NodeProxy instead of EdgeProxy
+#   - preview for current dir may require previews for all entries at once
+#   - can't choose clear attrs subset to delegate to edge (e.g. name, stats)
+class NodeProxy(object):
+    def __init__(self, g, uid):
+        self._g = g
+        self._uid = uid
+
+    def get(self):
+        return self._g[self._uid]
+
+    # ALT: ret edges and walk by euid
+    def __iter__(self):
+        for uid in self._g.neighbors(self._uid):
+            yield NodeProxy(self._g, uid)
+
 
 # API accepts/returns proxy instance of accessors to IdGraph
 #   * each proxy aggregates _uid and _g to be able to operate on itself
 #   == weak_ptr == actual object inside Graph may be destroyed any time
-class ProxyGraph(object):
-    def __init__(self):
-        self._g = ObjectGraph()
+class GraphProxy(object):
+    def __init__(self, g):
+        self._g = g
 
-    def get_node(self, uid):
-        return INode(self._g, uid)
+    def __getitem__(self, uid):
+        return NodeProxy(self._g, uid)
+
+    def __iter__(self):
+        for uid in self._g:
+            yield NodeProxy(self._g, uid)
 
 
 # Wrapper classes extend base container by shortcuts
 #   E.G. add_node_connected_to(node, [neighbour_nodes])
 #     == add_node() + add_edges_from()
 # THINK: replace dedicated "root" concept by aquired "entry point for edge" from GraphNode
-class RootedGraph(ProxyGraph):
+#   => must be aware of all edges and attach each connection separately
+class RootedGraph(GraphProxy):
     def __init__(self, rootid=None, **kw):
         self._rootid = rootid
         super().__init__(**kw)
