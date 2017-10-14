@@ -1,6 +1,8 @@
 import logging
 from collections import defaultdict
 
+from . import dom
+
 _log = logging.getLogger(__name__.split('.', 2)[1])
 
 # https://bradfieldcs.com/algos/graphs/representing-a-graph/
@@ -21,14 +23,30 @@ _log = logging.getLogger(__name__.split('.', 2)[1])
 #   https://en.wikipedia.org/wiki/OrientDB
 #   +? http://www.gstore-pku.com/en/
 
+# IDEA: watch dir/tree
+#   * disable = refresh content only manually
+#   * silent = inotifywait and update content without questions
+#   * mark = mark new files green, changed yellow, deleted red, replaced brown
 
+
+# THINK: <> Provider <> Accessor <> Executor <> CommandPattern
+#   * CommandPattern == lazy / deffered evaluation, binded values
+#   * Executor == immediate results from vars passed to Interpreter
+#   * Accessor == per-file / per-stat / per-param
+#   * Provider == ways to aquire values
+#     E.G. FileSystemProvider, ShellProvider, SocketProvider, ProcessProvider
 def run(argv):
-    g = ObjectGraph()
-    uids = g.add_objects_from("abc")
-    g.add_edge(uids[0], uids[1])
-    gp = GraphProxy(g)
+    gp = GraphProxy(ObjectGraph())
+
+    nps = gp.add_objects_from("abc")
+    gp.add_edge(nps[0], nps[1])
+    gp.add_edge(nps[1], nps[2])
+    exe = gp.add_object(dom.ShellProvider('ls'))
+    gp.add_edge(nps[2], exe)
+
     for np in gp:
-        s = str(np.get()) + ' -- ' + ' '.join(n.get() for n in np)
+        s = str(np.get()) + ' -> {' \
+            + ', '.join(str(n.get()) for n in np) + '}'
         print(s)
 
     # n = g.getRoot()
@@ -203,10 +221,19 @@ class BaseGraph(object):
     def __setitem__(self, uid, obj):
         self._nodes[uid] = obj
 
+    def __delitem__(self, uid):
+        # THINK: also delete part of network ?
+        #   => diff kind of "delete"
+        #   * existence in _nodes
+        #   * value vs None
+        #   * edges as network knowledge
+        #   * memory knowledge -- this uid from all vals of whole graph
+        del self._nodes[uid]
+
 
 # API accepts id (instead of objects) and returns objects itself
 # CHG: rename => GraphAdapter (because it pairs interface with container)
-#   (uid -> obj)
+## Convenience methods (uid -> obj) -- can be merged to container or dropped
 class ObjectGraph(BaseGraph):
     _new_uid = g_new_uid
 
@@ -218,6 +245,11 @@ class ObjectGraph(BaseGraph):
         self[uid] = obj
         return uid
 
+    # DEV: use as mix-in :: aggregate both (ContainerGraph + ObjectGraph)
+    #   BUT: in case of GraphProxy them may require additional logic anyway
+    #   BET? independent global functions to operate on IGraph
+    #    => can't be optimized for range operations CHECK if needed
+    #     == gen list of uids
     def add_objects_from(self, iterable):
         return [self.add_object(obj) for obj in iterable]
 
@@ -230,6 +262,11 @@ class ObjectGraph(BaseGraph):
 # * weak_ptr => may become nonexistent => exception | ret node.val itself
 # * may directly provide INode interface, locking node object on access
 #   => BUT: need specialized proxy per each INode ifc => can't be general
+#   NEED: sep method query per attr or attr range: name, content, stats, ...
+#     == Accessor / CachingAccessor with methods per property
+#     BAD: edges are also node property or independent ?
+#       << edges are outside of node value, being part of graph._neighbors
+#       << but edges can be queried from node accessor, E.G. files in dir
 # * provide directly NodeProxy instead of EdgeProxy
 #   - preview for current dir may require previews for all entries at once
 #   - can't choose clear attrs subset to delegate to edge (e.g. name, stats)
@@ -246,6 +283,10 @@ class NodeProxy(object):
         for uid in self._g.neighbors(self._uid):
             yield NodeProxy(self._g, uid)
 
+    @property
+    def uid(self):
+        return self._uid
+
 
 # API accepts/returns proxy instance of accessors to IdGraph
 #   * each proxy aggregates _uid and _g to be able to operate on itself
@@ -257,9 +298,25 @@ class GraphProxy(object):
     def __getitem__(self, uid):
         return NodeProxy(self._g, uid)
 
+    # NEED: gen iter_range(1, 100) or g[1:100] for scrolling really long lists
+    #   THINK: update only viewport when random files add/del
+    #   NEED: continuous infinite / stream iterator E.G. lines in "less" pager
     def __iter__(self):
         for uid in self._g:
             yield NodeProxy(self._g, uid)
+
+    # SEE: convenience funcs from Networkx
+    #   add_edges_from([(1,2)..])
+    #   add_neighbours_from(1, [2..]) == add_star_from([1,2..])
+    #   add_path_from([1,2,3..])
+    def add_edge(self, np1, np2):
+        self._g.add_edge(np1.uid, np2.uid)
+
+    def add_object(self, obj):
+        return NodeProxy(self._g, self._g.add_object(obj))
+
+    def add_objects_from(self, iterable):
+        return [self.add_object(obj) for obj in iterable]
 
 
 # Wrapper classes extend base container by shortcuts
