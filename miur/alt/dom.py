@@ -49,7 +49,7 @@ class TestProvider(Provider):
 
 class ShellProvider(Provider):
     def __init__(self, cmd):
-        super().__init__(proto.execute, cmd)
+        super().__init__(proto.execute_n, cmd)
 
 
 class ShellNodeProvider(ShellProvider):

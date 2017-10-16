@@ -32,9 +32,12 @@ _log = logging.getLogger(__name__.split('.', 2)[1])
 # THINK: <> Provider <> Accessor <> Executor <> CommandPattern
 #   * CommandPattern == lazy / deffered evaluation, binded values
 #   * Executor == immediate results from vars passed to Interpreter
-#   * Accessor == per-file / per-stat / per-param
-#   * Provider == ways to aquire values
-#     E.G. FileSystemProvider, ShellProvider, SocketProvider, ProcessProvider
+#   * Accessor == per-file / per-stat / per-param ways to aquire values
+#     E.G. all accessors are underlying for specialized GraphProvider
+#   * Provider == substitutable wrapper over service
+#     E.G. FileSystemProvider = ShellProvider, SocketProvider, ProcessProvider
+#   == FileSystemProvider(GraphProvider) -> {NativeAccessor|ShellAccessor}
+#   = ShellAccessor -> {ShellProvider}
 def run(argv):
     gp = GraphProxy(ObjectGraph())
 
@@ -291,6 +294,7 @@ class NodeProxy(object):
 # API accepts/returns proxy instance of accessors to IdGraph
 #   * each proxy aggregates _uid and _g to be able to operate on itself
 #   == weak_ptr == actual object inside Graph may be destroyed any time
+# NOTE: layer which combines heterogeneous graphs in single namespace
 class GraphProxy(object):
     def __init__(self, g):
         self._g = g
@@ -317,6 +321,10 @@ class GraphProxy(object):
 
     def add_objects_from(self, iterable):
         return [self.add_object(obj) for obj in iterable]
+
+    def add_star_from(self, rootnode, iterable):
+        for newnode in self.add_objects_from(iterable):
+            self.add_edge(rootnode, newnode)
 
 
 # Wrapper classes extend base container by shortcuts

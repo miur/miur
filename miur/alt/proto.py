@@ -16,7 +16,17 @@ def execute(cmd):
     except CalledProcessError:
         return None
     else:
-        return out[:-1].decode('utf-8').splitlines()
+        return out[:-1].decode('utf-8')
+
+
+def execute_n(cmd):
+    out = execute(cmd)
+    return None if out is None else out.splitlines()
+
+
+def execute_0(cmd):
+    out = execute(cmd)
+    return None if out is None else out.split('\0')
 
 
 # NEED:
@@ -31,7 +41,7 @@ def list2dom(items, parent=None):
 
 
 def cmd2dom(cmd, parent=None):
-    return list2dom(execute(cmd), parent)
+    return list2dom(execute_n(cmd), parent)
 
 
 # NOTE: in-place replacing of prop by value on access
