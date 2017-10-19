@@ -29,17 +29,18 @@ def print_graph(node, seen, depth=0):
     if p in seen:
         return
     seen.add(p)
-    print(" "*depth + p)
+    print('  '*depth + fs.basename(p))
     for n in node:
         print_graph(n, seen, depth + 1)
 
 
-# BUG: returns objects instead of values
 def run(argv):
     g = FindWalkerGraph('/etc/asciidoc')
+    print_graph(g.getRoot(), set())
     # for node in g.getRoot():
     #     print(node.get())
-    print_graph(g.getRoot(), set())
+    #     for n in node:
+    #         print('  ' + n.get())
 
 
 # TRY: replace by "functools.bind()"
@@ -95,6 +96,7 @@ class FindNode(object):
         self._cmd = cmd
         self._path = path
         self._g = None
+        self._uid = None
 
     # NEED: more node attrs accessors :: content, stats, etc
     def get(self):
@@ -108,25 +110,26 @@ class FindNode(object):
 
     def _paths2graph(self, paths):
         g = graph.ObjectGraph()
-        cache = {'': g.add_object(self._path)}
+        self._uid = g.add_object(self._path)
+        cache = {'': self._uid}
         for p in paths:
             if p in cache:
                 continue
             cache[p] = g.add_object(p)
-            while True:
+            while '' != p:
                 pp = fs.dirname(p)
-                if pp not in cache:
-                    cache[pp] = g.add_object(pp)
-                g.add_edge(cache[pp], cache[p])
-                if '' == pp:
+                if pp in cache:
+                    g.add_edge(cache[pp], cache[p])
                     break
+                cache[pp] = g.add_object(pp)
+                g.add_edge(cache[pp], cache[p])
                 p = pp
         return g
 
     def __iter__(self):
         if self._g is None:
             self._g = self._paths2graph(self._cmd(self._path))
-        for uid in self._g:
+        for uid in self._g.neighbors(self._uid):
             yield graph.NodeProxy(self._g, uid)
 
 

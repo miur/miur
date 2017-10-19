@@ -199,6 +199,8 @@ class BaseGraph(object):
         #     ALSO you need full fledged object of Edge -- to remain connected
         #     on one side (surrounding graph knowledge) when replacing edges
         #     connect-point to another node
+        # BAD: _neighbors don't support multi-edge connection between nodes
+        #   BUT: it supports self-edge
         self._neighbors[uid1].add(uid2)
         self._neighbors[uid2].add(uid1)
         # NEED: cache added node in adjacency set of each node
