@@ -24,11 +24,22 @@ def run1(argv):
     #     print(s)
 
 
+def print_graph(node, seen, depth=0):
+    p = node.get()
+    if p in seen:
+        return
+    seen.add(p)
+    print(" "*depth + p)
+    for n in node:
+        print_graph(n, seen, depth + 1)
+
+
 # BUG: returns objects instead of values
 def run(argv):
     g = FindWalkerGraph('/etc/asciidoc')
-    for node in g.getRoot():
-        print(node.get())
+    # for node in g.getRoot():
+    #     print(node.get())
+    print_graph(g.getRoot(), set())
 
 
 # TRY: replace by "functools.bind()"
@@ -76,6 +87,9 @@ class FindCommand(object):
 
 
 # NOTE: on access generates graph and caches it in isolated GraphContainer
+# Persistent on-demand
+#   * nothing -> all
+#   * created/destroyed at once
 class FindNode(object):
     def __init__(self, cmd, path):
         self._cmd = cmd
@@ -93,14 +107,20 @@ class FindNode(object):
     #     self._g = g
 
     def _paths2graph(self, paths):
-        g = graph.GraphProxy(graph.ObjectGraph())
-        path2uid = {'': g.add_object(self._path)}
-        for pp in paths:
-            p = pp
-            while p not in path2uid and '' != p:
-                path2uid[p] = g.add_object(p)
-                p = fs.dirname(p)
-            g.add_edge(path2uid[fs.dirname(p)], path2uid[pp])
+        g = graph.ObjectGraph()
+        cache = {'': g.add_object(self._path)}
+        for p in paths:
+            if p in cache:
+                continue
+            cache[p] = g.add_object(p)
+            while True:
+                pp = fs.dirname(p)
+                if pp not in cache:
+                    cache[pp] = g.add_object(pp)
+                g.add_edge(cache[pp], cache[p])
+                if '' == pp:
+                    break
+                p = pp
         return g
 
     def __iter__(self):
