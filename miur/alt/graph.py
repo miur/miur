@@ -149,17 +149,15 @@ class BaseGraph(object):
         #   * must be optimized for graphs which are "mostly tree" (at least)
         #     => nr_edges ~>= nr_nodes - 1
         #     => traversing nodes one-by-one => need adjacency info
-        self._nodes = {}
-        self._neighbors = defaultdict(set)  # cached adjacency
         ## NEED: for edges pointing to non-existent uids
         #   ALSO: traversing/filtering list of all nodes
         #       -- currently not in priority
         # self._edges = {}
-
         # THINK: is there need for sep _attrs field ?
         #   * general/common graph-related attrs can be stored directly in graph
         #       independent from node/edge object in graph itself
         #   => has sense if graph embodies network/media of some kind
+        self.clear()
 
     def add_node(self, uid, obj=None):
         if uid in self._nodes:
@@ -209,6 +207,10 @@ class BaseGraph(object):
     def neighbors(self, uid):
         return iter(self._neighbors[uid])
 
+    def clear(self):
+        self._nodes = {}
+        self._neighbors = defaultdict(set)  # cached adjacency
+
     ## Convenience methods
     # Prefer uids of nodes for default operations
     def __iter__(self):
@@ -240,12 +242,14 @@ class BaseGraph(object):
 # CHG: rename => GraphAdapter (because it pairs interface with container)
 ## Convenience methods (uid -> obj) -- can be merged to container or dropped
 class ObjectGraph(BaseGraph):
-    _new_uid = g_new_uid
+    def __init__(self, _new_uid=g_new_uid):
+        self._new_uid = _new_uid
+        super().__init__()
 
     # high-level api -- relocate in its own ObjectGraph superstructure
     #   MAYBE: aggregate instead of inherit ?
     def add_object(self, obj):
-        uid = ObjectGraph._new_uid()
+        uid = self._new_uid()
         self.add_node(uid)
         self[uid] = obj
         return uid
