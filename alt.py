@@ -3,7 +3,7 @@
 import sys
 import logging
 
-import miur.alt as M
+import miur.graph as M
 
 
 if __name__ == '__main__':
