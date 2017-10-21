@@ -1,3 +1,4 @@
+# TODO:(py3.4):USE: pathlib instead of os.path to manipulate pure paths
 import os.path as fs
 from . import proto, graph
 
