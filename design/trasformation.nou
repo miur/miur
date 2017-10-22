@@ -1,0 +1,105 @@
+Space
+  * Graph is coordinate/uid space
+  * Attrs are binded to coords (uid), regions (uid.rad(2)) or clusters (set{uid})
+  * GraphProxy -> NodeProxy -> Events -> Entity -> Accessors -> Provider
+
+  * iter() -> { on_iter() -> AccessStrategy { provider.get_entities(node.pr_id) -> transform(graph) } }
+          \-> { graph.get_neighbors(node.uid) }
+  AccessStrategy
+    - persistent
+    - ondemand
+    - lazy
+    - immediate
+    - cached
+
+
+Transformation
+  * modifies graph as network
+  * not related to type of entity at all -- pure network transformation
+  * parametrized by location (e.g. ProxyNode) on immediate call
+    Transformation(graph, node, generator, context)
+      NEED? generator to insert nodes
+
+
+Node
+  * proxy does not have value => therefore _represents_ any entity
+    = proxy is what left from node and you know nothing beyond
+  * node value impersonates entity
+    - DirNode
+      * preview for directory in 3rd panel is allowed to be any other stats of dir
+      * iterable nodes will be shown as part of graph
+    - FileNode
+    - ExecutableFileNode (backed by fs) -> stdout into VirtualFileNode
+      = DFL preview is file content, additional api .execute(argv, env)
+      * .execute() may produce isolated {node,list,graph} through provider
+      * .execute() !does not join! produced graph with global graph by DFL
+        => you may choose joint/isolated/none at the moment of execution
+        => "none" when you need only side-effects and not stdout
+    - VirtualDirNode -> for unionfs and logistics
+    - VirtualFileNode -> procfs-like generated data / inner state
+    - VirtualExecutableFileNode -> stdout into Virtual{Dir|File}Node
+      = DFL preview is result of execution, command itself only on "edit()"
+  * entity provides arbitrary set of accessors to attrs
+    - name
+    - stat
+    - ...
+  * entity has uid *per each* attr provider
+    - path for fs
+    - line number for plain text
+    - ...
+  * entity has no knowledge about relations with other entities
+    >> some external processing is necessary to determine relations and generate graph
+    ! BUT: directory is sole method to aquire relations inside fs
+    ! BET:(when parsing AST): produce graph directly w/o intermediate flat !
+  * accessor combines entity uid with underlying attr provider (e.g. fs)
+    - .ctime() -> os.ctime(self.path)
+  * accessor generates events as any other api/interface
+
+
+NOTE: access iter(node) and cursor focus(node) may generate similar events
+  * both events may lazy-generate and cache part of graph
+  ? where to place dispatcher function {event -> transformation}
+  ? where to store dispatcher data (who and how often can change it)
+    ~ directly in entities -- being binded to graph nodes
+    ~ separate ?custom? container ?
+  * event are independent and contains type of event and producing location (node)
+    == orthogonal coords in {event,graph,time} space
+
+
+Nested
+  * THINK: how to traverse seamlessly between outer and inner graph
+    > diving-in must look similar/exactly as iterating outer graph
+
+
+Graph
+  for graph-wide operations
+    * search paths between nodes
+    * search by criteria
+
+  IDEA overlay graphs combining ::: USE traversing paths
+    NOTE: immediate graphs aren't backed by container
+      => no need to pass graph in ctor or .add_object()
+      => you can't iter() this graph, only explicitly traverse()
+    E.G. immediate + virtual -- need container to store virtual layer nodes !
+      << it's too hard to force generators include additional custom edges
+      NEED: iter() must augment gen edges by stored virtual edges
+        >> call iter() on node provider before iter() container itself
+      BAD:NEED: uid for generated nodes -- to attach virtual edges
+        ~ store all gen nodes -- even immediate (reduce to lazy loading)
+        BAD: overlay anchors become invalid after garbage collection
+          << re-generated nodes has another uid after cache clean
+        ~ BET? overlay by traversing paths to be reproducible on another uid
+    ALT:THINK how to combine overlays from multiple arbitrary graphs ?
+      NEED: completely shared uid space
+        * no different nodes with same uid
+        * dangling edges with free end uid from another graph
+      ALT: combine by traverse paths instead of uids
+
+  DECIDE: bind whole graph to provider or individual nodes
+    ? use provider per node
+      * virtual nodes are special / different
+      * virtual edges may connect distinct graphs
+    ? combine nodes by layers and set provider per layer
+      + you may easily show all nodes of certain type
+      - memory to store uids of nodes in layer
+      * NEED: mechanics to seamlessly traverse between graph clusters
