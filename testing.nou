@@ -1,0 +1,5 @@
+NEED: repo *miur-test-data*
+  * multiple nested filesystem with links -- to test graphs traversing and combining
+  * text file formats -- for parsing as virtual graphs
+  * scripts -- generating virtual nodes from stdout
+  * media files -- binary preview testing

@@ -19,6 +19,13 @@ Transformation
   * parametrized by location (e.g. ProxyNode) on immediate call
     Transformation(graph, node, generator, context)
       NEED? generator to insert nodes
+  Superimpose / Augment
+    * convert uids between graph spaces
+    * insert nodes and edges from one graph into another
+    * connect graphs
+      ~ superimpose curr node with root
+      ~ bind root of inserted graph to current node
+      ~ BET? replace underlying graph in proxy by direct container
 
 
 Node
@@ -103,3 +110,21 @@ Graph
       + you may easily show all nodes of certain type
       - memory to store uids of nodes in layer
       * NEED: mechanics to seamlessly traverse between graph clusters
+
+
+Proxy
+  * proxy may be acquired even before node exists
+  * both __call__ and __iter__ must trigger generating and attaching graph
+  * on-demand subgraph may be hidden in root or any other node
+
+  * proxy of curr node is already in use and can't be replaced
+    << some obj have refs to proxy and may call it again, damaging graph
+  * on-demand entry in container initially contains metadata or nonexistent
+    >> on Tr it will be replaced by persistent entity
+    >> replace only once -- switch behavior
+      BAD:(None in node as flag): we assign unrelated meaning to None in graph
+      BAD:(bool VAR member as flag): excessive var and conditional per proxy
+      BET: on-demand replace/rewrite whole object by another one
+  XXX => ProxyNode are the same, always ? only inner strategy changes ?
+  IDEA: replace whole underlying graph _g inside proxy
+    => use graph wrapper which can trigger graph regeneration
