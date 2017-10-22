@@ -199,6 +199,12 @@ class BaseGraph(object):
         #     connect-point to another node
         # BAD: _neighbors don't support multi-edge connection between nodes
         #   BUT: it supports self-edge
+        # HACK: using edge-object you can find who connects to you
+        #   => so you can reconnect edges to another uid on node replace
+        #   * directed edge by itself in _neighbors doesn't allow this
+        #   * pair of directed edges requires to ensure invariants
+        #   * sometimes you need only single directed edge (e.g. symlink)
+        #   CHECK: no need to reconnect -- replace entity in node itself
         self._neighbors[uid1].add(uid2)
         self._neighbors[uid2].add(uid1)
         # NEED: cache added node in adjacency set of each node
