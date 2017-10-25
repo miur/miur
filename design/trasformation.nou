@@ -111,6 +111,25 @@ Graph
       - memory to store uids of nodes in layer
       * NEED: mechanics to seamlessly traverse between graph clusters
 
+  IDEA:BAD: graph-wide hardcoded gen strategy and trigger condition
+    ~ switch-case by uid => use logic directly inside diff Node classes
+    ~ convert node type in runtime => parametrize node by Strategy
+    ? change node provider in runtime ?
+    ? partial provider -- sep for node and edges ?
+    ? store proxy in graph or generate on access ?
+      + no ctor/dtor calls on access -- only on load
+        ~ gain is eliminated by lazy nodes with small cache
+      - additional memory per proxy
+  ATT: I treat graph as caching graph for generating nodes
+    !!! FAIL it's wrong approach !!!
+    * neighbors may be stored in nodes instead of sep G
+      + single hashkey lookup per node with attrs
+    * strategy per node may be stored in separate array in inherited G
+      << instead of proxy node of original G
+      => it's completely impl-dependent !
+    * strategy is value acquired/assigned/attributed to node
+      ! not original one !
+      it may share "node" container but does not intersects with entity
 
 Proxy
   * proxy may be acquired even before node exists
