@@ -13,6 +13,14 @@ Space
     - cached
 
 
+IDEA: provide fake file system by syscall hooking
+  USAGE: bash/find/grep launched from *miur* -- to apply coreutils ops to virtual nodes
+  * augment real fs by ro- virtual nodes with limited set of file operations
+    - read/edit content, stats, enlist as directory, behave as link or script, etc
+  * pseudomount isolated nested graphs with less limited set of file operations
+    - create new nodes and delete existing ones in virtual graph
+
+
 Transformation
   * modifies graph as network
   * not related to type of entity at all -- pure network transformation
@@ -82,6 +90,21 @@ Graph
   for graph-wide operations
     * search paths between nodes
     * search by criteria
+
+  Abstract Virtual Container
+    * graph is container _only_
+      - may be approximated as container of node containers
+      - or multiple containers related by uids per each attr
+    * graph operates and returns as results only uids (and stored vals)
+    * edges are 1st class citizens -- completely independent from nodes
+      - their generation is directly related to graph itself, not entities
+      - as nodes are inseparable (however hidden) part of graph,
+        \ they can be directly involved in generation of edges
+      - NodeContainer is inner struct in comparison to NodeProxy
+    * values may contain info about their edges, which must be extracted
+    * reduced ifc for pure virtual graphs (on contrast to on-demand graphs)
+      - impossible full enumeration for either nodes and edges
+      - impossible random access w/o sequential traversing
 
   IDEA overlay graphs combining ::: USE traversing paths
     NOTE: immediate graphs aren't backed by container
