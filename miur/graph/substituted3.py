@@ -1,3 +1,5 @@
+from . import graph, entity
+
 # NOTE: global neighbors dict is useful only to save memory in sparse graphs
 # with for many isolated nodes
 #   self._neighbors = defaultdict(set)
@@ -5,21 +7,52 @@
 
 
 def run(argv):
-    GraphContainer()
+    g = GraphContainer()
+    ru = g.add_object(entity.DirEntity('/etc/asciidoc'))
+    g.set_strategy(ru, AccumulateStrategy())
+
+    print('[' + g[ru].name + ']')
+    for u in g.neighbors(ru):
+        print(g[u].name)
+        for uu in g.neighbors(u):
+            print('  ' + g[uu].name)
+
+
+class AccumulateStrategy(object):
+    def __call__(self, event, g, obj):
+        print('yes')
+        if 'neighbors' != event:
+            return
+        try:
+            it = iter(obj)
+        except TypeError:
+            return
+        else:
+            # ERR: inserts objects in graph, even if already exists
+            #   NEED: resolve same neighbors into same set of uids
+            for o in it:
+                nu = g.add_neighbor(g, g.add_object(o))
+                nu.set_strategy(self)
+                yield nu
 
 
 # THINK: does NodeContainer needs to know its own uid ?
 #   MAYBE: it's enough to pass its own ouid only to methods which require ?
 class NodeContainer(object):
-    def __init__(self, entity):
+    def __init__(self, entity, strategy=None):
         # NOTE: entity must be passed to strategy
         self._entity = entity
+        self._attributes = {}
+        # TEMP: we assume edges does not have attributes
         self._neighbors = set()
-        # NOTE: multiple strategies per single node possible
-        #   BUT: they are composable and can be combined in single strategem
-        self._strategy = None
+        # NOTE: multiple strategies per single node behavior is possible
+        #   BUT: they are composable and can be combined in single stratagem
+        self._strategy = strategy
         # NOTE: transformation must be parameterizing the strategy
         self._transform = None
+
+    def set_strategy(self, strategy):
+        self._strategy = strategy
 
     def __call__(self, g):
         return self._entity
@@ -29,6 +62,7 @@ class NodeContainer(object):
     # BAD: gen node can't provide uids from this function ?
     #   BUT: it has access to 'g' ..., so it can insert new nodes directly
     def neighbors(self, g):
+        self._strategy('neighbors', g, self._entity)
         return self._neighbors
 
     # ERR: raise error if operation is unsupported for such NodeContainer
@@ -41,6 +75,7 @@ class NodeContainer(object):
         if uid in self._neighbors:
             raise LookupError(uid)
         self._neighbors.add(uid)
+        return uid
 
     # NOTE: use any callable object
     # CHG: arguable signature
@@ -52,6 +87,12 @@ class NodeContainer(object):
         return self._strategy(g, event, self._entity)
 
 
+# BAD: what to do with immediate graphs ?
+#   * generate and return uids of neighbors
+#   * uids may be different each time
+#   * retrieve object from graph by uid
+#   * object itself obeys strategy and can be acquired by NodeContainer
+#   ! strategies for both nodes and edges are integral parts of graph
 class GraphContainer(object):
     def __init__(self):
         self.clear()
@@ -72,3 +113,13 @@ class GraphContainer(object):
         if e_uid not in self._nodes:
             raise KeyError(e_uid)
         self._nodes[b_uid].add_neighbor(self, e_uid)
+
+    def add_object(self, obj):
+        uid = graph.g_new_uid()
+        if uid in self._nodes:
+            raise KeyError(uid)
+        self[uid] = obj
+        return uid
+
+    def set_strategy(self, uid, strategy):
+        return self._nodes[uid].set_strategy(strategy)
