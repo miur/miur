@@ -9,7 +9,7 @@ from . import graph, entity
 def run(argv):
     g = GraphContainer()
     ru = g.add_object(entity.DirEntity('/etc/asciidoc'))
-    g.set_strategy(ru, AccumulateStrategy())
+    g.set_strategy(ru, AccumulateGenerator())
 
     print('[' + g[ru].name + ']')
     for u in g.neighbors(ru):
@@ -18,22 +18,22 @@ def run(argv):
             print('  ' + g[uu].name)
 
 
-class AccumulateStrategy(object):
-    def __call__(self, event, g, obj):
-        print('yes')
+class AccumulateGenerator(object):
+    def __call__(self, event, g, node):
         if 'neighbors' != event:
             return
         try:
-            it = iter(obj)
+            it = iter(node(g))
         except TypeError:
             return
         else:
             # ERR: inserts objects in graph, even if already exists
             #   NEED: resolve same neighbors into same set of uids
             for o in it:
-                nu = g.add_neighbor(g, g.add_object(o))
-                nu.set_strategy(self)
-                yield nu
+                nu = g.add_object(o)
+                g.set_strategy(nu, self)
+                node.add_neighbor(g, nu)
+                # yield nu
 
 
 # THINK: does NodeContainer needs to know its own uid ?
@@ -62,7 +62,7 @@ class NodeContainer(object):
     # BAD: gen node can't provide uids from this function ?
     #   BUT: it has access to 'g' ..., so it can insert new nodes directly
     def neighbors(self, g):
-        self._strategy('neighbors', g, self._entity)
+        self._strategy('neighbors', g, self)
         return self._neighbors
 
     # ERR: raise error if operation is unsupported for such NodeContainer
