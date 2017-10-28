@@ -9,10 +9,34 @@ def g_new_uid():
 g_new_uid._maxuid = 0
 
 
+class GraphReadIfc(object):
+    def __getitem__(self, uid):
+        raise NotImplementedError()
+
+    def neighbors(self, uid):
+        raise NotImplementedError()
+
+
+class GraphWriteIfc(object):
+    def clear(self):
+        raise NotImplementedError()
+
+    def __setitem__(self, uid, obj):
+        """ Set value for new or existing node """
+        raise NotImplementedError()
+
+    def add_arrow(self, b_uid, e_uid):
+        raise NotImplementedError()
+
+
+class GraphContainerIfc(GraphReadIfc, GraphWriteIfc):
+    pass
+
+
 # NOTE: container has two sep ifc -- 'get' and 'set'
 #   => immediate graph is container-like but has only 'get' ifc
 #    ~ maybe it can support part of 'set' ifc such as set_root()
-class GraphContainer(object):
+class GraphContainer(GraphContainerIfc):
     def __init__(self):
         self.clear()
 
@@ -39,9 +63,11 @@ class GraphContainer(object):
 
 
 class ExtendedGraphContainer(GraphContainer):
+    # BAD: impossible for ImmediateGraph
     def __iter__(self):
         return iter(self._nodes)
 
+    # BAD: impossible for ImmediateGraph
     def __len__(self):
         return len(self._nodes)
 

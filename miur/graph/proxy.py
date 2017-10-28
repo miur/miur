@@ -5,6 +5,9 @@
 #     MAYBE: accessors have ifc equal to NodeContainer
 #       => then you can directly connect NodeProxy with NodeContainer without
 #       intermediate graph (which doesn't have container for Immediate anyway)
+# ! uid is meaningless for ImmediateGraph
+#   ~ directly connect NodeProxy->NodeContainer or ->Accessor->GraphContainer
+#   ~ always pass NodeProxy->{Immediate,Persistent}GraphProxy
 
 
 class NodeProxy(object):
