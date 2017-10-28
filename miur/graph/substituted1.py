@@ -7,11 +7,7 @@ def run(argv):
 
     rp = SignalNodeProxy(g, g.get_root())
     rp.set_strategy(SubstituteStrategy())
-
-    for n in rp:
-        print(n().name)
-        for nn in n:
-            print('  ' + nn().name)
+    proxy.print2lvl(rp)
 
 
 # ALT: emit to underlying graph -> replace graph

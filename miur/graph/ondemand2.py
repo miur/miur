@@ -6,11 +6,7 @@ def run(argv):
     g.set_root(g.add_object(None))
     gp = OndemandGraph(g)
     ru = gp.get_root()
-    print('[' + gp[ru].name + ']')
-    for u in gp.neighbors(ru):
-        print(gp[u].name)
-        for uu in gp.neighbors(u):
-            print('  ' + gp[uu].name)
+    graph.print2lvl(gp, ru)
 
 
 # MAYBE: NodeProxy isn't necessary at all -- move everything to GraphProxy ?

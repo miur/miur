@@ -9,7 +9,15 @@ def g_new_uid():
 g_new_uid._maxuid = 0
 
 
-class GraphReadIfc(object):
+def print2lvl(g, ru):
+    print('[' + g[ru].name + ']')
+    for u in g.neighbors(ru):
+        print(g[u].name)
+        for uu in g.neighbors(u):
+            print('  ' + g[uu].name)
+
+
+class IGraphRead(object):
     def __getitem__(self, uid):
         raise NotImplementedError()
 
@@ -17,7 +25,7 @@ class GraphReadIfc(object):
         raise NotImplementedError()
 
 
-class GraphWriteIfc(object):
+class IGraphWrite(object):
     def clear(self):
         raise NotImplementedError()
 
@@ -29,14 +37,14 @@ class GraphWriteIfc(object):
         raise NotImplementedError()
 
 
-class GraphContainerIfc(GraphReadIfc, GraphWriteIfc):
+class IGraphContainer(IGraphRead, IGraphWrite):
     pass
 
 
 # NOTE: container has two sep ifc -- 'get' and 'set'
 #   => immediate graph is container-like but has only 'get' ifc
 #    ~ maybe it can support part of 'set' ifc such as set_root()
-class GraphContainer(GraphContainerIfc):
+class GraphContainer(IGraphContainer):
     def __init__(self):
         self.clear()
 

@@ -10,12 +10,7 @@ def run(argv):
     g = GraphContainer()
     ru = g.add_object(entity.DirEntity('/etc/asciidoc'))
     g.set_strategy(ru, AccumulateGenerator())
-
-    print('[' + g[ru].name + ']')
-    for u in g.neighbors(ru):
-        print(g[u].name)
-        for uu in g.neighbors(u):
-            print('  ' + g[uu].name)
+    graph.print2lvl(g, ru)
 
 
 class AccumulateGenerator(object):

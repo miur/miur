@@ -1,18 +1,13 @@
 # INFO: direct NodeProxy -> NodeContainer
 
-from . import entity
+from . import entity, proxy
 
 
 # ? how to create first NodeProxy for ImmediateGraph ?
 def run(argv):
     g = ImmediateGraphProxy()
     rp = g.add_object(entity.DirEntity('/etc/asciidoc'))
-
-    print('[' + rp().name + ']')
-    for n in rp:
-        print(n().name)
-        for nn in n:
-            print('  ' + nn().name)
+    proxy.print2lvl(rp)
 
 
 # NOTE: works only with GraphProxy -- because ImmediateGraph has no uid

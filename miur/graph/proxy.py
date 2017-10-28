@@ -10,6 +10,14 @@
 #   ~ always pass NodeProxy->{Immediate,Persistent}GraphProxy
 
 
+def print2lvl(rp):
+    print('[' + rp().name + ']')
+    for n in rp:
+        print(n().name)
+        for nn in n:
+            print('  ' + nn().name)
+
+
 class NodeProxy(object):
     def __init__(self, g, uid):
         self._g = g

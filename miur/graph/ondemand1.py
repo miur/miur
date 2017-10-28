@@ -1,17 +1,11 @@
-from . import graph, provider
+from . import graph, proxy, provider
 
 
 def run(argv):
     g = graph.RootedGraphContainer()
     g.set_root(g.add_object(None))
-
     gp = OndemandGraph(g)
-    rn = gp.get_root()
-    print('[' + rn().name + ']')
-    for n in rn:
-        print(n().name)
-        for nn in n:
-            print('  ' + nn().name)
+    proxy.print2lvl(gp.get_root())
 
 
 # TRY: replace proxy and all attrs accessors by weakptr

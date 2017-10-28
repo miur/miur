@@ -1,12 +1,9 @@
-from . import entity
+from . import entity, proxy
 
 
 def run(argv):
     g = ImmediateGraph(entity.DirEntity('/etc/asciidoc'))
-    for n in g.get_root():
-        print(n().name)
-        for nn in n:
-            print('  ' + nn().name)
+    proxy.print2lvl(g.get_root())
 
 
 class ImmediateNode(object):

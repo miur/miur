@@ -8,11 +8,7 @@ def run(argv):
 
     gd = SignalDecorator(g, g.slot)
     rp = proxy.NodeProxy(gd, gd.get_root())
-
-    for n in rp:
-        print(n().name)
-        for nn in n:
-            print('  ' + nn().name)
+    proxy.print2lvl(rp)
 
 
 # BAD: replacement must be on per-node basis
