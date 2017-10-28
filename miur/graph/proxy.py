@@ -1,3 +1,10 @@
+# NOTE: all operations with nodes are conducted through NodeProxy
+#   * NodeProxy may point to any type of graph -- Immediate, Persistent, etc
+#   * If you need to replace underlying container of NodeProxy in runtime
+#     -- then you need sep accessors per each type of unerlying graph
+#     MAYBE: accessors have ifc equal to NodeContainer
+#       => then you can directly connect NodeProxy with NodeContainer without
+#       intermediate graph (which doesn't have container for Immediate anyway)
 
 
 class NodeProxy(object):
