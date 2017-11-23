@@ -56,3 +56,24 @@ mpd controls
 git / hg
   * list 'git status' as flat/nested graph to nodes --> for immitent edit
   * provide hunks as inner repr of file --> direct jump to hunk
+
+
+interactive exec
+  load list of items
+    $ pkgfile -bsg '*act*'
+  set single parametric cmdline
+    $ pacman -Si {}
+  apply cmdline to item under cursor and view result
+    => read about pkgs of interest one-by-one in arbitrary order
+
+
+interactive pipe
+  each folder represents single cmd of pipe
+  execution of first cmd creates items in folder (from delimited by \0 or \n)
+  you can choose items interactively and pass them to next cmd
+    ~ process items by 4kB blocks of inner buffering until 1st cmd waits on write() syscall
+    ~ reorder lines if this is desirable or pick+push lines you like and delete which you aren't interested in
+  then look inside folder of second cmd and repeat items processing again
+  IDEA: cache whole streamed results in each folder
+    => you can return several steps earlier and run only rest of pipe with tweaked input or cmds
+  IDEA:HACK: graphs instead of pipes -- like in "dgsh"
