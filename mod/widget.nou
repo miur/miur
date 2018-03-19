@@ -65,3 +65,6 @@ Preview
   extended viewer on 'i'
     ~ same script with additional flags
     ~ completely another script-aggregator
+  preview for custom file types in list-format
+    => general list-viewer can be optimized by lazy reading part of file and displaying only part on screen
+    e.g. pidgin/weechat chat messages as files with certain date
