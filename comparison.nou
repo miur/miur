@@ -1,3 +1,6 @@
+BLOG
+  https://www.quora.com/What-do-I-have-to-know-to-develop-a-file-manager-for-Linux
+
 FIND each and every file manager (Windows/Linux/Android)
   = SEE integration features with system/apps/services
   = THINK how tree-structure used in them
@@ -49,6 +52,14 @@ lfm
 Haskell
   https://github.com/hasufell/hsfm
   https://github.com/michaeldever/haskellfm
+
+Lisp
+  https://github.com/stacksmith/cl-fm
+  https://github.com/vozhyk-/minifileman
+  (OS) https://github.com/froggey/Mezzano
+  (emacs) https://writequit.org/denver-emacs/presentations/2016-05-24-elpy-and-dired.html
+    https://truongtx.me/2013/04/25/dired-as-default-file-manager-5-customize-ls-command
+    https://github.com/gabriel-laddel/flexi-trivial-dired
 
 ALSO:
   |aur/nav-git:| nav is a hackable ncurses file manager, inspired by vim, ranger, and dvtm.
