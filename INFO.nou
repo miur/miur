@@ -6,6 +6,9 @@ Microkernel relay in fm world
   add key hooks to TTS dirs content for blind people
 
 TODO
+  [_] SEE graph database
+    => maybe idea how to store *dom* ?
+    ? similar to btrfs decomposition
   [_] ALT: search file manager in Lisp
     NOTE: lisp
       + flexible language/domain boundary and REPL => useful for extending

@@ -1,3 +1,9 @@
+REPL
+  expose generaic functions and attributes of *dom* nodes/edges
+    => list them with short help by <Tab>
+  i.e. select/filter/sort as list operations / comprehensions
+
+
 ag
   each search query inside dir adds virtual entry inside that dir ("query")
     * look cached value by <l>
