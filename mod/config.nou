@@ -1,5 +1,21 @@
 %%%%% Configuration
 
+ARCH: distribution
+  IDEA
+    * provide multiple starting points for users (configs + presets)
+    * negotiate defaults in community to benefit all new users
+    * adjust user's personal setup as overlay over choosen default presets
+    * notify on upgrade when preset defaults are changing to alert user to adjust his configs once more
+  core configs
+    * bare (everything disabled)
+    * normal user (reasonable defaults)
+    * advanced user (powerful abilities)
+    * ultimate (everything enabled)
+  typical presets
+    * different servers to connect with preset settings
+    * different tasks / approaches configured
+
+
 caching converted/recompiled configuration files with
   like colorscheme: RGB -> 256-term-colors
 
