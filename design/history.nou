@@ -43,6 +43,11 @@ History
       BUT at the same time each hist point must have uid to refer old
         ? OrderedDict => to remove item from front/back ?
 
+  timestamps
+    history must contain and show timestamps
+      e.g. when you manually search command history for commands executed some days ago
+        (but don't remember any part of those commands to grep history)
+
 
 INSIGHT: *dom* is a combined space-time graph
   * flattened along 'time' axis
