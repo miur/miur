@@ -2,6 +2,10 @@ REF
   Python sync primitives with diagrams
     http://www.laurentluce.com/posts/python-threads-synchronization-locks-rlocks-semaphores-conditions-events-and-queues/
     http://effbot.org/zone/thread-synchronization.htm
+  Coroutines in C++
+    https://m.habr.com/post/201826/
+    https://github.com/whtc123/libuvc
+
 
 Readers-writers lock
   REF https://en.wikipedia.org/wiki/Readers%E2%80%93writers_problem
