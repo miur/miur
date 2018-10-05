@@ -68,3 +68,12 @@ Preview
   preview for custom file types in list-format
     => general list-viewer can be optimized by lazy reading part of file and displaying only part on screen
     e.g. pidgin/weechat chat messages as files with certain date
+  embed libterminal to support interactive-like ncurses preview
+    !! even vim can be used in this way
+  handle mapping of mime/extension to list of fallback chains with alternative viewers
+    * generate/choose user defaults on startup based on available prg in env
+    * fallback is only used to support uncertain files (i.e. user _intends_ to use all of these programs)
+    * alternative fallback chains per mime can be switched in runtime by keybinding or shown at the same time in different widges
+    * create multiple built-in high-performance previewers -- text, text-syntax, hex-binary
+    * use special preview-server to amortize cost of pygmentize startup -- and simply pipe data through it
+  open vim directly in widget's place (or separately) with current content shown in preview
