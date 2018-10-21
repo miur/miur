@@ -1,3 +1,10 @@
+[_] TRY: ZeroMQ + libuv as communication core
+  http://zguide.zeromq.org/page:all
+    => it can even be used as core of "dgsh" shell
+  ALSO:SEE: POSIX compliant |community/nanomsg|
+    = You might like, guess Amit, Martin SUSTRIK's next artwork
+    https://github.com/nanomsg/nng
+
 Test stand (out-of-control environment)
   multiple process N >> n cores
     scheduled sleep
