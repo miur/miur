@@ -5,6 +5,7 @@ REF
   Coroutines in C++
     https://m.habr.com/post/201826/
     https://github.com/whtc123/libuvc
+    (nano-coroutines) https://www.youtube.com/watch?v=j9tlJAqMV7U
 
 
 Readers-writers lock
