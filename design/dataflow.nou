@@ -1,0 +1,32 @@
+events -> | fetch | update_dom | add_colors | viewer | -> events
+
+  <events>
+  |*fetch* << fs
+  |
+  <data>
+  |*update_dom* << dom
+  |
+  ----------
+  <data>
+  |*use_data* << config (?widgets?)
+  |
+  <visual_graph> =
+  |*use_layout* << config(layout)
+  |
+  <visual_graph> =
+  |*use_colors* << config(colors)
+  |  NEED:(for properties pattern matching)
+  |   - full access to DOM + respective ids of layout items
+  |   - fetch batch of ids properties
+  |
+  <visual_graph> |*viewer* << fs(img) | <visual_graph>
+  | NEED:
+    - on first connection fetch full visual_graph dom for current type of viewer (already cached)
+    - autosubsribe to incremental updates of dom
+    - when visual error is suspected -- discard everything and request full fetch from zero
+      = by explicit events OR emulate reconnect subscription to fetch data again
+    - use input visual_graph language as representation of serialized widgets
+    - associate widgets with data strems -- to directly request more data on resize or scroll
+  |
+  <keypress>
+  | -> <events>
