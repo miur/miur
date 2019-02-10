@@ -30,3 +30,13 @@ events -> | fetch | update_dom | add_colors | viewer | -> events
   |
   <keypress>
   | -> <events>
+
+
+Caching model
+  all_layouts -> list of displayed objects and their properties -> query and cache only this dataset
+    = reduce queried info to requested info only (protocol negotiation and amendments)
+    = assemble requested info from all gui at once -- and track changes to it only
+      NEED: load balancing strategy to prevent scrolling generating too much update requests
+  onchange -> | dataset_cache | layout | view | gui_cache | -> onchange
+    = watch for underlying fs / data-producer -- for events which invalidate the cached/displayed area (only)
+    = watch for gui events which request properties or area outside of current cache
