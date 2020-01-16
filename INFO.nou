@@ -6,6 +6,29 @@ Microkernel relay in fm world
   add key hooks to TTS dirs content for blind people
 
 TODO
+  [_] DEV: intelligent monitoring of user activity statistics
+    * user typical behavior patterns -- headless wandering up-down-up-down, looking into random files, etc..
+    * separate statistics <frame> per each dynamic workflow switch
+    CASE: user goes to categorize 1000+ files for 4 hours
+      -- then on retro he looks into statistics and thinks about mapping decisions on task volume
+    CASE: unpacking-deleting many archives with bug logs, finding, reading logs, and grepping
+      -- then optimizing keymaps or even creating separate workflow *mode* for this regular work task
+      e.g. categorizing --> use 'c' to 'cut' file and 'i' to 'insert'
+      e.g. regularization --> use 'c' and 'i' to rename files
+    !! BET: apply such usage statistics on whole user system stack :: kernel + wm + web + fm + editor
+      <= because workflow is straight-through all these systems
+      + monitoring system load/events/traces can be also useful by itself (system optimizing)
+        or as auxiliary data (user ifc usage latency due to network speed)
+  [_] IDEA: fm cfg -- is also filesystem-like virtual structure (registry)
+  [_] TRY: tightly integrate with Linux system-wide ecosystem
+    e.g. kernel, systemd, dbus, coreutils, wm, editor, etc.
+    = don't create your own services, daemons, mounts and sockets -- you have systemd
+    = don't create your own communication bus -- you have dbus
+    = don't create media framework -- you have gstreamer
+    = don't manage windows -- you have wm
+    <= after all each *workflow* permeats everything on all levels through whole system
+      * e.g. modal keybindings are <global> and full immediate keyset is composed from all programs
+  [_] make keybindings (key->func) into simple plugin, which can be replaced, augmented or overlayed
   [_] SEE graph database
     => maybe idea how to store *dom* ?
     ? similar to btrfs decomposition
