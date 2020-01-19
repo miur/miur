@@ -1,4 +1,5 @@
-PR := ./miur.py
+PR := ./alt.py
+# PR := ./miur.py
 .DEFAULT_GOAL = main
 
 .PHONY: main
@@ -14,3 +15,14 @@ test:
 DEPS := python-pytest python-pytest-cov python-pytest-mock
 deps-install:
 	sudo pacman -S $(DEPS:%='%') </dev/stdin >/dev/stdout
+
+PRFDEPS := python-pycallgraph python-psutil python-memory_profiler
+deps-profile:
+	pacaur -S $(PRFDEPS:%='%') </dev/stdin >/dev/stdout
+
+call-graph:
+	pycallgraph graphviz --output-file="/tmp/pycallgraph.png" -- $(PR)
+	feh "/tmp/pycallgraph.png"
+
+mem-prf:
+	python -u -m memory_profiler -- "$(PR)"
