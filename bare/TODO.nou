@@ -1,0 +1,66 @@
+SPDX-FileCopyrightText: 2020 Dmytro Kolomoiets <amerlyq@gmail.com> and contributors.
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-----
+
+TODO
+  [_] Use multiprocessing to workaround urwid+signal_handler problems at least temporary
+    = keep ipc://connect.sock inside XDG_RUNTIME_DIR= /run/user/1000/miur/connect-$pid.sock
+  [_] Use incoming and outgoing channels from single socket
+    TRY:PERF: pass io/ev events to same pub/sub bus and filter them solely by *mod* prefix
+    e.g. "input.keyboard" and "output.ui"
+
+
+Features
+  Suggest alternative (advertise)
+    * user must know about new plugins
+      = new possibilities of workflows
+    * user must know about new similar plugins
+      = maybe he is eager to convert
+    * user must know about major development in old ones
+      = he may refused to convert earlier, but if problems fixed -- he will try it
+    * easy feedback on +/- of each plugin shared with everyone
+      = cetralize and gather opinions on plugins users had tried
+        BAD! too many opinions is too many == same problem as Steam and GooglePlay
+      = access online db from plugin docs to help to choose plugin
+    * announcements of plugins upgrade incompatibilities with manual intervention
+      = like ArchLinux for package upgrades between versions
+  Usage GIF (watch)
+    %/gif/ OR %/demo/
+    * each *feature* must contain preview of workflow -- because simple "help" is not enough
+  Trial Try (interact)
+    * each *feature* must be possible to almost immediately enable, try, and disable
+    * slots for generic *features* after reverting must keep and restore all settings of previous favorite choice of *feature*
+  Collaborative Document
+    * replace installed *feature* by development version with all the docs, etc. OR revert back to minimal installation version
+    * merge everything together with configuration into one static binary for embedded and remote systems
+    * edit runtime code on the fly
+    * involve literally everybody working with *miur* into contributing something back, even words corrections
+      e.g. send small fixes as mails with git patches
+        + auto-create PRs from them
+        + auto-test them by CI
+
+
+USE: ZeroMQ :: http://zguide.zeromq.org/py:all
+  curses + ZeroMQ + multiprocessing + poll
+    https://learning-0mq-with-pyzmq.readthedocs.io/en/latest/pyzmq/multiprocess/multiprocess.html
+    https://learning-0mq-with-pyzmq.readthedocs.io/en/latest/pyzmq/multisocket/zmqpoller.html
+    BUT: inproc:// not possible for multiprocessing
+      https://opensource.com/article/17/4/grok-gil
+    BET: devices
+      https://learning-0mq-with-pyzmq.readthedocs.io/en/latest/pyzmq/pyzmqdevices/pyzmqdevices.html
+      OFF: https://pyzmq.readthedocs.io/en/latest/devices.html
+    Interprocess communication with pyzmq and multiprocessing
+      https://gist.github.com/lebedov/2400604
+      + https://stackoverflow.com/questions/25367700/python-multithreaded-zeromq-req-rep
+  TUT
+    ++ Getting REAL Concurrency out of Python3 with ZeroMQ
+      https://csirtgadgets.com/commits/2019/1/5/combat-automation-in-opsec-getting-real-concurrency-out-of-python3-with-zeromq
+    Python for the Lab Using pyZMQ for inter-process communication: Part 2
+      https://www.pythonforthelab.com/blog/using-pyzmq-for-inter-process-communication-part-2/
+  MAYBE:TRY: MonitoredQueue to trace events
+    E.G. https://learning-0mq-with-pyzmq.readthedocs.io/en/latest/pyzmq/pyzmqdevices/monitorqueue.html
+    OFF: https://pyzmq.readthedocs.io/en/latest/devices.html
+    IDEA: https://csirtgadgets.com/commits/2019/4/20/hunting-through-your-home-network-with-elastiflow
+  SEE: socket lingering
+    https://github.com/zeromq/pyzmq/issues/755
