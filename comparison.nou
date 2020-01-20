@@ -38,6 +38,7 @@ SEE
   http://git.2f30.org/noice/files.html
   (fork) https://github.com/jarun/nnn
     https://github.com/jarun/nnn/wiki/nnn-vs.-noice
+  LOG: https://www.reddit.com/r/commandline/comments/ep04rs/file_manager_nnn_v29_simpler_controls_smarter/
 
 !! mc
   https://www.midnight-commander.org/
@@ -60,6 +61,11 @@ Lisp
   (emacs) https://writequit.org/denver-emacs/presentations/2016-05-24-elpy-and-dired.html
     https://truongtx.me/2013/04/25/dired-as-default-file-manager-5-customize-ls-command
     https://github.com/gabriel-laddel/flexi-trivial-dired
+
+
+ALT: tree-viewers
+  https://dystroy.org/broot/
+
 
 ALSO:
   |aur/nav-git:| nav is a hackable ncurses file manager, inspired by vim, ranger, and dvtm.

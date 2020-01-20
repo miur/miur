@@ -6,6 +6,12 @@ Microkernel relay in fm world
   add key hooks to TTS dirs content for blind people
 
 TODO
+  IDEA: merge ideas from kirie/dast and miur
+    = connect data streams between modules/widgets to compose pipelines
+    * "vmstat -w 1" -> sed -> accumulate -> gnuplot -> termwindow
+  IDEA: plot graphics directly inside preview window
+    * "vmstat -w 1" -> scroll preview window table (like multiline watch())
+    OR: "vmstat -w 1" -> terminal graph of values
   [_] DEV: intelligent monitoring of user activity statistics
     * user typical behavior patterns -- headless wandering up-down-up-down, looking into random files, etc..
     * separate statistics <frame> per each dynamic workflow switch
@@ -29,6 +35,22 @@ TODO
     <= after all each *workflow* permeats everything on all levels through whole system
       * e.g. modal keybindings are <global> and full immediate keyset is composed from all programs
   [_] make keybindings (key->func) into simple plugin, which can be replaced, augmented or overlayed
+  [_] IDEA: flat Linux IDE
+    use simplest one-window fm w/o layout
+    use multiple cli/gui windows at once
+    distribute preview over these windows
+    manipulate tiling WM windows to compose useful layout for fm workflow
+    ? how about SSH -- each window will have its own communication channel muxed on SSH ?
+  [_] flat project structure, merge with *miur-docs*
+    workflow as combination of features
+    piece each workflow as composition of other workflows
+    workflow is a flat feature itself
+    dynamic switching between workflows
+      e.g. exploratory navigation -> batch preview -> categorizing files
+  [_] changelog/diff between any two versions
+    situation: you haven't updated your highly-customized configs in the last half a year
+    ::: show "what's new" to import new changes to your configs
+      -- because direct "diff" of highly customized configs is useless
   [_] SEE graph database
     => maybe idea how to store *dom* ?
     ? similar to btrfs decomposition
