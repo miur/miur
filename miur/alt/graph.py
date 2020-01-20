@@ -1,3 +1,8 @@
+#
+# SPDX-FileCopyrightText: 2017 Dmytro Kolomoiets <amerlyq@gmail.com> and contributors.
+#
+# SPDX-License-Identifier: GPL-3.0-only
+#
 import logging
 from collections import defaultdict
 

@@ -1,3 +1,8 @@
+#
+# SPDX-FileCopyrightText: 2016 Dmytro Kolomoiets <amerlyq@gmail.com> and contributors.
+#
+# SPDX-License-Identifier: GPL-3.0-only
+#
 from ..base import BaseCommand
 import miur.core.fs as fs
 

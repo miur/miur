@@ -1,5 +1,14 @@
-/.cache/
+#
+# SPDX-FileCopyrightText: 2016-2017,2020 Dmytro Kolomoiets <amerlyq@gmail.com> and contributors.
+#
+# SPDX-License-Identifier: CC0-1.0
+#
 
-*.pyo
-*.pyc
-__pycache__
+## Generated build logs, local pkgs, etc.
+/_build*/
+
+## Local-only reference materials, temporary cloned repos, etc.
+&*/
+
+## Python project
+__pycache__/

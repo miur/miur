@@ -1,3 +1,8 @@
+#
+# SPDX-FileCopyrightText: 2017 Dmytro Kolomoiets <amerlyq@gmail.com> and contributors.
+#
+# SPDX-License-Identifier: GPL-3.0-only
+#
 from . import graph, entity
 
 # NOTE: global neighbors dict is useful only to save memory in sparse graphs

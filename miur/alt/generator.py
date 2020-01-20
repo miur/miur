@@ -1,3 +1,8 @@
+#
+# SPDX-FileCopyrightText: 2017 Dmytro Kolomoiets <amerlyq@gmail.com> and contributors.
+#
+# SPDX-License-Identifier: GPL-3.0-only
+#
 # TODO:(py3.4):USE: pathlib instead of os.path to manipulate pure paths
 import os.path as fs
 from . import proto, graph

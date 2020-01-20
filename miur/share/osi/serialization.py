@@ -1,3 +1,8 @@
+#
+# SPDX-FileCopyrightText: 2016 Dmytro Kolomoiets <amerlyq@gmail.com> and contributors.
+#
+# SPDX-License-Identifier: GPL-3.0-only
+#
 # TODO: generalize for any object type by some 'unfactory()/accessor()' passed to Serialize
 # ALT:(name): CommandPresentation
 

@@ -1,3 +1,9 @@
+#
+# SPDX-FileCopyrightText: 2016-2017 Dmytro Kolomoiets <amerlyq@gmail.com> and contributors.
+#
+# SPDX-License-Identifier: GPL-3.0-only
+#
+
 import logging
 import abc
 from collections.abc import Callable, Iterable

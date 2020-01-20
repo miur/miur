@@ -1,0 +1,6 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: miur
+Upstream-Contact: Dmytro Kolomoiets <amerlyq@gmail.com>
+Source: https://github.com/miur/miur
+License: GPL-3.0-only
+Copyright: 2016-2020 Dmytro Kolomoiets <amerlyq@gmail.com> and contributors

@@ -1,3 +1,9 @@
+#
+# SPDX-FileCopyrightText: 2017 Dmytro Kolomoiets <amerlyq@gmail.com> and contributors.
+#
+# SPDX-License-Identifier: GPL-3.0-only
+#
+
 # NOTE: all operations with nodes are conducted through NodeProxy
 #   * NodeProxy may point to any type of graph -- Immediate, Persistent, etc
 #   * If you need to replace underlying container of NodeProxy in runtime

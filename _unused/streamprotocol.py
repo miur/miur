@@ -1,3 +1,8 @@
+#
+# SPDX-FileCopyrightText: 2016 Dmytro Kolomoiets <amerlyq@gmail.com> and contributors.
+#
+# SPDX-License-Identifier: GPL-3.0-only
+#
 # IDEA: replace 'core/server' by coro handler
 #   http://stackoverflow.com/questions/37452039/how-to-correct-asyncio-yield-from-in-data-received
 # BAD: there no 'connection_lost' callback beside polling on 'reader.at_eof()'

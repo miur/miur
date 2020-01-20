@@ -1,3 +1,8 @@
+#
+# SPDX-FileCopyrightText: 2016 Dmytro Kolomoiets <amerlyq@gmail.com> and contributors.
+#
+# SPDX-License-Identifier: GPL-3.0-only
+#
 # NOTE: effect is completely equivalent to any other message
 #   * it carries part of new state
 #   * all of them has cmd type 'state.update'

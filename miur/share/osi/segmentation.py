@@ -1,3 +1,8 @@
+#
+# SPDX-FileCopyrightText: 2016 Dmytro Kolomoiets <amerlyq@gmail.com> and contributors.
+#
+# SPDX-License-Identifier: GPL-3.0-only
+#
 # RFC: pack/unpack will be the same for all streams/pipes/fifo
 # BUT: for UDP unpack requires sending requests for repeating lost UDP packets
 # DEV: periodically send 'heartbeat' data and drop incomplete msg on each
