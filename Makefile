@@ -4,7 +4,8 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-PR := ./alt.py
+PR := ./bare/miur
+# PR := ./alt.py
 # PR := ./miur.py
 .DEFAULT_GOAL = main
 
