@@ -6,6 +6,21 @@ NEED protocol to communicate with core
     =>> WTF when you launch several different cores at time, how to sync ?
 
 
+CMP: @/uix-*
+  Different UIs in Python - The Dan MacKinlay family of variably-well-considered enterprises
+    https://danmackinlay.name/notebook/python_gui.html
+  TangibleUI Технические средства человеко-компьютерного взаимодействия TUI. Обзор и анализ возможностей использования в игрофикации
+    https://cyberleninka.ru/article/n/tehnicheskie-sredstva-cheloveko-kompyuternogo-vzaimodeystviya-tui-obzor-i-analiz-vozmozhnostey-ispolzovaniya-v-igrofikatsii/viewer
+    = different NOT:STD ifc for manipulation
+  Oberon TextUI & AcmePlan9 TextEditor
+    https://en.wikipedia.org/wiki/Text-based_user_interface#Oberon
+  LUI
+    https://en.wikipedia.org/wiki/Natural-language_user_interface
+  VIZ
+    https://en.wikipedia.org/wiki/Category:User_interfaces
+
+
+
 Adoption
   nvim (headless server)
     edit text regions
