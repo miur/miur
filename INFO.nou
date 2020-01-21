@@ -12,6 +12,45 @@ TODO
   IDEA: plot graphics directly inside preview window
     * "vmstat -w 1" -> scroll preview window table (like multiline watch())
     OR: "vmstat -w 1" -> terminal graph of values
+  [_] IDEA: distribute multiple different packages
+    MOVE: @/miur/beatrix/packaging.nou
+    * miur-core -- core only (plugins manager), all other features and their deps install by yourself
+    * miur-pico -- fm core -- only some ultimately necessary features with their deps, other install yourself
+    * miur-full -- all features present, but without system deps -- they are available if present and complain if not
+    * miur-all -- all features with all optional dependecies "required" to be installed by pkgmanager
+    * miur-bin -- bundle all python code and libraries into single binary (maybe, beside only glibc)
+      e.g. LIKE:(borg): https://borgbackup.readthedocs.io/en/stable/faq.html
+    * miur-dev -- everything together with tests, documentation, issues, worklogs, etc. to get full development context
+    * miur-my  -- everything archived together with unrelated reference information from ./&*/ dirs
+  [_] IDEA: workflow is interactive pipeline
+    * each *feature* accepts some data and creates some data (like kirie)
+      fs => filelist
+    * your ia transforms this data by *feature* functions and shows you new derivative data
+      filelist => ia select files
+    * you may pass this result to next step -- and process this data further by each new module
+      selection => grep AAA
+      grep AAA => grep BBB
+      grep BBB => ia text editor
+      modified text => save file
+    * you store all actions into history and may retrospect it and *reuse*
+      => this cmd history together with results work as *workbook* e.g. jupyter-notebook / Wolfram
+      => export results as research log
+    * macro -- create ia scripts from reused history == pick actions you wish to repeat
+      filelist => grep => grep => [ia edit] => save
+  [_] IDEA: tree-structured text -- text as filesystem
+    http://www.tom-ridge.com/2016-02-19_tree-structured_text.html
+    SRC: https://github.com/tomjridge/tree_structured_text
+  [_] Lem -- specification tool
+    https://www.cl.cam.ac.uk/~pes20/lem/
+    THINK: http://www.tom-ridge.com/2013-11-24_experience_of_using_lem.html
+    ALSO: parsers / compilers
+      http://www.tom-ridge.com/2014-11-21_talk_on_parsing_at_the_university_of_sussex.html
+      PROMO: http://www.tom-ridge.com/resources/2014-11-21_sussex_slides.standalone.html
+  [_] ARCH: tus -- open protocol for resumable file uploads
+    https://tus.io/
+  [_] SEE: db with git-like history IDEA: use as underlying DOM
+    https://github.com/terminusdb/terminus-server/blob/dev/docs/whitepaper/terminusdb.pdf
+    TALK: https://www.reddit.com/r/git/comments/eondi2/git_for_data_a_terminusdb_technical_paper/
   [_] DEV: intelligent monitoring of user activity statistics
     * user typical behavior patterns -- headless wandering up-down-up-down, looking into random files, etc..
     * separate statistics <frame> per each dynamic workflow switch
@@ -23,8 +62,12 @@ TODO
       e.g. regularization --> use 'c' and 'i' to rename files
     !! BET: apply such usage statistics on whole user system stack :: kernel + wm + web + fm + editor
       <= because workflow is straight-through all these systems
+        ALSO:SEE: Reproducible recorded research
+          https://renku.readthedocs.io/en/latest/
       + monitoring system load/events/traces can be also useful by itself (system optimizing)
         or as auxiliary data (user ifc usage latency due to network speed)
+    ALSO: monitor system resources statistics for child processes and threads
+      !! even for short-lived processes lauched as "cp" or "preview"
   [_] IDEA: fm cfg -- is also filesystem-like virtual structure (registry)
   [_] TRY: tightly integrate with Linux system-wide ecosystem
     e.g. kernel, systemd, dbus, coreutils, wm, editor, etc.
@@ -34,6 +77,11 @@ TODO
     = don't manage windows -- you have wm
     <= after all each *workflow* permeats everything on all levels through whole system
       * e.g. modal keybindings are <global> and full immediate keyset is composed from all programs
+    IDEA: Common Workflow Language -- spec to connect all cli tools together
+      https://www.commonwl.org/
+    IDEA: "docker" is no more than a way to convert "dynamic exe + libraries + configuration" into basic composable "build blocks" of systems
+      !! similar to my *miur* linux-as-IDE idea, where I use miur as skeleton and grow different apps around it
+      => similar to my *airy* repo with apps configured for personal preferences
   [_] make keybindings (key->func) into simple plugin, which can be replaced, augmented or overlayed
   [_] IDEA: flat Linux IDE
     use simplest one-window fm w/o layout
