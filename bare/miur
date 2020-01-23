@@ -17,10 +17,7 @@ import sys
 import threading
 import time
 
-# import blessed
-import inspect
 import pickle
-import prctl
 import urwid
 
 import zmq
@@ -149,10 +146,19 @@ def logger_client(src_uri, dst_uri):
 
 def set_current_thread_name(nm=None):
     if nm is None:
+        import inspect
         nm = inspect.currentframe().f_back.f_code.co_name
     nm = __appname__ + "/" + nm
     threading.current_thread().name = nm
-    prctl.set_name(nm)
+
+    # HACK:BAD:(docs): overwrites "sys.argv" to change process name
+    # BET: use explicit shebang "#!/usr/bin/python" and substitute path in post-install hook (for virtualenv)
+    #   OR by maintainer when building package for concrete distribution
+    try:
+        import prctl
+        prctl.set_name(nm)
+    except:
+        pass
 
 
 def main(argv):
@@ -170,10 +176,6 @@ def main(argv):
     #     root.removeHandler(h)
     # root.filters -> root.removeFilter(f)
 
-    # HACK:BAD:(docs): overwrites "sys.argv" to change process name
-    # BET: use explicit shebang "#!/usr/bin/python" and substitute path in post-install hook (for virtualenv)
-    #   OR by maintainer when building package for concrete distribution
-    prctl.set_name(__appname__)
     set_current_thread_name()
 
     src_uri = "inproc://broker"
