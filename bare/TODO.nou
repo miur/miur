@@ -64,3 +64,31 @@ USE: ZeroMQ :: http://zguide.zeromq.org/py:all
     IDEA: https://csirtgadgets.com/commits/2019/4/20/hunting-through-your-home-network-with-elastiflow
   SEE: socket lingering
     https://github.com/zeromq/pyzmq/issues/755
+  DEBUG
+    ++ https://stackoverflow.com/questions/15837022/does-zmq-expose-any-internal-logging-if-so-how-do-you-use-it
+    https://stackoverflow.com/questions/43981272/zeromq-is-there-a-limitation-for-the-amount-of-topics-that-subs-can-subscribe-f
+    https://medium.com/@8th_Dev/real-world-8th-debugging-a-client-server-application-with-zeromq-1a8b7be635b4
+    https://github.com/JustinTulloss/zeromq.node/issues/585
+  DEPLOY
+    https://docs.openstack.org/oslo.messaging/pike/admin/zmq_driver.html
+    https://www.circl.lu/doc/misp/misp-zmq/
+  ALT:CMP:
+    nanomsg
+      https://nanomsg.org/documentation-zeromq.html
+    opendds / combined
+      https://objectcomputing.com/resources/publications/mnb/comparing-opendds-and-zeromq-usage-and-performance
+
+
+LTTng
+  https://events19.linuxfoundation.org/wp-content/uploads/2017/12/Fine-grained-Distributed-Application-Monitoring-Using-LTTng-J%C3%A9r%C3%A9mie-Galarneau-EfficiOS.pdf
+  https://lttng.org/blog/2019/07/16/debugging-python-applications/
+  https://github.com/giraldeau/lttng-tools/blob/master/doc/python-howto.txt
+  https://pypi.org/project/lttnganalyses/
+  https://stackoverflow.com/questions/56379377/is-it-possible-to-use-babeltrace-python-api-or-any-other-software-tool-for-rea
+  http://archive.eclipse.org/tracecompass/doc/stable/org.eclipse.tracecompass.doc.user/LTTng-Tracer-Control.html
+
+
+Introspect Dynamic Topology
+  IDEA: track subscriptions -- from each [module.instance.socket.topic]
+    http://hintjens.com/blog:37
+    https://stackoverflow.com/questions/51074564/pyzmq-zeromq-how-to-get-a-subscription-key-from-a-sub-socket

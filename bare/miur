@@ -6,6 +6,10 @@
 #
 # SUMMARY: crude fm impl
 #
+# SEIZE:TUT: http://urwid.org/tutorial/index.html
+#
+# NICE:READ: http://hintjens.com/blog:84
+#
 
 import logging
 import os, os.path as fs
@@ -15,94 +19,132 @@ import time
 
 # import blessed
 import inspect
+import pickle
 import prctl
 import urwid
+
 import zmq
+from zmq import devices
+from zmq.log.handlers import PUBHandler
 
 
 __appname__ = "miur"
-_log = logging.getLogger(__name__.partition('.')[2].partition('.')[0])
 
 
 def ui_client(src_uri, dst_uri):
     set_current_thread_name()
     ctx = zmq.Context.instance()
 
-    src_sock = ctx.socket(zmq.SUB)
-    src_sock.setsockopt_string(zmq.SUBSCRIBE, '')
-    src_sock.connect(src_uri)
+    # NOTE:(cohesion): connect topology backward :: from dst to src
+    pub = ctx.socket(zmq.PUSH)
+    pub.connect(dst_uri)
 
-    dst_sock = ctx.socket(zmq.PUB)
-    dst_sock.connect(dst_uri)
+    _log = zeromq_log(pub, logging.DEBUG)
+
+    sub = ctx.socket(zmq.SUB)
+    sub.connect(src_uri)
+    sub.setsockopt_string(zmq.SUBSCRIBE, '*')  # custom broadcast
+    sub.setsockopt_string(zmq.SUBSCRIBE, 'ui')
 
     try:
         ## BET: python-urwid
-        body = urwid.Text("Text")
-        prompt = urwid.Edit("Prompt: ")
-        view = urwid.Frame(
-            header=prompt,
-            body=urwid.Filler(body, valign='bottom'),
-            focus_part='header')
+        # [Urwid] key capture in different views
+        # http://lists.excess.org/pipermail/urwid/2011-July/001080.html
+        body = urwid.Text("<Press ',' to exit>")
+        view = urwid.Filler(body, 'top')
 
-        def exit_when(k):
-            if k in ('q', 'Q', 'enter'):
+        def unhandled_input(key):
+            if key in ('esc', ','):
                 raise urwid.ExitMainLoop()
+            pub.send_multipart([b'key', pickle.dumps(key)])
+            _log.info("Press: " + key)
 
-        loop = urwid.MainLoop(view, unhandled_input=exit_when)
+            # FIXME: change text only in subscriber
+            body.set_text(repr(key))
+
+        loop = urwid.MainLoop(view, unhandled_input=unhandled_input)
         loop.run()
 
-        ## ALT: python-blessed
-        # term = blessed.Terminal()
-        # with term.cbreak():
-        #     key = ''
-        #     while key.lower() != 'q':
-        #         key = term.inkey(timeout=5)
-        #         if not key:
-        #             _log.info("Timeout")
-        #         elif key.is_sequence:
-        #             print("got sequence: {0}.".format((str(key), key.name, key.code)))
-        #         elif key:
-        #             _log.debug(f'got {key}')
-        #             dst_sock.send_pyobj(key)
+    except KeyboardInterrupt:
+        pass
     finally:
-        dst_sock.send_pyobj('q')
-        dst_sock.close()
-        src_sock.close()
+        _log.info("Fin: " + threading.current_thread().name)
+        pub.send_multipart([b'*', pickle.dumps('quit')])
+        pub.close()
+        sub.close()
         # ERR:(exception): can call only once in main thread
         # zmq.Context.instance().term()
-    _log.info("End: " + threading.current_thread().name)
 
 
-# RENAME? communication_hub
-def central_hub(src_uri, dst_uri):
+def zeromq_log(dst, level=None):
+    ## Gather all logs
+    # https://github.com/zeromq/pyzmq/blob/master/examples/logger/zmqlogger.py
+    # https://pyzmq.readthedocs.io/en/latest/api/zmq.log.handlers.html
+    # ++ https://stackoverflow.com/questions/40218325/use-of-pyzmqs-logging-handler-in-python
+    # zlog = PUBHandler('inproc://log')
+    # NOTE: use the same dst_uri sink as other modules
+    handler = PUBHandler(dst)
+    handler.root_topic = 'log'
+    return redirect_log(handler, level)
+
+
+def filename_log(level=None):
+    d_build = fs.join(fs.dirname(fs.dirname(__file__)), "_build")
+    f_log = fs.join(d_build, __appname__ + ".log")
+    os.makedirs(d_build, exist_ok=True)
+    handler = logging.FileHandler(f_log)
+    return redirect_log(handler, level)
+
+
+def redirect_log(handler, level=logging.INFO):
+    tid = threading.get_native_id()  # OR: str(os.getpid())
+    mod = __name__.partition('.')[2].partition('.')[0]
+    mod = (mod if mod else 'root') + '-' + str(tid)
+    log = logging.getLogger(mod)
+
+    if level is None:
+        level = logging.DEBUG
+    handler.setLevel(level)
+
+    # TODO: also print pid/tid inside log msg to distinguish threads
+    fmt = "%(asctime)s %(name)8s %(levelname)s [%(module)s:%(lineno)d]: %(message)s"
+    handler.setFormatter(logging.Formatter(fmt, datefmt="%H:%M:%S"))
+
+    log.addHandler(handler)
+    return log
+
+
+def logger_client(src_uri, dst_uri):
     set_current_thread_name()
     ctx = zmq.Context.instance()
 
-    src_sock = ctx.socket(zmq.SUB)
-    src_sock.setsockopt_string(zmq.SUBSCRIBE, '')
-    src_sock.bind(src_uri)
+    sub = ctx.socket(zmq.SUB)
+    sub.connect(src_uri)
+    sub.setsockopt_string(zmq.SUBSCRIBE, '')
 
-    dst_sock = ctx.socket(zmq.PUB)
-    dst_sock.bind(dst_uri)
+    _log = filename_log()
+    _log.info('-' * 40)
 
     try:
-        # FIXME: drain all messages from queue on reconnect before loop
-        #     e.g. msgs with timestamp less then ./hub starttime
-        #   => otherwise on ./hub restart it will get and replay all messages,
-        #     already obsolete at that moment
-        cmd = None
-        while not isinstance(cmd, str) or cmd.lower() != 'q':
-            cmd = src_sock.recv_pyobj()
-            _log.info(cmd)
-            dst_sock.send_pyobj(cmd)
-        _log.info("End: " + threading.current_thread().name)
-    except KeyboardInterrupt:
-        dst_sock.send_pyobj('q')
+        while True:
+            frames = sub.recv_multipart()
+            topic = frames[0].decode('utf-8')
+            if topic.startswith('log'):
+                lvl = getattr(logging, topic.partition('.')[2])
+                msg = frames[1].decode('utf-8')
+                if msg.endswith('\n'):
+                    msg = msg[:-1]
+            else:
+                lvl = logging.DEBUG
+                msg = pickle.loads(frames[1])
+
+            _log.log(lvl, '[' + topic + '] ' + str(msg))
+
+    except (zmq.ContextTerminated, KeyboardInterrupt):
+        pass
     finally:
-        dst_sock.close()
-        src_sock.close()
-        # ERR:(exception): can call only once in main thread
-        # zmq.Context.instance().term()
+        # _log.info("Fin: " + threading.current_thread().name)
+        sub.close()
 
 
 def set_current_thread_name(nm=None):
@@ -113,51 +155,61 @@ def set_current_thread_name(nm=None):
     prctl.set_name(nm)
 
 
-def handle_exception(a):
-    if issubclass(a.exc_type, KeyboardInterrupt):
-        threading.__excepthook__(a.exc_type, a.exc_value, a.exc_traceback)
-        return
-    # _log.addHandler(logging.StreamHandler(stream=sys.stderr))
-    _log.critical("Uncaught exception", exc_info=(a.exc_type, a.exc_value, a.exc_traceback))
-
-
-def init_logging(level=logging.INFO):
-    d_build = fs.join(fs.dirname(fs.dirname(__file__)), "_build")
-    os.makedirs(d_build, exist_ok=True)
+def main(argv):
     logging.basicConfig(
-        level=level,
-        filename=fs.join(d_build, __appname__ + ".log"),
-        datefmt="%H:%M:%S",
-        format=("%(asctime)s %(name)8s %(levelname)s " +
-                "[%(module)s:%(lineno)d]: %(message)s")
+        level=logging.DEBUG,
+        handlers=(),
+        # datefmt="%H:%M:%S",
+        # format=("%(asctime)s %(name)8s %(levelname)s " +
+        #         "[%(module)s:%(lineno)d]: %(message)s")
     )
 
+    ## FUTURE: reset logger when reloading code in runtime
+    # root = logging.getLogger()
+    # for h in root.handlers[:]:
+    #     root.removeHandler(h)
+    # root.filters -> root.removeFilter(f)
 
-def main(argv):
-    init_logging(logging.DEBUG)
-    _log.info('-' * 40)
-
-    # HACK:BAD:(docs): overwrites "argv" to change process name
+    # HACK:BAD:(docs): overwrites "sys.argv" to change process name
     # BET: use explicit shebang "#!/usr/bin/python" and substitute path in post-install hook (for virtualenv)
     #   OR by maintainer when building package for concrete distribution
     prctl.set_name(__appname__)
     set_current_thread_name()
 
-    io_uri = "inproc://input"
-    ev_uri = "inproc://events"
+    src_uri = "inproc://broker"
+    dst_uri = "inproc://feedback"
+
+    # CHG: use broker only as discovery service
+    #   http://wiki.zeromq.org/whitepapers:brokerless#toc3
+    # INFO: PULL+XPUB :: https://github.com/zeromq/libzmq/issues/2267
+    # ENH: use clone{srv,cli}5.py :: PUB+ROUTER+PULL server
+    # TODO: cap (capture) socket to redirect everything to external logger module
+    #   BET: connect logger as any other module but with SUB('')
+    # TODO: ctl (conntrol) socket to control flow from logger/etc.
+    hub = devices.ThreadDevice(zmq.FORWARDER, zmq.PULL, zmq.XPUB)
+    hub.bind_in(dst_uri)
+    # FIXED: +++ https://stackoverflow.com/questions/30864145/zmq-no-subscription-message-on-xpub-socket-for-multiple-subscribers-last-value/30975378
+    # hub.setsockopt_out(zmq.XPUB_VERBOSE, True)
+    hub.bind_out(src_uri)
+    # CHECK: drain all messages from queue on reconnect before loop
+    #     e.g. msgs with timestamp less then ./hub starttime
+    #   => otherwise on ./hub restart it will get and replay all messages,
+    #     already obsolete at that moment
+    hub.start()
 
     # threading.excepthook = handle_exception  # NEED: python>=3.8
-    threading.Thread(name="hub", target=central_hub, args=(io_uri, ev_uri)).start()
+    threading.Thread(name="logger", target=logger_client, args=(src_uri, dst_uri)).start()
 
     # BAD: "urwid" must be the main thread, because raw_screen.start() registers UNIX signals
-    ui_client(ev_uri, io_uri)
+    ui_client(src_uri, dst_uri)
+
+    # WARN: can call only once in main thread
+    # NEED: call before joining threads to interrupt zmq.proxy
+    zmq.Context.instance().term()
 
     for t in threading.enumerate():
         if t is not threading.main_thread():
             t.join()
-
-    # WARN: can call only once in main thread
-    zmq.Context.instance().term()
 
 
 if __name__ == "__main__":
