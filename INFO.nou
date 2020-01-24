@@ -6,6 +6,9 @@ Microkernel relay in fm world
   add key hooks to TTS dirs content for blind people
 
 TODO
+  [_] IDEA: use filewatchers to monitor write()/etc. to send invalidation events into DB (update requests)
+    a quick review of file watchers - anarcat
+      https://anarc.at/blog/2019-11-20-file-monitoring-tools/
   [_] IDEA: use GraphQL as query interface for central *miur* daemon db
     https://hub.packtpub.com/7-reasons-to-choose-graphql-apis-over-rest-for-building-your-apis/
   [_] IDEA: merge ideas from kirie/dast and miur
@@ -50,6 +53,11 @@ TODO
       PROMO: http://www.tom-ridge.com/resources/2014-11-21_sussex_slides.standalone.html
   [_] ARCH: tus -- open protocol for resumable file uploads
     https://tus.io/
+  [_] ALSO: IPFS Powers the Distributed Web
+    SPEC: https://ipfs.io/
+      IMPL: https://github.com/ipfs/go-ipfs/blob/master/docs/experimental-features.md#ipfs-filestore
+  [_] Sharing and archiving data sets with Dat - anarcat
+    https://anarc.at/blog/2018-09-10-sharing-and-archiving-data-sets-with-dat/
   [_] SEE: db with git-like history IDEA: use as underlying DOM
     https://github.com/terminusdb/terminus-server/blob/dev/docs/whitepaper/terminusdb.pdf
     TALK: https://www.reddit.com/r/git/comments/eondi2/git_for_data_a_terminusdb_technical_paper/
