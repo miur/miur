@@ -170,12 +170,6 @@ def main(argv):
         #         "[%(module)s:%(lineno)d]: %(message)s")
     )
 
-    ## FUTURE: reset logger when reloading code in runtime
-    # root = logging.getLogger()
-    # for h in root.handlers[:]:
-    #     root.removeHandler(h)
-    # root.filters -> root.removeFilter(f)
-
     set_current_thread_name()
 
     src_uri = "inproc://broker"
