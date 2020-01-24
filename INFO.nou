@@ -6,10 +6,12 @@ Microkernel relay in fm world
   add key hooks to TTS dirs content for blind people
 
 TODO
-  IDEA: merge ideas from kirie/dast and miur
+  [_] IDEA: use GraphQL as query interface for central *miur* daemon db
+    https://hub.packtpub.com/7-reasons-to-choose-graphql-apis-over-rest-for-building-your-apis/
+  [_] IDEA: merge ideas from kirie/dast and miur
     = connect data streams between modules/widgets to compose pipelines
     * "vmstat -w 1" -> sed -> accumulate -> gnuplot -> termwindow
-  IDEA: plot graphics directly inside preview window
+  [_] IDEA: plot graphics directly inside preview window
     * "vmstat -w 1" -> scroll preview window table (like multiline watch())
     OR: "vmstat -w 1" -> terminal graph of values
   [_] IDEA: distribute multiple different packages
