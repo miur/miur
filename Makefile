@@ -9,10 +9,16 @@ pkgname := miur
 brun := ./main/$(pkgname).py
 bdir := _build
 
+
+.PRECIOUS: %/
+%/: ; +@mkdir -p '$@'
+
+# THINK: always open /dev/tty for TUI to allow redirection of /dev/stdout
 .PHONY: main
 main: PYTHONASYNCIODEBUG=1
-main:
-	@$(brun)
+main: | $(bdir)/
+	'$(brun)' --pidfile='$(bdir)/pid'
+# 2> '$(bdir)/$(pkgname).log'
 
 .PHONY: test
 # py.test -s  # print() on screen
@@ -59,7 +65,7 @@ pkg-build: PKGBUILD
 ## DEBUG: verify threading and ZeroMQ created threads
 .PHONY: ps
 ps:
-	@pstree -ct $(if $(args),-aps) $$(pgrep $(pkgname))
+	@pstree -ct $(if $(args),-aps) $$(pgrep --pidfile '$(bdir)/pid')
 
 
 log:
