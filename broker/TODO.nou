@@ -1,0 +1,44 @@
+SPDX-FileCopyrightText: 2020 Dmytro Kolomoiets <amerlyq@gmail.com> and contributors.
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-----
+%%%% broker
+
+
+TODO:DEV:
+  [_] hub must inject broadcast msg "hub {pub|sub} [dis]connected <module>"
+  [_] ENH: use clone{srv,cli}5.py :: PUB+ROUTER+PULL server
+    http://zguide.zeromq.org/py:all#Reliable-Pub-Sub-Clone-Pattern
+  [_] MAYBE: ctl (conntrol) socket to control flow from logger/etc.
+  [_] FIXED: +++ https://stackoverflow.com/questions/30864145/zmq-no-subscription-message-on-xpub-socket-for-multiple-subscribers-last-value/30975378
+    ::: hub.setsockopt_out(zmq.XPUB_VERBOSE, True)
+  [_] CHECK: drain all messages from queue on reconnect before loop
+    e.g. msgs with timestamp less then ./hub starttime
+    => otherwise on ./hub restart it will get and replay all messages, already obsolete at that moment
+
+
+DECI: Custom .vs. generic broker
+  BET? zeromq/malamute IMPL broker patterns
+    https://github.com/zeromq/malamute
+  OR: zeromq/majordomo IMPL clients <-> services
+    https://github.com/zeromq/majordomo
+  CHG: use broker only as discovery service
+    http://wiki.zeromq.org/whitepapers:brokerless#toc3
+
+
+READ: data transfer
+  SRC: zeromq/filemq IMPL file transfering on request
+    https://github.com/zeromq/filemq
+  NICE:READ: Revisting ZeroMQ Multipart - Hintjens.com
+    http://hintjens.com/blog:84
+
+
+INFO
+  PULL+XPUB
+    https://github.com/zeromq/libzmq/issues/2267
+  NOTE: queue .vs. forwarder
+    https://learning-0mq-with-pyzmq.readthedocs.io/en/latest/pyzmq/devices/queue.html
+    https://learning-0mq-with-pyzmq.readthedocs.io/en/latest/pyzmq/devices/forwarder.html
+    ::: we don't need MonitoredForwarder -- simply connect monitor as one of subscribers
+      [$] TODO: cap (capture) or mon (monitor) socket to redirect everything to external logger module
+      BET: connect logger as any other module but with SUB('')

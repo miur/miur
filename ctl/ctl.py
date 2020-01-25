@@ -8,6 +8,7 @@ import threading
 
 import zmq
 
+from ..broker import broker_hub
 from ..ifc import *
 
 def create_instance(argv):
@@ -18,6 +19,8 @@ def create_instance(argv):
     log_uri = "inproc://log"
     trace_uri = "inproc://trace"
     client_uri = (src_uri, dst_uri, log_uri)
+
+    broker_hub(dst_uri, src_uri)
 
     # WARN: can call only once in main thread
     # NEED: call before joining threads to interrupt zmq.proxy
