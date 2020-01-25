@@ -65,7 +65,7 @@ pkg-build: PKGBUILD
 ## DEBUG: verify threading and ZeroMQ created threads
 .PHONY: ps
 ps:
-	@pstree -ct $(if $(args),-aps) $$(pgrep --pidfile '$(bdir)/pid')
+	@pstree -ctp $(if $(full),-as) $(or $(shell pgrep --pidfile '$(bdir)/pid'),$(error "wrong PID file"))
 
 
 log:
