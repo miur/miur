@@ -3,18 +3,16 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 #
-
-PR := ./bare/miur
-# PR := ./alt.py
-# PR := ./miur.py
 .DEFAULT_GOAL = main
 
+pkgname := miur
+brun := ./main/$(pkgname).py
 bdir := _build
 
 .PHONY: main
 main: PYTHONASYNCIODEBUG=1
 main:
-	@$(PR)
+	@$(brun)
 
 .PHONY: test
 # py.test -s  # print() on screen
@@ -36,11 +34,11 @@ deps-profile:
 	pacaur -S $(PRFDEPS:%='%') </dev/stdin >/dev/stdout
 
 call-graph:
-	pycallgraph graphviz --output-file="$(bdir)/pycallgraph.png" -- $(PR)
-	feh "$(bdir)/pycallgraph.png"
+	pycallgraph graphviz --output-file='$(bdir)/pycallgraph.png' -- '$(brun)'
+	feh '$(bdir)/pycallgraph.png'
 
 mem-prf:
-	python -u -m memory_profiler -- "$(PR)"
+	python -u -m memory_profiler -- '$(brun)'
 
 
 .PHONY: pkg-install
@@ -61,8 +59,8 @@ pkg-build: PKGBUILD
 ## DEBUG: verify threading and ZeroMQ created threads
 .PHONY: ps
 ps:
-	@pstree -ct $(if $(args),-aps) $$(pgrep miur)
+	@pstree -ct $(if $(args),-aps) $$(pgrep $(pkgname))
 
 
 log:
-	tail -F '$(bdir)/miur.log'
+	tail -F '$(bdir)/$(pkgname).log'
