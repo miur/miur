@@ -6,5 +6,7 @@
 
 import sys
 
+from ..ctl import create_instance
+
 def main():
-    print(sys.argv)
+    create_instance(sys.argv)
