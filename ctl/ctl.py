@@ -8,22 +8,30 @@ import threading
 
 import zmq
 
-from ..broker import broker_hub
 from ..ifc import *
+from ..broker import broker_hub
+from ..scenario import play_scenario
 
-def create_instance(argv):
+
+def create_instance(opts):
     set_current_thread_name()
 
     src_uri = "inproc://broker"     # RENAME: events
     dst_uri = "inproc://feedback"   # RENAME: posts
     log_uri = "inproc://log"
-    trace_uri = "inproc://trace"
-    client_uri = (src_uri, dst_uri, log_uri)
+    # trace_uri = "inproc://trace"
 
-    broker_hub(dst_uri, src_uri)
+    connections = (src_uri, dst_uri, log_uri)
+
+    broker_hub(*connections)
+
+    # BET:TODO: set names of all processes/threads/asyncjobs from inside this ./ctl/
+    play_scenario(*connections)
 
     # WARN: can call only once in main thread
     # NEED: call before joining threads to interrupt zmq.proxy
+    # DEV:TODO: staff each plugin into process/thread/asyncjob resource mgmt
+    #   => conditionally auto-cleanup on exit depending on threading topology
     zmq.Context.instance().term()
 
     for t in threading.enumerate():
