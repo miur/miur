@@ -73,7 +73,7 @@ def ui_client(src_uri, dst_uri):
         # zmq.Context.instance().term()
 
 
-def zeromq_log(dst, level=None):
+def zeromq_log(dst, lvl=None):
     ## Gather all logs
     # https://github.com/zeromq/pyzmq/blob/master/examples/logger/zmqlogger.py
     # https://pyzmq.readthedocs.io/en/latest/api/zmq.log.handlers.html
@@ -82,42 +82,45 @@ def zeromq_log(dst, level=None):
     # NOTE: use the same dst_uri sink as other modules
     handler = PUBHandler(dst)
     handler.root_topic = 'log'
-    return redirect_log(handler, level)
+    return redirect_log(handler, lvl)
 
 
-def filename_log(level=None):
+def filename_log(lvl=None):
     d_build = fs.join(fs.dirname(fs.dirname(__file__)), "_build")
     f_log = fs.join(d_build, __appname__ + ".log")
     os.makedirs(d_build, exist_ok=True)
     handler = logging.FileHandler(f_log)
-    return redirect_log(handler, level)
+    return redirect_log(handler, lvl)
 
 
-def redirect_log(handler, level=logging.INFO):
+def redirect_log(handler, lvl=None):
     tid = threading.get_native_id()  # OR: str(os.getpid())
     mod = __name__.partition('.')[2].partition('.')[0]
     mod = (mod if mod else 'root') + '-' + str(tid)
-    log = logging.getLogger(mod)
-
-    if level is None:
-        level = logging.DEBUG
-    handler.setLevel(level)
+    fmt = "%(asctime)s %(name)8s %(levelname:<8s) [%(module)s:%(lineno)d]: %(message)s"
 
     # TODO: also print pid/tid inside log msg to distinguish threads
-    fmt = "%(asctime)s %(name)8s %(levelname)s [%(module)s:%(lineno)d]: %(message)s"
-    handler.setFormatter(logging.Formatter(fmt, datefmt="%H:%M:%S"))
+    # SEE: https://stackoverflow.com/questions/38323810/does-pythons-logging-config-dictconfig-apply-the-loggers-configuration-setti
+    logging.basicConfig(
+        level=(lvl if lvl is not None else logging.DEBUG),
+        handlers=(handler,),
+        datefmt="%H:%M:%S",
+        format=fmt
+    )
+    return logging.getLogger(mod)
 
-    log.addHandler(handler)
-    return log
 
-
-def logger_client(src_uri, dst_uri):
+def logger_sink(src_uri, dst_uri, log_uri):
     set_current_thread_name()
     ctx = zmq.Context.instance()
 
-    sub = ctx.socket(zmq.SUB)
-    sub.connect(src_uri)
+    sub = ctx.socket(zmq.XSUB)
+    sub.connect(log_uri)
     sub.setsockopt_string(zmq.SUBSCRIBE, '')
+
+    mon = ctx.socket(zmq.SUB)
+    mon.connect(src_uri)
+    mon.setsockopt_string(zmq.SUBSCRIBE, '')
 
     _log = filename_log()
     _log.info('-' * 40)
@@ -161,24 +164,24 @@ def set_current_thread_name(nm=None):
         pass
 
 
-def main(argv):
-    logging.basicConfig(
-        level=logging.DEBUG,
-        handlers=(),
-        # datefmt="%H:%M:%S",
-        # format=("%(asctime)s %(name)8s %(levelname)s " +
-        #         "[%(module)s:%(lineno)d]: %(message)s")
-    )
 
-    set_current_thread_name()
-
-    src_uri = "inproc://broker"
-    dst_uri = "inproc://feedback"
-
+# BET? zeromq/malamute IMPL broker patterns
+#   https://github.com/zeromq/malamute
+# OR: zeromq/majordomo IMPL clients <-> services
+#   https://github.com/zeromq/majordomo
+# ALSO: zeromq/filemq IMPL file transfering on request
+#   https://github.com/zeromq/filemq
+# NOTE: queue .vs. forwarder
+#   https://learning-0mq-with-pyzmq.readthedocs.io/en/latest/pyzmq/devices/queue.html
+#   https://learning-0mq-with-pyzmq.readthedocs.io/en/latest/pyzmq/devices/forwarder.html
+#   ::: we don't need MonitoredForwarder -- simply connect monitor as one of subscribers
+#   [_] TODO: hub must inject broadcast msg "hub {pub|sub} [dis]connected <module>"
+def broker_hub(src_uri, dst_uri):
     # CHG: use broker only as discovery service
     #   http://wiki.zeromq.org/whitepapers:brokerless#toc3
     # INFO: PULL+XPUB :: https://github.com/zeromq/libzmq/issues/2267
     # ENH: use clone{srv,cli}5.py :: PUB+ROUTER+PULL server
+    #   http://zguide.zeromq.org/py:all#Reliable-Pub-Sub-Clone-Pattern
     # TODO: cap (capture) socket to redirect everything to external logger module
     #   BET: connect logger as any other module but with SUB('')
     # TODO: ctl (conntrol) socket to control flow from logger/etc.
@@ -193,11 +196,23 @@ def main(argv):
     #     already obsolete at that moment
     hub.start()
 
+
+def main(argv):
+    set_current_thread_name()
+
+    src_uri = "inproc://broker"     # RENAME: events
+    dst_uri = "inproc://feedback"   # RENAME: posts
+    log_uri = "inproc://log"
+    trace_uri = "inproc://trace"
+    client_uri = (src_uri, dst_uri, log_uri)
+
+    broker_hub(dst_uri, src_uri)
+
     # threading.excepthook = handle_exception  # NEED: python>=3.8
-    threading.Thread(name="logger", target=logger_client, args=(src_uri, dst_uri)).start()
+    threading.Thread(target=logger_sink, args=client_uri).start()
 
     # BAD: "urwid" must be the main thread, because raw_screen.start() registers UNIX signals
-    ui_client(src_uri, dst_uri)
+    ui_client(*client_uri)
 
     # WARN: can call only once in main thread
     # NEED: call before joining threads to interrupt zmq.proxy
