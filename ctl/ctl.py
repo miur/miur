@@ -8,8 +8,11 @@ import threading
 
 import zmq
 
+from ..ifc import *
 
 def create_instance(argv):
+    set_current_thread_name()
+
     src_uri = "inproc://broker"     # RENAME: events
     dst_uri = "inproc://feedback"   # RENAME: posts
     log_uri = "inproc://log"
