@@ -5,6 +5,7 @@
 #
 
 import argparse
+import fcntl
 import os
 import sys
 
@@ -33,7 +34,8 @@ def pipeguard(f):
 def main():
     opts = options(sys.argv[1:])
     with open(opts.pidfile, 'w') as pidf:
-        # NOTE: keep file opened until program dies
+        # NOTE: keep file opened and locked until program dies -- to track session
+        fcntl.flock(pidf, fcntl.LOCK_EX | fcntl.LOCK_NB)
         pidf.write(str(os.getpid()))
         pidf.flush()
         pipeguard(lambda: create_instance(opts))

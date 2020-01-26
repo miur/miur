@@ -8,6 +8,7 @@
 pkgname := miur
 brun := ./main/$(pkgname).py
 bdir := _build
+session := default
 
 
 .PRECIOUS: %/
@@ -17,7 +18,7 @@ bdir := _build
 .PHONY: main
 main: PYTHONASYNCIODEBUG=1
 main: | $(bdir)/
-	'$(brun)' --pidfile='$(bdir)/pid'
+	'$(brun)' --pidfile='$(bdir)/$(session).pid'
 # 2> '$(bdir)/$(pkgname).log'
 
 .PHONY: test
@@ -63,9 +64,10 @@ pkg-build: PKGBUILD
 
 
 ## DEBUG: verify threading and ZeroMQ created threads
+getPID = $(or $(shell pgrep --pidfile '$1'),$(error "wrong PID in file $1"))
 .PHONY: ps
 ps:
-	@pstree -ctp $(if $(full),-as) $(or $(shell pgrep --pidfile '$(bdir)/pid'),$(error "wrong PID file"))
+	@pstree -ctp $(if $(full),-as) '$(call getPID,$(bdir)/$(session).pid)'
 
 
 log:
