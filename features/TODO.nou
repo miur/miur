@@ -1,0 +1,33 @@
+SPDX-FileCopyrightText: 2020 Dmytro Kolomoiets <amerlyq@gmail.com> and contributors.
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-----
+
+Features
+  Suggest alternative (advertise)
+    * user must know about new plugins
+      = new possibilities of workflows
+    * user must know about new similar plugins
+      = maybe he is eager to convert
+    * user must know about major development in old ones
+      = he may refused to convert earlier, but if problems fixed -- he will try it
+    * easy feedback on +/- of each plugin shared with everyone
+      = cetralize and gather opinions on plugins users had tried
+        BAD! too many opinions is too many == same problem as Steam and GooglePlay
+      = access online db from plugin docs to help to choose plugin
+    * announcements of plugins upgrade incompatibilities with manual intervention
+      = like ArchLinux for package upgrades between versions
+  Usage GIF (watch)
+    %/gif/ OR %/demo/
+    * each *feature* must contain preview of workflow -- because simple "help" is not enough
+  Trial Try (interact)
+    * each *feature* must be possible to almost immediately enable, try, and disable
+    * slots for generic *features* after reverting must keep and restore all settings of previous favorite choice of *feature*
+  Collaborative Document
+    * replace installed *feature* by development version with all the docs, etc. OR revert back to minimal installation version
+    * merge everything together with configuration into one static binary for embedded and remote systems
+    * edit runtime code on the fly
+    * involve literally everybody working with *miur* into contributing something back, even words corrections
+      e.g. send small fixes as mails with git patches
+        + auto-create PRs from them
+        + auto-test them by CI

@@ -1,0 +1,12 @@
+SPDX-FileCopyrightText: 2020 Dmytro Kolomoiets <amerlyq@gmail.com> and contributors.
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-----
+
+SEE
+  https://events19.linuxfoundation.org/wp-content/uploads/2017/12/Fine-grained-Distributed-Application-Monitoring-Using-LTTng-J%C3%A9r%C3%A9mie-Galarneau-EfficiOS.pdf
+  https://lttng.org/blog/2019/07/16/debugging-python-applications/
+  https://github.com/giraldeau/lttng-tools/blob/master/doc/python-howto.txt
+  https://pypi.org/project/lttnganalyses/
+  https://stackoverflow.com/questions/56379377/is-it-possible-to-use-babeltrace-python-api-or-any-other-software-tool-for-rea
+  http://archive.eclipse.org/tracecompass/doc/stable/org.eclipse.tracecompass.doc.user/LTTng-Tracer-Control.html

@@ -19,6 +19,9 @@ TODO:DEV:
   [_] CHECK: drain all messages from queue on reconnect before loop
     e.g. msgs with timestamp less then ./hub starttime
     => otherwise on ./hub restart it will get and replay all messages, already obsolete at that moment
+  [_] Use incoming and outgoing channels from single socket
+    TRY:PERF: pass io/ev events to same pub/sub bus and filter them solely by *mod* prefix
+    e.g. "input.keyboard" and "output.ui"
 
 
 DECI: Custom .vs. generic broker
@@ -37,9 +40,26 @@ READ: data transfer
     http://hintjens.com/blog:84
   100% CPU usage with pyzmq socket when sending huge data. · Issue #887 · zeromq/pyzmq
     https://github.com/zeromq/pyzmq/issues/887
+  I/O Threads - ZeroMQ [Book]
+    https://www.oreilly.com/library/view/zeromq/9781449334437/ch02s01s05.html
+    https://stackoverflow.com/questions/45154956/zmq-context-should-i-create-another-context-in-a-new-thread
+    ::: context with one background I/O thread per 1GiB/sec data
 
 
 INFO
+  XSUB+XPUB
+    +++ Design of PUB/SUB subsystem in ØMQ - 250bpm
+      http://250bpm.com/pubsub
+    Trivia
+     XPUB is similar to a PUB socket, except that you can receive messages from it.
+       The messages you receive are the subscriptions traveling upstream.
+     XSUB is similar to SUB except that you subscribe by sending a subscription message to it.
+       fmt ::= {0|1} NULL 'topic'
+    ERR: PUB-XSUB can't subscibe => send 0x01 byte instead
+      http://derpturkey.com/zeromq-subscribe-with-xsub/
+    zeromq - What can an XSUB-XPUB broker do than a SUB-PUB broker can't? - Stack Overflow
+      https://stackoverflow.com/questions/48566810/what-can-an-xsub-xpub-broker-do-than-a-sub-pub-broker-cant
+      ::: you can use simple PUB-SUB if any of your clients had subscribed to "" everything
   PULL+XPUB
     https://github.com/zeromq/libzmq/issues/2267
   NOTE: queue .vs. forwarder
@@ -48,10 +68,3 @@ INFO
     ::: we don't need MonitoredForwarder -- simply connect monitor as one of subscribers
       [$] TODO: cap (capture) or mon (monitor) socket to redirect everything to external logger module
       BET: connect logger as any other module but with SUB('')
-  Multithreading Magic - zeromq
-    http://wiki.zeromq.org/blog:multithreading-magic
-  Benchmarks
-    Measuring messaging performance - zeromq
-      http://wiki.zeromq.org/whitepapers:measuring-performance
-    CMP: different messaging frameworks
-      https://indico.cern.ch/event/390748/contributions/1825041/attachments/1281312/1904937/CRX_PosterSession1_214.pdf

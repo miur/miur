@@ -1,0 +1,70 @@
+SPDX-FileCopyrightText: 2020 Dmytro Kolomoiets <amerlyq@gmail.com> and contributors.
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-----
+%%%% ZeroMQ
+
+
+TODO
+  [_] MAYBE:TRY: MonitoredQueue to trace events in both directions
+    E.G. https://learning-0mq-with-pyzmq.readthedocs.io/en/latest/pyzmq/pyzmqdevices/monitorqueue.html
+    OFF: https://pyzmq.readthedocs.io/en/latest/devices.html
+    IDEA: https://csirtgadgets.com/commits/2019/4/20/hunting-through-your-home-network-with-elastiflow
+
+
+ALT:CMP:
+  RabbitMQ
+    SRC: https://github.com/mila-iqia/platoon/issues/49
+      If you want to do monitoring, you'd need to look at using a message broker like RabbitMQ.
+      Although RabbitMQ is generally used with AMQP, it should play nice with ZeroMQ as well.
+    TUT:(python): https://www.rabbitmq.com/tutorials/tutorial-two-python.html
+  nanomsg
+    https://nanomsg.org/documentation-zeromq.html
+  opendds / combined
+    https://objectcomputing.com/resources/publications/mnb/comparing-opendds-and-zeromq-usage-and-performance
+
+
+PERF:CMP: Benchmarks
+  Measuring messaging performance - zeromq
+    http://wiki.zeromq.org/whitepapers:measuring-performance
+  CMP: different messaging frameworks
+    https://indico.cern.ch/event/390748/contributions/1825041/attachments/1281312/1904937/CRX_PosterSession1_214.pdf
+
+
+REF
+  http://zguide.zeromq.org/py:all
+
+
+USE
+  curses + ZeroMQ + multiprocessing + poll
+    https://learning-0mq-with-pyzmq.readthedocs.io/en/latest/pyzmq/multiprocess/multiprocess.html
+    https://learning-0mq-with-pyzmq.readthedocs.io/en/latest/pyzmq/multisocket/zmqpoller.html
+    BUT: inproc:// not possible for multiprocessing
+      https://opensource.com/article/17/4/grok-gil
+  BET: devices
+    https://learning-0mq-with-pyzmq.readthedocs.io/en/latest/pyzmq/pyzmqdevices/pyzmqdevices.html
+    OFF: https://pyzmq.readthedocs.io/en/latest/devices.html
+  Interprocess communication with pyzmq and multiprocessing
+    https://gist.github.com/lebedov/2400604
+    + https://stackoverflow.com/questions/25367700/python-multithreaded-zeromq-req-rep
+  SEE: socket lingering
+    https://github.com/zeromq/pyzmq/issues/755
+
+
+TUT
+  ++ Getting REAL Concurrency out of Python3 with ZeroMQ
+    https://csirtgadgets.com/commits/2019/1/5/combat-automation-in-opsec-getting-real-concurrency-out-of-python3-with-zeromq
+  Python for the Lab Using pyZMQ for inter-process communication: Part 2
+    https://www.pythonforthelab.com/blog/using-pyzmq-for-inter-process-communication-part-2/
+
+
+DEBUG
+  ++ https://stackoverflow.com/questions/15837022/does-zmq-expose-any-internal-logging-if-so-how-do-you-use-it
+  https://stackoverflow.com/questions/43981272/zeromq-is-there-a-limitation-for-the-amount-of-topics-that-subs-can-subscribe-f
+  https://medium.com/@8th_Dev/real-world-8th-debugging-a-client-server-application-with-zeromq-1a8b7be635b4
+  https://github.com/JustinTulloss/zeromq.node/issues/585
+
+
+DEPLOY
+  https://docs.openstack.org/oslo.messaging/pike/admin/zmq_driver.html
+  https://www.circl.lu/doc/misp/misp-zmq/

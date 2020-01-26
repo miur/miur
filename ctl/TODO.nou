@@ -1,9 +1,23 @@
+SPDX-FileCopyrightText: 2020 Dmytro Kolomoiets <amerlyq@gmail.com> and contributors.
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-----
+
+TODO
+  [_] Use multiprocessing to workaround urwid+signal_handler problems at least temporary
+    = keep ipc://connect.sock inside XDG_RUNTIME_DIR= /run/user/1000/miur/connect-$pid.sock
+
+
 IDEA: multiple ctl instances to configure all tasks centralizedly
   * one thread, multiple tasks
+    [_] FIND: how to merge two background threads ZMQbg/IO/0 and ZMQbg/Reaper into the same ioloop with user tasks
   * one process, multiple threads
     + threadpool
   * one PC, multiple process ipc
     + processpool
+  * one network, distributed PC ports
+    + manually established ssh-connections
+      SEE:(built-in pyzmq): 2.9 Tunneling PyZMQ Connections with SSH
   * one network, multiple PC nodes
     + cluster
   * one world, multiple networks
@@ -16,3 +30,13 @@ NOTE: each plugin provides only *tasks* annotated by their properties
     * long, exemptable (infinite loops or transferring large files)
     * short, continuous, noninterruptible
   => it's responsibility of :/ctl/ to compose working topology and restart dying tasks
+
+
+INFO
+  Multithreading Magic - zeromq
+    http://wiki.zeromq.org/blog:multithreading-magic
+
+
+SECU: authorize and encrypt your connections
+  Make your distributed apps secure against eavesdropping and tampering – IBM Developer
+    [_] https://developer.ibm.com/tutorials/se-distributed-apps-zeromq-part2/

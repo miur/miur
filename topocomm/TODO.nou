@@ -1,0 +1,22 @@
+SPDX-FileCopyrightText: 2020 Dmytro Kolomoiets <amerlyq@gmail.com> and contributors.
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-----
+%%%% Communication Topology
+
+ARCH: how exactly data streams are distributed and flowing through tasks
+
+REF
+  :/broker/TODO.nou
+  :/ctl/TODO.nou
+
+
+FIND:DEBUG: because sometimes packets simply don't flow e.g. logging
+  [_] G: zeromq inspect topology
+  [_] G: zeromq inspect Communication
+
+
+Introspect Dynamic Topology
+  IDEA: track subscriptions -- from each [module.instance.socket.topic]
+    http://hintjens.com/blog:37
+    https://stackoverflow.com/questions/51074564/pyzmq-zeromq-how-to-get-a-subscription-key-from-a-sub-socket

@@ -1,0 +1,11 @@
+SPDX-FileCopyrightText: 2020 Dmytro Kolomoiets <amerlyq@gmail.com> and contributors.
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-----
+%%%% Execution Topology
+
+ARCH: how exactly virtual tasks are mapped to system resources
+
+REF
+  :/ctl/TODO.nou
+  :/ioloop/TODO.nou
