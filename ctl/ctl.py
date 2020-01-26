@@ -10,6 +10,7 @@ import zmq
 
 from ..ifc import *
 from ..broker import broker_hub
+from ..logger import logger_sink, logger_events
 from ..scenario import play_scenario
 
 
@@ -25,6 +26,8 @@ def create_instance(opts):
 
     # threading.excepthook = handle_exception  # NEED: python>=3.8
     threading.Thread(target=broker_hub, args=connections).start()
+    threading.Thread(target=logger_events, args=connections).start()
+    threading.Thread(target=logger_sink, args=connections).start()
 
     # BET:TODO: set names of all processes/threads/asyncjobs from inside this ./ctl/
     play_scenario(*connections)
