@@ -6,7 +6,11 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 
 TODO:DEV:
+  [_] FAIL: default broker_thread() device uses 100% CPU in its thread
+    REF: https://pyzmq.readthedocs.io/en/latest/devices.html
+    https://stackoverflow.com/questions/21935515/how-to-avoid-high-cpu-usage
   [_] hub must inject broadcast msg "hub {pub|sub} [dis]connected <module>"
+    BUT: can ZMQ identify individual sockets ? I don't think so...
   [_] ENH: use clone{srv,cli}5.py :: PUB+ROUTER+PULL server
     http://zguide.zeromq.org/py:all#Reliable-Pub-Sub-Clone-Pattern
   [_] MAYBE: ctl (conntrol) socket to control flow from logger/etc.
@@ -31,6 +35,8 @@ READ: data transfer
     https://github.com/zeromq/filemq
   NICE:READ: Revisting ZeroMQ Multipart - Hintjens.com
     http://hintjens.com/blog:84
+  100% CPU usage with pyzmq socket when sending huge data. · Issue #887 · zeromq/pyzmq
+    https://github.com/zeromq/pyzmq/issues/887
 
 
 INFO
@@ -42,3 +48,10 @@ INFO
     ::: we don't need MonitoredForwarder -- simply connect monitor as one of subscribers
       [$] TODO: cap (capture) or mon (monitor) socket to redirect everything to external logger module
       BET: connect logger as any other module but with SUB('')
+  Multithreading Magic - zeromq
+    http://wiki.zeromq.org/blog:multithreading-magic
+  Benchmarks
+    Measuring messaging performance - zeromq
+      http://wiki.zeromq.org/whitepapers:measuring-performance
+    CMP: different messaging frameworks
+      https://indico.cern.ch/event/390748/contributions/1825041/attachments/1281312/1904937/CRX_PosterSession1_214.pdf

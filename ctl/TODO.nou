@@ -1,0 +1,18 @@
+IDEA: multiple ctl instances to configure all tasks centralizedly
+  * one thread, multiple tasks
+  * one process, multiple threads
+    + threadpool
+  * one PC, multiple process ipc
+    + processpool
+  * one network, multiple PC nodes
+    + cluster
+  * one world, multiple networks
+    + federation
+  * hybrid -- nested heterogeneous tree of above
+
+
+NOTE: each plugin provides only *tasks* annotated by their properties
+ (e.g. inherited from one of possible base classes OR dynamically switched)
+    * long, exemptable (infinite loops or transferring large files)
+    * short, continuous, noninterruptible
+  => it's responsibility of :/ctl/ to compose working topology and restart dying tasks

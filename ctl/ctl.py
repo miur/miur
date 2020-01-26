@@ -23,7 +23,8 @@ def create_instance(opts):
 
     connections = (src_uri, dst_uri, log_uri)
 
-    broker_hub(*connections)
+    # threading.excepthook = handle_exception  # NEED: python>=3.8
+    threading.Thread(target=broker_hub, args=connections).start()
 
     # BET:TODO: set names of all processes/threads/asyncjobs from inside this ./ctl/
     play_scenario(*connections)
