@@ -56,6 +56,12 @@ TODO
   [_] ALSO: IPFS Powers the Distributed Web
     SPEC: https://ipfs.io/
       IMPL: https://github.com/ipfs/go-ipfs/blob/master/docs/experimental-features.md#ipfs-filestore
+    IDEA: https://medium.com/fortknoxster/how-the-ipfs-concept-can-change-the-internet-and-the-storage-distribution-c6c13283f12d
+    CASE: https://discuss.ipfs.io/t/understanding-ipfs/3063/6
+    USAGE: https://discuss.ipfs.io/t/is-there-good-ipfs-tutorials/3408/3
+    NICE: https://github.com/ipfs/awesome-ipfs
+    SECU:BAD: IPFS is not what you think it is - The Blueprint by Bluzelle
+      https://blog.bluzelle.com/ipfs-is-not-what-you-think-it-is-e0aa8dc69b
   [_] Sharing and archiving data sets with Dat - anarcat
     https://anarc.at/blog/2018-09-10-sharing-and-archiving-data-sets-with-dat/
   [_] SEE: db with git-like history IDEA: use as underlying DOM
