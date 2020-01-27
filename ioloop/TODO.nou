@@ -1,0 +1,25 @@
+SPDX-FileCopyrightText: 2020 Dmytro Kolomoiets <amerlyq@gmail.com> and contributors.
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-----
+%%%% async io
+
+IDEA: run :/ctl/ with all tasks inside single async ioloop
+
+DEV
+  :/&&/logger.py
+
+
+NEED: log id for each asyncjob
+  * they can migrate between pid/tid in thread/process pools
+  * we can have multiple jobs instantiated from the same module
+  * it would be great to account system resources for them separately
+    MAYBE: impossible w/o using Erlang :: http://wiki.zeromq.org/blog:multithreading-magic /process monitoring/
+  * trace execution timeline of single job through logs and system resources
+
+
+SEE
+  ALSO: http://zguide.zeromq.org/py:lruqueue3
+  https://medium.com/@yeraydiazdiaz/asyncio-coroutine-patterns-errors-and-cancellation-3bb422e961ff
+  https://stackoverflow.com/questions/39019354/handling-keyboard-interrupt-in-async-zmq
+  https://github.com/zeromq/pyzmq/issues/1114
