@@ -1,0 +1,9 @@
+IDEA: under each host show all device trees beside filesystem
+  * lspci
+  * lsusb
+  * … etc.
+
+REASON:
+  * stimulate user's exploration
+  * better, more satisfactory experience
+  * same access model, similar ifc, familiar allowed ops
