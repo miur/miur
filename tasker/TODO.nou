@@ -1,0 +1,8 @@
+SPDX-FileCopyrightText: 2020 Dmytro Kolomoiets <amerlyq@gmail.com> and contributors.
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-----
+
+ThreadPoolExecutor
+  python 3.x - How to avoid too many threads when using tornado.ioloop.IOLoop.run_in_executor? - Stack Overflow
+    https://stackoverflow.com/questions/57707073/how-to-avoid-too-many-threads-when-using-tornado-ioloop-ioloop-run-in-executor
