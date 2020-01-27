@@ -10,33 +10,19 @@ __all__ = [
 import logging
 import sys
 
-from zmq.log import handlers
 
+def getLogger(cmpt=None):
+    if cmpt is None:
+        # CHECK: in compiled Python code "inspect.currentframe()" don't work
+        caller = sys._getframe(1).f_back
+        func = caller.f_code.co_name
+        mod = caller.f_globals['__name__']
+        cmpt = mod.partition('.')[2].partition('.')[0]
+        cmpt = cmpt if cmpt else 'root'
 
-## Gather all logs
-# https://github.com/zeromq/pyzmq/blob/master/examples/logger/zmqlogger.py
-# https://pyzmq.readthedocs.io/en/latest/api/zmq.log.handlers.html
-# ++ https://stackoverflow.com/questions/40218325/use-of-pyzmqs-logging-handler-in-python
-# [_] TRY: also redirect all logging to LTTng trace
-def getLogger(pub_sock='inproc://log', lvl=None):
+    ## OBSOLETE: logging.Formatter has %(process:d) %(thread:d)
     # pid = os.getpid()
     # tid = threading.get_native_id()
-    mod = sys._getframe(1).f_back.f_globals['__name__']
-    cmpt = mod.partition('.')[2].partition('.')[0]
-    cmpt = cmpt if cmpt else 'root'
 
-    handler = handlers.PUBHandler(pub_sock)
-    handler.root_topic = 'log'
-
-    if lvl is None:
-        lvl = logging.DEBUG
-    handler.setLevel(lvl)
-
-    # ALSO: %(processName)s %(threadName)s
-    fmt = "%(asctime)s %(process:d) %(thread:d) [%(name:s)/%(levelname:s)] %(message)s :/%(pathname)s:%(lineno)d"
-    handler.setFormatter(logging.Formatter(fmt, datefmt="%H:%M:%S"))
-
-    # SEE: https://stackoverflow.com/questions/38323810/does-pythons-logging-config-dictconfig-apply-the-loggers-configuration-setti
-    logger = logging.getLogger(mod)
-    logger.addHandler(handler)
-    return logger
+    # THINK: do we need individual logger instances per cmpt at all ?
+    return logging.getLogger(cmpt)

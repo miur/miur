@@ -14,6 +14,8 @@ from ..ifc import *
 
 
 def logger_setup():
+    # TODO: setup new FileHandler instance and redirect everything there
+    #   FAIL: must forward all formatter columns as structured log here
     return lambda x: print(x, file=sys.stderr)
     # SEE: https://www.datadoghq.com/blog/python-logging-best-practices/
     # TRY: directly specify logging.dictConfig() with global handlers
@@ -64,20 +66,20 @@ def logger_sink(src_uri, dst_uri, log_uri):
 
     ctx = zmq.Context.instance()
 
-    log_sock = ctx.socket(zmq.XSUB)
+    # ATT: using XSUB as sink has no benefits over SUB, only pains:
+    #   => you must send customly composed sub msg to it to activate
+    log_sock = ctx.socket(zmq.SUB)
     log_sock.bind(log_uri)
 
     # HACK: subscribe to only specific log-level '' => 'INFO'
     #   BAD: useless without comparison 'lvl>INFO'
     #   BET: use <data-channel> name as first topic for filtering to make easier
     #     communication pipeline deciphering
-    # ERR: PUB-XSUB can't subscibe => send 0x01 byte instead
-    #   http://derpturkey.com/zeromq-subscribe-with-xsub/
-    # log_sock.setsockopt_string(zmq.SUBSCRIBE, '')
+    log_sock.setsockopt_string(zmq.SUBSCRIBE, '')
 
     try:
         while True:
-            log = log_sock.recv()
+            log = log_sock.recv_multipart()
             _log('log: ' + str(log))
 
             # frames = sub.recv_multipart()

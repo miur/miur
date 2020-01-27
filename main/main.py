@@ -33,6 +33,8 @@ def pipeguard(f):
 
 def main():
     opts = options(sys.argv[1:])
+    # FAIL: must first lock file, and only then clean-up its content
+    #   => otherwise running second instance of *miur* in same session will corrupt PIDfile
     with open(opts.pidfile, 'w') as pidf:
         # NOTE: keep file opened and locked until program dies -- to track session
         fcntl.flock(pidf, fcntl.LOCK_EX | fcntl.LOCK_NB)

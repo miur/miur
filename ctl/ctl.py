@@ -10,7 +10,7 @@ import zmq
 
 from ..ifc import *
 from ..broker import broker_hub
-from ..logger import logger_sink, logger_events
+from ..logger import setup_logging, logger_sink, logger_events
 from ..scenario import play_scenario
 
 
@@ -24,6 +24,7 @@ def create_instance(opts):
 
     connections = (src_uri, dst_uri, log_uri)
 
+    setup_logging(log_uri)
     # threading.excepthook = handle_exception  # NEED: python>=3.8
     threading.Thread(target=broker_hub, args=connections).start()
     threading.Thread(target=logger_events, args=connections).start()
@@ -31,6 +32,9 @@ def create_instance(opts):
 
     # BET:TODO: set names of all processes/threads/asyncjobs from inside this ./ctl/
     play_scenario(*connections)
+
+    # # BAD: "urwid" must be the main thread, because raw_screen.start() registers UNIX signals
+    # ui_client(*connections)
 
     # WARN: can call only once in main thread
     # NEED: call before joining threads to interrupt zmq.proxy

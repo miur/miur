@@ -10,3 +10,4 @@ __appname__ = "logger"
 __version__ = "0.0.5"
 
 from .logger import logger_sink, logger_events
+from .setup import setup_logging

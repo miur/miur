@@ -14,7 +14,7 @@ from ..ifc import *
 
 def play_scenario(src_uri, dst_uri, log_uri):
     set_current_thread_name()
-    # _log = getLogger(log_uri)
+    _log = getLogger()
 
     ctx = zmq.Context.instance()
 
@@ -31,7 +31,7 @@ def play_scenario(src_uri, dst_uri, log_uri):
         while cmd := cmd + 1:
             print('cmd: ' + str(cmd), file=sys.stderr)
             dst_sock.send_string(str(cmd))
-            # _log.debug(str(cmd))
+            _log.info(str(cmd))
             time.sleep(0.25)
 
     except (zmq.ContextTerminated, KeyboardInterrupt):
