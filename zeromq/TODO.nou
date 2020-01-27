@@ -13,20 +13,49 @@ TODO
 
 
 ALT:CMP:
+  CMP:
+    https://vironit.com/comparison-of-activemq-rabbitmq-and-zeromq-message-oriented-middleware/
+    Выбор MQ для высоконагруженного проекта / Хабр
+      https://habr.com/ru/post/326880/
+  ZeroMQ -- is just sockets! :)
+    http://wiki.zeromq.org/topics:omq-is-just-sockets
+  nanomsg
+    2020-01-27 [X] CMP: https://nanomsg.org/documentation-zeromq.html
+      ?? it seems nanomsg is much better ??
+        BAD: https://sealedabstract.com/rants/nanomsg-postmortem-and-other-stories/
+        BUT: http://garrett.damore.org/2018/05/no-nanomsg-is-not-dead.html
+      FIND: what zeromq still does better than nanomsg
+        ZeroMQ has really found a sweet-spot between raw TCP/UDP and application messaging protocols
+          nanomsg and other ZeroMQ alternatives being, for all intents and purposes, technological dead-ends,
+          <= https://discourse.julialang.org/t/zeromq-vs-other-transport-protocols-such-as-nanomsg/2136/3
+      BUT:BET: new complete rewrite of nanomsg "nng"
+        SRC: https://github.com/nanomsg/nng
+          https://github.com/nanomsg/nng/releases
+        TALK: Rationale: Or why am I bothering to rewrite nanomsg? | Hacker News
+          https://news.ycombinator.com/item?id=16796531
+  opendds / combined
+    https://objectcomputing.com/resources/publications/mnb/comparing-opendds-and-zeromq-usage-and-performance
+
+
+Broker-centric servers
   RabbitMQ
     SRC: https://github.com/mila-iqia/platoon/issues/49
       If you want to do monitoring, you'd need to look at using a message broker like RabbitMQ.
       Although RabbitMQ is generally used with AMQP, it should play nice with ZeroMQ as well.
     TUT:(python): https://www.rabbitmq.com/tutorials/tutorial-two-python.html
-  nanomsg
-    https://nanomsg.org/documentation-zeromq.html
-  opendds / combined
-    https://objectcomputing.com/resources/publications/mnb/comparing-opendds-and-zeromq-usage-and-performance
+    CMP: https://stackshare.io/stackups/rabbitmq-vs-zeromq
+    +++ TALK: any real reason you should use zeromq over rabbitmq? | Hacker News
+      https://news.ycombinator.com/item?id=9634801
+  NATS
+    https://habr.com/ru/post/326880/
+    https://news.ycombinator.com/item?id=11284489
 
 
 PERF:CMP: Benchmarks
   Measuring messaging performance - zeromq
     http://wiki.zeromq.org/whitepapers:measuring-performance
+  Dissecting Message Queues – Brave New Geek
+    https://bravenewgeek.com/dissecting-message-queues/
   CMP: different messaging frameworks
     https://indico.cern.ch/event/390748/contributions/1825041/attachments/1281312/1904937/CRX_PosterSession1_214.pdf
 

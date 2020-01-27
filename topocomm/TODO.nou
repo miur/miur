@@ -20,3 +20,8 @@ Introspect Dynamic Topology
   IDEA: track subscriptions -- from each [module.instance.socket.topic]
     http://hintjens.com/blog:37
     https://stackoverflow.com/questions/51074564/pyzmq-zeromq-how-to-get-a-subscription-key-from-a-sub-socket
+
+
+Flow Monitoring
+  Traffic Monitoring - zeromq
+    http://wiki.zeromq.org/whitepapers:traffic-monitoring-v20

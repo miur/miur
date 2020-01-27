@@ -27,6 +27,12 @@ TODO:DEV:
 DECI: Custom .vs. generic broker
   BET? zeromq/malamute IMPL broker patterns
     https://github.com/zeromq/malamute
+    | We do have a broker, Malamute, which works nicely for various patterns. I
+    | use this in lots of projects. However not in the conventional sense of
+    | starting a process on a box somewhere. I use Malamute as an actor thread,
+    | to coordinate events and workload between other actor threads, in a
+    | single process. (c) Pieter Hintjens
+      <= SRC:(any real reason you should use zeromq over rabbitmq): https://news.ycombinator.com/item?id=9634801
   OR: zeromq/majordomo IMPL clients <-> services
     https://github.com/zeromq/majordomo
   CHG: use broker only as discovery service
