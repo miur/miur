@@ -45,12 +45,14 @@ TODO
   [_] IDEA: tree-structured text -- text as filesystem
     http://www.tom-ridge.com/2016-02-19_tree-structured_text.html
     SRC: https://github.com/tomjridge/tree_structured_text
-  [_] Lem -- specification tool
+  [_] Lem -- specification tool /x/spec-fsm-tla
     https://www.cl.cam.ac.uk/~pes20/lem/
     THINK: http://www.tom-ridge.com/2013-11-24_experience_of_using_lem.html
     ALSO: parsers / compilers
       http://www.tom-ridge.com/2014-11-21_talk_on_parsing_at_the_university_of_sussex.html
       PROMO: http://www.tom-ridge.com/resources/2014-11-21_sussex_slides.standalone.html
+  [_] Introduction :: Learn TLA+  /x/spec-fsm-tla
+    https://learntla.com/introduction/
   [_] ARCH: tus -- open protocol for resumable file uploads
     https://tus.io/
   [_] ALSO: IPFS Powers the Distributed Web
@@ -93,7 +95,7 @@ TODO
     = don't manage windows -- you have wm
     <= after all each *workflow* permeats everything on all levels through whole system
       * e.g. modal keybindings are <global> and full immediate keyset is composed from all programs
-    IDEA: Common Workflow Language -- spec to connect all cli tools together
+    IDEA: Common Workflow Language -- spec to connect all cli tools together /x/spec-fsm-tla
       https://www.commonwl.org/
     IDEA: "docker" is no more than a way to convert "dynamic exe + libraries + configuration" into basic composable "build blocks" of systems
       !! similar to my *miur* linux-as-IDE idea, where I use miur as skeleton and grow different apps around it
