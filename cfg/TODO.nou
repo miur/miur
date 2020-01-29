@@ -1,0 +1,20 @@
+
+"I'm too tired and don't want to configure anything anymore!!!"
+
+Maybe I'm becoming too old…
+I hope it would "Just works!" (c) for everyone, even me.
+
+Still, I will undergo immeasurable suffering if this default workflow contradicts
+and is not possible to customize to my needs.
+And I will be reluctant to maintain my own fork with customizations patches over codebase.
+
+Maybe, strategy chosen by radare2(1) authors is the best one:
+  * don't fragment community -- keep them all "on the same page" with same defaults for everyone
+  * painless updates -- simply force everyone learn new commands and workflows without breaking configs
+  * redirect configuration efforts of community back into upstream PRs submitting,
+    using motivation "scratch where it itch" of everyone to make product better for everyone
+    = vim royally failed on this aspect allowing too broad user configurations without contributing to upstream
+      i.e. creating dividing line between "crappy buggy upstream" and "my shiny config with plugins over it"
+
+!. On the other hand, unscrupulous acceptance and accomodation of all PRs w/o moderation,
+  will lead to the same fate of becoming a quagmire as Oh-My-Zsh did…
