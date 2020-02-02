@@ -97,6 +97,10 @@ TODO
       * e.g. modal keybindings are <global> and full immediate keyset is composed from all programs
     IDEA: Common Workflow Language -- spec to connect all cli tools together /x/spec-fsm-tla
       https://www.commonwl.org/
+    IDEA: VARLINK ⌇IGVnu
+      https://varlink.org/
+        = plain-text ifc desc fmt + proto for both humans and machines -- through single fd
+        FROM:(pdf): https://www.phoronix.com/scan.php?page=news_item&px=systemd-homed
     IDEA: "docker" is no more than a way to convert "dynamic exe + libraries + configuration" into basic composable "build blocks" of systems
       !! similar to my *miur* linux-as-IDE idea, where I use miur as skeleton and grow different apps around it
       => similar to my *airy* repo with apps configured for personal preferences
