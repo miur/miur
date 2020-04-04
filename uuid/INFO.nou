@@ -1,0 +1,16 @@
+
+ARCH
+  Auto increment keys vs. UUID - Marek Sirkovský - Medium ⌇⡞⠻⡴⢞
+    https://medium.com/@Mareks_082/auto-increment-keys-vs-uuid-a74d81f7476a
+
+
+SECU
+  WARN: uuid1 is not safe it has privacy concerns because it shows the computer’s network address in UUID.
+    privacy - Is it dangerous to post my MAC address publicly? - Information Security Stack Exchange ⌇⡞⠻⡸⠼
+      https://security.stackexchange.com/questions/67893/is-it-dangerous-to-post-my-mac-address-publicly
+
+  Cautionary note: UUIDs generally do not meet security requirements – Little Man In My Head ⌇⡞⠻⡲⠮
+    https://littlemaninmyhead.wordpress.com/2015/11/22/cautionary-note-uuids-should-generally-not-be-used-for-authentication-tokens/
+    TALK: https://news.ycombinator.com/item?id=10631806
+  Deserialization Attacks - DSC VIT Vellore - Medium ⌇⡞⠻⡳⡙
+    https://medium.com/gdg-vit/deserialization-attacks-d312fbe58e7d

@@ -1,0 +1,3 @@
+IDEA: use *miur* as pager
+  Pipe filelist to *miur* to get sizes/total of untracked files
+  $ git ls-files --others --exclude-standard | miur

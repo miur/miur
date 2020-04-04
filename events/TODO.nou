@@ -1,0 +1,11 @@
+IDEA:THINK: how to combine graph navigation tool with events structural logging
+  i.e. weechat also isn't the best way to consume feeds in a unified way
+    - system events
+    - performance traces
+    - im chats
+    - news feeds
+    - bash jokes
+    - forums answers
+    - web articles
+  BUT! we NEED unified interface for streams -- to add dataflow processing
+    and adding such thinks to weechat is truly awkward

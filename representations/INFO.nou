@@ -1,0 +1,8 @@
+IDEA: each folder/file has a set of representations (traits)
+  = alternative data streams -- which can be accessed individually
+  E.G: content, lstat, xattr, repr(hex), repr(outline)
+  [_] FIND: my old mentionings of this idea in other wording
+
+Formalized impl of idea:
+  The Semantic Web & Linked Data ⌇⡞⠻⢘⣺
+    https://rubenverborgh.github.io/WebFundamentals/semantic-web/#rdf-model
