@@ -12,22 +12,46 @@ import zmq
 
 from ..ifc import *
 
+def getLogger():
+    fmt = ' '.join([
+        "%(asctime)s",
+        "%(process:d)/%(processName:s)",
+        "%(thread:d)/%(threadName:s)",
+        "[%(name:s)/%(levelname:s)]",
+        "%(message)s",
+        ":/%(pathname)s:%(lineno)d",
+    ])
 
-def logger_setup():
-    # TODO: setup new FileHandler instance and redirect everything there
-    #   FAIL: must forward all formatter columns as structured log here
-    return lambda x: print(x, file=sys.stderr)
-    # SEE: https://www.datadoghq.com/blog/python-logging-best-practices/
-    # TRY: directly specify logging.dictConfig() with global handlers
-    # handler = logging.FileHandler(f_log)
-    # _log = redirect_log(handler, lvl)
-    # _log = filename_log()
-    # _log.info('-' * 40)
+    # ALT: use logging.dictConfig()
+    # TUT: Configuring Python logging for a local module differently to the main file - Stack Overflow ⌇xN(nu
+    #     https://stackoverflow.com/questions/51721895/configuring-python-logging-for-a-local-module-differently-to-the-main-file
+    # SEE: https://stackoverflow.com/questions/38323810/does-pythons-logging-config-dictconfig-apply-the-loggers-configuration-setti
+    logging.basicConfig(
+        level=logging.DEBUG,
+        # handlers=(handler,),
+        datefmt="%H:%M:%S.uuu",
+        format=fmt
+    )
+    _log = logging.getLogger(__name__.split('.', 2)[1])
+    _log.propagate = False
+    return _log
+
+
+# def logger_init():
+#     # TODO: setup new FileHandler instance and redirect everything there
+#     #   FAIL: must forward all formatter columns as structured log here
+#     return lambda x: print(x, file=sys.stderr)
+#     # SEE: https://www.datadoghq.com/blog/python-logging-best-practices/
+#     # TRY: directly specify logging.dictConfig() with global handlers
+#     _log = getLogger()
+#     # _log = redirect_log(handler, lvl)
+#     # _log = filename_log()
+#     _log.info('-' * 40)
 
 
 def logger_events(src_uri, dst_uri, log_uri):
     set_current_thread_name()
-    _log = logger_setup()
+    # _log = getLogger()
 
     ctx = zmq.Context.instance()
 
@@ -39,7 +63,7 @@ def logger_events(src_uri, dst_uri, log_uri):
         while True:
             event = src_sock.recv_string()
             lvl = logging.DEBUG
-            _log('event: ' + event)
+            # _log.info('event: ' + event)
             # msg = pickle.loads(frames[1])
             # _log.log(lvl, '[' + topic + '] ' + str(msg))
 
@@ -57,12 +81,12 @@ def logger_events(src_uri, dst_uri, log_uri):
             pass
     finally:
         src_sock.close()
-        _log('exit')
+        # _log.info('exit')
 
 
 def logger_sink(src_uri, dst_uri, log_uri):
     set_current_thread_name()
-    _log = logger_setup()
+    # _log = getLogger()
 
     ctx = zmq.Context.instance()
 
@@ -80,7 +104,7 @@ def logger_sink(src_uri, dst_uri, log_uri):
     try:
         while True:
             log = log_sock.recv_multipart()
-            _log('log: ' + str(log))
+            # _log.info('log: ' + str(log))
 
             # frames = sub.recv_multipart()
             # topic = frames[0].decode('utf-8')
@@ -104,4 +128,4 @@ def logger_sink(src_uri, dst_uri, log_uri):
             pass
     finally:
         log_sock.close()
-        _log('exit')
+        # _log.info('exit')

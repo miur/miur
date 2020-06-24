@@ -20,9 +20,9 @@ def options(args=None):
     return parser.parse_args(args=args)
 
 
-def pipeguard(f):
+def pipeguard(fn):
     try:
-        f()
+        fn()
     except BrokenPipeError:
         # Python flushes standard streams on exit; redirect remaining output
         # to devnull to avoid another BrokenPipeError at shutdown

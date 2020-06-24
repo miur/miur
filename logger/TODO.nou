@@ -6,6 +6,13 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 
 TODO
+  [_] DEV: fully override logger handler for single thread
+    multithreading - How do I log to different files from different threads in python? - Stack Overflow ⌇{$[nu
+      https://stackoverflow.com/questions/54048034/how-do-i-log-to-different-files-from-different-threads-in-python
+    Configuring Python logging for a local module differently to the main file - Stack Overflow ⌇/$[nu
+      https://stackoverflow.com/questions/51721895/configuring-python-logging-for-a-local-module-differently-to-the-main-file
+    logging — Logging facility for Python — Python 3.8.1 documentation ⌇<$[nu
+      https://docs.python.org/3/library/logging.html#logging.Logger.propagate
   [_] FIXME: must again setup logging.basicConfig() inside :/logger/ -- otherwise all location info is lost
   [_] TRY: send unformatted list of original objects to central logger before string interpolation
     => IDEA: achieve structured logging like with LTTng

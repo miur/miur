@@ -18,8 +18,7 @@ session := default
 .PHONY: main
 main: PYTHONASYNCIODEBUG=1
 main: | $(bdir)/
-	'$(brun)' --pidfile='$(bdir)/$(session).pid'
-# 2> '$(bdir)/$(pkgname).log'
+	'$(brun)' --pidfile='$(bdir)/$(session).pid' 2> '$(bdir)/$(pkgname).log'
 
 .PHONY: test
 # py.test -s  # print() on screen

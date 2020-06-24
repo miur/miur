@@ -3,6 +3,11 @@ SPDX-FileCopyrightText: 2020 Dmytro Kolomoiets <amerlyq@gmail.com> and contribut
 SPDX-License-Identifier: CC-BY-SA-4.0
 -----
 
+ALT?
+  Supervisor: A Process Control System — Supervisor 4.1.0 documentation ⌇⡞⡥⠯⡸
+    http://supervisord.org/
+
+
 TODO
   [_] Use multiprocessing to workaround urwid+signal_handler problems at least temporary
     = keep ipc://connect.sock inside XDG_RUNTIME_DIR= /run/user/1000/miur/connect-$pid.sock
