@@ -1,0 +1,11 @@
+SPDX-FileCopyrightText: 2020 Dmytro Kolomoiets <amerlyq@gmail.com> and contributors.
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-----
+
+Alias: "miur" = "wf" = "workflow" i.e. workflow-based graph mananger
+
+IDEA: "features exploration" -- limited by workflow
+  + easy discoverability of features required for workflow
+  + less distraction
+  + easy to track changelog by effects on different workflows
