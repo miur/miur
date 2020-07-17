@@ -6,3 +6,14 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 ThreadPoolExecutor
   python 3.x - How to avoid too many threads when using tornado.ioloop.IOLoop.run_in_executor? - Stack Overflow
     https://stackoverflow.com/questions/57707073/how-to-avoid-too-many-threads-when-using-tornado-ioloop-ioloop-run-in-executor
+
+
+IDEA: use intermediate language between "parsing recipes" and "execute dependent queues" to debug and validate recipes ⌇⡟⠑⡩⡵
+  !! runtime DOM of parsed/composed recipes prepared to be executed -- is an intermediate language by itself !!
+    >> so language with self-reflection (e.g. Python) can combine all three roles into the same AST
+    << but for (e.g. C-lang) it's better to split { parse -> augment -> DOM -> execute } stages,
+      to decouple parser, augmenter and executor
+  SRC: https://www.yoctoproject.org/docs/3.1.1/overview-manual/overview-manual.html
+  ¦ BitBake is the tool at the heart of the OpenEmbedded build system and is
+  ¦ responsible for parsing the Metadata, generating a list of tasks from it, and
+  ¦ then executing those tasks.
