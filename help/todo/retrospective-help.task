@@ -1,0 +1,26 @@
+⌇⡟⠧⠨⢔
+Retrospective help
+
+* show keybindings as searchable list
+
+* IDEA: show keybinds as annotated keyboard
+  NICE: facilitate muscule memory -- to orient where which binding is
+  layout
+    - STD pc
+    - laptop
+    - Advantage2
+    - ...
+  xkbmap
+    - english
+    - dvorak
+    - ...
+
+FUTURE:NICE:NICE:IDEA: show whole WF on annotated keyboard
+  i.e. show sequence how each item must be pressed to execute WF
+    << so user can estimate how nice/bad his new WF is
+  USE: muscule strain options
+    - normal hands (basic)
+    - small hands (-Fxx-)
+    - large hands (+Fxx+)
+    - short pinky finger (-<P,Q,_>-)
+    - ...
