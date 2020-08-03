@@ -14,3 +14,7 @@ INSIGHT: workflow IMPL -- ways to reuse habits / common knowledge
   ~ uix :: same keys + similar effects = reimplement everything in !st "select and execute" like it was done in !vim on <gx>
   ~ lib :: same keys + same function = reimpl only ifc, but use actual functionality
   ~ app :: similar keys + same ifc = on another key open the actual app user uses everywhere
+
+IDEA: analyze workflow events and derive *process*
+  PM4Py - Process Mining for Python ⌇⡟⠧⣟⡮
+    https://pm4py.fit.fraunhofer.de/
