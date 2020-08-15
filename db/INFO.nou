@@ -1,0 +1,95 @@
+Formalized impl of idea:
+  The Semantic Web & Linked Data ⌇⡞⠻⢘⣺
+    https://rubenverborgh.github.io/WebFundamentals/semantic-web/#rdf-model
+  IDEA: use JSON-LD as conceptual base for my DB ⌇⡟⠴⢝⣟
+    https://www.w3.org/TR/json-ld/#dfn-iri
+    Example 19: Using JSON-LD — AllegroGraph Python client 101.0.6.dev0 documentation ⌇⡟⠴⣗⡐
+      https://franz.com/agraph/support/documentation/current/python/tutorial/example019.html
+  E.G. blogPost - schema.org Property ⌇⡟⠴⢯⢸
+    https://schema.org/blogPost
+
+
+Namings and IDs
+  [⡟⠷⠕⢠] Hash-based URN schemes ⌇⡟⠷⠄⠥
+    http://www.nuke24.net/docs/2015/HashURNs.html
+  [⡟⠷⠕⢡] URN — Википедия ⌇⡟⠷⠍⡽
+    https://ru.wikipedia.org/wiki/URN
+
+
+BUT:BAD: limitations of SemanticWeb
+  Possibilities and limitations of RDF ⌇⡟⠴⣀⠛
+    https://course.freeyourmetadata.org/possibilities/
+  Introduction to the Semantic Web — GraphDB SE 9.3 documentation ⌇⡟⠴⣀⡼
+    http://graphdb.ontotext.com/documentation/standard/introduction-to-semantic-web.html
+  Data quality ⌇⡟⠴⣅⣝
+    https://course.freeyourmetadata.org/quality/
+
+
+IDEA: use Prolog-like lang directly instead of DB
+  BUT:NEED: distribute with compiler/interpreter to add/modify FS DB in runtime
+  NICE: Mercury Crash Course ※⡟⠴⢬⡍
+    https://mercury-in.space/crash.html
+
+
+ALT:BET: use Lisp as eternal runtime-modified DB
+  BET?USE: "embedded lisp" directly as DB from another lang
+    hylang/hy: A dialect of Lisp that's embedded in Python ⌇⡟⠴⣫⡃
+      https://github.com/hylang/hy
+    !!! [⡟⠵⢶⡶] Read A Lisp Programmer Living in Python-Land: The Hy Programming Language | Leanpub ⌇⡟⠴⣫⡓
+      https://leanpub.com/hy-lisp-python/read
+        + Automatically constructing Knowledge Graphs from text documents, semantic web and linked data
+        + Knowledge Graph Navigator project
+          Screen shots taken of the Common Lisp version of KnowledgeGraph Navigator Intelligent Query Interface for Knowledge Graphs ⌇⡟⠵⢶⢩
+            http://www.knowledgegraphnavigator.com/screen/#
+        + Knowledge Graph Creator project
+          = tool for automating the generation of data for Knowledge Graphs from raw text data, databases, and spreadsheets.
+          KGcreator.com - Auto-build Knowledge Graphs ⌇⡟⠵⢩⣳
+            http://www.kgcreator.com/
+        REF: Apache Jena - SPARQL Tutorial ⌇⡟⠵⢪⡋
+          https://jena.apache.org/tutorials/sparql.html
+      SRC:ex: mark-watson/hy-lisp-python: examples for my book ⌇⡟⠷⡽⡬
+        https://github.com/mark-watson/hy-lisp-python
+  FIND: existing FM in Lisp -- to see how to do system programming
+    SEE:(Filer): froggey/Mezzano: An operating system written in Common Lisp ⌇⡟⠴⣩⡑
+      https://github.com/froggey/Mezzano
+    stacksmith/cl-fm: A File Manager in Common Lisp, using cl-cffi-gtk ⌇⡟⠴⣩⢟
+      https://github.com/stacksmith/cl-fm
+
+
+Free Text
+  Is there any tool to convert a sentence into a triplet form (subject verb object) to search in ontology? ⌇⡟⠴⣐⡿
+    https://www.researchgate.net/post/Is_there_any_tool_to_convert_a_sentence_into_a_triplet_form_subject_verb_object_to_search_in_ontology
+    FRED
+      FRED: From Natural Language Text to RDF and OWL in One Click | SpringerLink ⌇⡟⠴⣐⣌
+        https://link.springer.com/chapter/10.1007/978-3-642-41242-4_36
+      http://www.istc.cnr.it/news/fred-and-tipalo-natural-language-rdfowl
+    ReVerb
+      ReVerb - Open Information Extraction Software ⌇⡟⠴⣐⢾
+        http://reverb.cs.washington.edu/
+    Spacy
+      https://github.com/NSchrading/intro-spacy-nlp/blob/master/subject_object_extraction.py
+      Natural Language Processing With spaCy in Python – Real Python ⌇⡟⠴⣗⢚
+        https://realpython.com/natural-language-processing-spacy-python/
+
+
+Triples in #python
+  metasoarous/tripl: This one weird trick turns JSON documents into semantic graph databases! ⌇⡟⠴⣓⡛
+    https://github.com/metasoarous/tripl
+  RDFLib/rdflib: RDFLib is a Python library for working with RDF, a simple yet powerful language for representing information. ⌇⡟⠴⣓⡺
+    https://github.com/RDFLib/rdflib
+  Semantic models ⌇⡟⠴⣖⠞
+    https://alan-turing-institute.github.io/rsd-engineeringcourse/ch09fileformats/12SemanticModels.html
+  What is HDT – RDF HDT ⌇⡟⠴⣞⡔
+    http://www.rdfhdt.org/what-is-hdt/
+
+
+Graphs in #python
+  CMP:PERF: Benchmark of popular graph/network packages - Quasilinear Musings ⌇⡟⠵⢹⢩
+    https://www.timlrx.com/2019/05/05/benchmark-of-popular-graph-network-packages/
+  NICE: NetworkX — NetworkX documentation ⌇⡟⠵⢾⠦
+    http://networkx.github.io/
+    https://www.python-course.eu/networkx.php ⌇⡟⠵⢹⠎
+  PERF: graph-tool: Efficent network analysis with python ⌇⡟⠵⢽⢊
+    https://graph-tool.skewed.de/
+  takemaru/graphillion: Fast, lightweight graphset operation library ⌇⡟⠵⢻⠫
+    https://github.com/takemaru/graphillion

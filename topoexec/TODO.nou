@@ -9,3 +9,9 @@ ARCH: how exactly virtual tasks are mapped to system resources
 REF
   :/ctl/TODO.nou
   :/ioloop/TODO.nou
+
+SEE: TensorFlow
+  ¦ With TensorFlow you will have computation done by the use of data flow
+  ¦ graphs which results in machine learning that is scalable.
+  ¦ TensorFlow’s architecture is flexible and without rewriting of any code, allows
+  ¦ you to deploy computation across multiple CPUs or GPUs within a mobile device, desktop or server.

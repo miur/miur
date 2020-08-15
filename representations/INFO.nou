@@ -2,7 +2,22 @@ IDEA: each folder/file has a set of representations (traits)
   = alternative data streams -- which can be accessed individually
   E.G: content, lstat, xattr, repr(hex), repr(outline)
   [_] FIND: my old mentionings of this idea in other wording
+  i.e. the same as "knowledge base" DB dif. queires
 
 Formalized impl of idea:
-  The Semantic Web & Linked Data ⌇⡞⠻⢘⣺
+  The Semantic Web & Linked Data ※⡞⠻⢘⣺
     https://rubenverborgh.github.io/WebFundamentals/semantic-web/#rdf-model
+
+
+Visualization #python
+  CMP: The Best Python Data Visualization Libraries - FusionBrew - The FusionCharts Blog ⌇⡟⠵⢽⣦
+    https://www.fusioncharts.com/blog/best-python-data-visualization-libraries/
+  NICE: seaborn: statistical data visualization — seaborn 0.10.1 documentation ⌇⡟⠵⢽⠎
+    https://seaborn.pydata.org/
+  DEMO: The Python Graph Gallery – Visualizing data – with Python ⌇⡟⠵⢽⣑
+    https://python-graph-gallery.com/
+  PyQtGraph - Scientific Graphics and GUI Library for Python ⌇⡟⠵⢻⡅
+    http://www.pyqtgraph.org/
+    BUT:BET: https://github.com/vispy/vispy
+  The Next Level of Data Visualization in Python | by Will Koehrsen | Towards Data Science ⌇⡟⠵⢹⢛
+    https://towardsdatascience.com/the-next-level-of-data-visualization-in-python-dd6e99039d5e

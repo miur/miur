@@ -21,6 +21,15 @@ depends=(
   python-prctl
   python-pyzmq
   python-urwid
+  # python-rdflib
+  # auri python-spacy
+  # auri python-spacy-en_core_web_sm
+
+  # itertools — Functions creating iterators for efficient looping — Python 3.8.5 documentation ⌇⡟⠷⡶⣁
+  #   https://docs.python.org/3/library/itertools.html#itertools-recipes
+  # more-itertools · PyPI ⌇⡟⠷⡶⢣
+  #   https://pypi.org/project/more-itertools/
+  # python-more-itertools
 )
 
 optdepends=(
