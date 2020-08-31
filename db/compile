@@ -67,6 +67,7 @@ class MiurFM(object):
         for x in d.objects(FS.child):
             print(x.value(FS.name))
 
+    # BAD:ARCH: dirty hack to not keep widget explicit state for picking items
     def select_at(self, cwd, *, sortkey=None):
         d = self._g.resource(BNode(str(cwd)))
 
@@ -89,35 +90,133 @@ class MiurFM(object):
         return xs[i].value(FS.path)
 
 
-def uix_cli(fm, cwd):
-    by_name = lambda x: x.value(FS.name).value
+# TODO: replace by hub which aggregates all input events streams and supplies them
+import readline
+def userinput(prompt, *, fd=None):
+    def _repl():
+        try:
+            # FAIL: everything tightly linked here (I, O, fd)
+            # FAIL: can't change stdin/tty => fd
+            s = input(prompt)
+        except EOFError:
+            return 'exit-app'
+            ## BAD: value is not unique enough BUG: hides errors
+            # return None
+            ## BAD: confusing reuse, obscure purpose
+            # return StopMainLoop
+        else:
+            return int(s) if s.isdigit() else s
+    return _repl
+
+
+# ALSO: pipe, tab, cli, shell, tui, gui, 3d, vr, ...
+class ReplUI(object):
+    def __init__(self, fm, *, fd=None, cwd=None):
+        self.fm = fm
+        self.fd = fd
+        self.sortby = lambda x: x.value(FS.name).value
+        self.cwd = cwd  # MOVE: class Cursor
+
+    def __call__(self, act):
+        try:
+            loop = self.fm.select_at(self.cwd, sortkey=self.sortby)
+            lineG = next(loop)
+            self.draw(lineG)
+            loop.send(act)
+        except (IndexError, KeyError, ValueError) as ex:
+            print(f'ERROR: {ex}', file=sys.stderr)
+        except StopIteration as ex:
+            self.cwd = ex.value
+
+    def draw(self, lines):
+        print(f'\n[{self.cwd}]', file=self.fd)
+        for i, k, n in lines:
+            print(f'{i:>2d}) {k:<16} {{{n}}}', file=self.fd)
+
+
+# IDEA: "app/ctx" => "arch" i.e. "graph+flow" instead of simple list of objects
+#   <= where "ctx" is from generic func "dispatch(ctx)"
+class Application(object):
+    def __init__(self):
+        d_root = Path.home() / '.Mathematica'
+        # d_root = Path.home() / 'j8'
+        self.fm = MiurFM()
+        self.fm.load_dirs([d_root])
+
+        self.src = userinput('=> ', fd=sys.stdin)
+
+        # BAD:NEED: iterate in user preferred order
+        # self.ui = {'repl': ReplUI(...), 'cli': ...}
+        # for ui in self.ui.values(): ui(ev, *a, **kw)
+        self.ui = ReplUI(self.fm, fd=sys.stdout, cwd=d_root)
+
+    # HACK: ignore first input() call on startup PERF: redirect to actual call
+    def get_sys_event(self):
+        self.get_sys_event = self.src
+
+    # i.e. 'key-j' => 'list-cursor-move-down' OR 'input-letter-j' ...
+    # ARCH: system_event -> translate -> combine/log/queue -> apply_to_dom -> gen_event
+    #   NEED: two queues -- for system events and for inner (decoded) events
+    #     <= so all translated and produced events will be re-inserted into inner queue
+    def translate_event_by_ctx(self, ev):
+        return ev
+
+    def __call__(self, act, *a, **kw):
+        self.ui(act, *a, **kw)
+
+
+class StopMainLoop(Exception):
+    pass
+
+
+# FAIL:ARCH: too simplistic :: on any event it does full redraw NEED:RFC:
+#   * graph of long background jobs -- new events must be converted
+#     into state-change commands, added into logically appropriate
+#     place of execution flow graph and queued
+#     SEE: https://gist.github.com/hgrecco/5682306
+#   * pool of working threads
+#   * read all accumulated events at once and create jobs in batch
+#   * collect events from multiple sources -- cli/gui/pipe
+#   * create multiple jobs per event -- tui/gui/log
+#   * priority of events and its jobs
+#   ? immediate dispatch of events to immediately affect state of execution flow graph
+#     e.g. interrupt/cancel/undo queued jobs by their mutually exclusive counterparts
+def simple_pass_through(getevent, translate, dispatch):
+    def _iterate(*a, **kw):
+        ev = getevent()
+        # HACK: ignore useless events
+        # if ev is None:
+        #     return
+        act = translate(ev)
+        print(f'{ev} => {act}')
+        if act == 'exit-app':
+            raise StopMainLoop
+        dispatch(act, *a, **kw)
+    return _iterate
+
+
+def mainloop(iterate, *a, prolog=None, epilog=None, **kw):
+    if prolog:
+        prolog()
     try:
+        # IDEA: replace loop by infinite tail-recursion with pure state passing
         while True:
-            try:
-                loop = fm.select_at(cwd, sortkey=by_name)
-                print(f'\n[{cwd}]')
-                for i, k, n in next(loop):
-                    print(f'{i:>2d}) {k:<16} {{{n}}}')
-                r = input('=> ')
-                loop.send(int(r) if r.isdigit() else r)
-            except (IndexError, KeyError, ValueError) as ex:
-                print(f'ERROR: {ex}', file=sys.stderr)
-            except StopIteration as ex:
-                cwd = ex.value
-    except EOFError:
+            iterate(*a, **kw)
+    except StopMainLoop:
         pass
+    finally:
+        if epilog:
+            epilog()
 
 
 def main(exepath):
     mtop = sys.modules[__name__]
     here, __appname__ = fs.split(exepath)
 
-    d_root = Path.home() / 'j8'
-    fm = MiurFM()
-    fm.load_dirs([d_root])
-    # fm.print_db()
-    # fm.print_at(d_root)
-    uix_cli(fm, d_root)
+    app = Application()
+    trans = app.translate_event_by_ctx
+    strategy = simple_pass_through(app.get_sys_event, trans, app.__call__)
+    mainloop(strategy)
 
 
 if __name__ == '__main__':
