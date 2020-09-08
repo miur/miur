@@ -18,3 +18,19 @@ INSIGHT: workflow IMPL -- ways to reuse habits / common knowledge
 IDEA: analyze workflow events and derive *process*
   PM4Py - Process Mining for Python ⌇⡟⠧⣟⡮
     https://pm4py.fit.fraunhofer.de/
+
+
+WHY:SEE※⡟⡗⢤⣬ :: simplicity illusion
+
+THEO: "knowledge keeping" (primarily on tools e.g. vim) ⌇⡟⡗⢥⡴
+  * active context (always needed, always remembered)
+    => core knowledge
+  * tiers of known but progressively rarely used features, often forgotten
+    => must be searchable and easily explorable (limited highly structured lists)
+  * discovery of unknown but already present features (learning)
+    => tutorials ? searching ?
+  * discovery of unknown but searchable features
+    => by keywords on demand :: feature-specific activities
+    => by exploration :: awesome-lists
+  * collection of assortment ideas found elsewhere -- which are impossible to find again
+    => keep your own searchable infodb
