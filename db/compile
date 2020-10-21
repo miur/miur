@@ -87,7 +87,11 @@ class MiurFM(object):
         if not isinstance(i, int):
             # OR? sel = d.value(FS.child / FS.name, i)
             i = nms.index(i)
-        return xs[i].value(FS.path)
+        cwd = xs[i].value(FS.path).value
+
+        # if cwd.is_file() and len(nums) == 1:
+
+        return cwd
 
 
 # TODO: replace by hub which aggregates all input events streams and supplies them
@@ -217,6 +221,17 @@ def main(exepath):
     trans = app.translate_event_by_ctx
     strategy = simple_pass_through(app.get_sys_event, trans, app.__call__)
     mainloop(strategy)
+
+    # import spacy
+    # # nlp_model = spacy.load('en')  # ALT:(complete):RQ:NEED: pip install spacy
+    # nlp_model = spacy.load('en_core_web_sm')
+
+    # with open(fs.join(here, 'INFO.nou')) as f:
+    #     text = f.read()
+    #     # text = ' '.join(l.strip() for l in f.readlines()).strip()
+    # # print(nlp_model(text).ents)
+    # for e in nlp_model(text).ents:
+    #     print(f'{e.text} {e.label_}')
 
 
 if __name__ == '__main__':
