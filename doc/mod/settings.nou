@@ -1,0 +1,92 @@
+%%%%% Settings
+
+Locality
+  tmux/vim model
+    global
+    server
+    + gui-global
+    + view-global
+    window / tab
+    panel
+  THINK: is there any alternatives to separation with fallback ?
+  ? what is effective management strategy ?
+
+  incapsulation
+    global shared static
+      - slow fallback on each access
+      --- some obj _must_ have local unshared settings (whole Qt ui)
+        and can be changed only by function call (set/get)
+      + easy dumping/loading
+      ++ easy hooking and access control
+    local independent sync
+      - need exqusite system to combine all cfg on save
+      - excessive settings copying
+        ? try copy-on-write ?
+        + easy multithreading
+      -- broadcast signal 'SettingChanged' with value of setting
+        > avalanche ui recreation slow-down on setting change
+        * ignored by obj with settings of higher locality then signalled change
+          = affected only obj w/o local settings overrides in local reg hive
+      + more independence (can even crash/eliminate some objects)
+      + more locality -- group props by obj
+      +++ instance unique settings
+        * can be saved to .config and loaded back
+        * name/tag/pattern matching to which runtime obj those saved settings will apply
+      = Local registry micro-hive
+
+
+Inheritance
+  C++ like -- many years of expertise tells you its good
+    abstract -- must be overriden
+    override -- reject change to already user-defined option w/o override
+      ALT: demand override only if 'constant' was demanded earlier
+  shell like -- nothing better for plain text cmd where invented
+    $ map -or <key> <cmd>
+      BAD: limited set of single letters
+        ? use more isotropic specifiers (<unique>) like in vim ?
+        ? BETTER simply use long options ?
+  tagging rules
+   = apply settings only to objects matching all conditions
+    find-like boolean inclusion
+    :set -n <name> -o ( -t <tag> -a -t <tag> )
+    ALT: regex inclusion
+    $ set -a 'n:name|(t:tag&&t:tag)'
+
+
+Cloning settings (remote source)
+= Useful when you use somebody else PC as client to connect to *mods mesh*
+  settings priority list
+    cmdline specified options
+    cmdline /path/to/config
+    user local ~/.config/
+    system settings /etc
+    rmt core settings
+    rmt <same mod> settings
+    rmt settings from any with host=<home>
+    embedded settings (if present and compiled-in code)
+    raise exception
+  reorder/override list
+    smart rules: choose settings source by host
+      * "any where host==home"
+      * "only when ui and ui.host=home"
+
+Config
+  can be written in native lang
+    + very fast loading -- if precompiled
+    + all lang features are supported
+    - no cross-lang support
+  used plain text config
+    + cross-lang
+    + more clean, robust and safe
+    - slow to load / parse
+    - all syntax constructions must be reinvented
+  plain text -- converted/pre-compiled in native
+    + all '+'
+    - no advanced features
+    - OR each lang must create bindings to universal constructs
+  Human readable config != settings representation
+    + you write config in favorite lang and having all '+' of speed and comfort
+      = all syntax constructs only for user's comfort and compactness
+    + for mod in other langs -- you simply dump whole reg hive into plain text / json db / binary
+      = such data dump does not require syntax constructs
+      >> you can use config for 'miur' in favorite lang and convert it for all other mods in 'C++'

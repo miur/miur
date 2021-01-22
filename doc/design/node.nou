@@ -1,0 +1,98 @@
+%%%% Node
+%%% flat vs nested
+
+% super flat (pool)
+  node -> edges
+  BET.(rules)
+    ! any nested struct << partical case of super flat
+    ! tags are superior to folders >> multiple unorthogonal views per set of nodes
+  ++ immediate graph -- direct jump
+  --- mixed up edges and its history, virtual nodes with their history, etc
+  -- access to any next node involves complex search in edges
+  + easy flat view (if there is any sense in that)
+  NEED:
+    * no global types => each node is unique
+    * ramified/manifold cursors/views/accessors
+      => api *dom*.attr(node, type)
+      ALT *dom*[node] => NodeProxy with props mapped to iterator and accessors
+    * emulate nested views/slices for super flat
+      BAD: can't ref to slices in uniform way
+        ~~ add slices back into pool to be able to choose them again on demand
+          HACK: flatten nested views by adding each group into super flat
+          !!! HACK: similar to wasm machine instructions impl for Prolog !!!
+        ~~ involve sep system of reference -- to ref views itself (as funcs)
+          !2 [_] DECIDE: refs to views are necessary anyways -- even for composite
+            ! composite have only several choosen pre-cached views
+              ? how important to cache exactly that set of views ?
+                * only if these ops/views are the most often used
+              [_] TRY: encapsulate in api to postpone arch decision
+            => to construct complex user data layouts
+            => direct ref to "View" to construct
+            ? add as edges all possible views (or only cache previously constructed for this node views)
+
+% flat (dict)
+  node -> type -> edges
+  -- history is messed up with types
+  NEED:
+    * global types -- to dispatch ops on nodes
+
+% chaotic flat
+  non-strict super flat == partially typed flat
+    * TEMP: edges of some groups (E.G. main) isn't added directly to node edges in level 1
+
+% nested (tree)
+  node -> history -> type -> history
+  NEED:
+    ? how to detemine 'good' nesting and 'bad' one ?
+    ? how much nesting is still 'good' ?
+
+% composite (classes)
+  node -> history -> category -> type -> instance -> ... -> history -> edges
+  ++ pre-cached distribution into groups
+  -- BAD: actual structure is hardcoded into programming language primitives (class attrs)
+  NEED:
+    * generate reduced/simplified virtual node views for navigation
+    * convert "CategoryNode" attrs into virtual node to display in graph
+  VIZ. HistoryCategoryNode -> CategoryNode[0] -> { HistoryEdgesNode -> EdgesNode[0], AttrNode }
+    * classes instead of types
+    * combine distinct nodes with history
+    !!! BAD: "CategoryNode" with predetermined set of attrs breaks subsystems concept
+      ~~ but you can create specific node for each 'type' and discard global type dict
+
+% hybrid % ?callback?
+  super flat with generated virtual nested on demand (OR vice versa)
+  -- can view only single generated view at once
+  -- can't look at list of all possible generated as graph
+  ++ less memory consumption -- only for real nodes
+
+% api % ?accessors?
+  encapsulate node -- postpone arch decision
+  == Actually, inner struct of node may be anything above
+    !! only api methods matter
+  NEED:
+    * generate one-timed nested virtual node views
+    BAD: can't ref to individual nodes in those views
+      => OR:REQ create and cache the same uids per virtual view nodes
+    BAD: can't copy-paste virtual nodes between one-timed views
+      => otherwise REQ propagate inserted node into underlying impl data
+
+
+IDEA:HACK: use parent/hub uid as type of gen node
+  => so each history node will have its hub uid as type
+    "history" => "{hub_uid}"
+  ++ each history will have its unique type
+  ++ no need to create names for types in global map
+
+
+%%% Multichoice
+  Treat attrs as standalone part of graph
+    rootnode -> multichoice -> [edgesnode -> multichoice] ...
+
+  Use special algorithmic cursor
+    * ALG: choosen per node per cursor
+      ~ prefer edges for dir, open per file, results per cmd
+      ~ always prefer inode metainfo
+    * MENTAL: reduced navigation graph over underlying graph
+      == choose specific attr per multichoice to move into on <h/l>/<Enter>
+      == pick single history node to visualize
+    * cursor may point to multichoice menu itself => open whole menu on <H/L>

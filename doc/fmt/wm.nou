@@ -1,0 +1,5 @@
+WM layout as filesystem
+  * switch layouts by tagging file
+  * tree file view for bsp view of nested windows in binary split layout
+  * attributes as extended file attributes
+  * delete/move/copy windows between workspaces

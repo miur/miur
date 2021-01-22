@@ -1,0 +1,211 @@
+%%%%% IDEA
+*Ranger done right*
+Refactoring and evolution
+Microkernel relay in fm world
+++ Accessibility
+  add key hooks to TTS dirs content for blind people
+
+TODO
+  [_] IDEA: use filewatchers to monitor write()/etc. to send invalidation events into DB (update requests)
+    a quick review of file watchers - anarcat
+      https://anarc.at/blog/2019-11-20-file-monitoring-tools/
+  [_] IDEA: use GraphQL as query interface for central *miur* daemon db
+    https://hub.packtpub.com/7-reasons-to-choose-graphql-apis-over-rest-for-building-your-apis/
+  [_] IDEA: merge ideas from kirie/dast and miur
+    = connect data streams between modules/widgets to compose pipelines
+    * "vmstat -w 1" -> sed -> accumulate -> gnuplot -> termwindow
+  [_] IDEA: plot graphics directly inside preview window
+    * "vmstat -w 1" -> scroll preview window table (like multiline watch())
+    OR: "vmstat -w 1" -> terminal graph of values
+  [_] IDEA: distribute multiple different packages
+    MOVE: @/miur/beatrix/packaging.nou
+    * miur-core -- core only (plugins manager), all other features and their deps install by yourself
+    * miur-pico -- fm core -- only some ultimately necessary features with their deps, other install yourself
+    * miur-full -- all features present, but without system deps -- they are available if present and complain if not
+    * miur-all -- all features with all optional dependecies "required" to be installed by pkgmanager
+    * miur-bin -- bundle all python code and libraries into single binary (maybe, beside only glibc)
+      e.g. LIKE:(borg): https://borgbackup.readthedocs.io/en/stable/faq.html
+    * miur-dev -- everything together with tests, documentation, issues, worklogs, etc. to get full development context
+    * miur-my  -- everything archived together with unrelated reference information from ./&*/ dirs
+  [_] IDEA: workflow is interactive pipeline
+    * each *feature* accepts some data and creates some data (like kirie)
+      fs => filelist
+    * your ia transforms this data by *feature* functions and shows you new derivative data
+      filelist => ia select files
+    * you may pass this result to next step -- and process this data further by each new module
+      selection => grep AAA
+      grep AAA => grep BBB
+      grep BBB => ia text editor
+      modified text => save file
+    * you store all actions into history and may retrospect it and *reuse*
+      => this cmd history together with results work as *workbook* e.g. jupyter-notebook / Wolfram
+      => export results as research log
+    * macro -- create ia scripts from reused history == pick actions you wish to repeat
+      filelist => grep => grep => [ia edit] => save
+  [_] IDEA: tree-structured text -- text as filesystem
+    http://www.tom-ridge.com/2016-02-19_tree-structured_text.html
+    SRC: https://github.com/tomjridge/tree_structured_text
+  [_] Lem -- specification tool /x/spec-fsm-tla
+    https://www.cl.cam.ac.uk/~pes20/lem/
+    THINK: http://www.tom-ridge.com/2013-11-24_experience_of_using_lem.html
+    ALSO: parsers / compilers
+      http://www.tom-ridge.com/2014-11-21_talk_on_parsing_at_the_university_of_sussex.html
+      PROMO: http://www.tom-ridge.com/resources/2014-11-21_sussex_slides.standalone.html
+  [_] Introduction :: Learn TLA+  /x/spec-fsm-tla
+    https://learntla.com/introduction/
+  [_] ARCH: tus -- open protocol for resumable file uploads
+    https://tus.io/
+  [_] ALSO: IPFS Powers the Distributed Web
+    SPEC: https://ipfs.io/
+      IMPL: https://github.com/ipfs/go-ipfs/blob/master/docs/experimental-features.md#ipfs-filestore
+    IDEA: https://medium.com/fortknoxster/how-the-ipfs-concept-can-change-the-internet-and-the-storage-distribution-c6c13283f12d
+    CASE: https://discuss.ipfs.io/t/understanding-ipfs/3063/6
+    USAGE: https://discuss.ipfs.io/t/is-there-good-ipfs-tutorials/3408/3
+    NICE: https://github.com/ipfs/awesome-ipfs
+    SECU:BAD: IPFS is not what you think it is - The Blueprint by Bluzelle
+      https://blog.bluzelle.com/ipfs-is-not-what-you-think-it-is-e0aa8dc69b
+    DEMO: Watch: JavaScript apps going Inter-Planetary | With Blue Ink ⌇⡟⡢⢆⠥
+      https://withblue.ink/2020/01/21/watch-javascript-apps-going-inter-planetary.html
+  [_] Sharing and archiving data sets with Dat - anarcat
+    https://anarc.at/blog/2018-09-10-sharing-and-archiving-data-sets-with-dat/
+  [_] SEE: db with git-like history IDEA: use as underlying DOM
+    https://github.com/terminusdb/terminus-server/blob/dev/docs/whitepaper/terminusdb.pdf
+    TALK: https://www.reddit.com/r/git/comments/eondi2/git_for_data_a_terminusdb_technical_paper/
+  [_] DEV: intelligent monitoring of user activity statistics
+    * user typical behavior patterns -- headless wandering up-down-up-down, looking into random files, etc..
+    * separate statistics <frame> per each dynamic workflow switch
+    CASE: user goes to categorize 1000+ files for 4 hours
+      -- then on retro he looks into statistics and thinks about mapping decisions on task volume
+    CASE: unpacking-deleting many archives with bug logs, finding, reading logs, and grepping
+      -- then optimizing keymaps or even creating separate workflow *mode* for this regular work task
+      e.g. categorizing --> use 'c' to 'cut' file and 'i' to 'insert'
+      e.g. regularization --> use 'c' and 'i' to rename files
+    !! BET: apply such usage statistics on whole user system stack :: kernel + wm + web + fm + editor
+      <= because workflow is straight-through all these systems
+        ALSO:SEE: Reproducible recorded research
+          https://renku.readthedocs.io/en/latest/
+      + monitoring system load/events/traces can be also useful by itself (system optimizing)
+        or as auxiliary data (user ifc usage latency due to network speed)
+    ALSO: monitor system resources statistics for child processes and threads
+      !! even for short-lived processes lauched as "cp" or "preview"
+  [_] IDEA: fm cfg -- is also filesystem-like virtual structure (registry)
+  [_] TRY: tightly integrate with Linux system-wide ecosystem
+    e.g. kernel, systemd, dbus, coreutils, wm, editor, etc.
+    = don't create your own services, daemons, mounts and sockets -- you have systemd
+    = don't create your own communication bus -- you have dbus
+    = don't create media framework -- you have gstreamer
+    = don't manage windows -- you have wm
+    <= after all each *workflow* permeats everything on all levels through whole system
+      * e.g. modal keybindings are <global> and full immediate keyset is composed from all programs
+    IDEA: Common Workflow Language -- spec to connect all cli tools together /x/spec-fsm-tla
+      https://www.commonwl.org/
+    IDEA: VARLINK ⌇IGVnu
+      https://varlink.org/
+        = plain-text ifc desc fmt + proto for both humans and machines -- through single fd
+        FROM:(pdf): https://www.phoronix.com/scan.php?page=news_item&px=systemd-homed
+    IDEA: "docker" is no more than a way to convert "dynamic exe + libraries + configuration" into basic composable "build blocks" of systems
+      !! similar to my *miur* linux-as-IDE idea, where I use miur as skeleton and grow different apps around it
+      => similar to my *airy* repo with apps configured for personal preferences
+  [_] make keybindings (key->func) into simple plugin, which can be replaced, augmented or overlayed
+  [_] IDEA: flat Linux IDE
+    use simplest one-window fm w/o layout
+    use multiple cli/gui windows at once
+    distribute preview over these windows
+    manipulate tiling WM windows to compose useful layout for fm workflow
+    ? how about SSH -- each window will have its own communication channel muxed on SSH ?
+  [_] flat project structure, merge with *miur-docs*
+    workflow as combination of features
+    piece each workflow as composition of other workflows
+    workflow is a flat feature itself
+    dynamic switching between workflows
+      e.g. exploratory navigation -> batch preview -> categorizing files
+  [_] changelog/diff between any two versions
+    situation: you haven't updated your highly-customized configs in the last half a year
+    ::: show "what's new" to import new changes to your configs
+      -- because direct "diff" of highly customized configs is useless
+  [_] SEE graph database
+    => maybe idea how to store *dom* ?
+    ? similar to btrfs decomposition
+  [_] ALT: search file manager in Lisp
+    NOTE: lisp
+      + flexible language/domain boundary and REPL => useful for extending
+      - large deps, can't be easily ported to C for embedded pltf
+      ? How to postpone this arch decision to allow to introduce Lisp glue power in later stages ?
+    https://github.com/stacksmith/cl-fm
+    +? https://github.com/vozhyk-/minifileman
+    https://github.com/kostafey/flex-commander
+    https://github.com/lup777/emcfmgr
+    https://github.com/escherdragon/sunrise-commander
+  [_] move ideas from 'term/ranger'
+  [_] move ideas from 'nou.vim'
+  [_] IDEA:SEE Emacspeak's table browsing functionality (online docs)
+    = richest collection of end-user affordances for working with two-dimensional data.
+    + MAYBE useful for my graph representations
+  [_] THINK audio notions for working with text
+  [_] Combine skeleton from ready-to-use libs
+    * borrow ideas from neovim
+    * write glue in whatever hell there is
+    ! postpone more decisions for better arch, more drop-in replacements !
+    http://libuv.org/
+      https://github.com/libuv/libuv
+    https://github.com/ClusterLabs/libqb
+    https://habrahabr.ru/company/centosadmin/blog/323556/
+  [_] NEED: fault-tolerance for server part to continue to work
+  [_] NEED: ifc sep to impl audio ifc !
+
+Fork
+  ? is there need for compatibility with python2 ?
+  ? MAYBE use C++ or haskell instead of python ?
+  I can use 'ranger' as prototype and integrate my ideas there first
+  \ and then use its architecture and found flaws to develop C++/haskell variant
+    FIND concrete code parts to rewrite which I will touch
+      = attach refs to the issue
+      = point concrete actions I will take in rewriting
+    Gather more usecases which demand such refactoring
+  ALSO:(reverse-prototype) I can develop simple skeleton with my splitted
+  \ architecture to test my vision before refactoring ranger codebase in its direction
+    * it also allows to test ideas directly in my small framework
+    * this prototype will be the first step for haskell port
+
+Deps
+  http://suckless.org/rocks
+  https://gist.github.com/XVilka/8346728
+  http://wiki.musl-libc.org/wiki/Alternative_libraries
+
+
+Goal
+  ship/activate only necessary subset of modules for each OS/distribution
+    => like another TUI on Windows, etc
+  complete abstraction ui layer
+    to be able to test ifc with unit/mock
+  providing universal DOM
+    show graphs to user
+    allow to apply commands
+
+
+Usability
+  tiling WM -- many instances in many terminals
+  low usability of task manager
+  low usability of preview window
+
+
+Performance
+  slow access / dir listing
+    kernel/firmware sources
+    always slow flattening
+    when I need load all recursive -- for 'ag' search results
+
+
+splitted modules
+  don't load all python code at once
+  future extensibility
+
+
+Problems with functionality
+  vim great -- because it's somewhat more universal interface than ranger
+  slow fs -- like network fs with slow ping : sshfs, curlfs, nfs, imapfs
+    > disable metainfo/preview only for choosen dirs
+  many hardcoded defaults/routines which are impossible to extend/disable
+    ~ like using file.basename in directory.py/refilter()
+    ~ or always loading file metainfo on directory read
+  open vim inside ranger inside vim -- need to return action

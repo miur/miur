@@ -1,0 +1,10 @@
+Make integration with editor subset
+  * define config file with vars
+    - open editor itself
+    - open file in editor
+    - add file to editor
+    - open stdin in editor
+    - open and jump to lineno
+      = when grep populates entries as list -- open entry and jump to file
+      = preview on right can be centered and highlighted based on lineno
+        =IDEA context-dependent preview!

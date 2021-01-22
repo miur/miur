@@ -1,0 +1,103 @@
+RQ:FIND: ncurses alternative
+  ! true-color
+    https://gist.github.com/XVilka/8346728
+  ! extended-keys
+    http://www.leonerd.org.uk/hacks/fixterms/
+     + libtickit (same author)
+    SEE: https://github.com/mawww/kakoune/issues/2554
+    BET: kitty approach -- full kbd extension
+      https://sw.kovidgoyal.net/kitty/
+      SPEC: https://gitlab.freedesktop.org/terminal-wg/specifications/issues/1
+
+INFO
+  So you want to make a TUI…
+    https://p.janouch.name/article-tui.html
+  On the road to modern peer-to-peer applications - Schemecomm - List archives
+    https://srfi-email.schemers.org/schemecomm/msg/12382927/
+
+
+CMP
+  https://en.wikipedia.org/wiki/Text-based_user_interface
+
+ALT:(ncurses)
+  ALT:DEV(custom): from ground up
+    USE: http://man7.org/linux/man-pages/man5/user_caps.5.html
+  blessed -- bare (reimplement)
+    ++ SRC: https://github.com/jquast/blessed
+      <= https://github.com/erikrose/blessings
+    + supports 24-bit color
+    - no widgets, too low-level, too simple, raw echo everything
+    - wrapper over STD(curses)
+    SEE:ALSO: yaronn/blessed-contrib: Build terminal dashboards using ascii/ansi art and javascript
+      https://github.com/yaronn/blessed-contrib
+      = BAD:(npm)
+  npyscreen
+    TUT: https://medium.com/@ValTron/create-tui-on-python-71377849879d
+    - old, stale 4 years
+    - only manual centering of text/etc
+    - too complex arch to add new screens/widgets
+    - hard to make composite widgets and complex layout from simple building blocks
+      https://www.e-learn.cn/topic/2047457
+      OFF: http://www.npcole.com/npyscreen/
+  ++ urwid
+    OFF: http://urwid.org/
+    SRC: https://github.com/urwid/urwid
+    - weak set of examples
+      REF: https://pypi.org/project/picotui/
+    - too low-level
+    CMP: npyscreen .vs. BET: urwid
+      https://bonusxp.com/2016/02/holiday-python-project/
+  curtsies
+    https://github.com/thomasballinger/curtsies
+    - old, stale 2 years
+  notcurses
+    doc: https://npyscreen.readthedocs.io/index.html
+    https://www.reddit.com/r/linux/comments/edo49w/notcurses_091_released_multimediacapable_tui/
+    python: https://github.com/dankamongmen/notcurses/issues/149
+    C: https://github.com/dankamongmen/notcurses
+  sailor
+    https://github.com/rix0rrr/sailor
+      = fills the composition gap between npyscreen .and. urwid
+  picotui
+    SRC: https://github.com/pfalcon/picotui
+    https://pypi.org/project/picotui/
+    = BET(than urwid)
+    - old, stale 1 years
+  Termbox
+    SRC: https://github.com/nsf/termbox
+    BUT no true color
+    $ pacaur -S --edit termbox-git
+    # package()+ python setup.py install --root="$pkgdir"
+  OLD: pyCDK
+    https://invisible-island.net/cdk/
+  STFL
+    http://www.clifford.at/stfl/
+      <= https://functional.cafe/@minoru/100373704782010003
+  ncurses
+    TUT: Текстовый интерфейс, ч.2. Взаимодействие с пользователем / Habr
+      https://habr.com/en/post/208582/
+    TUT: Curses Programming in Python | DevDungeon
+      https://www.devdungeon.com/content/curses-programming-python
+  libyui / YaST
+    https://github.com/libyui/libyui
+  ++ C: libtickit
+
+
+SEE
+  http://alternativeto.net/software/libtcod/
+  http://alternativeto.net/software/ncurses/
+
+  https://github.com/thomasballinger/curtsies
+  http://www.npcole.com/npyscreen/
+  https://github.com/peterbrittain/asciimatics
+  http://plie.readthedocs.io/en/master/
+
+
+Haskell
+  SEE:(inspiration): http://hackage.haskell.org/package/summoner-tui
+  http://stackoverflow.com/questions/6924009/hscurses-or-ncurses-which-one-to-use
+  https://www.reddit.com/r/haskell/comments/31maqb/textual_ui_in_haskell/
+
+
+READ
+  https://www.reddit.com/r/Python/comments/1132ct/im_trying_to_make_a_fancy_cli_interface_in_python/

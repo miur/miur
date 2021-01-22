@@ -1,0 +1,176 @@
+[_] TRY: ZeroMQ + libuv as communication core
+  http://zguide.zeromq.org/page:all
+    => it can even be used as core of "dgsh" shell
+  ALSO:SEE: POSIX compliant |community/nanomsg|
+    = You might like, guess Amit, Martin SUSTRIK's next artwork
+    https://github.com/nanomsg/nng
+
+Test stand (out-of-control environment)
+  multiple process N >> n cores
+    scheduled sleep
+    io blocking
+  multiple threads
+    global ctx continuously changing
+    scheduled sleep
+    blocking on shared access
+  minimal system resources
+    cpu load
+    threads
+    memory
+    io
+    net traffic
+
+
+Coupling / relations
+  immediate timing
+  immediate ctx  # imm catch == __init__
+  immediate actions
+  local ctx (self)
+  local actions
+  global timing
+  global ctx
+  global actions
+  other local timing
+  other local ctx
+  other local actions
+  ctx catch duration
+  actions duration
+  locality
+
+
+Time inconsistency for imm_ctx
+  THINK: in one thread user look at ui, press key, \
+    handle event and catches 'path' into imm_ctx
+    ! BAD: if 'rsp' of prev action comes between 'handle' and 'catch', \
+      and its effects applied -- then user's intention will be inconsistent \
+      with actual generated msg (containing changed imm_ctx)
+      E.G. user desire move to child, then move to parent
+        => result: he stays in place
+        BUT: his intention is equal to last action -- move to parent
+
+
+%% Lifecycle
+  handle event
+  catch ctx
+  create msg
+  # send msg
+  wrap cmd
+  exec cmd
+    ! currently exec() involves too much of macaroni mess
+      * catch own local/global state
+      * apply actions, read state, again apply actions
+      * then form total rsp to return from func
+    = exec() stages are similar to whole lifecycle stages
+      ? MAYBE its possible to reduce exec() complexity by splitting \
+        responsibilities similar to lifecycle
+  gather rsp
+  # send rsp
+  emit rsp
+  apply rsp
+
+
+%%%% Evolution
+
+Each block represents one level of indirection and solves single problem of coupling
+  * no need to introduce indirection if there is no problem
+  * too much of indirection introduces latency and complexity
+  * full normalization isn't possible -- you must stop somewhere
+
+%%% Graph
+Some problems can be solved separately.
+Some -- only on top of previous solution.
+Some require aggregation of multiple previous solutions and adding new aspects.
+=> Therefore -- it _must_ be graph to represent relations.
+
+USE:(.gv)
+  Macaroni --> Organized --> Callback --> Command --> Chain
+      ^--> ...                  ^--> callback of callbacks -->
+
+NEED
+  add support for synchronous path (use additional field in msg)
+    default: use impl-dependent preferable way
+    async: allows delays between any stages of action passing
+    full: if you need to execute very high priority cmd immediately
+    partial: block on send()/recv() only, but use async to manage msg on client side
+
+
+
+%% Blocks
+  Macaroni: keypress {event} -> handler {code}
+    + immediate exec
+    + direct access to local_ctx
+    - event:action = 1:1  # code repetition
+    - postpone all new events by total duration  # low responsiveness, big latency
+    - long catch_ctx : slow acquisition of all data  # time inconsistency (blurred snapshot of data), latency
+    - mixed ctx access and code execution over  # complexity, time inconsistency
+    - inconsistent sequential access
+      - immediate data can be changed until they will be read in future
+      - exec ctx may change significantly and changes become incompatible
+    - wide access_dom :: low encapsulation / localization  # complexity, hard correctness proving
+    - long actions :: blocks other code execution (E.G. process new event)
+    - hardcoded code : locality  # code repetition = in-space inconsistency
+    - imm application of evaluation results to global ctx
+
+  Organized: keypress {event} -> handler {code}
+    + catch imm_ctx at beginning  # reduce exter infl
+
+  Callback: handler -> action {code}
+    + event:action = N:1
+      + reduce space inconsistency
+      -
+        SOL: callback of callbacks of ...
+          ~ hard order = can't be reordered
+    + encapsulate {code} deps into sep file
+      connascence by (name, args_type)
+    - local_ctx must be passed to func
+      BAD: back ref to ctx : breaks catched imm_ctx localization
+
+  Command: handler -> obj {init} -> action {code}
+    = {code} split into init() and action()
+    + no need for immediate exec
+      + time distance until execution
+      + space distance until execution
+      ? THINK is it possible to gain only single characteristic of these two by simpler approach ?
+    ! impossible access to immediate local ctx in the moment of execution
+      = local_ctx must be saved into obj
+      = consistency lost -- between saved ctx and actual immediate ctx
+
+  Chain-of-responsibilty:
+    http://wiki.c2.com/?ChainOfResponsibilityPattern
+     Do not use Chain of Responsibility when each request is only handled by
+     one handler, or, when the client object knows which service object should
+     handle the request.
+    + event:action = 1:N
+      - unspecified order
+        # use 'priority', etc to dynamically rearrange order
+
+  ctx can be gathered in parallel and must be combined before exec() possible
+    <~ augmenting/infusing/enriching msg allows only sequential processing and not parallel
+      msg arrives to aug_ctx subscriber
+      it executes some queries with msg data inside its own local ctx
+      msg is recreated with additional gathered results -- haskell (or added to msg -- python)
+      this new msg sent further or emitted from the beginning
+  state accumulation
+    msg:rsp = N:1
+    = you need send multiple msg,
+      each one executes action
+      each next combines/reuses prev results (parallel/sequential)
+      total/resulting rsp is sent back at once
+  split init()+state -> state+exec()+rsp+apply()
+    cactch whole ctx in one place
+    and execute in another
+    they may be sep by any media and be in diff langs
+  split init() -> state -> exec()+rsp+apply()
+    sep methods to generate plain msg with state structures
+      ++ can have multiple cmds with same 'state' but each impl its own exec()
+    sep method to execute incoming msg
+    msg can be transfered through media unchanged (no need to re-create whole obj)
+  split exec() -> rsp -> apply()
+    results can be retrieved in one place and applied in another
+    ! so -- they can be executed when they have access to global state !
+    rsp is also msg == can be transfered through media
+  msg:rsp = 1:N
+    send partial frames in rsp continuously until condition
+    serve eternaly (like keep-alive)
+    wait on occascional incoming server-initiated state updates
+    listening to the other mods connection through

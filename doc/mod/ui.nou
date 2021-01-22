@@ -1,0 +1,113 @@
+%%%%% UI
+
+NEED protocol to communicate with core
+  [_] SEE neovim
+  block / mutex on operations from different gui
+    =>> WTF when you launch several different cores at time, how to sync ?
+
+
+CMP: @/uix-*
+  Different UIs in Python - The Dan MacKinlay family of variably-well-considered enterprises
+    https://danmackinlay.name/notebook/python_gui.html
+  TangibleUI Технические средства человеко-компьютерного взаимодействия TUI. Обзор и анализ возможностей использования в игрофикации
+    https://cyberleninka.ru/article/n/tehnicheskie-sredstva-cheloveko-kompyuternogo-vzaimodeystviya-tui-obzor-i-analiz-vozmozhnostey-ispolzovaniya-v-igrofikatsii/viewer
+    = different NOT:STD ifc for manipulation
+  Oberon TextUI & AcmePlan9 TextEditor
+    https://en.wikipedia.org/wiki/Text-based_user_interface#Oberon
+  LUI
+    https://en.wikipedia.org/wiki/Natural-language_user_interface
+  VIZ
+    https://en.wikipedia.org/wiki/Category:User_interfaces
+
+
+
+Adoption
+  nvim (headless server)
+    edit text regions
+      entry (file rename)
+      preview (like fast-edit/substitute)
+  w3m
+    img preview
+  readline
+    https://github.com/jonathanslenders/ptpython/
+      https://github.com/jonathanslenders/python-prompt-toolkit
+    ALT
+      https://code.google.com/archive/p/squires
+
+
+Frontend
+  test_mock
+    inner testing only
+  raw
+    $ nc <mod_dst> [<mod_port>]
+  pipe
+    not_raw: supports *keymap*, so can use macro (E.G. vim's ':norm ...')
+      insert text commands directly in pipe
+    ? THINK: unidirectional : no ret/output ?
+    goal: headless scripting
+      ! feels like bloating ?
+      alternative shell language
+        * allows to apply shell/etc commands to virtual lists/files DOM
+        => ALT:USE: bash $ miur -H -t core -c '...'
+    query
+      cat necessary details from pipe in shell scripts
+      expose *miur* instance details similar to /sys or /proc of kernel VFS
+        +++ easy native ifc to any other *miur* instance
+          * you can copy current file under cursor from any instance
+          * go into the same directory
+          * ...
+        BUT:BAD: we need LKM to expose it directly into filesystem
+        BET:ALT: unroll single pipe into virtual tree view only inside *miur* (any other instance)
+  cli
+    interactive query-like fm (ls, zsh, fzf)
+      * embed into zsh to interactively select files
+    approximates *view* widget window : zsh-like or ipython-like
+      curses-free widgets
+      textual infostring representations for lists and statusbars
+    make it independent plugin
+    controls like zsh-vi-cmd-mode
+      single letter directly launches cmd in 'vi' by monitoring getch()
+        on 'i' you can go to 'insert' mode with emacs-like edition
+        in emacs-mode you must press <CR> after one-letter alias to execute line
+      perform chosing files through cli
+        first / last / find by rgx
+        NEED: concept of 'cursor' and 'selection' in cli ui (in contrast to tui)
+      type processing commands directly in cli like shell cmds (similar to ipython)
+        E.G. Like typing $ :j /+ %L $ to apply J lang construct on current list
+    E.G.
+      launch by $ miur --cli
+      similar to shell itself
+      has prompt with current status
+      builtins == actual *miur* keywords
+      instead of mappings -- buildins (like zle widgets)
+      use shlex to parse flags
+      track current 'tab' and switch between them
+      you can launch shell inside
+    ALT
+      SEE: https://github.com/fwkz/riposte
+  tui
+    ncurses
+  web
+    = browser, etc
+    dynamic web ui on js (gui-like)
+    static web ui (embedded ftp-like fs browsing)
+    [_] SEE radare2
+  gui
+    qt frontend
+  2d
+    graphviz
+      integration to interpret graphs in one click
+  3d
+    opengl graphs like xmind
+      redirect catched input to bkgr *core* server for DOM manipulation
+    E.G. renderers
+      https://github.com/tunabrain/tungsten
+  wrappers / embedding
+    = augment existing facilities instead of recreating ui from scratch
+    nvim / gvim
+    emacs
+
+
+Display
+  Has no interest here == must be incorporated in frameworks api
+    altr: Xorg, Wayland

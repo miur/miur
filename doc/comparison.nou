@@ -1,0 +1,81 @@
+BLOG
+  https://www.quora.com/What-do-I-have-to-know-to-develop-a-file-manager-for-Linux
+  https://www.tecmint.com/linux-terminal-file-managers/
+
+FIND each and every file manager (Windows/Linux/Android)
+  = SEE integration features with system/apps/services
+  = THINK how tree-structure used in them
+
+Filesystem-like services
+  SEE Gopher
+    http://suckless.org/project_ideas
+    https://en.wikipedia.org/wiki/Gopher_%28protocol%29
+
+SEE
+  https://wiki.archlinux.org/index.php/Category:File_managers
+  Win
+    TC
+    FAR
+  tmux
+    http://www.mit.edu/afs.new/athena/project/bsd/src/tmux-1.7/TODO
+
+!!4 manatee
+  BETTER: Has similar ideology
+  https://wiki.haskell.org/Manatee
+    https://hackage.haskell.org/package/manatee-filemanager
+
+!!! ranger
+  http://ranger.nongnu.org/
+    https://github.com/ranger/ranger
+
+!! vifm
+  https://vifm.info/
+    https://github.com/vifm
+    NOTE 'vifm' has 104k lines in C vs 'ranger' 15k in python
+    ++ Directly navigate inside archives (as TC)
+    + inner file associations
+
+!! noice -- very small suckless ranger-like fm in C
+  http://git.2f30.org/noice/files.html
+  (fork) https://github.com/jarun/nnn
+    https://github.com/jarun/nnn/wiki/nnn-vs.-noice
+  LOG: https://www.reddit.com/r/commandline/comments/ep04rs/file_manager_nnn_v29_simpler_controls_smarter/
+
+!! mc
+  https://www.midnight-commander.org/
+    https://github.com/MidnightCommander/mc
+
+lfm
+  https://inigo.katxi.org/devel/lfm/
+    https://bitbucket.org/inigoserna/lfm3
+  review:
+    http://zenway.ru/page/lfm
+
+Haskell
+  https://github.com/hasufell/hsfm
+  https://github.com/michaeldever/haskellfm
+
+Lisp
+  https://github.com/stacksmith/cl-fm ※⡟⠴⣩⢟
+  https://github.com/vozhyk-/minifileman
+  (OS) https://github.com/froggey/Mezzano
+  (emacs) https://writequit.org/denver-emacs/presentations/2016-05-24-elpy-and-dired.html
+    https://truongtx.me/2013/04/25/dired-as-default-file-manager-5-customize-ls-command
+    https://github.com/gabriel-laddel/flexi-trivial-dired
+
+
+ALT: tree-viewers
+  https://dystroy.org/broot/
+
+
+ALSO:
+  |aur/nav-git:| nav is a hackable ncurses file manager, inspired by vim, ranger, and dvtm.
+  |aur/lf:| A terminal file manager, heavily inspired by ranger
+  |aur/lscd-git:| file browser written in bash with an interface similar to ranger's
+
+TODO:
+  [_] github -- search 'filemanager', 'file manager', 'fm', etc
+  [_] I need to read all the issues/pull-req on ranger/vifm
+    => Because there may be contained some great vision
+  [_] qutebrowser has nice discussions and ideas in Issues, like this
+    https://github.com/The-Compiler/qutebrowser/issues/499

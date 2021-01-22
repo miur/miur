@@ -1,0 +1,325 @@
+%%%%% Protocol
+Re-invent UDP-like over any other protocol/media.
+Additional level of indirection.
+
+TODO
+  !!! [_] FIND distributed/remote/secure evaluation
+    SEE system clocks and timestamps
+    [_] http://books.ifmo.ru/book/1403/vvedenie_v_raspredelennye_vychisleniya.htm
+      https://habrahabr.ru/post/232361/
+
+%% Msg
+  Format
+    ask ( type, id/timestamp, dst, body )
+    rsp ( type, id/timestamp, dst, body )
+
+    type: may be single letter with fixed length body afterwards
+      'rsp' can be capital letter to distinguish direction
+      = NEED for unpacking objects (pickle-like)
+
+    id-timestamp:
+      = important only for async/multithread apps -- so can be added after queue.pop() instead of inside imm handle()
+      id = timestamp: WARN: may become non-unique due to sys clock discrepancies
+        BAD: by hacking timestamp you can alter cmds order and interleave with cmds from another client
+      id = cmd: BAD performance for large cmd/selection -- no sense to send them back to client
+      id = hash('cmd'): WARN: isn't enough for multiple identical cmds or same cmd from diff clients
+      id = hash(('cmd', 'time', 'client')): too complex ?
+        NEED: 'counter' to recreate cmd order
+        NEED: 'time' so reconnected client suddenly didn't get rsp for its req before disconnection
+        CHECK:THINK:(collision) incoming msgs with the same hash as waiting on response outgoing ones
+          => ? Can't place all msgs in single pool ?
+          ? Must have separate pool for diff dirs ?
+      id = hash(('counter', 'time')) -- is it unique enough ? Or I need trace of 'cmd' anyway ?
+      id = hashof(dwait, key) -- directly use hash from dict()
+        BAD: no guarantee hash won't change between transactions due to
+        reordering of dict elements on its growth or items deleting
+
+    body: cmd/rsp
+      maybe gzip
+
+  Ignore msg/rsp relative order
+    cmd can activate slow bkgr task, which results will be delivered long after multiple msg transactions
+    NEED identify which req asked for this rsp (use id/timestamp)
+
+  msg has addressee
+    Using addressee guarantees fastest delivery
+      All transit msgs must be sent immediately
+        don't store into queue == reduce delivering latency for re-emitting from queue
+    DFL:
+      _parent_ responsible for processing -- on *mod*'s own tree branch
+      _returnee_ where to send msg after processing
+    target
+      -t core
+      -t view
+      -t self
+    broadcast
+      -t all
+      -t neighbors
+      -t ui/all
+      -t all/ui
+
+
+%% Impl
+  each msg has class
+    = msg based RPC
+    = execute serialized 'future' over sockets
+    + best horizontal scaling for conform classes
+    + you can lazy load commands from file/db on demand ! yahoo !!
+    ? OR better to register callbacks on rsp instead of dispensable class ?
+      ! need to keep request data/cmd to hang around
+        check server correctness/compatibility (verify possible garbage / attack)
+      ! state streaming -- send single *frame* by fragments/segments
+        E.G. stream long directory
+        need isolated state to track transmission progress -- so need obj
+
+  only msg itself knows how to parse rsp from *core*
+    ! keep msg obj around, until rsp will be processed
+    => can't process some server rsp
+      - unknown format (no such obj in dispatcher)
+      - obj instance wasn't scheduled to wait on server rsp
+    ? WTF with broadcast msgs -- when clients don't expect it ?
+      ? always keep universal objects for allowed broadcast msgs ?
+        = don't destroy after recv processing
+        * keep minimal state (or none)
+        * use .clone() to create obj with encapsulated rsp and pass to processors
+
+  containers for combined msgs
+    = equal type as other msgs
+    * you can pipe results from 'move to parent' to 'list node'
+      + less latency -- eliminates delay between separate reqs
+      + less traffic -- single compressed message
+      + *core* by itself process first and then pipe to second part of msg
+      = NEED: placeholders for results to specify: like '%1', '$1', 'out[1]'
+        ALT: use 'state-proxy' (local to cmd container)
+          * imitates fragment of client's global state
+          * each command changes something in this small structure locally by *core* on exec
+          * after cmd arrives into dst, its state merges into global state
+          + through using 'state-proxy' you can generalize access to *dom* and
+            \ reuse effects of prev cmds application even before that state arrives
+            \ to client ! (therefore reducing transaction count and traffic)
+    Attributes
+      execution: chain / pipe / parallel
+        parallel = rsp can be returned in arbitrary sequence of other containers
+        chain = similar to Haskell monads chaining
+      results: discard / n-th / last / vector gather
+        gather = return same container with all rsps
+      flow: till 1st err / all
+      failsafe: (all|any) err = ok / (any|all) err = err
+    Consistency
+      single op can req mult cmds to succeed
+      atomically apply all of them to *dom* BUT: how ??
+        instead of *dom* fragment substitution you can undo effects from already applied sub-cmds
+      revert/rollback incomplete operation
+        E.G. no sense to chg curr path to parent's, if you can't load/recv its file list
+      containers must encapsulate this atomic behavior
+
+  all cmds has global order
+    ! you can't request node listing before you completed choosing dir path
+    = global counter (unique for this client)
+      check missed numbers, wait on them
+      * *core* must add (tuple) it's own global counter to all processed commands
+        = easier coordination through undo history
+        = you can track / undo overlapping actions of other clients
+
+  auto-destruct cmd after timeout
+    SEE:(progress-bar) https://en.wikipedia.org/wiki/Command_pattern
+    for long tasks periodically send rsp {'progress': 88.4 }
+      also works as 'keep-alive' for commands itself
+      if no progress for a long time (no 'keep-alive')
+        through the same cmd ifc send 'cancel' to server
+        delete 'waiter' from _dwait_ on client side w/o waiting on 'cancel' rsp
+    if cmd in server queue can't be executed over long time (high load, long tasks, thread pool exhausted)
+      clean up queue from not started 'stale' cmds
+        : user BETTER send cmds again than see unexpected/forgotten action 15 min after
+      clean up 'hang up' cmds which not notified about their progress for long time
+      on 'cancel' search and remove cmd, or ignore if not found
+
+  NEED: encapsulate global state changes
+    ~ another msg bus to eliminate locks and keep definitive order ?
+    ~ return {'state.path' = p} for registry hive, and apply changes in another executor
+    ?? maybe directly send registry hive path with response ??
+      - you need verify path anyways
+      - too tight coupling on sent format
+
+  each cmd is 'Command' pattern object
+    https://en.wikipedia.org/wiki/Command_pattern
+      ALSO:SEE: pattern 'Master/Worker'
+      !_ [_] FIND:(arch) remote: evaluations, calculations, processing, procedure call
+    on recv() move dwait[h] -> qexec.put() -> dom_obj: cmd.exec(self)
+      + locality to obj in question -- no need for global state to apply cmds
+      global: exec() -> chg state OR send msg
+      extern: exec(self) -> global.handle(self)
+      local:  exec(self) -> self.handle(cmd) OR self.var = ...
+  ALT: emit() : Executed Routed Event -- wiki/Command_pattern/Terminology/3.1:WPF
+    NOTE: my sep by 'client/cmd' and 'server/exe' is all about replicating cmd \
+        on both sides of channel -- which is essentially equivalent to 'copying' \
+        or 'sending' serialized cmd class through channel.
+      => ?? THINK use single library of commands with both msg()/rsp() \
+            and process() methods
+
+  ALT: each cmd IS _event_ (WPF)
+    ~ WPF cmd has ref to target
+      E.G. the same 'Copy' cmd will have different impl for text and img by using target->copy()
+        => ? no need for code logic in cmd itself ?
+    * no code inside
+    * no ref to target (dst)
+      tuple space instead of pipe
+      pattern matching instead of address
+      unordered (even) subscribers
+        all consumers equal and can't hinder each other (with same level of priority)
+          ! they even can be spread distantly through web
+        priority to form dynamic chains/trees of responsibility
+          can be set individually for each type of event/msg
+          = partial (synchronous) order of msg passing/flow
+          = you can block msg in high priority consumer from passing to others
+    * exec() is emit()
+      - each subsciber must impl 'port' for cmd to arrive (in addition to api)
+       "The difference being that messages are directed, events are not — a
+       message has a clear addressable recipient while an event just happen
+       for others (0-N) to observe it."
+    * event is msg
+      important only time instant and embedded data
+      event don't interpret its own data at all
+      interpreting occurs inside event subscribers
+      = easy to directly serialize cmd and send through channel instead of replicating by 'msg'
+        + .so src code for cmd can be shared between server and client
+        + protobuf can be used
+        + easy scaling and any level of detour indirection possible
+    * process event by chain/tree-of-responsibility with subscribers
+      ! instead of setSuccessor() use native linked lists or graphs
+        => split 'data-graph' structure from actual processing code
+    + you can use CQRS also for received responses
+      ?? does it has any sense -- storing history of received data ??
+
+    WPF
+      http://docs.gigaspaces.com/sbp/master-worker-pattern.html
+      https://encrypted.google.com/search?q=executed%20routed%20event
+      [70%] 2016-11-11 https://msdn.microsoft.com/en-us/library/ms752308.aspx
+       The Execute and CanExecute methods of a RoutedCommand do not contain the
+       application logic for the command, but rather they raise routed events
+       that tunnel and bubble through the element tree until they encounter an
+       object with a CommandBinding.
+       https://msdn.microsoft.com/en-us/library/ms742806.aspx
+       https://msdn.microsoft.com/en-us/library/system.windows.input.commandbinding.aspx
+       https://msdn.microsoft.com/en-us/library/system.windows.input.routedcommand.aspx
+
+  MAYBE: encapsulate even getters from globals
+    create objects w/o arguments at all ?
+      # OR: at least use it as default args
+      <! gui has button to produce action, but gui has no need \
+        to access global state to create args for this action !
+
+  Trade off
+    Tight coupling with high locality
+      raw events
+    More generalized standarization on larger scale
+      pre-processed 'cooked' events/msgs
+
+  event -> cmd --(infusing)-> msg --- msg -> event -> msg --(prc)-> rsp
+    infusing/enrichment of cmd by grabbed context frame
+      like: Copy -> Selection (catch into cmd) -> History
+    indicate to ifc exec() availability/status by: cmd.CanExecute(), cmd.IsBusy()
+      = it can test target itself if compatible with cmd / possible at all to exec()
+      = and target's state (or local context) if ready to exec()
+      event: CanExecuteChanged to listen inside cmd src
+    Concept boundaries
+      external actions (events) [N -> 1] command
+        = map multiple actions to same command
+          (enriched with slightly different ctx)
+      command [1 -> N] bindings
+        = allows flexibility in choosing binding type
+        any choice of actual binding
+          property 'exec()' with __call__ attr may be literally anything
+            being function itself, directly bound to some class method or global func
+          ALT: emit() event on exec()
+    !! postpone key decisons in 'arch'
+      bindings
+        allow multiple choices for impl logic
+          embed into cmd
+            access to global/local execution env -- api/static/singleton/etc
+          delegate to target
+            pass cmd to target's port(..) and target will handle it itself
+          external binding
+            dispatcher finds appropriate independent function to operate on cmd
+          chain of responsibility
+            subscribers decide by themself what to do with msg
+
+  exceptions
+    send to clients all occured exc (inside rsp)
+    all cmds must ret at least status => each 'cmd' is paired with {1..N} 'rsp'
+
+
+
+%% Scripts as msg
+Use Lua or any other scripting lang
+NEED: more cmds implemented and bigger arch prototype fleshed out
+\ to make decision about scripting language. It won't hurt to add
+\ Lua bindings to completed set of commands if I will want scripting capabilities.
+
+  * provides binding to *core* universal interface
+  * directly exchange by Lua snippets instead of 'msg'
+  + embedded 'state-proxy' in script as global VAR:(state)
+  + better data flow control between ops
+  + bindings to *core/api* to combine them under single command
+    ! ++ no need to reflect 1-1 each client cmd to each core cmd
+      = more untied ifc, more flexibility
+  + ! rsp fmt inscribed directly by Command -- more encapsulation
+    E.G combination of return types -- constructed structure
+      -- written in script text
+  - you still need cmd counterpart to impl *core/api*
+    BUT your client's cmds become completely independent from now on
+  - bloat: each *mod* must link to Lua interpreter
+  -- slow: script interpreting takes time
+  -- one more lang for src
+    => 'Command' contains most of *fm* logic -- so src will be full of Lua
+    ! can't optimize seq ops in native lang (or by using C) due to tie up to low-performance Lua
+  -- cumbersome parallelism of commands in Lua syntax
+    NEED create own bulkhead over scripting language constructs
+  --- security
+    NEED greatly reduce functionality subset (like IO)
+
+
+%% Channel
+  queue multiple msgs
+    save each msg to queue and continue wait on socket
+    mark msg by emitter for response (add back-ref to client)
+      ~ directly use ref to explicitly call client code
+      ~ use 'id' to resolve it into client
+        BETTER :: allows to use write queue
+        http://stackoverflow.com/questions/10605083/python-asyncore-keep-track-of-clients
+  special 'cancel <op>' msg to reset queue
+    what receiving data format to be expected to 'cancel' at any time ?
+  reply to same client
+    embed returning 'id'
+  broadcast *dom* state change
+    do it until *ui* and only there make decision to update *cursor*
+      = make updating _on demand_ only
+  msg => cmd => class
+    search handler by type/class
+      = Haskell way
+      = C++ polymorphisms
+    easier to process/split cmds queue/pool
+  cmd authentication (check access/ops permissions), logging
+    NEED formal dispatcher between cmd and handler
+  cmd => event
+
+  [_] filter/block some rsp before dispatching into handlers/appliers
+    = use chain of responsibility
+    * mark allowed 'id' to accept rsp
+    * track statistics -- how much 'id' of each type is waiting on rsp
+  [_] wrap 'handle()' over 'put_in_queue' to choose execution method (sync/async/deferred/etc)
+    ? no sense to make sync/async field in msg itself ?
+      ? directly call convenient _method()_ inside 'schedule' by dfl impl or passed VAR ?
+
+
+%% Serialization
+  [_] TRY: json/gzip
+    http://stackoverflow.com/questions/2751098/sending-data-as-instances-using-python-sockets
+  REF
+    https://en.wikipedia.org/wiki/Comparison_of_data_serialization_formats
+  Blog
+    https://www.sitepoint.com/choosing-right-serialization-format/
+    http://stackoverflow.com/questions/144435/whats-the-best-way-to-serialize-data-in-a-language-independent-binary-format
+    http://maxondev.com/serialization-performance-comparison-c-net-formats-frameworks-xmldatacontractserializer-xmlserializer-binaryformatter-json-newtonsoft-servicestack-text/
+  E.G.
+    http://msgpack.org/

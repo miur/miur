@@ -1,0 +1,12 @@
+Chat as filesystem
+  * date/nick -- as extended file attrs ?
+  * ./protocol/server/channel/date_nick:shortmsg:<full_msg>
+  * attached files -- simply message with actual content
+
+Filter = hide nicks
+
+Sort (universal)
+  * DFL: asc date
+  * nick (grouping)
+  * full msg (as whole)
+  * by individual words in msgs

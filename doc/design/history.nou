@@ -1,0 +1,98 @@
+History
+
+  Blend history in graph itself
+    * ro graph => disable changes in nodes itself => stores all graph's past history
+        => discard too old cached states when cache size exceeded
+        HACK track list of discarded uids to notify user about obsolete access
+    * ALSO store changes in real fs graph as similar history
+        ? USE when external change to fs ?
+        => however, 'undo history' will be more effective and less space-consuming
+        ALT: use incremental history and reconstruct virtual nodes on demand
+    * edges -- is only a history cursor for whole graph
+        => I.E. bunch of per node history cursors
+    * share nodes between similar histories to reduce space consumption
+        => ref count before deleting
+        ? when generating node with same content => return same node
+            => NEED copy-on-write for this type of sharing
+
+  Independent history nodes
+    HACK: diff edges between history nodes => to ascertain changes
+  WARN: other nodes continue to point into old edges
+    * NEED: port xrefs to new edges (MAYBE together with xrefs)
+      + if node was deleted => keep xref pointing to old edges
+    * NEED: keep brefs to node to update xrefs in all related nodes on node delete
+
+  THINK: history per attr instead of total history for whole dict
+    => NEED generalized history to connect to groups or individ objs as you wish
+    !! NEED free convert between simple dict and graph repr
+    IDEA: even whole content of node (all edges,cmds,attrs,etc) can be placed under history
+      == hist of changes of node itself
+      ? [_] TRY: history of subpart of node -- picked subset of cmds/attrs under sep hist
+
+  history as sep node in subsystem
+    type == history --> jump to one of nodes in "List"
+      .type == history
+      _history = {node: [nodes..]}
+    otherwise --> node is immanent itself
+    !_ "history" is extension of any node
+      node with type "History" === proxy to actual node
+    NEED: deque :: bidirectional iter, direct access to beg/end
+      * add new nodes to end -- works as stack
+      * remove old nodes from beg -- works as fifo
+      ALT:(super flat): sort hist nodes by timestamp and delete oldest one
+      BUT at the same time each hist point must have uid to refer old
+        ? OrderedDict => to remove item from front/back ?
+
+  timestamps
+    history must contain and show timestamps
+      e.g. when you manually search command history for commands executed some days ago
+        (but don't remember any part of those commands to grep history)
+
+
+INSIGHT: *dom* is a combined space-time graph
+  * flattened along 'time' axis
+    => therefore all history nodes are stacked as edges into same space nodes
+    sorting by ctime => time axis becomes embedded into each individual node
+    ++ compact memory for history -- only for necessary nodes
+    -- BAD: all ops must be node-localized
+    -- BAD:HACK: create virtual 'grouping branch' and provide history graph for it
+    -- NEED mechanics for grouping
+      +++ single time point added on time tree at once
+        => no need for grouping of time nodes => no need for immediate access
+        => no need for immediate space access
+      --- lost grouping in space (cmd localization)
+      Assumption: each cmd produces graph of changes but only _single point_ of time
+        BUT: cmds may also produce time graphs
+      == zero-point localized space
+      ! HACK you don't know about exitence of anything until you have connection with it
+        * adding new edge leading to before nonexistent node -- allows it to be accessed by space graph (and us)
+          => all nodes are eternal -- exist before even graph exists and keep existing after graph destroy
+        * on node update you must also update all nodes having connection to it
+        * distant nodes have only _memory/recollection_ about existence of node in the past
+          - you may update them as well
+          - OR you may keep them as is -- and update only on demand by heuristics searching the updated node version
+    == CVS style
+
+  * OR: flatten along 'space' axis
+    => each time point contains copy of whole graph
+    -- memory overuse -- saves whole graph at each point
+      SEE how git/hg resolve this problem
+    -- hard to derive history for individual node
+    -- BAD: can't undo and branch history for single node
+    -- BAD: can't view history for single node, keeping remaining graph intact
+    -- NEED synchronized global states
+      ! REQ immediate access to all data in plane/slice at axis time -- to fixate global data change
+      == zero thickness on time axis
+    == GIT style SEE gitfs, pygit2
+      https://lwn.net/Articles/654075/
+        https://www.presslabs.com/gitfs/
+        https://github.com/PressLabs/gitfs
+      ALSO https://github.com/Microsoft/GVFS
+        https://news.ycombinator.com/item?id=13559662
+
+  * BET:NOT flattening -- 'time' axis is also graph
+    = if you rewind history and generate again -- you obtain 'undo graph'
+    !!! too complex :: nonuniform/anisotropic space-time continuum
+      => cause-effect relations can be localized in space or time BUT:NOT: both
+    ++ history graph branching per node/group
+    ~ xrefs between past nodes and present

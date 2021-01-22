@@ -1,0 +1,14 @@
+
+Git-like database for ops history and events tracing mgmt
+  G: https://www.google.com/search?q=git%20like%20database
+
+  https://stackoverflow.com/questions/2575405/is-there-a-database-with-git-like-qualities
+  https://elixirforum.com/t/git-as-a-database-and-alternatives/27068
+  https://www.slideshare.net/Codemotion/kenneth-truyers-using-git-as-a-nosql-database-codemotion-milan-2018
+
+  TerminusDB
+    https://dev.to/cheukting_ho/storing-data-like-git-terminusdb-2n0o
+  noms
+    https://github.com/attic-labs/noms
+  OrpheusDB
+    https://orpheus-db.github.io/

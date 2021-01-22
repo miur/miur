@@ -1,0 +1,372 @@
+%%%% Viewer
+DEV:TEMP: combined input/output/ui
+
+%%% Data Flow
+fs -> DOM  (caching everything due to slow access time to fs data, incremental sync)
+DOM -> reflection (lazy partial view of DOM (cached with timespan) -- only requested parts)
+  ATT: reflection is necessary only for client-server arch w/o full access to original DOM
+DOM/reflection -> proxy (lazy cache of visible preprocessed elements and data-related metainfo)
+  HACK: optimization if no filtering => simply pass-through to directly access DOM/reflection
+  E.G. even lists may be partially sorted for current view and incrementally sorted only on cursor move
+    + IDEA: renaming firstly affects proxy and only then propagates back to system
+      NEED: on renaming store prev names for back-propagation
+      NOTE: err if back propagation isn't possible anymore due to changes on system's fs
+  ALSO: some choosen entries of proxy may be replaced on update event from DOM change
+  NOTE: independent and incremental operations
+    * inc ops are on top of prev result => filtering accumulates destructive changes
+    * all destructive changes mark dataset as 'modified'
+    * independent ops check 'modified' flag and re-fetch data from DOM before ops
+    * any proxy may be restored to original dataset by fetching again from DOM/reflection
+  NOTE: caching full data in proxy is very normal => because screen/ncurses caches text until redraw anyways
+    => and reacquisition of info for alterating views will be slow
+  * combine nested single-entry java-like paths with single element in single entry
+    E.G:(github) ./com/java/module/ or ./some/dir/file.txt
+proxy -> view (cursor and other display-related metainfo)
+  * stores immediate state (e.g. like registers)
+  * view tree exists in parallel to proxy tree and linked in nodes
+  * history of order: visited dirs, selected files (jumps)
+    => tightly linked to *cursor/input* metainfo == history of cursor movements
+    !!! can't be shared between cursors >>> otherwise order will be messed up !!!
+      BUT: can be cloned from another cursor OR created anew from default config
+  * last cursor positions in visited dirs
+    => tightly linked to cursor history
+    ALSO may be treated as selection == [all visited dirs * 'cursor selection']
+  RENAME: to "session" ?
+    * new session == clean visited history and cursor positions
+    MAYBE: also clean selections ?
+view -> widget (baking proxy+view to concrete size, style and formatting)
+  * widget also has 'view' which points to one of compatible data 'view' (E.G. dir view or tree view)
+  * widget has no w/h by default => it's only cursor for layout view with embedded behaviour
+  ?? merge all data and metainfo trees here into single list of content with attributes
+    * filesystem
+    * mounts / binds
+    * tags
+    * selections
+    * virtual entries
+  * multiple cursors
+    - control multiple cursors one-by-one
+    - ... as single group with fixed gaps
+    - control each by different keys
+    - show ghost cursors from different widgets pointing into single dir
+      << similar to google excel tables
+      ?? use single shared view per dir or view per widget ??
+        => cursor must be per widget => for independent split screen
+    - show ghost cursors from other instances of *miur*
+      == sync view metainfo back through server *dom*
+widget -> layout
+  * its layout which enforces x/y/w/h on widget
+  * the same widget may be positioned in diff places in diff layouts under diff frontends and have diff sizes
+    BUT: it always shows the same info
+  ?? stack of opened in-place widgets
+    E.G. embedded {pager/editor/terminal} directly into widget's place, then returning back to widget
+    temporarily replace/overlay more specialized widgets in place of current navigational ones
+  NOTE: tabs impl
+    ~ each tab has its own clone of layout with widgets (even if identical)
+      different dataset linked to different widget clones
+    ~ shared instance of layout + widgets
+      only links to data and states replaced inside widgets
+        BUT: then widget state must be separated from widget itself
+layout -> window
+  * single abstract widget => multiple fully-synced frontends
+  ? isn't window is widget itself ?
+    => some input streams with focus may be associated with whole background window
+window -> ncurses (copying / invalidating baked data)
+  ? colorscheme must be is shared for widget or individual per frontend ?
+    BET: translation tables 'grapheme type' => 'its color'
+      * can be completely shared between frontends or individual
+
+
+!5 [_] IDEA: generalize composition instead of strict hierarchy
+  = outer combine instead of direct composition
+  ~~ some func to aplly/bind one to another only temporarily to produce result
+    = ALSO: cache can be treated in the same way
+      => generalized cached decoupled from its actual content
+    == generalized 'applier' of (object + transformation + cache + ...)
+    !! any of intermediate classes => transformations !!
+  VIZ. transformations -- incapsulate access to lower layers
+    dom + filter => proxy ~dom~         # TODO: apply multiple small filters (hide, sort, ...)
+    proxy + cursor => view ~dict~       # IDEA: apply multiple cursors (vert,horiz,history)
+    view + widget => model ~graphemes~  # IDEA: generate incremental update for render
+    model + layout => scene ~graphemes~  # NEED: distinguish incremental or complete scene
+    scene + render => <ui>
+
+
+IDEA: targeted modal keymap
+  * navigation :: ranger tree with preview
+  * reordering tree :: single ascii graphics tree view
+    <h/l> close/open [+] node dir
+  * sorting files :: two panel with preview
+    <h/l> switch panel left/right
+    <d/f> move file under cursor -- always left/right despite focused tab
+  IMPL: general fallback for other keys => use collections.ChainMap
+
+
+IDEA:HACK: sync cursor position in different DOM / cache
+  ~ sync moves up / down
+  ~ sync entry index positions
+  ~ place on entries with same names
+
+IDEA:DEV: reimplement small utils inside python code (E.G. path-compact)
+  ! provide for them outer interface in ./miur/bin/miur-* to call directly from shell if necessary
+
+IDEA: different keys for controlling tabs in two-panel mode by both hands
+
+IDEA: show paths as list and preview as tree in 2nd panel
+  /tmp/path/to/file | path
+  ...               | └── to
+                    |     └── file
+
+IDEA: navigation in multi-edge graph in 2D/3D
+  mark each edge with hint letter
+  pressing keys moves you along its corresponding edge
+
+
+IDEA: edit current widgets/layout in the same way as any other graph
+  = show virtual fs for windows/layout/widgets
+  = each widget contains params (files) or another widgets (dirs)
+  HACK: each param == slider entry as in ncmpcpp to control value
+    position, color, size, behaviour
+  ALT: open widget as text file in vim and change values manually
+    ALSO: open whole widgets tree as yaml
+
+
+IDEA: when renaming entry == connect LineWidget to bkgr neovim
+  +++ textobj navigation
+  batch rename => send to neovim multiple entries at once
+
+IDEA: populate $MIUR_* env vars from current *view* for forked processes
+  file under cursor
+  whole dir content after sorting and filtering
+  current selection / tagging
+    + with choosen attrs of current selection (E.G. mtime, readlink)
+  NOTE: seamless reusage of selected files inside shell
+    ! no need to yank paths
+    ! no need to write complex cmdlines E.G. :shell r.cmd -u %s
+
+IDEA: preview four (multiple) dirs / elements at once
+  * sync movements of 'preview selection' with cursor
+  * draw ghost 'preview selection' behind 'cursor selection'
+  * draw ascii lines from entries of 'preview selection' to respective "PreviewWidget"`s
+
+
+Input / Control
+  each have associated "Cursor/Focus" object
+  multiple inputs may control the same *cursor*
+    E.G. navigation in same panel through keyboard and fifo
+  single input may be sent to multiple *cursors*
+  cmds may be splitted and each part controlled by its associated keyboard
+  VIZ.
+    keyboard is only one of possible streams
+    cli/fifo pipe may control some side-widget
+    info may be acquired back from satellite programs
+      E.G. image preview
+        => pressing keys
+        => passing them into *miur* though additional input stream
+        => control hidden tab cursor when keyboard itself controls foreground tab
+
+
+NOTE: two variants :: widget -> cursor
+  ~ data incapsulated in cursor
+    full-fledged "Cursor"
+    pseudo-cursor -- only to point to dst for "WatchWidget"
+      + also provides access to data for widget
+  ~ data independently supplied to widgets
+    = cursor only provides position, nothing more
+    ? is there any advantage ?
+
+
+Cursor / Focus
+  !!! two different cursors == dom cursor and ui cursor !!!
+    *cursor* == each widget has link to 'dom cursor' == observes data
+    *focus* == each layout has link to 'ui cursor'
+      ? is there need to switch 'ui cursor' when in fifo ?
+        ::: !YES! you choose data repr func to print in stdout before calling func
+          == it's equivalent to choosing widget beforehand (though pipe/fifo-widget)
+      !!! you can control multiple navigational views through one input !!!
+        E.G. tabs in different windows
+        OR: two-panel file manager
+      switch 'ui cursor'
+        diff input translation table for diff widgets
+          * keymap for keyboard charwise input
+          * switches/names for cli linewise input
+        diff destination => focus diff 'dom cursor' to control
+          widget attached to 'dom cursor' (observes / stalks)
+      nested tree with history for 'ui cursor'
+        same principle as with 'dom cursor', but independent hierarchy
+        use history to toggle between E.G. two last tabs OR between "Status" / "Navigation"
+    ui cursor allowed to have no history
+  separate independent object "Cursor/Focus"
+    associated with concrete input device/stream
+    E.G. two keyboards control the same widget in window => multiple cursors per widget
+  switches {input stream / control focus} between objects
+    there is no rule for single focus point only
+    all focused areas receive the same input simultaneously
+      keymap can be filtered to split keyboard between focus groups
+    multiple keyboards => independently controllable input focuses
+  allows simple incremental ops to accumulate inner state \
+    == in contrast to 'pass all arguments at once' == no inner state
+    == cursor is tightly coupled to metainfo state
+      * however multiple cursors may modify single metainfo
+    * choose files/destinations one-by-one
+    * compose operation from pieces and apply
+    * reuse parts of prev ops
+    NOTE: each keypress is exactly such 'simple incremental op'
+  no relation to widget => cursor isn't required to be shown
+    E.G. off screen, hidden tab
+    * WatchWidget == frozen/dynamic preview
+      for single directory or file
+      no showing cursor
+      no kbd focus
+    * PagerWidget == scrollable pager, but no cursor
+    * NodeWidget == for list/tree repr as in FM
+      == PagerWidget + sync to cursor
+  # sync different widgets shown data on the same cursor
+  #   listing, status, preview
+  have associated 'cursor selection' per item
+    highlights single item
+    unrelated to general fixed-position selection
+    all active 'cursor selections' can be shown at once as metainfo list on virtual tree
+    when switching cursor to controlling 'group selection'
+      => previous 'cursor selection' will be drawn as 'ghost' to show where \
+         cursor will jump when switching back to cursor selection
+
+Selection / Group
+  !5 [_] TODO: seize ideas of generalized selections from 'vis=>0.4'
+  incapsulates objects/lists to which actions applied (E.G. vim textobj)
+    == action focus => marks/selects objs in widgets
+  all selections must be tagged by their creator (cursor)
+    I.E. use all files selected by _current_ widget
+      and not by all widgets connected to same metainfo
+  'cursor selection'
+    ??? belongs to *view* == with accumulated inner state ?
+    single cursor per widget (multiple -- per each input stream)
+      collaborative editing (E.G. google excel tables)
+    sync cursor positions between tabs \
+      == unite disconnected selections under single focus/cursor
+      * by relative movements +1 / -1
+        ? extend focus and send controls to multiple selections at once
+      * by absolute index
+      * by names
+      * by uuid
+  * selection == multiple cursors in single dir
+    !! you can _move_ individual entries of yankbuffer instead of toggle them by main cursor !!
+    IDEA: move complex selection at once => gaps between selections as invariants
+      !!! need *lock* for representation lock until moving operation ends
+        E.G. if file/selection was added/deleted => w/o lock result will be confusing for user
+  * tags/yankbuffer = multiple cursors in different dirs
+    IDEA choose entry from virtual list and focus/jump to it
+  * HACK: widget w/o cursor is cursor itself
+    such widget supports scrolling anyways
+    scrolling represented by beg/end indexes of lines => which is cursor
+    scroll allows to apply action to all currently visible elements
+  * HACK dataproxy itself is cursor
+    widget can scroll inside list of dataproxy data
+    dataproxy represent whole list of files being possible to display in that dir
+    => dataproxy is cursor to whole set of data
+  * cursor -- is completely independent entity
+    => it's up to widget to show it or not
+    ... and iteract with cursor or not (E.G. scroll position depending on cursor)
+  * each dir == has its own cursor == to restore when going back
+    widget is single instance on layout => shows each choosen dir with its own cursor
+    ? cursor is related to proxy and must be stored inside proxy
+  * single dir view => multiple cursors (E.G. vim split)
+    ! cursor is stored in 'view' metainfo
+      => 'view' can be detached from both "filtered underlying data" and from "concrete widget cursor"
+        E.G. TEMP:(share) OR:(sync) views from two different dirs
+
+NOTE: selection -- NOT attr of entry -> it's independent metainfo
+  * selection also can be shown as virtual tree graph
+  * you can manipulate by the selection itself (remove entries or add/rename them manually)
+  * convert between index-based and name-based selections
+
+
+Multiple selection groups -- different colors / tags
+  $ func {1} {2}
+  TRY: use the same specifiers as in 'parallel' instead of %f/%s as in 'ranger'
+
+Two-panel simultaneous mode
+  jk -- up/down, hl -- change tab, HL -- move file to another tab
+  OR: arr_up/dn -- move up/down in another tab
+
+Widget
+  List
+    Single item == LineWidget / MultilineWidget / InputWidget
+      renaming => replacing widget in-place by InputWidget
+  Scroll
+    simplistic +/- indicators as in Wheechat
+  OR: Tree
+    openable menu with +/- and pseudographics
+  * syncs to *cursor* position with hysteresis
+    == has inner state for scroll
+
+Layout
+  Transition table between layouts (declarative)
+    widget size => fixed 12c / proportional 20%
+    if window shrinks to (20% < 12c) => replace current layout by simplified
+      !! otherwise ncurses will crush
+
+*******************************
+
+NOTE: multiple possible *dom* state (undef cursor or entries)
+  * actual code hardcodes layout and reaction on each var value
+  * multiple funcs => multiple possible views
+  * small funcs => reuse in other variants of views
+  * desc format => combine resulting view from small funcs by text file spec
+
+
+WINDOW = DOM x PROJECTION
+  BUT:NEED: lazy PROJECTION <<< ncurses allows partial redraw
+    => no need to compose whole frame on redraw
+    => on event fetch and redraw only refreshed info
+      BUT: can't redraw on each event
+        => accumulate events between scheduled redraw
+        => immediately unconditionally redraw on subset of events
+          * user navigation (cursor) => immediate redraw
+          * external events => on timer
+          * BAD: too many external events accumulated => sluggish cursor movements
+            => never redraw all of them at once on user navigation
+            => split in batches by priority and date
+            => choose flexible sizes of batches (40+21 instead of 60+1)
+
+DEV:
+  store function returning iterable
+  pass widget limitations
+    E.G. distance between cursor and top entry depends on widget height => need loopback
+  pull info until widget saturated, then draw in one go
+    BET: if only several lines refreshed => pull only them => redraw only them
+    NEED:VAR control full or incremental update by arg
+      * initial always full
+      * consecutive are implicitly incremental (until explicit <C-L> redraw())
+  widget provides funcs to get different representations or incremental list
+    - solid text      (preformatted with newlines)
+    - line-based      (different length)
+    ? column-based    (bounded on height)
+    - char matrix     (bounding rect)
+
+
+%% Proxy
+NOTE: proxy represents access to some part of DOM
+
+decorating :: visible fast-jump labels
+metainfo :: hidden tags, inner attrs, intermediate caching, additional info
+  E.G. delimiters between entries combined with different sorting method
+    delimiter after each 10 entries
+    grouped files with same extension
+    thresholds of size groups
+post-processing :: DOM sorting, reordering, filtering (hiding from view, compactness optimizing)
+sorting :: THINK: large lists require caching => for fast view on cursor moving
+BUT:
+  cache grows => drop older caches
+  data change => invalidate cache
+  multiple views => multiple independent caches
+    => connect to same cache to get the same sorting (reuse for other purposes)
+        E.G. print to stdout list after filtering
+    => connect to same cursor to get synced cursors but different views/layouts
+    ?? maybe, this structure isn't hierarchical but composable ??
+      NOT: cursor is completely dependent on underlying cache DOM
+        ? BUT:MAYBE: sync cursors between DOM ?
+
+IDEA: filtered view of node attrs
+  * only latest nodes of each kind (relative to history)
+    * only choosen subset of nodes for peculiar user-friendly view
+  * only single kind of node with whole history

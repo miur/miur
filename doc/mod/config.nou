@@ -1,0 +1,44 @@
+%%%%% Configuration
+
+ARCH: distribution
+  IDEA
+    * provide multiple starting points for users (configs + presets)
+    * negotiate defaults in community to benefit all new users
+    * adjust user's personal setup as overlay over choosen default presets
+    * notify on upgrade when preset defaults are changing to alert user to adjust his configs once more
+  core configs
+    * bare (everything disabled)
+    * normal user (reasonable defaults)
+    * advanced user (powerful abilities)
+    * ultimate (everything enabled)
+  typical presets
+    * different servers to connect with preset settings
+    * different tasks / approaches configured
+
+
+caching converted/recompiled configuration files with
+  like colorscheme: RGB -> 256-term-colors
+
+
+colorscheme
+  filetype
+  interface
+  fm
+    state markers (before |:save|)
+    cursor markers (selection, find highlight)
+
+
+NEED
+  SEE: discussion
+    https://github.com/The-Compiler/qutebrowser/issues/499
+  smth simply looking (like vimrc config)
+  allowing control logic
+  E.G.
+    Lua ?
+    ! python is complex in such way? or not?
+      => can't be used for non-pythonic core
+  I can use conf provider, converting config into DOM
+    like running python over conf then extracting resulting values
+    ! BUT no way to use pythonic functions inside conf ?
+      <= simply use only one of allowed tool-languages inside conf
+        = them executed only in runtime anyway

@@ -1,0 +1,76 @@
+REF
+  Python sync primitives with diagrams
+    http://www.laurentluce.com/posts/python-threads-synchronization-locks-rlocks-semaphores-conditions-events-and-queues/
+    http://effbot.org/zone/thread-synchronization.htm
+  Coroutines in C++
+    https://m.habr.com/post/201826/
+    https://github.com/whtc123/libuvc
+    (nano-coroutines) https://www.youtube.com/watch?v=j9tlJAqMV7U
+
+
+Readers-writers lock
+  REF https://en.wikipedia.org/wiki/Readers%E2%80%93writers_problem
+  http://stackoverflow.com/questions/16261902/python-any-way-to-get-one-process-to-have-a-write-lock-and-others-to-just-read
+    * https://majid.info/blog/a-reader-writer-lock-for-python/
+    * http://code.activestate.com/recipes/577803-reader-writer-lock-with-priority-for-writers/
+    https://www.safaribooksonline.com/library/view/python-cookbook/0596001673/ch06s04.html
+
+
+Temporal Logic Planning Toolbox
+# E.G. Robot Motion Planning, etc
+= TRY using as operations planing for *core*
+  http://tulip-control.sourceforge.net/doc/
+
+
+Atomic ops
+  http://effbot.org/zone/thread-synchronization.htm
+
+
+Profiling
+  https://github.com/what-studio/profiling
+  http://stackoverflow.com/questions/39348869/understanding-python-asyncio-profiler-output
+
+
+Multithreading
+  Kill childs on Ctrl-C
+    http://code.activestate.com/recipes/496735-workaround-for-missed-sigint-in-multithreaded-prog/
+
+
+Coroutines
+  co-routines
+    http://dabeaz.com/generators/
+    http://dabeaz.com/coroutines/
+    http://eli.thegreenplace.net/2009/08/29/co-routines-as-an-alternative-to-state-machines/
+    https://docs.python.org/3/library/asyncio-task.html#coroutine
+    +++ http://www.snarky.ca/how-the-heck-does-async-await-work-in-python-3-5
+  asyncio
+    https://habrahabr.ru/post/242541/
+    https://habrahabr.ru/post/282972/
+      # SEE asyncio+pycurl and perform() in cycle
+    ++ http://www.curiousefficiency.org/posts/2015/07/asyncio-background-calls.html
+      E.G. simple demo for bkgr coros
+    ++ http://www.buzzcapture.com/en/2014/05/python-asyncio-inside/
+    +++ http://stackoverflow.com/questions/26154125/why-is-the-asyncio-library-slower-than-threads-for-this-i-o-bound-operation
+      # asyncio vs threading -- typical errors
+    !!! http://lucumr.pocoo.org/2016/10/30/i-dont-understand-asyncio/
+    Two threads for two event-loops
+      http://stackoverflow.com/questions/31623194/asyncio-two-loops-for-different-i-o-tasks
+    ensure_future <vs> create_task
+      ++ http://stackoverflow.com/questions/36342899/asyncio-ensure-future-vs-baseeventloop-create-task-vs-simple-coroutine
+    Keep-alive
+      http://stackoverflow.com/questions/32054066/python-how-to-run-multiple-coroutines-concurrently-using-asyncio
+    Using in class methods
+      http://stackoverflow.com/questions/33128325/how-to-set-class-attribute-with-await-in-init
+    Client-server
+      ++ https://gist.github.com/dbehnke/9627160
+       + http://stackoverflow.com/questions/37452039/how-to-correct-asyncio-yield-from-in-data-received
+      http://stackoverflow.com/questions/31077182/python-asyncio-streaming-api
+      https://pymotw.com/3/asyncio/io_coroutine.html
+      https://gist.github.com/nathan-hoad/8966377
+      http://stackoverflow.com/questions/27676954/non-blocking-i-o-with-asyncio
+      http://www.drdobbs.com/open-source/the-new-asyncio-in-python-34-servers-pro/240168408
+    TODO
+      [_] FIND what it means that 'streams API' implements pause_writing/resume_reading ?
+        ? Socket can't be used simultaneously on read/write ?
+        ? Cross-platform code generalization/limitation w/o explicit exception for Linux ?
+        ? Optimization over kernel net-buffers for better responsiveness ?

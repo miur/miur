@@ -1,0 +1,158 @@
+*dom*
+
+Arch:
+  ENH: map of views
+    * real nodes => copied/synced from data
+    * virtual nodes => generated and cached
+    * generator nodes => executes command and creates nodes graph on access
+      CHG: 'flat' list impossible => read generator nodes from other src
+  ALT: flat list of nodes => filter list by {real/virtual/generator} on each access
+    ++ reasonable if too many kinds of entries beside those three
+    = use *proxy* to cache certain kind of entries
+  BET: use intermediate node instead of map
+    ++ isotropic representation and navigation
+    NEED: skip path links => jump to predetermined node
+    IDEA: generate intermediate node on demand
+      NEED: access to 'edges' only through api
+        => so I could substitute real content by virtual menu of choices \
+          for entries {real,virtual,generated...}
+
+  BET: api to access nodes (or lists of nodes -- for performance)
+    => hides impl of multiple lists instead of 'flat' one
+    => transparently generates data when necessary
+    => single point to manage cached nodes
+
+  ??? single flat list for any types of nodes ???
+      --- hard to remove all metainfo of node at once
+        << even virtual nodes have persistent nature
+    ALT: sep tree for file-specific attrs and generated nodes
+      +++ easy to delete all metainfo together with file
+    DECIDE: lazy arch decision => hide impl under api
+
+  IDEA: convert virtual/generated nodes into actual fs inodes
+    * files with cmdline names and cached content
+    * symlinks for virtual links
+    * dirs for more complex content
+      ~ E.G. ag results distributed in dirs
+      ~ readelf => split ELF binary structure by dirs
+
+
+API
+  IDEA:HACK: desc api instead of planning *dom* inner layout
+    * api == protocol == testcase / usage example
+    * api + constraints / requirements => optimize inner layout / caching
+  IMPL: encapsulate behind api
+    * postpone arch decision for impl
+    * choose preffered horiz/vert arch (OOP or DDD) after clearing up usage patterns
+    * return dynamic iterators over impl instead of actually constructed structures
+  NOTE!(insight): my DDD subsystems are equivalent to column-based db (E.G. J-lang DB)
+    E.G. OOP vs DDD === row- vs column-based DB
+    * HACK: I can even use any relational DB for this -- to store all nodes with all their history!
+    * HACK: hotplug different DB engines for *dom* behind api
+
+
+Identifiers:
+  NEED: uid (as in git)
+    REF https://stackoverflow.com/questions/1210458/how-can-i-generate-a-unique-id-in-python/15741983#15741983
+      ++ http://pubs.opengroup.org/onlinepubs/9629399/apdxa.htm
+    TUT http://www.minvolai.com/blog/2009/10/Creating-Universally-Unique-ID-in-Python/creating-universally-unique-id-in-python/
+      https://eager.io/blog/how-long-does-an-id-need-to-be/
+    WARN:(collisions): https://softwareengineering.stackexchange.com/a/299338
+      ? ignore it => you need to generate 2^61 entries for any significant probability of collision
+        !!! https://github.com/ramsey/uuid/issues/80
+          => CRIT: bugged uuid impl may generate too many collisions
+      https://blogs.msdn.microsoft.com/oldnewthing/20160114-00/?p=92851
+        uuid1 > uuid4 ERR:(hardware): may generate identical uuid
+      BUG! if collision => you will apply ops to wrong file and overwrite valid one
+        ? detect collision => performance impact ?
+    => so I could flatten dir and show only basenames anambigously
+      ! actual path becomes only one of attrs for filtering
+
+  THINK: uuid4() is not always appropriate
+    * parsing graphviz .dot => same quoted name must produce same uuid
+    * filesystem => depending on MAC and <path>
+    * ro media files --> BET: using SHA1 on content
+    ??? [_] use different uuid for different cases ???
+    !!! [_] collision between diff ALG !!!
+
+  ATT: by using uuid we loose typeinfo => all objs are abstract nodes
+    - using sep nodes per each attr of file is inefficient
+    ~ anyways, attrs may be represented in the same uniform way as nodes
+      BET: generate such virtual subgraphs only on demand
+      IDEA:(DOM performance): compromise between MEM and CPU
+        * store original/orthogonal/important data
+        * generate derivative data structs only on demand
+
+  ALT: id from monotonous counter for session <<< (because uuid isn't unique anyways)
+    IF: ro- graph with history => counter only grows => nodes keys never deleted (only values)
+      * effective direct memory access by index
+          vector[id] = pointer to attribute data
+      ~ deleting old cached node by removing pointer value
+          vector[id] = nullptr
+        BUT:BAD: memory cell will never become really freed
+          ?? not much memory lost: 8 MB per million nodes on x64
+          ??? [_] TEST how long it will take to generate million nodes by normal workflow ???
+    NOTE: even TESIV uses 32b vals per world as uids
+
+
+ALSO: G: urn -- Uniform Resource Name
+  https://ru.wikipedia.org/wiki/URN
+  urn:uuid:6e8bc430-9c3a-11d9-9669-0800200c9a66
+
+
+!!! IDEA hash whole node attrs into SHA1 as in git :: same hash => same node
+  * read-only filesystem :: replace node completely instead of changing
+  * immediately detect changes w/o comparing fields between nodes
+  * easy sync for cached nodes => simply discard old ones and update xrefs
+  https://stackoverflow.com/questions/2434931/python-why-use-anything-other-than-uuid4-for-unique-strings
+
+
+NOTE: single node may point to multiple (virtual) views simultaneously
+  dir -> {files, xattrs, hex view on disk, ...}
+  file -> {text preview, xattrs, hex preview, virtual data structure, ...}
+  BUT: you can move cursor only to single variant structure
+    ? there is no menu to choose OR provide diff keybindings ?
+      = default view (Cursor), preview for each variant, list menu to choose
+
+
+!!! [_] DECIDE dict of flats or flat of Nodes ?
+  dict of flats
+    -- two steps to filter by one feature but yield another
+    -- multiple steps to filter by multiple features
+    ?? easy to add new subsystems
+    ++ more granular encapsulated access to individual attributes of nodes
+    ++8 distribute encapsulated subsystems through conveyor
+      * keep *dom* as real-data-only mirror
+      * virtual nodes -> "Overlay"
+      * generated nodes -> "Query"
+      * _transf -> "Proxy"
+      BAD: hard to delete all Node details from all distributed subsystems
+        slow, cpuload, impractical, send_event
+    +++ independent value fallback strategies for each subsystem
+      * shareable strategies
+      * dynamically replaceable
+    +++ IDEA: Ray Tracing -- aquire/render only visible data
+      *widget* == viewport
+      *cursor* == ray/camera
+      *fontsize/style/columns_list* == perspective matrix
+      HACK: each ray traverses only until subsystem which can generate value
+        !! no need to generate whole "Node" and traverse deep into underlying *dom*
+    ~~ each multichoice IMPL
+      ~~ flat list of blended history, commands, etc
+        => store nodes in _types = {}
+        => show certain category by filtering by _types
+        BUT: how to distinguish last 'edges' from everything else when rendering ?
+      -- nested list => predefined nodes => must be distributed by names (too slow)
+  flat of Nodes
+    -- all attrs are gathered in one place
+      despite them are necessary only in diff subsystems on diff stages of conveyor
+      +++ easy to completely delete Node
+
+  !!! IDEA: instead of flat united dom allow dom of doms
+    * keep encapsulation of each dom to add/remove it as complete entity
+    * treat each dom itself as node
+    !!! similar to meridia enclosures idea
+    ++ uid must be unique only inside single partial dom
+      BUT then each nested node will have composite uid = <dom_uid, node_uid>
+    --- can't access any node by uid in one go => need searching all doms
+    -- need to search concreate dom to modify -- on add/remove individual nodes

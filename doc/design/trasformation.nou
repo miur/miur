@@ -1,0 +1,193 @@
+Space
+  * Graph is coordinate/uid space
+  * Attrs are binded to coords (uid), regions (uid.rad(2)) or clusters (set{uid})
+  * GraphProxy -> NodeProxy -> Events -> Entity -> Accessors -> Provider
+
+  * iter() -> { on_iter() -> AccessStrategy { provider.get_entities(node.pr_id) -> transform(graph) } }
+          \-> { graph.get_neighbors(node.uid) }
+  AccessStrategy
+    - persistent
+    - ondemand
+    - lazy
+    - immediate
+    - cached
+
+
+IDEA: provide fake file system by syscall hooking
+  USAGE: bash/find/grep launched from *miur* -- to apply coreutils ops to virtual nodes
+  * augment real fs by ro- virtual nodes with limited set of file operations
+    - read/edit content, stats, enlist as directory, behave as link or script, etc
+  * pseudomount isolated nested graphs with less limited set of file operations
+    - create new nodes and delete existing ones in virtual graph
+
+
+Transformation
+  * modifies graph as network
+  * not related to type of entity at all -- pure network transformation
+  * parametrized by location (e.g. ProxyNode) on immediate call
+    Transformation(graph, node, generator, context)
+      NEED? generator to insert nodes
+  Superimpose / Augment
+    * convert uids between graph spaces
+    * insert nodes and edges from one graph into another
+    * connect graphs
+      ~ superimpose curr node with root
+      ~ bind root of inserted graph to current node
+      ~ BET? replace underlying graph in proxy by direct container
+
+
+Node
+  * proxy does not have value => therefore _represents_ any entity
+    = proxy is what left from node and you know nothing beyond
+  * node value impersonates entity
+    - DirNode
+      * preview for directory in 3rd panel is allowed to be any other stats of dir
+      * iterable nodes will be shown as part of graph
+    - FileNode
+    - ExecutableFileNode (backed by fs) -> stdout into VirtualFileNode
+      = DFL preview is file content, additional api .execute(argv, env)
+      * .execute() may produce isolated {node,list,graph} through provider
+      * .execute() !does not join! produced graph with global graph by DFL
+        => you may choose joint/isolated/none at the moment of execution
+        => "none" when you need only side-effects and not stdout
+    - VirtualDirNode -> for unionfs and logistics
+    - VirtualFileNode -> procfs-like generated data / inner state
+    - VirtualExecutableFileNode -> stdout into Virtual{Dir|File}Node
+      = DFL preview is result of execution, command itself only on "edit()"
+  * entity provides arbitrary set of accessors to attrs
+    - name
+    - stat
+    - ...
+  * entity has uid *per each* attr provider
+    - path for fs
+    - line number for plain text
+    - ...
+  * entity has no knowledge about relations with other entities
+    >> some external processing is necessary to determine relations and generate graph
+    ! BUT: directory is sole method to aquire relations inside fs
+    ! BET:(when parsing AST): produce graph directly w/o intermediate flat !
+  * accessor combines entity uid with underlying attr provider (e.g. fs)
+    - .ctime() -> os.ctime(self.path)
+  * accessor generates events as any other api/interface
+
+
+NOTE: access iter(node) and cursor focus(node) may generate similar events
+  * both events may lazy-generate and cache part of graph
+  ? where to place dispatcher function {event -> transformation}
+  ? where to store dispatcher data (who and how often can change it)
+    ~ directly in entities -- being binded to graph nodes
+    ~ separate ?custom? container ?
+  * event are independent and contains type of event and producing location (node)
+    == orthogonal coords in {event,graph,time} space
+
+
+Nested
+  * THINK: how to traverse seamlessly between outer and inner graph
+    > diving-in must look similar/exactly as iterating outer graph
+
+
+Graph
+  for graph-wide operations
+    * search paths between nodes
+    * search by criteria
+
+  Abstract Virtual Container
+    * graph is container _only_
+      - may be approximated as container of node containers
+      - or multiple containers related by uids per each attr
+    * graph operates and returns as results only uids (and stored vals)
+    * edges are 1st class citizens -- completely independent from nodes
+      - their generation is directly related to graph itself, not entities
+      - as nodes are inseparable (however hidden) part of graph,
+        \ they can be directly involved in generation of edges
+      - NodeContainer is inner struct in comparison to NodeProxy
+    * values may contain info about their edges, which must be extracted
+    * reduced ifc for pure virtual graphs (on contrast to on-demand graphs)
+      - impossible full enumeration for either nodes and edges
+      - impossible random access w/o sequential traversing
+
+  IDEA overlay graphs combining ::: USE traversing paths
+    NOTE: immediate graphs aren't backed by container
+      => no need to pass graph in ctor or .add_object()
+      => you can't iter() this graph, only explicitly traverse()
+    E.G. immediate + virtual -- need container to store virtual layer nodes !
+      << it's too hard to force generators include additional custom edges
+      NEED: iter() must augment gen edges by stored virtual edges
+        >> call iter() on node provider before iter() container itself
+      BAD:NEED: uid for generated nodes -- to attach virtual edges
+        ~ store all gen nodes -- even immediate (reduce to lazy loading)
+        BAD: overlay anchors become invalid after garbage collection
+          << re-generated nodes has another uid after cache clean
+        ~ BET? overlay by traversing paths to be reproducible on another uid
+    ALT:THINK how to combine overlays from multiple arbitrary graphs ?
+      NEED: completely shared uid space
+        * no different nodes with same uid
+        * dangling edges with free end uid from another graph
+      ALT: combine by traverse paths instead of uids
+
+  DECIDE: bind whole graph to provider or individual nodes
+    ? use provider per node
+      * virtual nodes are special / different
+      * virtual edges may connect distinct graphs
+    ? combine nodes by layers and set provider per layer
+      + you may easily show all nodes of certain type
+      - memory to store uids of nodes in layer
+      * NEED: mechanics to seamlessly traverse between graph clusters
+
+  IDEA:BAD: graph-wide hardcoded gen strategy and trigger condition
+    ~ switch-case by uid => use logic directly inside diff Node classes
+    ~ convert node type in runtime => parametrize node by Strategy
+    ? change node provider in runtime ?
+    ? partial provider -- sep for node and edges ?
+    ? store proxy in graph or generate on access ?
+      + no ctor/dtor calls on access -- only on load
+        ~ gain is eliminated by lazy nodes with small cache
+      - additional memory per proxy
+  ATT: I treat graph as caching graph for generating nodes
+    !!! FAIL it's wrong approach !!!
+    * neighbors may be stored in nodes instead of sep G
+      + single hashkey lookup per node with attrs
+    * strategy per node may be stored in separate array in inherited G
+      << instead of proxy node of original G
+      => it's completely impl-dependent !
+    * strategy is value acquired/assigned/attributed to node
+      ! not original one !
+      it may share "node" container but does not intersects with entity
+
+Proxy
+  * proxy may be acquired even before node exists
+  * both __call__ and __iter__ must trigger generating and attaching graph
+  * on-demand subgraph may be hidden in root or any other node
+
+  * proxy of curr node is already in use and can't be replaced
+    << some obj have refs to proxy and may call it again, damaging graph
+  * on-demand entry in container initially contains metadata or nonexistent
+    >> on Tr it will be replaced by persistent entity
+    >> replace only once -- switch behavior
+      BAD:(None in node as flag): we assign unrelated meaning to None in graph
+      BAD:(bool VAR member as flag): excessive var and conditional per proxy
+      BET: on-demand replace/rewrite whole object by another one
+  XXX => ProxyNode are the same, always ? only inner strategy changes ?
+  IDEA: replace whole underlying graph _g inside proxy
+    => use graph wrapper which can trigger graph regeneration
+
+
+Overlay
+  EdgeContainer (link)
+    NOTE: all links are "Arrows" -- single-directed
+    Overlay: points to path only -- to generate node on demand
+      * path is counted off some fixed NodeProxy (root)
+      * in this sense all paths are relative to their respective graph
+      * absolute path is counted from global root of id space graph
+    Overlay: point to NodeProxy -- more specialized encapsulated version
+    Augment: point directly to uid
+  Strategy of Generator of Generators
+    * neighbors() must return iterator
+      + show on screen only first ~20 files instead of whole list
+        BAD: you always need whole list if you need complete sorting
+      + incremental loading list when scrolling
+      + don't load whole list if you only traverse into depth
+    * to repeat from beginning -- call neighbors() again to get new iterator
+  Baked graph
+    * persistent independent copy
+    * generated by iterator from immediate/partially cached graph

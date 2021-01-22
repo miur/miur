@@ -1,0 +1,243 @@
+%%% Data fmt channel path
+# raw_data -> protocol -> objects -> exec -> objects -> protocol -> raw_data
+
+MAYBE: use 'mesh' instead of 'bus' ?
+  each client registers in virtual pool
+    = so each partial *mod* knows about all other *mods*
+      + equality, easiness?,
+      - security and encapsulation
+
+???_ where to embed queues (amortized delays) ???
+  >>> queues must operate on *cmds* only for flexibility and encapsulation
+    = so *bus* remains working the same way for all diff transports
+  >>> and channel must convert and apply *cmd* immediately to reduce async delays
+    < at least for now (maybe in future second queue won't render being so unreasonable)
+    + more easily to introduce some 'sync' cmds for DEV when there are only one queue
+  == symmetrical channel
+    queue on the left
+    call on the right
+
+
+%% Cases
+  single short msg
+    rsp received only after all stages are completed
+    best_time: sequentially w/o overlaps
+      ! two async queues is always worse than single one
+      ! no time diff for cmd before/after channel
+  single long msg
+    best_time: overlapping of deserialization, construction, execution and responding
+      ! construct cmd immediately for minimal interval until rsp
+      ! no time diff for cmd before/after channel
+    concept == generator for piping independent ordered lists
+      * raw_msg must be able to partially unpack in streamlined manner
+      * after filling up only metainfo for cmd -- put it in queue
+      * server keeps link to cmd inner cache and pushes all subsequent data in there
+        == create 'transport inside transport'
+      * ideally you need sep thread for each link of seq
+
+
+%% Sequence
+  receive whole msg/data and uncompressing
+    # MAYBE: streamlined uncompression
+    server()
+  convert to cmd and fill up fields
+    ? server()  # = asyncio.Transport
+      ++ immediately able to execute received cmd
+        => more of whole system can be controlled directly by cmds
+      - no access to any pr_ctx
+        ? can all necessary ctx be gained along the path to executor/class and through its ctx ?
+        ? is server ctx is needed when converting to cmd ?
+      - each long req delays income msg queue by obj creation
+        ? is it really that longer then placing data into queue beforehand ?
+        !!! using dict+list as intermediate protocol is _slow_
+          - can't process partially transferred data (closing brackets)
+            => converting raw_data incrementally by chunks may speed up transfer by reducing server idle time
+          - python must create std objs, read them and only then create actual objs
+          << BETTER: parse atoms directly into objs (YAML can support this)
+          ?? USE YAML with stream linewise parsing directly into objs ??
+    ? channel()  # = asyncio.Protocol
+      + serialization ops encapsulation
+      + can be used to abstract transport between *mods*
+        for tight coupling -- transfer *rsp* directly, w/o serialization
+        ! socket can be replaced by pipe, but msg fmt remains the same
+      + abstracting the relation :: N -> 1
+        E.G. server for all external clients and tight coupling for internal client
+      - no access to any pr_ctx
+    ? executor()
+      + speed up conversion by thread pool
+      + access to more pr_ctx
+      - must not know rsp fmt -- as transport can change
+        ? => MAYBE embedding 'cid' into *cmd* isn't good idea ?
+          it will mix up transport metadata and actual rsp msg content
+      - queue of raw unparsed msg from server has no application/necessity
+        = offers only encapsulation, which can be achieved by channel api anyway
+  execute cmd
+    choose thread in charge
+    choose appropriate execution time
+    choose cmds execution order
+    block interval until cmd complete
+  encapsulate rsp
+    keep inside cmd
+      - hard to create incremental rsp update | cmd -> rsp :: 1 -> N
+    push to external queue directly from cmd
+      + external cmd don't need to know where to push
+      - all rsp always delayed by queue -- ctx class can't react to it
+    return immediately from execute
+      - ext cmd must know how to deal with this rsp type
+      + each obj may decide by itself what to do with rsp and preprocess it
+      + immediate reaction depending on
+    mixed: choose way to handle execution by diff api
+      cmd.execute_keep() => put(cmd)  # put into queue the cmd itself
+      cmd.execute_push()  # cmd places results inside itself by itself
+        MAYBE: use overloaded 'put()' api from BaseCmd class to encapsulate cmd serialization
+      rsp = cmd.execute_return() => put(wrapped(rsp))
+  serialize rsp
+    ? server() or executor() ?
+  send whole rsp
+    server()
+
+
+%% Dispatcher
+# single shared bus -> while read + connection dispatcher -> convert rsp::msg -> convert msg::raw_data -> send
+  SEP mixed concepts of transport and protocol
+    single transport supports multiple protocols
+      plain, json, serialized, gzip, ...
+    single protocol can be carried by multiple transports
+      socket, pipe, memory mapped file, ...
+  only protocol knows how to convert *cmd* from bus into *rsp* msg
+    NOTE: ifmt, ofmt -- depends on protocol
+      * persistent fmt per connection
+      * individual fmt per message
+      * switchable fmt per sequence
+  dispatcher works with all conn lists
+    => all conn (despite transport) must be saved in global table for dispatching
+    'broadcast' -- to all
+    'group cast' -- explicit list
+    'loopback' -- to send cmds to itself throuth 'rsp' -> 'msg' loop
+  server transport protocol ClientProtocol controls stream of data packets itself
+    * low-level headers parsing, packet pieces combining
+      VIZ: length/delimiter, compression, decryption, ...
+    ! no parsing of logical struct of packet
+    ? generator-like piping long lists into cmd by frames is done by higher protocol ?
+      MAYBE: its too many of protocols nesting and I can remove some
+
+
+%% Channel Loop
+=_ OSI Levels  # https://en.wikipedia.org/wiki/OSI_model
+| Application  | bus/mesh | accumulated msg, abstract addressee
+| Presentation | channel  | serialize, encode, compress, encrypt
+| Session      | protocol | whole seq of segments -- start, end, phys error
+| Transport    |          | segment / datagram
+| Network      |          | packet
+| Data link    |          | frame
+| Physical     |          | bit
+
+  app -- app | direct, the same lang (python -- python)
+    single thread for all *mods*
+    multithread -- single thread for each *mod* and _pool_ for cmds exec
+  app -- adapter -- app | one-way, link to other supported lang (python -- C++)
+  app -- srz -- desrz -- app | link unsupported lang through vm (python -- lua)
+    !! I must always support 'session' level !!
+      + hot load / unload of plugins
+      + hot relocating of plugin over another transport through fork
+        ! problems to re-establish and re-initialize session when changing transport
+      - 'presentation' and 'application' must always be disabled by flags ?
+        - overhead by excessive abstractions even for tight coupling mode
+  app -- srz/zip/enc <> _transport_ <> dec/unzip/desrz -- app | any 'transport' in-between
+
+
+main -> bus {recv,send,transit} OR bus {planned,processed,transit}
+  tight_coupling: send 'bus' for one *mod* can be recv 'bus' for another
+    ? how to combine those 'bus' into single one ?
+    ? OR use adapter to shift msgs between buses ?
+main -> (bus.dispatcher) -> channel -> transport {put,take}
+  * 'bus' passes callback to 'channel' to retrieve composed msg
+    ? who manages/aggregates channels, is owner main() ?
+      = Application Level
+  * register/unregister each 'channel' in 'bus' to dispatch msgs
+  * channel aggregates heterogeneous connections/transports for in/out
+    E.G. data preview in pipe or mmf and queries by simplex fifo
+address -- is address of channel
+  * channel associated with recipient 'uid' and then -- with channel itself
+  ! BUT from single channel may be received msgs with 'uids' from multiple recipients
+    = if some of them are transited through that node
+    ++ msg/rsp pathes may be different if req was sent as transit but rsp received directly
+    => if there no channel associated with that 'uid' -- send rsp back to same channel as msg
+      ALT: replace transit 'uid' by its node 'uid' and place origin 'uid' in extra info to resolve when its back
+        => BUT then msg/rsp path must always be the same
+        BETTER: allow such replacing as option when you _must_ force the same returning path
+  => recipient 'uid' must not be dependent on transport
+    ++ 'transport' can be switched keeping 'uid' between recv msg and send rsp
+    use unique 'uid' regenerated on each launch ?
+      => so each new instance -- has separate 'uid'
+  ? BUT how to transit msgs ?
+    * distant recipients must know about each other id
+    ~ at least single one must know -- other's id comes with msg as embedded or transport's extra info
+
+subscribe channel to server events
+  * previewer sends req to subscribe on curr file update preview when launched separately
+  * OR core initiates creating previewer and subscribes it itself, w/o waiting on req from previewer
+  * *core* re-sends data each time when file updated
+
+each *cmd* may be enveloped inside another *cmd*
+  * outer one when executed delivers inner *cmd* to appropriate 'ctx' to execute
+    => this enveloping allows to delay and schedule delivering to 'ctx'
+
+
+%% Hub
+  VIZ: manifold, slot, plug, connector
+
+Hub :: N : 1 : N
+  * aggregate all possible listening servers
+  * aggregate all connections and manage add/remove
+  * dispatch msgs from bus to conn
+  ? also aggregate all buses and manage shifting of-between
+      OR make buses separate concept ?
+
+Channel :: 2 : 2
+  Not each channel must construct cmds
+    * direct ones don't need it for shift in-between
+    * adapter uses its own cmds converter to/from
+    => 'make_cmd' must be aggregated by transport
+    ? share 'make_cmd' instances with identical cmds lists between channels ?
+  I may restrict allowed cmds per channel (per recipient)
+    BUT how about direct channel ?
+      < I will need to filter already constructed cmds
+    => filtering must be per channel and not per transport
+      * filter already constructed cmds in channel, but allow construction of any cmds
+        ! possible DDoS by constructing cmds exceeding system resources
+  MAYBE unite cmds 'serialization' with its controvert part of 'make_cmd'
+  On system start we must initialize only Bus and coro.
+    BUT: server must be started by cmds sent to itself -- as it would from external cmds.
+    Each *mod* connected to bus through channel
+    ALSO: 'self' is equal recipient as other channels but w/ channel reduced to none
+      = 'executor' is attached to the end of channel OR it may be 'dispatcher' to execute in appropriate contexts
+      + then 'self' node may be changed to any another channel into thread/fork
+        !! dynamic load/stability regulation
+          * new thread when delays in mux/asyncio become too big and remove thread again after that
+          * new fork if op robustness is questionable and can crash program
+      ? does it means self can be detouched from bus completely ?
+        => then this node can work as transit only (unrepairable)
+  All channels are synchoronous (sync by the end of cmd transmission)
+    ? How to be with data streaming/piping ?
+    !!! I need multiplexing to transport when streaming transit and sending rsp
+
+Bus :: 1 : 1
+  THINK: how to be with trinity queue recv/send/transit and dispatching ?
+    ? is it separate entities, or dispatching must be embedded into bus ?
+    ? must it be three separate Bus or single one with in/out and short transit loop ?
+        ? unidirectional Bus has any sense/usefulness
+        ? OR only combination of three ?
+        ? has any separate sense the transit Bus
+          ? OR its only abstraction for optimization of duplex Bus ?
+          + useful: to minimize transit delay if you have separate thread to re-send cmds
+
+
+%% Pool of working threads
+Each queue has dedicated pool of worker task
+  Recv
+    * fastest independent relay of transit msgs
+    * exhausting input queue as fast as possible
+  Send
+    * independent send to each type of connections
+    * multiple senders per type -- if some 'send' socket becomes blocked by some recipient

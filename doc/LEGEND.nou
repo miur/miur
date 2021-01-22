@@ -1,0 +1,32 @@
+miur
+  launcher / wrapper
+  plugin mngr
+    = may itself be separated into ~miur-plugin-mngr~
+
+miur-docs
+  CC-BY-NC-SA
+    READ https://creativecommons.org/faq/
+    + architectural notes, user stories, etc
+    + graphviz diag / images
+    - man, usage doc
+    - url bundles
+  generate //*.nou -> |miur.github.io|
+
+miur-core.py
+miur-accessor-fs.py
+miur-preview.py
+miur-open.py
+
+miur-tui-curses.py
+miur-gui-qt.py
+miur-cli-zsh.py
+
+Wrappers / helpers
+  sh-miur.sh
+    * scripts for typical usecases with necessary flags fixed
+    * aliases to scripts 'alias m=miur', etc
+  vim-miur-??.{vim,py}
+    * bindings to apply vim functions to graph
+    * united ifc to separated 'miur-{cursor,*}-vim.vim' mods
+      *cursor* to access specific data
+      *view* convert vim buffer to and from *dom*

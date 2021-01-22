@@ -1,0 +1,108 @@
+%%%%% Modules
+All and only components are plugins
+
+%%%% Core
+
+%% Mod
+  * main
+    - read/parse its own config, (*ui* also has keymap)
+  * multithreading
+    - waiting main thread
+    - listening/working threads
+    - spawning (*core* only)
+  * state
+    - provides (exports) list of smth (struct)
+    - has focus on smth (state of struct in general)
+  * data flow
+    - query
+    - convert (here altr impl is diff)
+    - cache (their own representation)
+  * commands
+    - dispatch (universal *io*)
+      = control smth provided, change state
+      = pass unrelated cmds further down/up
+      = return err on non-existent command
+      = list of supported *api* commands may be queried
+    - execute
+    - send cache
+
+
+%% Coro
+  main loop
+    server listening
+      rarely needed : on new client attach
+  ?? main
+    clients communication
+    command dispatching
+  ?? pool
+    request processing
+
+
+
+%%%% Transforming
+
+%% Joints
+  Loose : coupling by sockets
+  Tight : coupling by linking
+    solid box
+    launch single listening server on demand (by setting options)
+      server has universal type for any of *mod*
+      clients send their own expected type as first message
+      server creates socket and integrates it into appropriate joint between *mod*
+        => any *mod* can be connected to already running self-sufficient *miur*
+    split any joint between *mod* on demand
+      fork *miur* on signal
+        on user action with explicit intent to split
+        ~ (option) when user closes *miur* but some other *mod* is still connected
+          => to keep *core* working for that another *ui*
+      close/remove/deallocate duplicated parts
+        keep *ui* in currently focused pid
+      connect parts by socket
+    rejoin any *mod* combo
+
+
+
+%%%% Packet mgmt
+
+Modular system
+  How to combine all of components inside distribution ecosystem ?
+    = components in different languages
+    = developer must be able to combine local bundle for testing without installing
+    = choose one of alternative components (language / impl details / name)
+      how to discover their existance ?
+        rehash all possible plugins dirs/types only on demand -- and cache 'used' list (neovim-like)
+      choice based on
+        cmdline flags
+        global config
+    >> use mods mgmt for plugins
+  REF
+    http://www.curiousefficiency.org/posts/2016/09/python-packaging-ecosystem.html#my-core-software-ecosystem-design-philosophy
+
+
+User configuration
+! make user configuration also as mode
+  = VIZ. configs, small scripts, extensions, lists of plugins
+  >> analogue to "reasonable" vim config
+    vanilla vim is generally unusable
+  + support "typical" configs
+    E.G suckless, ultimate, ranger-like, mc-like, totalcmd-like
+    = can be improved over time
+  + user can create its own package like AUR
+    = conflicting with any other similar package
+    * share ready config with others
+    * install on new system by native pkg manager
+    * remove stale links / configs when installing new version
+
+
+Mods mgmt
+  [_] TODO: investigate other plugin systems
+      mc, sublime
+  Structure (vim-like)
+    runtime
+      distributed with *core*
+    site
+      native packaging (pacman)
+    xdg
+      embedded framework for mods mgmt (vim8.0 / dein.nvim)
+    user
+      manually installed 'unmanaged' mods

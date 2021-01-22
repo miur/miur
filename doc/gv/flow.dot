@@ -1,0 +1,31 @@
+digraph G {
+  rankdir="LR"
+  label="Data Flow"
+  // splines=ortho
+
+  accessor -> dom -> cursor -> view -> window
+
+  dsp_ui -> dsp_view -> dsp_curs -> dsp_core
+
+  subgraph cluster_acsr {
+    label="accessors"
+    accessor
+  }
+  subgraph cluster_core {
+    label="core"
+    dsp_core -> dom [constraint=false]
+  }
+  subgraph cluster_curs {
+    label="cursor"
+    dsp_curs -> cursor [constraint=false]
+  }
+  subgraph cluster_view {
+    label="view"
+    dsp_view -> view [constraint=false]
+  }
+  subgraph cluster_ui {
+    label="ui"
+    window -> process
+    window -> dsp_ui [constraint=false]
+  }
+}

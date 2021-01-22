@@ -1,0 +1,25 @@
+IDEA:USE: protocols instead of direct composition
+  :: dom -> proxy -> widget -> renderer
+  * keep only transport protocols between classes
+    ++ dissect application in any place
+  * each class can become independent
+    ++ replace any part by another impl in another lang
+    E.G. sep opengl app which accepts list of primitives to draw
+      + incremental draw by supplying new objects continuously
+      ~ NEED: cache graphemes do draw in frame on *rederer* side
+
+
+VIZ. protocol primitive classes
+  * change whole frame
+  * incremental change
+  ...
+
+
+IDEA: encapsulate all connections between modules into single sep module
+  * it searches all plugins in configured dirs (.so, .py, etc)
+    => plugin manager is also filter which converts config into actual loaded plugins graph
+  * registers graph of choosen by config lazy/immediate plugins
+  * converses with forked local plugins by simplistic pipes
+    ==> HACK: each plugin is filter /dev/stdin -> /dev/stdout
+  * establishes connections with external entities, wrapping conversations in sockets
+    E.G. another instance of _this_ manager on remote host with complementary subset of plugins

@@ -1,0 +1,35 @@
+%%%% View
+
+CASE :: Transformation
+  * two instances of navigation widgets
+  ? single synced/shared cursor in two diff "Projections"
+    !8 [_] BUT shared cursor is impossible if some nodes are hidden
+      == sync to real cursor position, temporarily including that real pos despite being hidden
+      ? second widget must be slave pager and track only view/focus position
+  => diff sorting order and hiding subset
+    << TEMP:TRY: embed back into *dom* to easily switch shared/individual views for widgets
+
+  Transformation == view provider
+    NOTE: edges + transf => View
+    ??? WTF: where and when to apply transf ?
+    multiple different NodeProxy per each sorted/hidden view
+    HACK: attach sorting/hiding provider to view == Transformation !!!
+      => raw superflat list of attr -- is only partial case of provider accessing to dom
+
+  Transformation == also node with uid
+    * each node == func
+    * multiple funcs per node => flattened :: hub of nodes + [single func per node]
+    * DFL func is to do nothing
+    * each func may freely act on anything in *dom*
+      - several prescribed functor classes :: add to current/choosen node as new entry/edges/both
+    * edges == one of attributes of this func
+      - it may be filled by results of func
+        * single entry with transf to trigger generating new view on explicit call
+        <= insert newly generated virtual 'view node' back into *dom*
+      - it may be filled independently
+      - or even be permanently empty -- when applying this func to some distant nodes only
+
+
+CASE:WTF: sort by filetype/mime
+    -- need edges -> NodeProxy for sorting ...
+    ... anyway I need embed Transformation into *dom* first

@@ -1,0 +1,73 @@
+%%%% Introspection
+
+Inner struct to navigate through virtual graphs
+  multichoices for nodes
+    * what aspect to show as edges
+    * which editor use to open
+    * possible previews for same format
+    ...
+  transformation chains for nodes
+    list/manipulate coveyour before showing edges in dir
+    HACK: copy-paste selection of manipulation primitives between nodes
+  cursors
+    for all tabs / inputs
+  history
+    * previously visited nodes
+    * dated snapshots of prev nodes
+  selections
+    all the different selections with diff uuid and color
+  tags
+    all tags groups
+  cache
+    list all cached generated views from flat list
+  undo
+    tree with branches
+  tui menu
+    labels / buttons / switches / sliders
+  layout as tree
+    change order, widgets sizes, colors, etc
+  comment
+    USE: per each cmdline leave what it does in human-readable words
+    ++ comment can be used in Unite-like searching => E.G. in oneliners cheatsheet
+  deleted files
+    don't delete files immediately -- only mark them deleted and hide -- as in mutt
+      == 'deletion selection'
+      * hiding is necessary => for mental perception and refocusing
+    show list of deleted edges per node or total combined graph
+    actually delete only on user explicit command, ask to delete on change curr dir or *miur* exit
+      prompt with 'deletion selection' to review changes
+    after batch deletion => keep old (removed) list in history
+      replace current cursor by new empty selection
+  unionfs :: view multiple dirs at once
+  attributes
+    keymap for inner structure of node in *dom*
+      E.G. edges, name, mtime, xattr, etc
+    ! TEMP: use simple dict obj instead of full-fledged graph
+    +++ history even for attributes
+      => only uid is invariant => binded to path/content/mtime(gencmd)
+    +++ all attrs are 1st order objects
+      => xrefs are allowed between any type of nodes
+        ??? is there usecase ???
+        * partial update of node -- if only single attr was changed
+        * ref to certain attr -- jump directly into inner repr of file
+          BET:NEED: key-value repr in graph
+            ??? global flat map of all possible node types ???
+              => so I could use {key_name = str(node.type)}
+    VIZ.IMPL:
+      edges == one of attr
+        "all is attribute"
+        super nested
+      attrs == additional edges
+        "all is graph"
+        super flat
+
+    [_] TRY: no need for separate named dicts in *dom*
+      [_] BUT!!! how to distinguish attributes from edges ?
+        ??? global flat map of types ???
+        NEED: id to access certain
+      [_] how to query name/etc of certain node ?
+
+
+!5 [_] IDEA: seize ideas from Unite.vim
+  [_] combine lists with commands
+  [_] fast filtering uix

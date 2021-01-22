@@ -1,0 +1,21 @@
+Python graph
+  + http://stackoverflow.com/questions/606516/python-graph-library
+  https://pythonhosted.org/apgl/
+  + http://igraph.org/python/doc/tutorial/tutorial.html
+  + https://graph-tool.skewed.de/
+  https://github.com/pmatiello/python-graph
+    https://pypi.python.org/pypi/python-graph
+  http://bulbflow.com/overview/
+  + http://www.boost.org/doc/libs/1_37_0/libs/graph/doc/python.html
+  http://tulip.labri.fr/Documentation/current/tulip-python/html/tulipreference.html
+
+IDEA
+  http://pycallgraph.slowchop.com/en/master/
+  https://mg.pov.lt/objgraph/
+
+Tut
+  http://www.python-course.eu/graphs_python.php
+  https://pythonspot.com/en/python-graph/
+  http://eddmann.com/posts/depth-first-search-and-breadth-first-search-in-python/
+  http://vpython.org/contents/docs/graph.html
+  http://interactivepython.org/runestone/static/pythonds/Graphs/TheGraphAbstractDataType.html
