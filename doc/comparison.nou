@@ -37,9 +37,15 @@ SEE
 
 !! noice -- very small suckless ranger-like fm in C
   http://git.2f30.org/noice/files.html
-  (fork) https://github.com/jarun/nnn
+  NICE: (fork) https://github.com/jarun/nnn
     https://github.com/jarun/nnn/wiki/nnn-vs.-noice
   LOG: https://www.reddit.com/r/commandline/comments/ep04rs/file_manager_nnn_v29_simpler_controls_smarter/
+
+BET?
+  Broot ⌇⡠⡐⢎⡴
+    https://dystroy.org/broot/
+  Broot – A new way to see and navigate directory trees | Hacker News ⌇⡠⡐⢎⡶
+    https://news.ycombinator.com/item?id=21998638
 
 !! mc
   https://www.midnight-commander.org/
@@ -50,6 +56,9 @@ lfm
     https://bitbucket.org/inigoserna/lfm3
   review:
     http://zenway.ru/page/lfm
+
+gokcehan/lf: Terminal file manager ⌇⡠⡏⠾⠺
+  https://github.com/gokcehan/lf
 
 Haskell
   https://github.com/hasufell/hsfm
