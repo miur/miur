@@ -10,3 +10,8 @@ Sort (universal)
   * nick (grouping)
   * full msg (as whole)
   * by individual words in msgs
+
+
+matrix protocol python API
+  poljar/matrix-nio: A Python Matrix client library, designed according to sans I/O (http://sans-io.readthedocs.io/) principles ⌇⡠⡗⡺⣗
+    https://github.com/poljar/matrix-nio
