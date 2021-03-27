@@ -77,6 +77,9 @@ ALT: tree-viewers
   https://dystroy.org/broot/
 
 
+Worker -- based on AVFS by same author ⌇⡠⡟⡌⢢
+  http://boomerangsworld.de/cms/worker/
+
 ALSO:
   |aur/nav-git:| nav is a hackable ncurses file manager, inspired by vim, ranger, and dvtm.
   |aur/lf:| A terminal file manager, heavily inspired by ranger
