@@ -72,6 +72,10 @@ Lisp
     https://truongtx.me/2013/04/25/dired-as-default-file-manager-5-customize-ls-command
     https://github.com/gabriel-laddel/flexi-trivial-dired
 
+GUI
+  Small and highly customizable twin-panel file manager for Linux with support for plugins ⌇⡠⡼⡖⡸
+    https://github.com/MeanEYE/Sunflower
+
 
 ALT: tree-viewers
   https://dystroy.org/broot/
