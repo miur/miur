@@ -1,12 +1,8 @@
-import sys
 from typing import Any
 
 from just.iji.main import Context
 
-
-def navi(**_kw: Any) -> Any:
-    lines = sys.stdin.readlines()
-    return lines
+from .navi import navi
 
 
 def main(ctx: Context) -> Any:
