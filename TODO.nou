@@ -1,0 +1,43 @@
+⌇⡡⢳⣻⡙
+
+&goals:xlr
+  #graph-navi
+  #graphdb
+  #eventdb
+  #query
+  #workflow
+  #networking
+
+
+&goals:fea
+  dom: use #graphdb as generic #kdb prototype
+    = filelist in dir is an ephemerial timestamped snapshot
+  graph-navi: tree-like navigation but aware of loops/links in graph
+    TRY: preserve spatial memory for user -- keep structure as fixed as possible
+  unify: parse external apps outputs into :dom:
+  integ: directly bridge ext apps to #miur for interactive reflections
+  pipe: continuously feed synthesized data from cli/file into :dom:
+    = to navigate outputs of external apps
+  multi-view: alt views for all nodes metadata #semanticdb instead of only .content
+    OR: "merged" virtual view containing different types of nodes at once
+      NEED: show results of query()
+  query-view: preserve expression and virtual "slice" of results accross whole :dom:
+  reflections: display #miur innards in same dynamic ifc
+  workflow: wf-based ui/keymaps/modes with #workflow as (primary) first class citizen
+  multi-ifc: central exchange protocol and dif clients e.g. cli/tui/emacs/gui/opengl/audio
+  history: use #eventdb audit log
+  headless: core-client-server architecture with two hops
+  visual-scripting: embed bash-like ops directly as #semanticdb nodes to reflect all relationships
+    SEE: !xonsh as a base for embedding
+
+
+&goals:pj
+  &exploration (my craving)
+  ...
+
+
+IDEA
+  *Ranger done right*
+  Refactoring and evolution
+  Microkernel relay in fm world
+  ...
