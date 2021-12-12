@@ -24,6 +24,8 @@
   query-view: preserve expression and virtual "slice" of results accross whole :dom:
   reflections: display #miur innards in same dynamic ifc
   workflow: wf-based ui/keymaps/modes with #workflow as (primary) first class citizen
+  local-options: attach opts (e.g. hidden) to cursor/view, folder, device, tab, etc. with fallback
+    &why avoid long redraw when hide/unhide for whole system
   multi-ifc: central exchange protocol and dif clients e.g. cli/tui/emacs/gui/opengl/audio
   history: use #eventdb audit log
   headless: core-client-server architecture with two hops
