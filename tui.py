@@ -35,10 +35,11 @@ class TUI:
     def __init__(self) -> None:
         self.stdscr: C.window | None = None
         self.tty: BinaryIO | None = None
+        self.old: dict[str, int] | None = None
 
     def __enter__(self) -> "TUI":
         self.tty = open(get_ttyname(), "wb+", buffering=0)
-        _old = rebind_stdios_to_tty(self.tty)
+        self.old = rebind_stdios_to_tty(self.tty)
 
         C.setupterm(term=os.environ.get("TERM", "unknown"), fd=sys.__stdout__.fileno())
 
