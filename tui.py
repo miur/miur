@@ -1,8 +1,7 @@
 import curses as C
 import os
 import sys
-from io import BytesIO
-from typing import Any, Optional
+from typing import Any, BinaryIO
 
 import _curses
 
@@ -34,8 +33,8 @@ def rebind_stdios_to_tty(tty: Any) -> dict[str, int]:
 
 class TUI:
     def __init__(self) -> None:
-        self.stdscr: Optional[C.window] = None
-        self.tty = None
+        self.stdscr: C.window | None = None
+        self.tty: BinaryIO | None = None
 
     def __enter__(self) -> "TUI":
         self.tty = open(get_ttyname(), "wb+", buffering=0)
