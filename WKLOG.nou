@@ -1,0 +1,28 @@
+⌇⡡⣈⠔⢥
+
+2021-11-19-Fri-W46
+  [_] ^⡡⣈⠔⢥ #eventdb infer API-RQ first -> pick IMPL-PERF later ⌇⡡⡙⠬⡇
+    [_] #feed add two sqlite -- as eventdb basis and as view ⌇⡡⢚⢞⡐
+    [&] ⌁ DEV initial #eventdb in !just ⌇⡡⢫⢊⢚
+    [_] MAYBE: very simple global event-db based on lmdb-append by key=time[long]
+      FUTURE: compile it into semantic-db or archive into immudb
+    TRY:DEP: lmdbjava/native: LMDB Native Libraries Automatic Build Repository ⌇⡡⡚⢝⡅
+      https://github.com/lmdbjava/native
+
+
+2021-12-25-Sat-W51
+  [_] ^⡡⣈⠔⢥ !miur initial IMPL :: simple list-picker ⌇⡡⡓⣔⣵
+    [⡡⣆⣷⡽] ✗ 2h TRY ncurses 6.1 colors ※⡡⣆⣹⢇
+    [_] DEV cursor ⌇⡡⢬⢋⠞
+    [_] FUTURE:TRY: abstract-away color/attribute information from all text blocks
+      * category (colorscheme) -- like ranger filetypes and infotypes
+      * palette (color pairs) -- for fast hacking using ncurses
+      * rgb (direct colors) -- for fast hacking vim-like
+      * raw (sanitized escape codes) -- for fast hacking TrueColor caps
+      * markup/qml (<b>xml</b>) -- for more complex outputs
+      * markdown (*bold*)
+    [_] FUTURE:TRY: abstract-away line-list-widget hierarchy from TUI, QT, OGL
+      IDEA: create data "description" i.e. DOM, and then visitor.interpret() it by renderer (e.g. Qt)
+        i.e. access dynamic property List.LineRange[b,e].line[i].color
+      NEED: event-driven access to everything
+        e.g. change color event -> modifies DOM -> updates GUI
