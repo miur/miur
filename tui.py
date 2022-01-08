@@ -12,6 +12,7 @@ def get_ttyname() -> str:
     return next(os.ttyname(f.fileno()) for f in STDIOS if f.isatty())
 
 
+# [_] CMP: /@/research/airy/pacman/pikaur/pikaur/pikspect.py:87: class TTYInputWrapper():
 # stdout - How to I make python curses application pipeline friendly? - Stack Overflow ⌇⡡⢬⡺⠄
 #   https://stackoverflow.com/questions/53696818/how-to-i-make-python-curses-application-pipeline-friendly
 # percol/percol at master · mooz/percol ⌇⡡⢬⡹⣵
