@@ -31,6 +31,10 @@
   headless: core-client-server architecture with two hops
   visual-scripting: embed bash-like ops directly as #semanticdb nodes to reflect all relationships
     SEE: !xonsh as a base for embedding
+  oneui: same list-navi for everything
+    e.g. filemanager, package manager, git status of repo, volume controls,
+      list of workflows, features of each workflow, user settings of workflow,
+  ? homoiconicity:
 
 
 &goals:pj

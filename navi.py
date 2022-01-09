@@ -1,7 +1,7 @@
 import curses as C
-import sys
 from typing import Any
 
+from .dom import CursorViewWidget
 from .tui import TUI
 
 
@@ -9,28 +9,63 @@ def navi(**_kw: Any) -> Any:
     return main()
 
 
+def draw_footer(scr: C.window) -> None:
+    fg = 217
+    bg = 17
+    # info = C.color_content(fg)
+    info = C.COLOR_PAIRS
+    pair = 30
+    C.init_pair(pair, fg, bg)
+
+    scr.addstr(C.LINES - 2, 0, b"---", C.color_pair(pair))
+    scr.addstr(C.LINES - 1, 0, str(info), C.color_pair(pair))
+
+
+## BET?
+# jquast/blessed: Blessed is an easy, practical library for making python terminal apps ⌇⡡⣛⠵⠔
+#   https://github.com/jquast/blessed
+def draw_list(scr: C.window, wg: CursorViewWidget) -> None:
+    i = 0
+    lines = wg[i : i + C.LINES - 1]
+    for i, x in enumerate(lines, start=i):
+        attr = C.color_pair(2) if i == wg.pos else C.color_pair(1)
+        scr.addstr(i, 0, f"{i}: {x}", attr)
+
+
+def draw_all(scr: C.window, wg: CursorViewWidget) -> None:
+    scr.clear()
+    draw_list(scr, wg)
+    draw_footer(scr)
+    scr.refresh()
+
+
 def main() -> None:
-    if not C.has_extended_color_support():
-        raise NotImplementedError
-    # C.initscr()
-    # C.start_color()
-    # FIXME: must reassign stdout only temporarily until curses binds itself to TTY
+    wg = CursorViewWidget()
     with TUI() as tui:
         scr = tui.stdscr
 
+        C.init_pair(1, 7, 8)
+        C.init_pair(2, 8, 4)
+        scr.attron(C.color_pair(1))
         scr.clear()
-        i: int
-        for i, x in enumerate(sys.stdin):
-            scr.addstr(i, 0, f"{i}: {x}")
-
-        fg = 217
-        bg = 17
-        # info = C.color_content(fg)
-        info = C.COLOR_PAIRS
-        pair = 30
-        C.init_pair(pair, fg, bg)
-
-        scr.addstr(i + 1, 0, str(info), C.color_pair(pair))
         scr.refresh()
-        scr.getkey()
+
+        ## [_] TRY: stdout/stderr -> normal curses window, instead of fullscreen alt
+        ## [_] SEE: how !ranger does this when jumping into shell
+        ### WTF: does Alternate screen works or not ?
+        # tput = lambda s: tui.otty.write(C.tigetstr(s).decode(tui.otty.encoding))
+        # tput("rmcup")
+        # print(C.LINES)
+        # tput("smcup")
+
         # C.napms(1500)
+        while True:
+            draw_all(scr, wg)
+            key = scr.getkey()
+            # print(key)
+            if key in ("q", "d", "\033"):
+                break
+            if key == "j":
+                wg.pos += 1
+            if key == "k":
+                wg.pos -= 1
