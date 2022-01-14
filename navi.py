@@ -26,8 +26,8 @@ def draw_footer(scr: C.window) -> None:
 #   https://github.com/jquast/blessed
 def draw_list(scr: C.window, wg: CursorViewWidget) -> None:
     i = 0
-    lines = wg[i : i + C.LINES - 1]
-    for i, x in enumerate(lines, start=i):
+    items = wg[i : i + C.LINES - 1]
+    for i, x in enumerate(items, start=i):
         attr = C.color_pair(2) if i == wg.pos else C.color_pair(1)
         scr.addstr(i, 0, f"{i}: {x}", attr)
 
@@ -69,3 +69,15 @@ def main() -> None:
                 wg.pos += 1
             if key == "k":
                 wg.pos -= 1
+
+            # [_] FUTURE: wg.pos = -1
+            if key == "g":
+                wg.pos = -len(wg)
+            if key == "G":
+                wg.pos = len(wg)
+            if key == "H":
+                wg.pos = 0
+            if key == "M":
+                wg.pos = wg._scroll.height // 2
+            if key == "L":
+                wg.pos = wg._scroll.height

@@ -1,29 +1,38 @@
-import sys
 from subprocess import run
+from typing import Iterable
 
 
-def runlines(cmd):
-    return run(cmd, check=True, capture_output=True, text=True).stdout.splitlines()
+def runlines(cmd: str | Iterable) -> list[str]:
+    args = cmd.split() if isinstance(cmd, str) else tuple(cmd)
+    return run(args, check=True, capture_output=True, text=True).stdout.splitlines()
+
+
+class Item:
+    def __init__(self, data: str) -> None:
+        self._data = data
+
+    def __str__(self) -> str:
+        return str(self._data)
 
 
 class DataProvider:
     def __init__(self) -> None:
-        # self._lines = list(x.rstrip() for x in sys.stdin)
+        # self._items = list(x.rstrip() for x in sys.stdin)
         # USAGE: $ </dev/null M
-        self._lines = runlines("pacman -Qtq".split())
+        self._items = list(map(Item, runlines("pacman -Qtq".split())))
 
     def __len__(self) -> int:
         # FUTURE: ret "+Inf" to indicate that it's unbounded stream -- for easier comparisons
-        return len(self._lines)
+        return len(self._items)
 
-    def __getitem__(self, k: slice) -> list[str]:
+    def __getitem__(self, k: slice) -> list[Item]:
         if isinstance(k, slice):
-            # assert k.stop < len(self._lines)
+            # assert k.stop < len(self._items)
             beg = k.start
             end = k.stop
-            return self._lines[beg:end]
+            return self._items[beg:end]
         if isinstance(k, int):
-            return self._lines[k]
+            return self._items[k]
         return NotImplementedError
 
 
@@ -33,7 +42,10 @@ class ScrollListWidget:
         self._height = 20
         self._offset = 10
 
-    def __getitem__(self, k: slice) -> list[str]:
+    def __len__(self) -> int:
+        return len(self._provider)
+
+    def __getitem__(self, k: slice) -> list[Item]:
         if isinstance(k, slice):
             # assert k.stop - k.start <= self.height, k
             beg = k.start + self.offset
@@ -65,8 +77,11 @@ class CursorViewWidget:
         self._pos = 0
         self._margin = 3
 
-    def __getitem__(self, k: slice) -> list[str]:
+    def __getitem__(self, k: slice) -> list[Item]:
         return self._scroll[k]
+
+    def __len__(self) -> int:
+        return len(self._scroll)
 
     @property
     def pos(self) -> int:
@@ -74,6 +89,12 @@ class CursorViewWidget:
 
     @pos.setter
     def pos(self, y: int) -> None:
+        # TODO: relpos, wrappos, abspos -- for <End> = jump_to(-1)
+        # TODO: keepcursor i.e. when jumping by "delta y" -- keep onscree cursor at same place
+        #   << i.e. scroll list under cursor but keep cursor itself
+        # MAYBE: allow "peeking" by scrolling list under cursor, bound to item insted of screen position
+        #   << NOTE: cursor may disappear from current screen view and it's ok,
+        #     it must simply become "inactive" i.e. disable all destructive funcs
         wg = self._scroll
         vh = wg.height  # = viewport height
         top = 0
