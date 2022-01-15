@@ -44,8 +44,14 @@ def main() -> None:
     with TUI() as tui:
         scr = tui.stdscr
 
+        # print(C.COLORS)
+        # if C.COLORS < 8:
+        #     C.init_pair(1, 7, 0)
+        #     C.init_pair(2, 4, 6)
+        # else:
         C.init_pair(1, 7, 8)
         C.init_pair(2, 8, 4)
+
         scr.attron(C.color_pair(1))
         scr.clear()
         scr.refresh()
@@ -61,7 +67,10 @@ def main() -> None:
         # C.napms(1500)
         while True:
             draw_all(scr, wg)
-            key = scr.getkey()
+            try:
+                key = scr.getkey()
+            except KeyboardInterrupt:
+                break
             # print(key)
             if key in ("q", "d", "\033"):
                 break
