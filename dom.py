@@ -1,10 +1,4 @@
-from subprocess import run
-from typing import Iterable
-
-
-def runlines(cmd: str | Iterable) -> list[str]:
-    args = cmd.split() if isinstance(cmd, str) else tuple(cmd)
-    return run(args, check=True, capture_output=True, text=True).stdout.splitlines()
+from just.iji.shell import runlines
 
 
 class Item:
@@ -19,7 +13,7 @@ class DataProvider:
     def __init__(self) -> None:
         # self._items = list(x.rstrip() for x in sys.stdin)
         # USAGE: $ </dev/null M
-        self._items = list(map(Item, runlines("pacman -Qtq".split())))
+        self._items = list(map(Item, runlines("pacman -Qtq")))
 
     def __len__(self) -> int:
         # FUTURE: ret "+Inf" to indicate that it's unbounded stream -- for easier comparisons

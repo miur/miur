@@ -26,3 +26,8 @@
         i.e. access dynamic property List.LineRange[b,e].line[i].color
       NEED: event-driven access to everything
         e.g. change color event -> modifies DOM -> updates GUI
+
+
+2022-01-17-Mon-W03
+  [_] SEE: rothgar/awesome-tuis: List of projects that provide terminal user interfaces ⌇⡡⣥⢴⠚
+    https://github.com/rothgar/awesome-tuis
