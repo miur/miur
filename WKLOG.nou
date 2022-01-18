@@ -31,3 +31,49 @@
 2022-01-17-Mon-W03
   [_] SEE: rothgar/awesome-tuis: List of projects that provide terminal user interfaces ⌇⡡⣥⢴⠚
     https://github.com/rothgar/awesome-tuis
+  [⡡⣦⠪⠇] ✓ 1h40m #live ALT:TRY: run main QApp in bkgr thread ⌇⡡⣦⠝⣹
+    INFO:: G: qt run qapp from another thread
+      c++ - creating QApplication in a different thread - Stack Overflow ⌇⡡⣥⡴⣙
+        https://stackoverflow.com/questions/25349081/creating-qapplication-in-a-different-thread
+      HOw to use QApplication on a separate thread other than the main thread? | Qt Forum ⌇⡡⣥⡴⣟
+        https://forum.qt.io/topic/44245/how-to-use-qapplication-on-a-separate-thread-other-than-the-main-thread
+      Starting QT GUI in a seperate Thread ⌇⡡⣥⡵⢷
+        https://www.qtcentre.org/threads/16552-Starting-QT-GUI-in-a-seperate-Thread
+      [⡡⣥⡵⡡] ‼ Running QApplication::exec() from another thread (QCoreApplication, QGuiApplication) | Qt Forum ⌇⡡⣥⡵⡇
+        https://forum.qt.io/topic/124878/running-qapplication-exec-from-another-thread-qcoreapplication-qguiapplication/2
+        * the Qt "main thread" is the first thread to create a QObject instance.
+        * Only one QCoreApplication instance can be created at a time (or it's derivatives).
+        * It should be created in the Qt "main thread" (which should also be its thread affinity).
+        * Its exec() function starts the main event loop, and should be run from the Qt "main thread".
+        ‼ Do create all QWidget objects in the same thread as QApplication.
+      QApplication not created in main thread() | Qt Forum ⌇⡡⣦⠙⠴
+        https://forum.qt.io/topic/84485/qapplication-not-created-in-main-thread
+      c++ - How to avoid Qt app.exec() blocking main thread - Stack Overflow ⌇⡡⣦⠙⡇
+        https://stackoverflow.com/questions/22289423/how-to-avoid-qt-app-exec-blocking-main-thread/22290909#22290909
+        ‼ GUI classes must only be accessed from the thread which instantiates QApplication/QGuiApplication
+    [X] ERR: WARNING: QApplication was not created in the main() thread.
+      HACK: import from PyQt must be started inside bkgr thread too
+        ⦅python⦆ thr = Thread(target=lambda: __import__("HelloOpenGL").run())
+      FAIL: bkgr thread still does not work properly
+        ¦ QObject::killTimer: Timers cannot be stopped from another thread
+        ¦ QObject::~QObject: Timers cannot be stopped from another thread
+        ¦ qt.qpa.xcb: xcb_shm_detach() failed with error: 128 (Unknown), sequence: 6611, resource id: 33554469, major code: 130 (Unknown), minor code: 2
+        ¦ (process:29311): GLib-CRITICAL **: 03:53:39.889: g_main_context_pop_thread_default: assertion 'stack != NULL' failed
+        ¦ double free or corruption (out)
+        ¦ [1]    29311 abort (core dumped)  python TryQtBkgr.py
+    [⡡⣦⠤⡨] ✓ BET:TRY:HACK: integrate with IPython event loop
+      Integrating with GUI event loops — IPython 8.0.0 documentation ⌇⡡⣦⠟⢀
+        https://ipython.readthedocs.io/en/8.0.0/config/eventloops.html
+        %gui qt5
+        CFG: c.InteractiveShellApp.gui = "qt5"
+      I am having major issues using Matplotlib with IPython ⌇⡡⣦⠢⣄
+        https://www.reddit.com/r/IPython/comments/5nfh77/i_am_having_major_issues_using_matplotlib_with/
+        https://www.reddit.com/r/Python/comments/5n84mj/ipython_shell_with_matplotlib_the_qt_windows/
+        = this creates a QApplication so your code will need to use QApplication.instance()
+      ::: USAGE:
+        * %gui qt5
+        * don't create QApplication
+        * you may directly create QT window/etc
+  [_] FAIL: reload class method in instances
+    Sample of reloading a class definition in python. Old and new instances point to the correct class definition. ⌇⡡⣦⠧⣘
+      https://gist.github.com/javierarilos/6009059
