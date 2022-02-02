@@ -77,3 +77,12 @@
   [_] FAIL: reload class method in instances
     Sample of reloading a class definition in python. Old and new instances point to the correct class definition. ⌇⡡⣦⠧⣘
       https://gist.github.com/javierarilos/6009059
+
+
+2022-02-01-Tue-W05
+  [_] #miur reuse !ipython as proper cli ifc ⌇⡡⣹⢽⢡
+    << main idea of #miur -- is unified "list" repr for many different filetypes
+    >> in same way I may provide unified python API to access these lists and manipulate directly in python
+      e.g. sometimes it's easier to drop into ipython and directly manipulate current dir filelist to batch-rename by pattern
+        NEED: some kind of welcoming "help" on ipython-enter ++ kind of "discovery" mechanics to know which api are available
+        ALSO:NEED: short aliases to many ops and proper long names of cmds and data fields
