@@ -2,11 +2,12 @@ import curses as C
 from typing import Any
 
 from .dom import CursorViewWidget
-from .tui import TUI
+from .tui import TUI, newtermwindow
 
 
 def navi(**_kw: Any) -> Any:
-    return main()
+    main()
+    print("clean")
 
 
 def draw_footer(scr: C.window) -> None:
@@ -41,7 +42,7 @@ def draw_all(scr: C.window, wg: CursorViewWidget) -> None:
 
 def main() -> None:
     wg = CursorViewWidget()
-    with TUI() as tui:
+    with newtermwindow(), TUI() as tui:
         scr = tui.stdscr
 
         # print(C.COLORS)
