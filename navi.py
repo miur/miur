@@ -2,7 +2,7 @@ import curses as C
 from typing import Any
 
 from .dom import CursorViewWidget
-from .tui import TUI, newtermwindow
+from .tui import TUI
 
 
 def navi(**_kw: Any) -> Any:
@@ -42,9 +42,7 @@ def draw_all(scr: C.window, wg: CursorViewWidget) -> None:
 
 def main() -> None:
     wg = CursorViewWidget()
-    with newtermwindow(), TUI() as tui:
-        scr = tui.stdscr
-
+    with TUI() as scr:
         # print(C.COLORS)
         # if C.COLORS < 8:
         #     C.init_pair(1, 7, 0)
