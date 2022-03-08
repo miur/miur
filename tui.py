@@ -1,6 +1,6 @@
 import curses as C
-from contextlib import contextmanager
-from typing import Iterator
+from contextlib import ExitStack, contextmanager
+from typing import Any, ContextManager, Iterator
 
 from .fdredir import bind_fd01_from_tty
 from .newterm import newtermwindow
@@ -41,26 +41,52 @@ def makestdscr() -> Iterator[C.window]:
         del stdscr
 
 
-# class TUI:
-#     def __init__(self) -> None:
-#         pass
-#     def __enter__(self) -> "TUI":
-#         self.stdscr = self._init()
-#         return self
-#     def __exit__(self, exc_type: Any, exc_value: Any, traceback: Any) -> None:
-#         pass
 @contextmanager
-def TUI() -> Iterator[C.window]:
+def ScreenNcurses() -> Iterator[C.window]:
     with (
         newtermwindow() as rwtty,
         bind_fd01_from_tty(*rwtty),
         makestdscr() as stdscr,
     ):
         yield stdscr
-        ## DEBUG
-        # rtty.fileno()
-        # wtty.fileno()
-        # sys.stdin.fileno()
-        # sys.stdout.fileno()
-        # sys.__stdin__.fileno()
-        # sys.__stdout__.fileno()
+
+
+class TUI:
+    def __init__(self) -> None:
+        self.gen: ContextManager
+        self.scr: C.window
+        self._stack: ExitStack
+
+    def __enter__(self) -> "TUI":
+        with ExitStack() as stack:
+            self.scr = stack.enter_context(ScreenNcurses())
+            self._stack = stack.pop_all()
+        self._init(self.scr)
+        return self
+
+    def __exit__(self, exc_type: Any, exc_value: Any, traceback: Any) -> None:
+        self._stack.__exit__(exc_type, exc_value, traceback)
+
+    @staticmethod
+    def _init(scr: C.window) -> None:
+        # print(C.COLORS)
+        # if C.COLORS < 8:
+        #     C.init_pair(1, 7, 0)
+        #     C.init_pair(2, 4, 6)
+        # else:
+        C.init_pair(1, 7, 8)
+        C.init_pair(2, 8, 4)
+
+        scr.attron(C.color_pair(1))
+        scr.clear()
+        scr.refresh()
+
+        ## [_] TRY: stdout/stderr -> normal curses window, instead of fullscreen alt
+        ## [_] SEE: how !ranger does this when jumping into shell
+        ### WTF: does Alternate screen works or not ?
+        # tput = lambda s: tui.otty.write(C.tigetstr(s).decode(tui.otty.encoding))
+        # tput("rmcup")
+        # print(C.LINES)
+        # tput("smcup")
+
+        # C.napms(1500)

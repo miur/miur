@@ -31,8 +31,10 @@ def newtermwindow() -> Iterator[tuple[TextIO, TextIO]]:
     # TEMP:HACK: spawn new terminal to prevent crashing/corrupting any existing ones
     #   TRY: os.getpty()
     bgtty = Popen(["st", "-M", "sh", "-c", "tty|tee /tmp/miurttynm; sleep 1d"])
-    time.sleep(1)  # MAYBE: replace by asyncinotify
+    time.sleep(0.5)  # MAYBE: replace by asyncinotify
     ttynm = __import__("pathlib").Path("/tmp/miurttynm").read_text().strip()
+    # HACK: replace jupyter/ipykernel hardcoded TERM for proper curses init
+    os.environ["TERM"] = "st-256color"
     try:
         # WKRND: keep tty open until app exit (for simplicity)
         rtty, wtty = open_tty(ttynm)

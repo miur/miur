@@ -25,14 +25,14 @@ def redir_fd(fd: int, tgt: int) -> Iterator[int]:
 
 ## NOTE: should reassign sys.* fds -- prevent !python access to newterm
 @contextmanager
-def safe_reassign_sysio(nm: str, fdbkp: int, fdtmp: int) -> Iterator[tuple[bool, bool]]:
+def safe_reassign_sysio(nm: str, fdwas: int, fduse: int) -> Iterator[tuple[bool, bool]]:
     stdio = getattr(sys, nm)
     bkpio = getattr(sys, "__" + nm + "__")
-    seq = stdio.fileno() == fdbkp
-    beq = bkpio.fileno() == fdbkp
+    seq = stdio.fileno() == fdwas
+    beq = bkpio.fileno() == fdwas
     mode = None
 
-    # ATT:(outside try-catch): don't reassign STDIO if .close raised BadDescriptor
+    # ATT:(outside try-catch): don't reassign STDIO if .close raised BadDescr
     if seq:
         mode = stdio.mode
         stdio.close()
@@ -45,10 +45,10 @@ def safe_reassign_sysio(nm: str, fdbkp: int, fdtmp: int) -> Iterator[tuple[bool,
         yield (seq, beq)
     finally:
         # FIXED: on restore "fdtmp" will be closed -- making new sys.stdin invalid
-        # FIXED:BUG:(BadDescriptor): if .fdopen twice -- and then .close both
+        # FIXED:BUG:(BadDescr): if .fdopen twice -- and then .close both
         if seq or beq:
             assert mode is not None
-            newio = os.fdopen(fdtmp, mode)
+            newio = os.fdopen(fduse, mode)
             if seq:
                 setattr(sys, nm, newio)
             if beq:
@@ -59,19 +59,23 @@ def safe_reassign_sysio(nm: str, fdbkp: int, fdtmp: int) -> Iterator[tuple[bool,
 def rebind_sysio_to_fd(nm: str, fdold: int, fdnew: int) -> Iterator[int]:
     fdtmp = os.dup(fdold)
     try:
-        # ATT:(outside try-catch): propagate BadDescriptor from .close w/o restoring
+        # ATT:(outside try-catch): propagate BadDescr from .close w/o restoring
         with safe_reassign_sysio(nm, fdold, fdtmp):
             # WARN: low-level Jupyter may break when we try to redirect "remote output"
             #   << COS: it may have stored copies of sys.std* somewhere
             os.dup2(fdnew, fdold)
-
-        try:
-            yield fdtmp
-        finally:
-            with safe_reassign_sysio(nm, fdtmp, fdold):
-                os.dup2(fdtmp, fdold)
-    finally:
+    except:  # pylint:disable=bare-except
         os.close(fdtmp)
+
+    try:
+        yield fdtmp
+    finally:
+        # WARN: after ctxm "fdtmp" becomes BadDescr due to "sys.stdin.close()"
+        os.fstat(fdtmp)
+        os.fstat(fdold)
+        os.dup2(fdtmp, fdold)
+        with safe_reassign_sysio(nm, fdtmp, fdold):
+            pass
 
 
 ## WKRND:BAD: libncurses.so initscr() hardcodes fd0 and fd1
@@ -87,3 +91,10 @@ def bind_fd01_from_tty(rtty: TextIO, wtty: TextIO) -> Iterator[tuple[int, int]]:
         rebind_sysio_to_fd("stdout", 1, wtty.fileno()) as temp1,
     ):
         yield (temp0, temp1)
+        ## DEBUG
+        # rtty.fileno()
+        # wtty.fileno()
+        # sys.stdin.fileno()
+        # sys.stdout.fileno()
+        # sys.__stdin__.fileno()
+        # sys.__stdout__.fileno()
