@@ -17,7 +17,7 @@ def draw_footer(scr: C.window) -> None:
     pair = 30
     C.init_pair(pair, fg, bg)
 
-    scr.addstr(C.LINES - 2, 0, b"---", C.color_pair(pair))
+    scr.addstr(C.LINES - 2, 0, "---", C.color_pair(pair))
     scr.addstr(C.LINES - 1, 0, str(info), C.color_pair(pair))
 
 

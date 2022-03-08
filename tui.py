@@ -2,7 +2,9 @@ import curses as C
 import io
 import os
 import sys
+import time
 from contextlib import contextmanager
+from subprocess import Popen
 from typing import Any, TextIO, cast
 
 ## HACK
@@ -52,7 +54,8 @@ def DEPR_rebind_stdios_to_tty() -> dict[str, TextIO]:
 
 def get_ttynm(ttynm: str | None = None) -> str:
     if ttynm is None:
-        ttynm = "/dev/tty"  # "/dev/pts/6"
+        ttynm = "/dev/tty"
+        # ttynm = "/dev/pts/6"
     if os.path.exists(ttynm):
         return ttynm
     ## FAIL: if all fd* are redirected $ <input just miur navi &> output
@@ -110,7 +113,6 @@ def rebind_stdios_to_tty(ttynm: str | None = None) -> Any:
     # else:
     #     self.tty = rebind_stdios_to_tty()
     #     self.otty = self.tty["stdout"]
-    ttynm = "/dev/pts/3"
     # WKRND: keep tty open until app exit (for simplicity)
     rtty, wtty = open_tty(ttynm)
     newf0 = override_io(sys.stdin, rtty)
@@ -153,10 +155,17 @@ class TUI:
         return stdscr
 
     def __enter__(self) -> "TUI":
+        # TEMP:HACK: spawn new terminal to prevent corrupting any existing ones
+        self.bgtty = Popen(["st", "-M", "sh", "-c", "tty|tee /tmp/miurttynm; sleep 1d"])
+        time.sleep(1)  # MAYBE: replace by asyncinotify
+        ttynm = __import__("pathlib").Path("/tmp/miurttynm").read_text().strip()
+
         # FIXME:TRY: reassign stdout only temporarily until curses binds itself to TTY
         #   << FAIL? libncurses.so directly uses fd0 inside getch()
         # WKRND: keep tty open until app exit (for simplicity)
-        with rebind_stdios_to_tty("/dev/pts/10") as self.rwtty:
+        with rebind_stdios_to_tty(ttynm) as self.rwtty:
+            # ss = sys.stdin.read(1)
+            # print(ss, sys.stdin.fileno())
             # self.stdscr = self._init(term="st-256color", fd=self.rwtty[1].fileno())
             self.stdscr = self._init()
         return self
@@ -183,3 +192,5 @@ class TUI:
         for f in self.rwtty:
             if f is not None:
                 f.close()
+
+        self.bgtty.terminate()
