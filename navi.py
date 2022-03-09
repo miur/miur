@@ -1,8 +1,10 @@
 import asyncio
 import curses as C
-from typing import Any
+from time import time
+from typing import Any, cast
 
 from just.ext.asyncio import enable_debug_asyncio
+from just.iji.shell import runlines
 
 from .dom import CursorViewWidget
 from .tui import TUI
@@ -35,9 +37,10 @@ def draw_list(scr: C.window, wg: CursorViewWidget) -> None:
     i = 0
     hh, ww = scr.getmaxyx()  # C.LINES
     items = wg[i : i + hh - 1]
+    beg, _ = wg._scroll.range(i)
     for i, x in enumerate(items, start=i):
         attr = C.color_pair(2) if i == wg.pos else C.color_pair(1)
-        scr.addstr(i, 0, f"{i:02d}| {x}", attr)
+        scr.addstr(i, 0, f"{i:02d}| {beg + i:03d}: {x}", attr)
 
 
 def draw_all(scr: C.window, wg: CursorViewWidget) -> None:
@@ -48,23 +51,53 @@ def draw_all(scr: C.window, wg: CursorViewWidget) -> None:
 
 
 async def run(tui: TUI, wg: CursorViewWidget) -> None:
+    tsk = cast(asyncio.Task, asyncio.current_task())
+    loop = asyncio.get_running_loop()
+    event = asyncio.Event()
+    STDIN_FILENO = 0
+
+    # [_] SEIZE: A Python asyncio cancellation pattern | by Rob Blackbourn | Medium ⌇⡢⠨⢣⣉
+    #   https://rob-blackbourn.medium.com/a-python-asyncio-cancellation-pattern-a808db861b84
+    def fstop() -> None:
+        loop.remove_reader(fd=STDIN_FILENO)
+        tsk.cancel()
+
+    def resize() -> None:
+        C.update_lines_cols()
+        hh, ww = scr.getmaxyx()
+        # print(hh, ww, C.LINES, C.COLS)
+        wg.resize(ww, hh - 2)
+        event.set()
+
     scr = tui.scr
     scr.nodelay(True)  # non-blocking .getch()
-    cb = lambda scr=scr, wg=wg: process_input(scr, wg)
-    STDIN_FILENO = 0
-    asyncio.get_running_loop().add_reader(fd=STDIN_FILENO, callback=cb)
+    cb = lambda scr=scr, wg=wg: process_input(scr, wg, fstop, event, resize)
+    loop.add_reader(fd=STDIN_FILENO, callback=cb)
 
-    while True:
+    try:
+        resize()
         # PERF: don't bind "draw" and "handle" in single loop pass
-        # IDEA: use .invalidate() to mark region for redraw
-        #   and semaphor to wait in loop until it's triggered
-        #   HACK: to prevent too frequent polling/redraw -- measure "dtrun" and "dtwait"
-        #   and sleep till the end of Vsync frame before applying accumulated changes
-        draw_all(scr, wg)
-        await asyncio.sleep(0.1)  # TEMP:REM:
+
+        dtframe = 1 / 60
+        while True:
+            ts = time()
+            draw_all(scr, wg)
+            event.clear()
+            # IDEA: use .invalidate() to mark region for redraw and semaphor to wait in loop until it's triggered
+            #   HACK: to prevent too frequent polling/redraw -- measure "dtrun" and "dtwait"
+            #   and sleep till the end of Vsync frame before applying accumulated changes
+            await event.wait()
+            dt = time() - ts
+            if dt < dtframe:
+                await asyncio.sleep(dtframe - dt)
+
+    except asyncio.CancelledError:
+        pass
 
 
-def process_input(scr: C.window, wg: CursorViewWidget) -> None:
+def process_input(
+    scr: C.window, wg: CursorViewWidget, fstop: Any, event: asyncio.Event, resize: Any
+) -> None:
     # NOTE: only count events, don't accumulate into list for post-processing
     #   << otherwise new events received during processing will become stalled
     #   FUTURE:TRY: read events in bursts (nested while loop) to be able to cancel-out
@@ -84,20 +117,48 @@ def process_input(scr: C.window, wg: CursorViewWidget) -> None:
         ## DEP:configure(--enable-sigwinch)
         # BAD: does not work inside jupyter
         # BAD: should press some key before ev:410 will be reported
-        # if key == C.KEY_RESIZE:
-        #     C.update_lines_cols()
-        #     hh, ww = scr.getmaxyx()
-        #     wg.resize(ww, hh)
-        #     continue
-        handle_keybindings(key, wg)
+        # REGR: redraw() during KEY_RESIZE results in ncurses crash
+        #   THINK: how to prevent/block redraw in that case?
+        if key == C.KEY_RESIZE:
+            resize()
+            continue
+
+        handle_keybindings(key, wg, fstop)
+        event.set()
+
     if evnum == 0:
         print("WTF: processing woke up w/o input", file=__import__("sys").stderr)
 
 
-def handle_keybindings(key: str | int, wg: CursorViewWidget) -> None:
-    if key in ("q", "d", "\033"):
+def handle_keybindings(key: str | int, wg: CursorViewWidget, fstop: Any) -> None:
+    if key in ("q", "\033"):  # "d",
         # print("FIXME: quit loop", file=__import__("sys").stderr)
+        fstop()
 
+    # TRY: async wait for subprocess result
+    # https://docs.python.org/3/library/asyncio-subprocess.html#asyncio.create_subprocess_exec
+    def exe(cmdline: str) -> None:
+        print("\n".join(runlines(cmdline.split() + [str(wg.item)])))
+
+    if key == "\n":
+        exe("echo")
+    if key == "i":  # pacq
+        exe("pacman -Qi")
+    if key == "u":  # pacl
+        exe("pacman -Ql")
+    if key == "x":  # pacx
+        # [_] FIXME:FIND: work with sudo in python
+        exe("sudo pacman -Rsu")
+    if key == "r":  # pacR1+o
+        exe("pactree --color --depth 1 --optional --reverse")
+    if key == "d":  # pacr1+o
+        exe("pactree --color --depth 1 --optional")
+    if key == "D":  # pacr
+        exe("pactree --color")
+    if key == "R":  # pacR+o
+        exe("pactree --color --optional --reverse")
+
+    # ---
     if key == "j":
         wg.pos += 1
     if key == "k":
@@ -128,7 +189,7 @@ def main() -> None:
 
 def cancel_all() -> None:
     for t in asyncio.all_tasks():
-        if t.get_coro().__qualname__ != "Kernel.dispatch_queue":
+        if getattr(t.get_coro(), "__qualname__", None) != "Kernel.dispatch_queue":
             t.cancel()
 
 

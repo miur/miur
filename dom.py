@@ -13,6 +13,7 @@ class DataProvider:
     def __init__(self) -> None:
         # self._items = list(x.rstrip() for x in sys.stdin)
         # USAGE: $ </dev/null M
+        # ALT: read_text(/home/amer/aura/items/neo/pacman/odd-pkgs.txt)
         self._items = list(map(Item, runlines("pacman -Qtq")))
 
     def __len__(self) -> int:
@@ -30,6 +31,8 @@ class DataProvider:
         return NotImplementedError
 
 
+# TODO: wrap each Item into ScrollItem(Item) to embed position
+#   BAD: resort/midinsert => rebuild all ScrollItem objects (slow)
 class ScrollListWidget:
     def __init__(self, provider: DataProvider = None) -> None:
         self._provider = provider or DataProvider()
@@ -40,13 +43,20 @@ class ScrollListWidget:
         return len(self._provider)
 
     def __getitem__(self, k: slice) -> list[Item]:
+        beg, end = self.range(k)
+        if isinstance(k, int):
+            return self._provider[beg]
+        return self._provider[beg:end]
+
+    def range(self, k: slice) -> tuple[int, int]:
         if isinstance(k, slice):
             # assert k.stop - k.start <= self.height, k
             beg = k.start + self.offset
             end = min(k.stop + self.offset, beg + self.height)
-            return self._provider[beg:end]
+            return beg, end
         if isinstance(k, int):
-            return self._provider[k + self.offset]
+            beg = k + self.offset
+            return beg, beg + 1
         return NotImplementedError
 
     @property
@@ -82,6 +92,10 @@ class CursorViewWidget:
     def resize(self, w: int, h: int) -> None:
         self._scroll._width = w
         self._scroll._height = h
+
+    @property
+    def item(self) -> Item:
+        return self[self.pos]
 
     @property
     def pos(self) -> int:
