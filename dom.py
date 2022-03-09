@@ -65,6 +65,8 @@ class ScrollListWidget:
 # NOTE: cursor can only be applied to current "window/view" -- whatever is shown on screen
 #   BUT: "file selection" is applicable to whole underlying DataProvider
 #     WARN: it may even span over multiple folders instead of only current one
+#   ALSO: we may pan list to "preview" above/below stationary cursor for e.g. lazy/chat streams
+#     ALT: place bookmark for position and then jump to bookmark after cursor scrolling
 class CursorViewWidget:
     def __init__(self, widget: ScrollListWidget = None) -> None:
         self._scroll = widget or ScrollListWidget()
@@ -76,6 +78,10 @@ class CursorViewWidget:
 
     def __len__(self) -> int:
         return len(self._scroll)
+
+    def resize(self, w: int, h: int) -> None:
+        self._scroll._width = w
+        self._scroll._height = h
 
     @property
     def pos(self) -> int:

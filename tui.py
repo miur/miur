@@ -77,6 +77,7 @@ class TUI:
         C.init_pair(1, 7, 8)
         C.init_pair(2, 8, 4)
 
+        # pvis = C.curs_set(visibility=0)
         scr.attron(C.color_pair(1))
         scr.clear()
         scr.refresh()
