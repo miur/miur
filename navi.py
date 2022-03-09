@@ -45,36 +45,27 @@ async def run(tui: TUI, wg: CursorViewWidget) -> None:
     scr = tui.scr
     scr.nodelay(True)  # non-blocking .getch()
     while True:
+        # PERF: don't bind "draw" and "handle" in single loop pass
         draw_all(scr, wg)
-        try:
-            key = scr.getkey()
-        except C.error:
+
+        # HACK:(getch-ungetch-getkey): avoid throwing exception
+        ch = scr.getch()
+        if ch == C.ERR:
             # BET: wait on STDIN
             #   asyncio.get_event_loop().add_reader(fd=0, callback=lambda: on_xcb_ready(xconn, fsm))
             await asyncio.sleep(0.02)
-        else:
-            if key in ("q", "d", "\033"):
-                break
-            # if key == C.KEY_RESIZE:
-            #     draw_all(scr, wg)
-            handle_keys(key, wg)
+            continue
 
+        C.ungetch(ch)
+        key = scr.get_wch()
+        # key = scr.getkey()
 
-def main() -> None:
-    wg = CursorViewWidget()
-    ## DEBUG
-    # ctx = TUI()
-    # tui = ctx.__enter__()
-    # ctx.__exit__(None, None, None)
-    with TUI() as tui:
-        # pvis = curs_set(visibility=0)
-        try:
-            coro = run(tui, wg)
-            # await coro
-            # fut = asyncio.create_task(coro)
-            asyncio.run(coro)
-        except KeyboardInterrupt:
-            pass
+        if key in ("q", "d", "\033"):
+            break
+        # if key == C.KEY_RESIZE:
+        #     draw_all(scr, wg)
+        print(repr(key), file=__import__("sys").stderr)
+        handle_keys(key, wg)
 
 
 def handle_keys(key: str, wg: CursorViewWidget) -> None:
@@ -96,6 +87,27 @@ def handle_keys(key: str, wg: CursorViewWidget) -> None:
         wg.pos = wg._scroll.height
 
 
+def main() -> None:
+    wg = CursorViewWidget()
+    with TUI() as tui:
+        # pvis = curs_set(visibility=0)
+        try:
+            coro = run(tui, wg)
+            asyncio.run(coro)
+        except KeyboardInterrupt:
+            pass
+
+
 #%% NEED %gui asyncio
 def _live() -> None:
-    main()
+    wg = CursorViewWidget()
+    ctx = TUI()
+    tui = ctx.__enter__()
+    # await run(tui, wg)
+    fut = asyncio.create_task(run(tui, wg))
+
+    def _quit() -> None:
+        asyncio.all_tasks()
+        fut.cancel()
+        # BAD: should exit manually after 'q' stops loop
+        ctx.__exit__(None, None, None)
