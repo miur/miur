@@ -50,8 +50,8 @@ class Application:
         # ALT: use .gather to auto-cancel_all
         # MAYBE: use "timeout=10" and cancel tasks in several attempts
         done, pending = await asyncio.wait(self.tasks)
-        assert not pending
-        assert done == self.tasks
+        assert not pending, pending
+        assert done == set(self.tasks), (done, self.tasks)
 
     def run(self) -> None:
         asyncio.run(self.mainloop())

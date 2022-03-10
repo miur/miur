@@ -1,14 +1,13 @@
 import asyncio
 import curses as C
-import subprocess as P
 from time import time
 from typing import Any, cast
 
 from just.ext.asyncio import enable_debug_asyncio
-from just.iji.shell import runlines
 
 from .app import Application
 from .dom import CursorViewWidget
+from .fragments import handle_keybindings
 from .tui import TUI
 
 # BAD: only prints first instance of warning
@@ -136,80 +135,14 @@ def process_input(
             resize()
             continue
 
-        handle_keybindings(key, wg, fstop)
+        if key in ("q", "\033"):  # "d",
+            # print("FIXME: quit loop", file=__import__("sys").stderr)
+            fstop()
+        handle_keybindings(wg, key)
         event.set()
 
     if evnum == 0:
         print("WTF: processing woke up w/o input", file=__import__("sys").stderr)
-
-
-def handle_keybindings(key: str | int, wg: CursorViewWidget, fstop: Any) -> None:
-    if key in ("q", "\033"):  # "d",
-        # print("FIXME: quit loop", file=__import__("sys").stderr)
-        fstop()
-
-    # TRY: async wait for subprocess result
-    # https://docs.python.org/3/library/asyncio-subprocess.html#asyncio.create_subprocess_exec
-    def exe(cmdline: str) -> None:
-        print("\n".join(runlines(cmdline.split() + [str(wg.item)])))
-
-    if key == "\n":
-        exe("echo")
-    if key == "i":  # pacq
-        exe("pacman -Qi")
-    if key == "u":  # pacl
-        exe("pacman -Ql")
-    if key == "x":  # pacx
-
-        def pkguninstall() -> None:
-            import sys
-
-            # [_] FIXME:FIND: work with sudo in python
-            # exe("sudo pacman -Rsu")
-            # WKRND: total mess with input when redirecting fd0/fd1 into separate newterm
-            _ret = P.run(
-                "sudo pacman -Rsu".split() + [str(wg.item)],
-                stdin=sys.stdin,
-                stdout=sys.stdout,
-                stderr=sys.stderr,
-                check=True,
-            )
-            wg._scroll._provider.refresh()
-            # event.set()
-            print("done")
-
-        asyncio.get_running_loop().run_in_executor(None, pkguninstall)
-
-    if key == "f":  # pacR1+o
-        exe("pactree --color --depth 1 --optional --reverse")
-    if key == "d":  # pacr1+o
-        exe("pactree --color --depth 1 --optional")
-    if key == "s":  # pacr1
-        exe("pactree --color --depth 1")
-    if key == "a":  # pacr
-        exe("pactree --color --depth 2")
-    if key == "A":  # pacr
-        exe("pactree --color")
-    if key == "r":  # pacR+o
-        exe("pactree --color --optional --reverse")
-
-    # ---
-    if key == "j":
-        wg.pos += 1
-    if key == "k":
-        wg.pos -= 1
-
-    # [_] FUTURE: wg.pos = -1
-    if key == "g":
-        wg.pos = -len(wg)
-    if key == "G":
-        wg.pos = len(wg)
-    if key == "H":
-        wg.pos = 0
-    if key == "M":
-        wg.pos = wg._scroll.height // 2
-    if key == "L":
-        wg.pos = wg._scroll.height
 
 
 def cancel_all() -> None:
