@@ -97,6 +97,9 @@
     [_] ^⡡⣈⠔⢥ #eventdb infer API-RQ first -> pick IMPL-PERF later ※⡡⡙⠬⡇
   [_] WF
     [%] #mt:=maint pacman-aur info
+      [_] TODO: attach info to node
+        = instead of exe(info) printing -- insert it back into DOM node
+          to be immediately available when focused on node w/o repeated keypresses
     [_] #cb:=clipboard history navi
     [_] #fm:=filemanager list-picker ※⡡⡓⣔⣵
     [_] #sb:=statusbar render !xmobar as yaml-like list of data
@@ -157,3 +160,4 @@
       "workflow" concept solves same issues -- but additionally it helps to preserve order/timeline of actions
       grouping API into menu -- solves issue of mental overload during studying, even if API will be used only by SW
   [•⡢⠩⡬⣣] /4h ^⡡⣈⠔⢥ #miur RFC:ARCH: ⸢Application⸥ and ⸢Device⸥
+    [_] !python sudo

@@ -1,21 +1,33 @@
 import asyncio
 import curses as C
+import subprocess as P
 from time import time
 from typing import Any, cast
 
 from just.ext.asyncio import enable_debug_asyncio
 from just.iji.shell import runlines
 
+from .app import Application
 from .dom import CursorViewWidget
 from .tui import TUI
 
 # BAD: only prints first instance of warning
 # from warnings import warn
 
+if __name__ == "__main__":
+    navi()
+
 
 def navi(**_kw: Any) -> Any:
-    main()
-    print("clean")
+    app = Application()
+    app.aws.append(run(app.tui, app.wg))
+    try:
+        app.run()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        app.quit()
+        print("clean")
 
 
 def draw_footer(scr: C.window) -> None:
@@ -53,6 +65,7 @@ def draw_all(scr: C.window, wg: CursorViewWidget) -> None:
 async def run(tui: TUI, wg: CursorViewWidget) -> None:
     tsk = cast(asyncio.Task, asyncio.current_task())
     loop = asyncio.get_running_loop()
+    # RENAME: ev_screen_refresh
     event = asyncio.Event()
     STDIN_FILENO = 0
 
@@ -147,15 +160,37 @@ def handle_keybindings(key: str | int, wg: CursorViewWidget, fstop: Any) -> None
     if key == "u":  # pacl
         exe("pacman -Ql")
     if key == "x":  # pacx
-        # [_] FIXME:FIND: work with sudo in python
-        exe("sudo pacman -Rsu")
-    if key == "r":  # pacR1+o
+
+        def pkguninstall() -> None:
+            import sys
+
+            # [_] FIXME:FIND: work with sudo in python
+            # exe("sudo pacman -Rsu")
+            # WKRND: total mess with input when redirecting fd0/fd1 into separate newterm
+            _ret = P.run(
+                "sudo pacman -Rsu".split() + [str(wg.item)],
+                stdin=sys.stdin,
+                stdout=sys.stdout,
+                stderr=sys.stderr,
+                check=True,
+            )
+            wg._scroll._provider.refresh()
+            # event.set()
+            print("done")
+
+        asyncio.get_running_loop().run_in_executor(None, pkguninstall)
+
+    if key == "f":  # pacR1+o
         exe("pactree --color --depth 1 --optional --reverse")
     if key == "d":  # pacr1+o
         exe("pactree --color --depth 1 --optional")
-    if key == "D":  # pacr
+    if key == "s":  # pacr1
+        exe("pactree --color --depth 1")
+    if key == "a":  # pacr
+        exe("pactree --color --depth 2")
+    if key == "A":  # pacr
         exe("pactree --color")
-    if key == "R":  # pacR+o
+    if key == "r":  # pacR+o
         exe("pactree --color --optional --reverse")
 
     # ---
@@ -177,19 +212,10 @@ def handle_keybindings(key: str | int, wg: CursorViewWidget, fstop: Any) -> None
         wg.pos = wg._scroll.height
 
 
-def main() -> None:
-    wg = CursorViewWidget()
-    with TUI() as tui:
-        try:
-            coro = run(tui, wg)
-            asyncio.run(coro)
-        except KeyboardInterrupt:
-            pass
-
-
 def cancel_all() -> None:
     for t in asyncio.all_tasks():
-        if getattr(t.get_coro(), "__qualname__", None) != "Kernel.dispatch_queue":
+        tasknm = getattr(t.get_coro(), "__qualname__", None)
+        if tasknm != "Kernel.dispatch_queue":
             t.cancel()
 
 
