@@ -86,3 +86,74 @@
       e.g. sometimes it's easier to drop into ipython and directly manipulate current dir filelist to batch-rename by pattern
         NEED: some kind of welcoming "help" on ipython-enter ++ kind of "discovery" mechanics to know which api are available
         ALSO:NEED: short aliases to many ops and proper long names of cmds and data fields
+
+
+2022-03-07-Mon-W10
+  [_] TODO: pick &next
+    [⡊⡴] DEV in jupyter ERR C.cbreak()
+    [⡊⡴] RFC:USE jupyter %gui asyncio
+    [⡊⡵] DEV do action per item
+    [_] RFC cursor ※⡡⢬⢋⠞
+    [_] ^⡡⣈⠔⢥ #eventdb infer API-RQ first -> pick IMPL-PERF later ※⡡⡙⠬⡇
+  [_] WF
+    [%] #mt:=maint pacman-aur info
+    [_] #cb:=clipboard history navi
+    [_] #fm:=filemanager list-picker ※⡡⡓⣔⣵
+    [_] #sb:=statusbar render !xmobar as yaml-like list of data
+  [_] TODO: #miur as-library
+    = so other developers could reuse parts of #miur instead of rewriting from scratch
+      + at least part of my code will be maintained by others
+
+
+2022-03-08-Tue-W10
+  [⡢⠧⠴⠳] 8h ^⡡⣈⠔⢥ #miur DEV in jupyter ERR C.cbreak() ⌇⡢⠩⡯⡩
+    [X] FIND: where ifd or STDIN_FILENO may be used
+      NCURSES_SP_NAME(newterm) (NCURSES_SP_DCLx
+        SP_PARM->_ifd = fileno(_ifp);
+      if (Filedes == STDOUT_FILENO && !NC_ISATTY(Filedes))
+        Filedes = STDERR_FILENO;
+      typedef struct screen {
+          int		_ifd;		/* input file descriptor for screen */
+          int		_ofd;		/* output file descriptor for screen */
+    [X] FAIL: hardcoded stdout/stdin FDs
+      //base/lib_initscr.c:93 initscr(void)
+        if (newterm(name, stdout, stdin) == 0) {
+      [X] TRY: always redirect only fd0 and fd1
+    [X] MAYBE: we don't need C.setupterm() at all
+      SEE:OFF: curses.py
+      # we call setupterm() here because it raises an error
+      # instead of calling exit() in error cases.
+  [⡢⠧⢉⢑] 1h30m ^⡡⣈⠔⢥ #miur RFC:USE jupyter %gui asyncio
+    COS: otherwise I can't edit functions during running main()
+  [_] FUTURE !python inotify ^⡢⠩⡯⠶
+    https://asyncinotify.readthedocs.io/en/latest/
+    https://pypi.org/project/inotify-simple/
+    READ https://github.com/dsoprea/PyInotify
+      https://pypi.org/project/inotify/
+    OLD: https://github.com/seb-m/pyinotify
+
+
+2022-03-09-Wed-W10
+  [X] 1h ^⡡⣈⠔⢥ #miur DEV do action <CR> per item
+  [X] 6h ^⡡⣈⠔⢥ #miur RFC
+    [X] 3h RFC wait on fd0 for input out of loop
+    [X] 1h quit from app on <q>
+    [X] 1h get new W/H on term resize()
+    [X] 1h limit FPS for output
+    [10%] 1h/ RFC:ARCH: ⸢Application⸥ and ⸢Device⸥
+
+
+2022-03-10-Thu-W10
+  [_] ^⡡⣈⠔⢥ #miur THEO modal kbd :: class PacmanMode, etc. ⌇⡢⠩⡭⢧
+    = using vim-like modes solves as *problem*:
+      * hw: limited number of keys on keyboard (not all functions are mappable)
+      * brain: our mind can't pick and *hold* (≈remember) what is most important in overwhelming details
+      * energy: mental drain exponentially increases when you can't focus on small set of actions
+      * automation: small set of repeatable actions allows to remember decision tree and skip all active decision making
+      * ergo: body/hands have limitations on keys placement and muscular strain to press them
+      * memory: it's hard to remember what to press to achieve what you need,
+        or even remember what you can use (leaving only vague feeling)
+    ex:
+      "workflow" concept solves same issues -- but additionally it helps to preserve order/timeline of actions
+      grouping API into menu -- solves issue of mental overload during studying, even if API will be used only by SW
+  [•⡢⠩⡬⣣] /4h ^⡡⣈⠔⢥ #miur RFC:ARCH: ⸢Application⸥ and ⸢Device⸥
