@@ -166,9 +166,12 @@
 
 2022-03-11-Fri-W10
   [•] 4h ^⡡⣈⠔⢥ #miur RFC:ARCH: ⸢Application⸥ and ⸢Device⸥
+  [_] FUTURE:TRY: Using Filters to impart contextual information ⌇⡢⠪⣴⠽
+    https://docs.python.org/3/howto/logging-cookbook.html#filters-contextual
   [%] 30m ^⡡⣈⠔⢥ #miur ARCH modal kbd ⌇⡢⠪⣏⢗
     [_] MAYBE: group "kbd input fragments" with "dom data source" and "widget output fragments"
-      NICE: direct relation between "what you see", "how it's structured" and "how you can manipulate"
+      NICE:(visual coupling): direct relation between "what you see", "how it's structured" and "how you can manipulate"
+      ALSO:(code coupling): input-frag always needs access to show-frag -- to scroll, move cursor, etc.
       e.g. dom="pacman -Qi", widget=List, input=PacmanFrag
     [_] BET: attach input-frag to ⸢Item⸥ instead of show-frag or even whole ⸢Widget⸥
       ~~ keybindings will dynamically change from item to item -- allowing having mixed lists
