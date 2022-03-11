@@ -2,7 +2,6 @@ import asyncio
 import curses as C
 from typing import Any
 
-from ..app import Application
 from ..fragments import handle_keybindings
 from .output import CursesOutput
 
@@ -10,7 +9,7 @@ from .output import CursesOutput
 class CursesInput:
     STDIN_FILENO = 0
 
-    def __init__(self, app: Application, canvas: CursesOutput) -> None:
+    def __init__(self, app: "Application", canvas: CursesOutput) -> None:
         self.app = app
         self.scr = app.tui.scr
         self.wg = app.wg
@@ -26,7 +25,7 @@ class CursesInput:
         self.loop.add_reader(fd=self.STDIN_FILENO, callback=self.process_input)
         return self
 
-    def __exit__(self, *_args: Any) -> None:
+    def __exit__(self, *_exc: Any) -> None:
         self.loop.remove_reader(fd=self.STDIN_FILENO)
         self.scr.nodelay(False)
 

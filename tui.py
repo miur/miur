@@ -1,17 +1,9 @@
 import curses as C
 from contextlib import ExitStack, contextmanager
-from typing import Any, ContextManager, Iterator
+from typing import Any, Iterator
 
 from .fdredir import bind_fd01_from_tty
 from .newterm import newtermwindow
-
-## HACK
-# try:
-#     __IPYTHON__
-# except NameError:
-#     __IPYTHON__ = False
-# if __IPYTHON__:
-#     pass
 
 
 @contextmanager
@@ -56,8 +48,9 @@ class TUI:
         self._init(self.scr)
         return self
 
-    def __exit__(self, exc_type: Any, exc_value: Any, traceback: Any) -> None:
-        self._stack.__exit__(exc_type, exc_value, traceback)
+    # VIZ: exc_type, exc_value, traceback
+    def __exit__(self, *exc: Any) -> bool:
+        return self._stack.__exit__(*exc)
 
     @staticmethod
     def _init(scr: C.window) -> None:

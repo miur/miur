@@ -11,12 +11,13 @@ class CursesOutput:
     def invalidate(self) -> None:
         self._ev_screen_refresh.set()
 
-    def resize(self) -> None:
+    # FIXME: use passed ww/hh when present
+    def resize(self, ww: int = None, hh: int = None) -> None:
         C.update_lines_cols()
         hh, ww = self._scr.getmaxyx()
         # print(hh, ww, C.LINES, C.COLS)
         self._wg.resize(ww, hh - 2)
-        self.invalidate
+        self.invalidate()
 
     def draw_footer(self) -> None:
         fg = 217
