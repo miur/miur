@@ -1,13 +1,11 @@
 import asyncio
 import curses as C
 
-from ..dom import CursorViewWidget
-
 
 class CursesOutput:
-    def __init__(self, scr: C.window, wg: CursorViewWidget):
-        self._scr = scr
-        self._wg = wg
+    def __init__(self, app: "Application"):
+        self._scr = app.tui.scr
+        self._wg = app.wg
         self._ev_screen_refresh = asyncio.Event()
 
     def invalidate(self) -> None:
