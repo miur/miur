@@ -147,8 +147,11 @@
 
 
 2022-03-10-Thu-W10
+  [%⡊⡵] 3h ^⡡⣈⠔⢥ #miur RFC:ARCH: ⸢Application⸥ and ⸢Device⸥
+    [_] !python sudo
+      [X] TEMP:IMPL pass-through to same tty
   [_] ^⡡⣈⠔⢥ #miur THEO modal kbd :: class PacmanMode, etc. ⌇⡢⠩⡭⢧
-    = using vim-like modes solves as *problem*:
+    = using vim-like modes solves a *problem*:
       * hw: limited number of keys on keyboard (not all functions are mappable)
       * brain: our mind can't pick and *hold* (≈remember) what is most important in overwhelming details
       * energy: mental drain exponentially increases when you can't focus on small set of actions
@@ -157,7 +160,26 @@
       * memory: it's hard to remember what to press to achieve what you need,
         or even remember what you can use (leaving only vague feeling)
     ex:
-      "workflow" concept solves same issues -- but additionally it helps to preserve order/timeline of actions
+      "flow/workflow" concept solves same issues -- but additionally it helps to preserve order/timeline of actions
       grouping API into menu -- solves issue of mental overload during studying, even if API will be used only by SW
-  [•⡢⠩⡬⣣] /4h ^⡡⣈⠔⢥ #miur RFC:ARCH: ⸢Application⸥ and ⸢Device⸥
-    [_] !python sudo
+
+
+2022-03-11-Fri-W10
+  [•] 4h ^⡡⣈⠔⢥ #miur RFC:ARCH: ⸢Application⸥ and ⸢Device⸥
+  [%] 30m ^⡡⣈⠔⢥ #miur ARCH modal kbd ⌇⡢⠪⣏⢗
+    [_] MAYBE: group "kbd input fragments" with "dom data source" and "widget output fragments"
+      NICE: direct relation between "what you see", "how it's structured" and "how you can manipulate"
+      e.g. dom="pacman -Qi", widget=List, input=PacmanFrag
+    [_] BET: attach input-frag to ⸢Item⸥ instead of show-frag or even whole ⸢Widget⸥
+      ~~ keybindings will dynamically change from item to item -- allowing having mixed lists
+      ‼ still some input-frags should be attached to show-frag as whole -- to apply unique actions,
+        inherent from the reason why all these mixed items were added to single union ⸢Widget⸥
+        [_] call same function on each item e.g. "load lazy data", or "generate preview"
+        [_] sort whole list by same field
+        [_] filter list by predicate
+    [_] ‼ each keybinding should be a sep class with .call(ctx) method
+      -- where ctx bounding is early or late (deferred till execution)
+      ALSO: provide Io.KeyBindFactory(frag, "M+k",lambda) for ease/compactness of mass-creating new hotkeys
+  [_] DEV multi-cell Item for tabular output
+    e.g: pacman -- show name, version, number of direct/reverse deps
+      BAD: may require preloading all data at once
