@@ -186,3 +186,6 @@
   [_] DEV multi-cell Item for tabular output
     e.g: pacman -- show name, version, number of direct/reverse deps
       BAD: may require preloading all data at once
+  [_] IDEA: reuse stable configuration/settings system
+    Traitlets — traitlets 5.1.1 documentation ⌇⡢⠫⠼⣮
+      https://traitlets.readthedocs.io/en/stable/

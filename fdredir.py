@@ -90,11 +90,13 @@ def bind_fd01_from_tty(rtty: TextIO, wtty: TextIO) -> Iterator[tuple[int, int]]:
         rebind_sysio_to_fd("stdin", 0, rtty.fileno()) as temp0,
         rebind_sysio_to_fd("stdout", 1, wtty.fileno()) as temp1,
     ):
-        yield (temp0, temp1)
         ## DEBUG
-        # rtty.fileno()
-        # wtty.fileno()
-        # sys.stdin.fileno()
-        # sys.stdout.fileno()
-        # sys.__stdin__.fileno()
-        # sys.__stdout__.fileno()
+        print(
+            f"""
+            {rtty.fileno()=} {wtty.fileno()=}
+            {temp0=} {temp1=}
+            {sys.stdin.fileno()=} {sys.stdout.fileno()=}
+            {sys.__stdin__.fileno()=} {sys.__stdout__.fileno()=}
+        """
+        )
+        yield (temp0, temp1)

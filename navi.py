@@ -2,7 +2,7 @@ import asyncio
 import curses as C
 from typing import Any, cast, no_type_check
 
-from just.ext.asyncio import enable_debug_asyncio
+from just.ext.asyncio import cancel_all, enable_debug_asyncio
 
 from .app import Application
 from .dom import CursorViewWidget
@@ -18,6 +18,7 @@ if __name__ == "__main__":
 
 
 def navi(**_kw: Any) -> Any:
+    enable_debug_asyncio()
     with Application(run) as app:
         app.run()
     print("clean")
@@ -93,24 +94,23 @@ class CursesOutput:
             pass
 
 
+# [_] SEIZE: A Python asyncio cancellation pattern | by Rob Blackbourn | Medium ⌇⡢⠨⢣⣉
+#   https://rob-blackbourn.medium.com/a-python-asyncio-cancellation-pattern-a808db861b84
 async def run(tui: TUI, wg: CursorViewWidget) -> None:
     tsk = cast(asyncio.Task, asyncio.current_task())
     loop = asyncio.get_running_loop()
     STDIN_FILENO = 0
 
-    # [_] SEIZE: A Python asyncio cancellation pattern | by Rob Blackbourn | Medium ⌇⡢⠨⢣⣉
-    #   https://rob-blackbourn.medium.com/a-python-asyncio-cancellation-pattern-a808db861b84
-    def fstop() -> None:
-        loop.remove_reader(fd=STDIN_FILENO)
-        tsk.cancel()
-
     scr = tui.scr
     draw = CursesOutput(scr, wg)
     scr.nodelay(True)  # non-blocking .getch()
-    cb = lambda scr=scr, wg=wg: process_input(scr, wg, fstop, draw)
+    cb = lambda: process_input(scr, wg, tsk.cancel, draw)
     loop.add_reader(fd=STDIN_FILENO, callback=cb)
 
-    await draw.drawloop()
+    try:
+        await draw.drawloop()
+    finally:
+        loop.remove_reader(fd=STDIN_FILENO)
 
 
 def process_input(
@@ -151,21 +151,12 @@ def process_input(
         print("WTF: processing woke up w/o input", file=__import__("sys").stderr)
 
 
-def cancel_all() -> None:
-    for t in asyncio.all_tasks():
-        tasknm = getattr(t.get_coro(), "__qualname__", None)
-        if tasknm != "Kernel.dispatch_queue":
-            t.cancel()
-
-
 #%% NEED %gui asyncio
 app: Application
 
 
 @no_type_check
 def _live():
-    enable_debug_asyncio()
-
     global app
     app = Application(run)
     app.__enter__()
@@ -176,6 +167,6 @@ def _live():
         cancel_all()
         asyncio.all_tasks()
 
-    def _quit(app=app):
+    def _quit():
         app.shutdown()
         del app

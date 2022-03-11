@@ -39,7 +39,9 @@ class Application:
         self.ctx.__exit__(typ, val, tb)
 
     def attach(self) -> None:
-        asyncio.get_running_loop().set_exception_handler(self.handle_exception)
+        ## BUG: overwrites Jupyter defaults and extends Application GC lifetime
+        # asyncio.get_running_loop().set_exception_handler(self.handle_exception)
+
         # WARN: mainloop() should be running COS .create_task() immediately schedules
         # TEMP:HACK:IMPL: deferred launch of awaitables
         # for aw in self.aws:
@@ -47,9 +49,13 @@ class Application:
         coro = self.fcoro(self.tui, self.wg)
         self.tasks.append(asyncio.create_task(coro))
 
+    # FUTURE:MAYBE: wait for tasks being cancelled
     def cancel(self) -> None:
         for t in self.tasks:
             t.cancel()
+        # NOTE: even if tasks won't be cancelled -- you can access them by .all_tasks()
+        #   NEED: for Jupyter re-launch ++ no-op .cancel
+        self.tasks = []
 
     async def mainloop(self) -> None:
         self.attach()

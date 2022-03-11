@@ -33,33 +33,25 @@ def makestdscr() -> Iterator[C.window]:
         yield stdscr
     finally:
         stdscr.keypad(False)
+        # BAD: not ported :: delscreen(stdscr)
+        del stdscr  # TRY
         C.echo()
         C.nocbreak()
+        # CHECK: is it safe to deinit libncurses multiple times in Jupyter?
         C.endwin()
-        # BAD: not ported :: delscreen(stdscr)
-        # TRY
-        del stdscr
-
-
-@contextmanager
-def ScreenNcurses() -> Iterator[C.window]:
-    with (
-        newtermwindow() as rwtty,
-        bind_fd01_from_tty(*rwtty),
-        makestdscr() as stdscr,
-    ):
-        yield stdscr
 
 
 class TUI:
     def __init__(self) -> None:
-        self.gen: ContextManager
+        self.rwtty: Any
         self.scr: C.window
         self._stack: ExitStack
 
     def __enter__(self) -> "TUI":
         with ExitStack() as stack:
-            self.scr = stack.enter_context(ScreenNcurses())
+            self.rwtty = stack.enter_context(newtermwindow())
+            stack.enter_context(bind_fd01_from_tty(*self.rwtty))
+            self.scr = stack.enter_context(makestdscr())
             self._stack = stack.pop_all()
         self._init(self.scr)
         return self
