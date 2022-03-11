@@ -1,13 +1,13 @@
 import asyncio
 import curses as C
-from typing import Any, cast, no_type_check
+from typing import Any, no_type_check
 
 from just.ext.asyncio import cancel_all, enable_debug_asyncio
 
 from .app import Application
+from .curses.output import CursesOutput
 from .dom import CursorViewWidget
 from .fragments import handle_keybindings
-from .tui import TUI
 
 # BAD: only prints first instance of warning
 # from warnings import warn
@@ -18,93 +18,24 @@ if __name__ == "__main__":
 
 
 def navi(**_kw: Any) -> Any:
-    enable_debug_asyncio()
     with Application(run) as app:
-        app.run()
+        app.run(enable_debug_asyncio)
     print("clean")
-
-
-class CursesOutput:
-    def __init__(self, scr: C.window, wg: CursorViewWidget):
-        self._scr = scr
-        self._wg = wg
-        self._ev_screen_refresh = asyncio.Event()
-
-    def invalidate(self) -> None:
-        self._ev_screen_refresh.set()
-
-    def resize(self) -> None:
-        C.update_lines_cols()
-        hh, ww = self._scr.getmaxyx()
-        # print(hh, ww, C.LINES, C.COLS)
-        self._wg.resize(ww, hh - 2)
-        self.invalidate
-
-    def draw_footer(self) -> None:
-        fg = 217
-        bg = 17
-        # info = C.color_content(fg)
-        info = C.COLOR_PAIRS
-        pair = 30
-        C.init_pair(pair, fg, bg)
-
-        scr = self._scr
-        hh, _ww = scr.getmaxyx()  # C.LINES
-        scr.addstr(hh - 2, 0, "---", C.color_pair(pair))
-        scr.addstr(hh - 1, 0, str(info), C.color_pair(pair))
-
-    ## BET?
-    # jquast/blessed: Blessed is an easy, practical library for making python terminal apps ⌇⡡⣛⠵⠔
-    #   https://github.com/jquast/blessed
-    def draw_list(self) -> None:
-        i = 0
-        hh, _ww = self._scr.getmaxyx()  # C.LINES
-        items = self._wg[i : i + hh - 1]
-        beg, _ = self._wg._scroll.range(i)
-        for i, x in enumerate(items, start=i):
-            attr = C.color_pair(2) if i == self._wg.pos else C.color_pair(1)
-            self._scr.addstr(i, 0, f"{i:02d}| {beg + i:03d}: {x}", attr)
-
-    def draw_all(self) -> None:
-        self._scr.clear()
-        self.draw_list()
-        self.draw_footer()
-        self._scr.refresh()
-
-    # PERF: don't bind "draw" and "handle" in single loop pass
-    async def drawloop(self) -> None:
-        self.resize()
-        # HACK: reduce CPU consumption in laptop powersave mode
-        dtframe = 1 / 15  # 60
-        monotime = asyncio.get_running_loop().time
-        try:
-            while True:
-                ts = monotime()
-                self.draw_all()
-                self._ev_screen_refresh.clear()
-                # IDEA: use .invalidate() to mark region for redraw and semaphor to wait in loop until it's triggered
-                #   HACK: to prevent too frequent polling/redraw -- measure "dtrun" and "dtwait"
-                #   and sleep till the end of Vsync frame before applying accumulated changes
-                await self._ev_screen_refresh.wait()
-                dt = monotime() - ts
-                if dt < dtframe:
-                    await asyncio.sleep(dtframe - dt)
-
-        except asyncio.CancelledError:
-            pass
 
 
 # [_] SEIZE: A Python asyncio cancellation pattern | by Rob Blackbourn | Medium ⌇⡢⠨⢣⣉
 #   https://rob-blackbourn.medium.com/a-python-asyncio-cancellation-pattern-a808db861b84
-async def run(tui: TUI, wg: CursorViewWidget) -> None:
-    tsk = cast(asyncio.Task, asyncio.current_task())
+async def run(app: Application) -> None:
+    # OLD: fstop = cast(asyncio.Task, asyncio.current_task()).cancel
+    # ALT:NICE: works even in Jupyter
+    fstop = app.cancel
+
+    scr = app.tui.scr
+    draw = CursesOutput(scr, app.wg)
+    scr.nodelay(True)  # non-blocking .getch()
     loop = asyncio.get_running_loop()
     STDIN_FILENO = 0
-
-    scr = tui.scr
-    draw = CursesOutput(scr, wg)
-    scr.nodelay(True)  # non-blocking .getch()
-    cb = lambda: process_input(scr, wg, tsk.cancel, draw)
+    cb = lambda: process_input(scr, app.wg, fstop, draw)
     loop.add_reader(fd=STDIN_FILENO, callback=cb)
 
     try:
@@ -142,7 +73,6 @@ def process_input(
             continue
 
         if key in ("q", "\033"):  # "d",
-            # print("FIXME: quit loop", file=__import__("sys").stderr)
             fstop()
         handle_keybindings(wg, key)
         tui.invalidate()
@@ -159,14 +89,18 @@ app: Application
 def _live():
     global app
     app = Application(run)
-    app.__enter__()
-    app.attach()
-    # TODO app.resize()
 
-    def _debug():
-        cancel_all()
-        asyncio.all_tasks()
+    app.__enter__().attach()
+
+    # HACK: autoclose newterm() to restore WM visual space
+    #   OR: never close newterm() -- to keep WM layout stable
+    app.tasks[0].add_done_callback(app.__exit__)
+    # TODO app.resize()
 
     def _quit():
         app.shutdown()
         del app
+
+    def _debug():
+        cancel_all()
+        asyncio.all_tasks()

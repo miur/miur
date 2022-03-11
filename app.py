@@ -46,7 +46,7 @@ class Application:
         # TEMP:HACK:IMPL: deferred launch of awaitables
         # for aw in self.aws:
         #     self.tasks.append(asyncio.create_task(aw))
-        coro = self.fcoro(self.tui, self.wg)
+        coro = self.fcoro(self)
         self.tasks.append(asyncio.create_task(coro))
 
     # FUTURE:MAYBE: wait for tasks being cancelled
@@ -57,20 +57,23 @@ class Application:
         #   NEED: for Jupyter re-launch ++ no-op .cancel
         self.tasks = []
 
-    async def mainloop(self) -> None:
+    async def mainloop(self, ainit: Any = None) -> None:
+        if ainit:
+            ainit()
         self.attach()
         # ALT: use .gather to auto-cancel_all
         # MAYBE: use "timeout=10" and cancel tasks in several attempts
-        done, pending = await asyncio.wait(self.tasks)
+        aws = self.tasks
+        done, pending = await asyncio.wait(aws)
         assert not pending, pending
-        assert done == set(self.tasks), (done, self.tasks)
+        assert done == set(aws), (done, aws)
 
     def shutdown(self) -> None:
         self.cancel()
         self.__exit__()
 
-    def run(self) -> None:
-        asyncio.run(self.mainloop())
+    def run(self, ainit: Any = None) -> None:
+        asyncio.run(self.mainloop(ainit))
 
     def handle_exception(self, _loop, context):  # type:ignore
         msg = context.get("exception", context["message"])
