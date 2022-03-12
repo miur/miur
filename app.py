@@ -3,10 +3,10 @@ import logging
 from contextlib import ExitStack
 from typing import Any
 
+from .curses.device import CursesDevice
 from .curses.input import CursesInput
 from .curses.output import CursesOutput
 from .dom import CursorViewWidget
-from .tui import TUI
 
 ## ARCH:
 # * all async only in App
@@ -19,7 +19,7 @@ from .tui import TUI
 class Application:
     STDIN_FILENO = 0
 
-    tui: TUI
+    iodev: CursesDevice
     canvas: CursesOutput
     hotkey: CursesInput
     _stack: ExitStack
@@ -35,10 +35,10 @@ class Application:
     # ---
     def __enter__(self) -> "Application":
         with ExitStack() as stack:
-            self.tui = stack.enter_context(TUI())  # OR: self.ctx()
+            self.iodev = stack.enter_context(CursesDevice())  # OR: self.ctx()
             # FAIL: lifetime should not continue past __exit__()
-            self.canvas = CursesOutput(self.tui, self.wg)
-            self.hotkey = CursesInput(self, self.canvas)
+            self.canvas = CursesOutput(self.iodev, self.wg)
+            self.hotkey = CursesInput(self, self.iodev, self.canvas)
             self._stack = stack.pop_all()
         return self
 
@@ -107,39 +107,8 @@ class Application:
         asyncio.run(self.mainloop(ainit))
 
     # ---
-    def handle_exception(self, _loop, context):  # type:ignore
-        msg = context.get("exception", context["message"])
-        logging.error(f"Caught exception: {msg}")
-        logging.info("Shutting down...")
-        asyncio.get_running_loop().call_soon(self.shutdown)
-
-    # def attach_input(self) -> None:
-    #     scr = tui.scr
-    #     scr.nodelay(True)  # non-blocking .getch()
-    #     STDIN_FILENO = 0
-    #     cb = lambda scr=scr, wg=wg: process_input(scr, wg)
-    #     asyncio.get_running_loop().add_reader(fd=STDIN_FILENO, callback=cb)
-
-    # def detach_input() -> None:
-    #     cancel_all()
-    #     asyncio.all_tasks()
-    #     # BAD: should exit manually after 'q' stops loop
-    #     ctx.__exit__(None, None, None)
-
-    # def attach_output(self) -> None:
-    #     ctx = TUI()
-    #     tui = ctx.__enter__()
-    #     scr = tui.scr
-    #     fut = asyncio.create_task(run(tui, wg))
-    #     # fut.cancel()
-    #     # await run(tui, wg)
-
-    # async def process_output(self) -> None:
-    #     while True:
-    #         # PERF: don't bind "draw" and "handle" in single loop pass
-    #         # IDEA: use .invalidate() to mark region for redraw
-    #         #   and semaphor to wait in loop until it's triggered
-    #         #   HACK: to prevent too frequent polling/redraw -- measure "dtrun" and "dtwait"
-    #         #   and sleep till the end of Vsync frame before applying accumulated changes
-    #         draw_all(scr, wg)
-    #         await asyncio.sleep(0.1)  # TEMP:REM:
+    # def handle_exception(self, _loop, context):  # type:ignore
+    #     msg = context.get("exception", context["message"])
+    #     logging.error(f"Caught exception: {msg}")
+    #     logging.info("Shutting down...")
+    #     asyncio.get_running_loop().call_soon(self.shutdown)

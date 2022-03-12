@@ -3,15 +3,18 @@ import curses as C
 from typing import Any
 
 from ..fragments import handle_keybindings
+from .device import CursesDevice
 from .output import CursesOutput
 
 
 class CursesInput:
     STDIN_FILENO = 0
 
-    def __init__(self, app: "Application", canvas: CursesOutput) -> None:
+    def __init__(
+        self, app: "Application", iodev: CursesDevice, canvas: CursesOutput
+    ) -> None:
         self.app = app
-        self.scr = app.tui.scr
+        self.scr = iodev.scr
         self.wg = app.wg
         self.canvas = canvas
 

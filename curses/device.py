@@ -2,8 +2,8 @@ import curses as C
 from contextlib import ExitStack, contextmanager
 from typing import Any, Iterator
 
-from .fdredir import bind_fd01_from_tty
-from .newterm import newtermwindow
+from ..devhelp.fdredir import bind_fd01_from_tty
+from ..devhelp.newterm import newtermwindow
 
 
 @contextmanager
@@ -33,13 +33,13 @@ def makestdscr() -> Iterator[C.window]:
         C.endwin()
 
 
-class TUI:
+class CursesDevice:
     def __init__(self) -> None:
         self.rwtty: Any
         self.scr: C.window
         self._stack: ExitStack
 
-    def __enter__(self) -> "TUI":
+    def __enter__(self) -> "CursesDevice":
         with ExitStack() as stack:
             self.rwtty = stack.enter_context(newtermwindow())
             stack.enter_context(bind_fd01_from_tty(*self.rwtty))
