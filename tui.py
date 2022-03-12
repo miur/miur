@@ -48,9 +48,13 @@ class TUI:
         self._init(self.scr)
         return self
 
-    # VIZ: exc_type, exc_value, traceback
-    def __exit__(self, *exc: Any) -> bool:
-        return self._stack.__exit__(*exc)
+    # def __exit__(self,
+    #   exc_type: Optional[Type[BaseException]],
+    #   exc_value: Optional[BaseException],
+    #   traceback: Optional[TracebackType]
+    #   ) -> Optional[bool]:
+    def __exit__(self, t=None, v=None, b=None):  # type:ignore
+        return self._stack.__exit__(t, v, b)
 
     @staticmethod
     def _init(scr: C.window) -> None:

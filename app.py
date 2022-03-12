@@ -21,7 +21,7 @@ class Application:
 
     tui: TUI
     canvas: CursesOutput
-    hotkey: CursesOutput
+    hotkey: CursesInput
     _stack: ExitStack
 
     def __init__(self) -> None:
@@ -36,13 +36,17 @@ class Application:
     def __enter__(self) -> "Application":
         with ExitStack() as stack:
             self.tui = stack.enter_context(TUI())  # OR: self.ctx()
-            self.canvas = CursesOutput(self)
+            # FAIL: lifetime should not continue past __exit__()
+            self.canvas = CursesOutput(self.tui, self.wg)
             self.hotkey = CursesInput(self, self.canvas)
             self._stack = stack.pop_all()
         return self
 
-    def __exit__(self, *exc: Any) -> bool:
-        return self._stack.__exit__(*exc)
+    def __exit__(self, t=None, v=None, b=None) -> bool:  # type:ignore
+        # FAIL: lifetime should not continue past __exit__()
+        del self.hotkey
+        del self.canvas
+        return self._stack.__exit__(t, v, b)
 
     # ---
     def attach(self) -> None:
@@ -55,6 +59,7 @@ class Application:
         #     self._tasks.append(asyncio.create_task(aw))
         coro = self.canvas.drawloop()
         self._tasks.append(asyncio.create_task(coro))
+        self.hotkey.__enter__()
 
     # FUTURE:MAYBE: wait for tasks being cancelled
     def cancel(self) -> None:
@@ -75,6 +80,7 @@ class Application:
 
     def shutdown(self) -> None:
         self.cancel()
+        self.hotkey.__exit__()
         self.__exit__()
 
     # ---
@@ -90,7 +96,10 @@ class Application:
         if ainit:
             ainit()
         self.attach()
-        await self.wait()
+        try:
+            await self.wait()
+        finally:
+            self.hotkey.__exit__()
 
     def run(self, ainit: Any = None) -> None:
         asyncio.run(self.mainloop(ainit))

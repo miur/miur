@@ -16,17 +16,17 @@ class CursesInput:
         self.canvas = canvas
 
     @property
-    def loop(self) -> asyncio.AbstractEventLoop:
+    def _loop(self) -> asyncio.AbstractEventLoop:
         return asyncio.get_running_loop()
 
     def __enter__(self) -> "CursesInput":
         # non-blocking .getch()
         self.scr.nodelay(True)
-        self.loop.add_reader(fd=self.STDIN_FILENO, callback=self.process_input)
+        self._loop.add_reader(fd=self.STDIN_FILENO, callback=self.process_input)
         return self
 
     def __exit__(self, *_exc: Any) -> None:
-        self.loop.remove_reader(fd=self.STDIN_FILENO)
+        self._loop.remove_reader(fd=self.STDIN_FILENO)
         self.scr.nodelay(False)
 
     def process_input(self) -> None:
