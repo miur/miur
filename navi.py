@@ -1,7 +1,7 @@
 import asyncio
 from typing import Any, no_type_check
 
-from just.ext.asyncio import __IPYTHON__, cancel_all, enable_debug_asyncio
+from just.ext.asyncio import cancel_all, enable_debug_asyncio
 
 from .app import Application
 
@@ -11,17 +11,18 @@ from .app import Application
 app: Application
 
 
-# HACK:(vimspector): allow running this script in debugger
-#   ALT: if __name__ == "__main__":
-if not __IPYTHON__:
-    navi()
-
-
 def navi(**_kw: Any) -> Any:
     global app
     with Application() as app:
         app.run(enable_debug_asyncio)
     print("clean")
+
+
+# HACK:(vimspector): allow running this script in debugger
+#   ALT: if not __IPYTHON__:
+if __name__ == "__main__":
+    navi()
+    # TODO: sys.exit()
 
 
 #%% NEED %gui asyncio
