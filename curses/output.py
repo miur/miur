@@ -4,6 +4,9 @@ import curses as C
 from ..widgets.scrolllist import CursorViewWidget
 from .device import CursesDevice
 
+# DEBUG
+#  export NCURSES_TRACE=9
+
 
 class CursesOutput:
     def __init__(self, iodev: CursesDevice, wg: CursorViewWidget):
@@ -51,6 +54,8 @@ class CursesOutput:
         self._scr.clear()
         self.draw_list()
         self.draw_footer()
+        # ALSO:(force-full-redraw): self._scr.touchwin()
+        #   BET: redraw = lambda: wrefresh(curscr)
         self._scr.refresh()
 
     # PERF: don't bind "draw" and "handle" in single loop pass
