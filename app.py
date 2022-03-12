@@ -1,12 +1,12 @@
 import asyncio
-import logging
 from contextlib import ExitStack
 from typing import Any
 
 from .curses.device import CursesDevice
 from .curses.input import CursesInput
 from .curses.output import CursesOutput
-from .dom import CursorViewWidget
+from .dom.provider import DataProvider
+from .widgets.scrolllist import CursorViewWidget, ScrollListWidget
 
 ## ARCH:
 # * all async only in App
@@ -28,7 +28,8 @@ class Application:
         # RENAME: dom
         #   BUT: dom(wg) is common only between all list-like displays
         #     -- concept of cursor won't have any sense in API, CLI, or AUDIO
-        self.wg = CursorViewWidget()
+        self.dom = DataProvider()
+        self.wg = CursorViewWidget(ScrollListWidget(self.dom))
         self._tasks: list[asyncio.Task] = []
         # self.aws: list[Awaitable] = []
 

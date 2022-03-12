@@ -1,7 +1,7 @@
 import asyncio
 import curses as C
 
-from ..dom import CursorViewWidget
+from ..widgets.scrolllist import CursorViewWidget
 from .device import CursesDevice
 
 

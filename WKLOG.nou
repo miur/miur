@@ -165,7 +165,20 @@
 
 
 2022-03-11-Fri-W10
-  [•] 4h ^⡡⣈⠔⢥ #miur RFC:ARCH: ⸢Application⸥ and ⸢Device⸥
+  [85%] 2h(4h) ^⡡⣈⠔⢥ #miur RFC:ARCH: ⸢Application⸥ and ⸢Device⸥
+    [+] 5h AGAIN:FIXME: run in jupyter
+      [⡢⠫⡏⣓] FIXME: no input on re-enter under Jupyter
+        ?? most likely libncurses.so still holds fd0 redirected to prev term
+          TRY: reinit libncurses.so ※⡢⠫⠧⣉ -- OR: prevent .endwin() to preserve lib
+        ++ if you exit on <q> -- all works ok
+        ::: should always .remove_reader() from loop
+      [⡢⠫⠼⠭] ERR: exc on close(jupyter repl)
+        ::: COS asyncio.get_running_loop().set_debug(True)
+          WTF: why it results in error -- is it error inside Jupyter itself ?
+      [⡢⠫⡙⣅] BUG: bkgr color fills parent on app close
+        ~~ most likely "stdout" is restored *before* successful ncurses deinit
+        ::: don't self.__exit__() from inside mainloop()
+  [_] ^⡡⣈⠔⢥ #miur &fun ADD python opengl widget asyncio list output (2D for now)
   [_] FUTURE:TRY: Using Filters to impart contextual information ⌇⡢⠪⣴⠽
     https://docs.python.org/3/howto/logging-cookbook.html#filters-contextual
   [%] 30m ^⡡⣈⠔⢥ #miur ARCH modal kbd ⌇⡢⠪⣏⢗
@@ -189,3 +202,8 @@
   [_] IDEA: reuse stable configuration/settings system
     Traitlets — traitlets 5.1.1 documentation ⌇⡢⠫⠼⣮
       https://traitlets.readthedocs.io/en/stable/
+
+
+2022-03-12-Sat-W10
+  [•] 2h ^⡡⣈⠔⢥ #miur RFC:ARCH: ⸢Application⸥ and ⸢Device⸥
+  [_] FUTURE:MOVE: "curses/*" -> "uix/curses/"
