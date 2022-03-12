@@ -100,6 +100,8 @@ class Application:
             await self.wait()
         finally:
             self.hotkey.__exit__()
+            # if ainit:
+            #     ainit(False)
 
     def run(self, ainit: Any = None) -> None:
         asyncio.run(self.mainloop(ainit))
