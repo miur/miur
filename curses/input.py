@@ -74,6 +74,9 @@ def xxx_frag(app: "Application", key: str | int) -> None:
         # ALT:NICE: works even in Jupyter
         app.cancel()
     if key == "e":
+        # FIXME: don't create new shell, if it's already running
+        # coro = app.iodev.shell_async(X=app.wg.item._data)
+        # fut = asyncio.create_task(coro)
         app.iodev.shell_out(X=app.wg.item._data)
-    if key == "w":
-        app.iodev.ipython_out(x=app.wg.item)
+    # if key == "w":
+    #     app.iodev.ipython_out(x=app.wg.item)

@@ -82,20 +82,43 @@ class CursesDevice:
 
         # C.napms(1500)
 
-    def shell_out(self, **envkw) -> None:
+    # FAIL: does not work as intended
+    async def shell_async(self, *args, **envkw) -> None:
+        import asyncio
+
+        cmd = args or [os.environ.get("SHELL", "sh")]
+        envp = dict(os.environ, **envkw)
+
+        C.def_prog_mode()
+        C.endwin()
+
+        try:
+            # SRC: https://docs.python.org/3/library/asyncio-subprocess.html#examples
+            proc = await asyncio.create_subprocess_exec(*cmd, env=envp)
+            rc = await proc.wait()
+            assert rc == 0, proc
+        finally:
+            self.scr.refresh()
+
+    def shell_out(self, *args, **envkw) -> None:
         from subprocess import run
 
-        self.scr.addstr("Shelling out...")
+        cmd = args or [os.environ.get("SHELL", "sh")]
+        envp = dict(os.environ, **envkw)
+
+        # self.scr.addstr("Shelling out...")
         C.def_prog_mode()  # save current tty modes
         C.endwin()  # restore original tty modes
-        cmd = [os.environ.get("SHELL", "sh")]
-        envp = dict(os.environ, **envkw)
-        # WARN: blocks Asyncio loop until shell returns
-        _rc = run(cmd, env=envp, check=True)
-        # BAD: not printed?
-        self.scr.addstr("returned.")
-        self.scr.refresh()  # restore save modes, repaint screen
 
+        try:
+            # WARN: blocks Asyncio loop until shell returns
+            _rc = run(cmd, env=envp, check=True)
+        finally:
+            # BAD: not printed?
+            self.scr.addstr("returned.")
+            self.scr.refresh()  # restore save modes, repaint screen
+
+    # FAIL: does not work properly
     def ipython_out(self, **kw) -> None:
         from traitlets.config import Config
 
