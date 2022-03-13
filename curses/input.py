@@ -73,6 +73,13 @@ def xxx_frag(app: "Application", key: str | int) -> None:
         # OLD: fstop = cast(asyncio.Task, asyncio.current_task()).cancel
         # ALT:NICE: works even in Jupyter
         app.cancel()
+
+    # HACK: replacement for <x>
+    # FAIL: should properly redirect to rwtty (including sys.stderr)
+    if key == "c":
+        cmd = "sudo pacman -Rsu".split() + [app.wg.item._data]
+        app.iodev.shell_out(*cmd)
+
     if key == "e":
         # FIXME: don't create new shell, if it's already running
         # coro = app.iodev.shell_async(X=app.wg.item._data)
