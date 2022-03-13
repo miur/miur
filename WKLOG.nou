@@ -164,7 +164,7 @@
       grouping API into menu -- solves issue of mental overload during studying, even if API will be used only by SW
 
 
-2022-03-11-Fri-W10
+2022-03-11-Fri-W10 [1/3]
   [85%] 2h(4h) ^⡡⣈⠔⢥ #miur RFC:ARCH: ⸢Application⸥ and ⸢Device⸥
     [+] 5h AGAIN:FIXME: run in jupyter
       [⡢⠫⡏⣓] FIXME: no input on re-enter under Jupyter
@@ -202,6 +202,56 @@
   [_] IDEA: reuse stable configuration/settings system
     Traitlets — traitlets 5.1.1 documentation ⌇⡢⠫⠼⣮
       https://traitlets.readthedocs.io/en/stable/
+
+
+2022-03-11-Fri-W10 [2/3]
+  [%] WTF: profile !jupyter high CPU under powersave ⌇⡢⠪⣥⣶
+    [$] WTF: why <defunct> !st in jupyter eats 25% ?
+    [X] WTF: why !jupyter eats 15% CPU by itself by simply running ?
+      ::: .epoll()
+    INFO
+      $ env -C /@/research/languages/python/jupyter_console -- python -m cProfile -o /t/miur.cprof -m jupyter_console
+      $ pyprof2calltree -k -i miur.cprof
+    performance - Profiling a long-running Python Server - Stack Overflow ⌇⡢⠪⣢⡞
+      https://stackoverflow.com/questions/9819142/profiling-a-long-running-python-server
+      benfred/py-spy: Sampling profiler for Python programs ⌇⡢⠪⣢⡡
+        https://github.com/benfred/py-spy
+      uber-archive/pyflame: 🔥 Pyflame: A Ptracing Profiler For Python. This project is deprecated and not maintained. ⌇⡢⠪⣢⡥
+        https://github.com/uber-archive/pyflame
+      devopspp/pyliveupdate: A runtime python code manipulation framework for profiling, debugging and bugfixing ⌇⡢⠪⣢⡨
+        https://github.com/devopspp/pyliveupdate
+    python - What is correct way to use cProfile with asyncio code? - Stack Overflow ⌇⡢⠪⣤⠆
+      https://stackoverflow.com/questions/54718265/what-is-correct-way-to-use-cprofile-with-asyncio-code
+      python 3.6 - Is there a way to tell if an asyncio event loop is at full capacity? - Stack Overflow ⌇⡢⠪⣤⠬
+        https://stackoverflow.com/questions/58021338/is-there-a-way-to-tell-if-an-asyncio-event-loop-is-at-full-capacity
+      Polling on REP socket takes significant CPU · Issue #770 · zeromq/pyzmq ⌇⡢⠪⣤⡄
+        https://github.com/zeromq/pyzmq/issues/770
+      Rooting Out Cpu Bottlenecks From Asyncio Based Api Services - Balajee Ramachandran ⌇⡢⠪⣤⡝
+        https://www.balajeerc.info/Rooting-out-CPU-Bottlenecks-from-asyncio-based-API-services/
+      100% CPU usage (maybe caused by new poll implementation?) · Issue #807 · Supervisor/supervisor ⌇⡢⠪⣤⡺
+        https://github.com/Supervisor/supervisor/issues/807
+
+
+2022-03-11-Fri-W10 [3/3]
+  [•30%] READ:TUT: Writing Programs with NCURSES ⌇⡢⠫⠧⣉
+    https://invisible-island.net/ncurses/ncurses-intro.html
+  [_] READ: Developing with asyncio — Python 3.10.2 documentation ⌇⡢⠫⠴⠈
+    https://docs.python.org/3/library/asyncio-dev.html#detect-never-retrieved-exceptions
+  [_] READ: !python #asyncio post-mortem ⌇⡢⠪⣥⠰
+    [_] READ: IPython 7.0, Async REPL. Today we are pleased to announce the… | by Matthias Bussonnier | Jupyter Blog ⌇⡢⠪⣥⠰
+      https://blog.jupyter.org/ipython-7-0-async-repl-a35ce050f7f7
+    [_] READ: Timeouts and cancellation for humans — njs blog ⌇⡢⠪⣥⠹
+      https://vorpus.org/blog/timeouts-and-cancellation-for-humans/
+    [_] READ: Notes on structured concurrency, or: Go statement considered harmful — njs blog ⌇⡢⠪⣥⠼
+      https://vorpus.org/blog/notes-on-structured-concurrency-or-go-statement-considered-harmful/
+    [_] READ: Companion post for my PyCon 2018 talk on async concurrency using Trio — njs blog ⌇⡢⠪⣥⠿
+      https://vorpus.org/blog/companion-post-for-my-pycon-2018-talk-on-async-concurrency-using-trio/
+    [_] READ: Some thoughts on asynchronous API design in a post-async/await world — njs blog ⌇⡢⠪⣥⡁
+      https://vorpus.org/blog/some-thoughts-on-asynchronous-api-design-in-a-post-asyncawait-world/
+    [_] READ: Announcing Trio — njs blog ⌇⡢⠪⣥⡃
+      https://vorpus.org/blog/announcing-trio/
+    [_] READ: Control-C handling in Python and Trio — njs blog ⌇⡢⠪⣥⡆
+      https://vorpus.org/blog/control-c-handling-in-python-and-trio/
 
 
 2022-03-12-Sat-W10
