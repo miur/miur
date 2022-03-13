@@ -58,14 +58,20 @@ class CursesInput:
                 self.canvas.resize()
                 continue
 
-            if key in ("q", "\033"):  # "d",
-                # [_] SEIZE: A Python asyncio cancellation pattern | by Rob Blackbourn | Medium ⌇⡢⠨⢣⣉
-                #   https://rob-blackbourn.medium.com/a-python-asyncio-cancellation-pattern-a808db861b84
-                # OLD: fstop = cast(asyncio.Task, asyncio.current_task()).cancel
-                # ALT:NICE: works even in Jupyter
-                self.app.cancel()
+            xxx_frag(self.app, key)
             handle_keybindings(self.wg, key)
             self.canvas.invalidate()
 
         if evnum == 0:
             print("WTF: processing woke up w/o input", file=__import__("sys").stderr)
+
+
+def xxx_frag(app: "Application", key: str | int) -> None:
+    if key in ("q", "\033"):  # "d",
+        # [_] SEIZE: A Python asyncio cancellation pattern | by Rob Blackbourn | Medium ⌇⡢⠨⢣⣉
+        #   https://rob-blackbourn.medium.com/a-python-asyncio-cancellation-pattern-a808db861b84
+        # OLD: fstop = cast(asyncio.Task, asyncio.current_task()).cancel
+        # ALT:NICE: works even in Jupyter
+        app.cancel()
+    if key == "e":
+        app.iodev.shell_out(X=app.wg.item._data)

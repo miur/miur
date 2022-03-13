@@ -1,4 +1,5 @@
 import curses as C
+import os
 from contextlib import ExitStack, contextmanager
 from typing import Any, Iterator
 
@@ -80,3 +81,15 @@ class CursesDevice:
         # tput("smcup")
 
         # C.napms(1500)
+
+    def shell_out(self, **envkw) -> None:
+        from subprocess import run
+
+        self.scr.addstr("Shelling out...")
+        C.def_prog_mode()  # save current tty modes
+        C.endwin()  # restore original tty modes
+        cmd = [os.environ.get("SHELL", "sh")]
+        envp = dict(os.environ, **envkw)
+        _rc = run(cmd, env=envp, check=True)  # run shell
+        self.scr.addstr("returned.")  # prepare return message
+        self.scr.refresh()  # restore save modes, repaint screen
