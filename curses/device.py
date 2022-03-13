@@ -90,6 +90,35 @@ class CursesDevice:
         C.endwin()  # restore original tty modes
         cmd = [os.environ.get("SHELL", "sh")]
         envp = dict(os.environ, **envkw)
-        _rc = run(cmd, env=envp, check=True)  # run shell
-        self.scr.addstr("returned.")  # prepare return message
+        # WARN: blocks Asyncio loop until shell returns
+        _rc = run(cmd, env=envp, check=True)
+        # BAD: not printed?
+        self.scr.addstr("returned.")
         self.scr.refresh()  # restore save modes, repaint screen
+
+    def ipython_out(self, **kw) -> None:
+        from traitlets.config import Config
+
+        c = Config()
+        c.InteractiveShell.confirm_exit = False
+        c.TerminalIPythonApp.display_banner = False
+        import IPython
+
+        C.def_prog_mode()
+        C.endwin()
+
+        ## FAIL: loop already running
+        # IPython.start_ipython(argv=[], config=c, user_ns=kw)
+        # IPython.embed()
+
+        # WKRND: python - Calling IPython.embed() in asynchronous code (specifying the event loop) - Stack Overflow ⌇⡢⠭⣎⣬
+        #   https://stackoverflow.com/questions/56415470/calling-ipython-embed-in-asynchronous-code-specifying-the-event-loop
+        import nest_asyncio
+
+        nest_asyncio.apply()
+        IPython.embed(using="asyncio")
+        # IPython.embed(using="asyncio", config=c)
+        # IPython.start_ipython(argv=[], user_ns=kw, config=c, using="asyncio")
+
+        # ALT:TRY: C.doupdate()
+        self.scr.refresh()

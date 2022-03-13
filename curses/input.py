@@ -75,3 +75,5 @@ def xxx_frag(app: "Application", key: str | int) -> None:
         app.cancel()
     if key == "e":
         app.iodev.shell_out(X=app.wg.item._data)
+    if key == "w":
+        app.iodev.ipython_out(x=app.wg.item)
