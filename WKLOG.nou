@@ -277,3 +277,27 @@
       * send commands to parent shell for background
     [_] FUTURE: shell-out to Jupyter kernel
       [_] TRY: remote ipython shell connect to my future Qt GUI
+
+
+2022-03-14-Mon-W11
+  [X] ◔ 1h30m ^⡡⣈⠔⢥ #miur ENH PacmanItem multi-cell output ⌇⡢⠯⠷⣞
+    [⡢⠮⣝⣖] 20m fix colors
+    [⡢⠮⣧⡭] 40m parse "-Qti" table output instead of simple "-Qtq"
+    [⡢⠮⣫⠞] 15m parse whole "-Qti" data
+    [⡢⠮⣫⢑] 5m show explicit/implicit field as "*"
+    [•] show "optional/required by"
+      [_] BAD: "-Qti" only shows orphans and explicits w/o rev-deps
+      [X] show number of direct deps
+      [_] opt deps + installed
+      [_] rev deps
+    [_] THINK how to iterate "startup refresh" development in !jupyter
+    [_] bkgr Popen -- faster startup :: continue filling DOM in bkgr
+      [_] FIXME safe close #miur before process ends
+    [_] lazy parse -- store whole output, BUT parse items only during scrolling
+    [?] BET: parse pacman db myself -- to avoid re-interpreting size/reason/etc. fields
+    [_] ENH:USE graph navi by #miur for pacman deps hierarchy
+      root nodes -- explicit, expldeps, and orphans (impldeps)
+    [_] print each ⸢Item⸥ as list of cells
+      [_] TRY: spaces in table rows first
+      [_] NOTE: allow multiline item in future (or now)
+        e.g. print some data in second line
