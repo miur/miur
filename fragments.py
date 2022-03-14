@@ -15,7 +15,7 @@ def pacman_frag(wg: Any, key: str | int) -> None:
     # TRY: async wait for subprocess result
     # https://docs.python.org/3/library/asyncio-subprocess.html#asyncio.create_subprocess_exec
     def exe(cmdline: str) -> None:
-        print("\n".join(runlines(cmdline.split() + [str(wg.item)])))
+        print("\n".join(runlines(cmdline.split() + [wg.item.name])))
 
     if key == "\n":
         exe("echo")
@@ -46,7 +46,7 @@ def pacman_frag(wg: Any, key: str | int) -> None:
             # exe("sudo pacman -Rsu")
             # WKRND: total mess with input when redirecting fd0/fd1 into separate newterm
             _ret = P.run(
-                "sudo pacman -Rsu".split() + [str(wg.item)],
+                "sudo pacman -Rsu".split() + [wg.item.name],
                 stdin=sys.stdin,
                 stdout=sys.stdout,
                 stderr=sys.stderr,

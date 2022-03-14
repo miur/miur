@@ -77,13 +77,13 @@ def xxx_frag(app: "Application", key: str | int) -> None:
     # HACK: replacement for <x>
     # FAIL: should properly redirect to rwtty (including sys.stderr)
     if key == "c":
-        cmd = "sudo pacman -Rsu".split() + [app.wg.item._data]
+        cmd = "sudo pacman -Rsu".split() + [app.wg.item.name]
         app.iodev.shell_out(*cmd)
 
     if key == "e":
         # FIXME: don't create new shell, if it's already running
-        # coro = app.iodev.shell_async(X=app.wg.item._data)
+        # coro = app.iodev.shell_async(X=app.wg.item.name)
         # fut = asyncio.create_task(coro)
-        app.iodev.shell_out(X=app.wg.item._data)
+        app.iodev.shell_out(X=app.wg.item.name)
     # if key == "w":
     #     app.iodev.ipython_out(x=app.wg.item)
