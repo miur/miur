@@ -64,8 +64,10 @@ class CursesDevice:
         #     C.init_pair(1, 7, 0)
         #     C.init_pair(2, 4, 6)
         # else:
-        C.init_pair(1, 7, 8)
-        C.init_pair(2, 8, 4)
+        C.use_default_colors()
+        C.init_pair(1, -1, -1)  # DFL: gray text on transparent bkgr
+        C.init_pair(2, 10, -1)  # aux info
+        C.init_pair(3, 8, 4)  # blue cursor
 
         # pvis = C.curs_set(visibility=0)
         scr.attron(C.color_pair(1))

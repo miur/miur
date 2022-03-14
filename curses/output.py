@@ -47,8 +47,9 @@ class CursesOutput:
         items = self._wg[i : i + hh - 1]
         beg, _ = self._wg._scroll.range(i)
         for i, x in enumerate(items, start=i):
-            attr = C.color_pair(2) if i == self._wg.pos else C.color_pair(1)
-            self._scr.addstr(i, 0, f"{i:02d}| {beg + i:03d}: {x}", attr)
+            self._scr.addstr(i, 0, f"{i:02d}| {beg + i:03d}:", C.color_pair(2))
+            attr = (C.A_REVERSE | C.A_BOLD) if i == self._wg.pos else C.color_pair(1)
+            self._scr.addstr(f" {x}", attr)
 
     def draw_all(self) -> None:
         self._scr.clear()
