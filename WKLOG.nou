@@ -255,5 +255,25 @@
 
 
 2022-03-12-Sat-W10
-  [•] 2h ^⡡⣈⠔⢥ #miur RFC:ARCH: ⸢Application⸥ and ⸢Device⸥
+  [X] 2h ^⡡⣈⠔⢥ #miur RFC:ARCH: ⸢Application⸥ and ⸢Device⸥
   [_] FUTURE:MOVE: "curses/*" -> "uix/curses/"
+
+
+2022-03-13-Sun-W10
+  [%] 3h ^⡡⣈⠔⢥ #miur ENH switch tui-cli-shell
+    [X] TRY: shell-out to nested ZSH
+      [%] THINK: pause miur process OR continue running its loop even during shell ?
+        ::: somehow FAIL
+      [_] TRY: replace <x> sudo shell by shell-out
+    [%] ✗ TRY: shell-out to same IPython
+      [_] BAD? ipython inside jupyter -- issues with asyncio
+        HACK https://stackoverflow.com/questions/56415470/calling-ipython-embed-in-asynchronous-code-specifying-the-event-loop
+        OFF: https://github.com/ipython/ipython/issues/11595
+        https://www.reddit.com/r/IPython/comments/becm4c/how_can_i_run_asyncio_code_in_ipythonembed/
+      [_] TRY: keep permanent background instance of IPython running
+    [_] FUTURE:HACK: shell-out to parent ZSH
+      * launch #miur in background
+      * reuse parent terminal fd0/fd1
+      * send commands to parent shell for background
+    [_] FUTURE: shell-out to Jupyter kernel
+      [_] TRY: remote ipython shell connect to my future Qt GUI
