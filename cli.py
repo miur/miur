@@ -46,6 +46,8 @@ def _live():
     global app
     app = Application()
     app.startup()
+    app.canvas.resize(58, 17)
+    # l = app.dom._items[154]._data["Optional Deps"]
 
     def _quit():
         app.shutdown()

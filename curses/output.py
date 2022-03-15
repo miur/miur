@@ -17,12 +17,18 @@ class CursesOutput:
     def invalidate(self) -> None:
         self._ev_screen_refresh.set()
 
-    # FIXME: use passed ww/hh when present
-    def resize(self, ww: int = None, hh: int = None) -> None:
-        C.update_lines_cols()
-        hh, ww = self._scr.getmaxyx()
-        # print(hh, ww, C.LINES, C.COLS)
-        self._wg.resize(ww, hh - 2)
+    def resize(self, w: int = None, h: int = None) -> None:
+        if w is None or h is None:
+            # C.update_lines_cols()
+            hh, ww = self._scr.getmaxyx()
+            if w is None:
+                w = ww
+            if h is None:
+                h = hh
+        else:
+            # C.resizeterm(hh, ww)
+            self._scr.resize(h, w)
+        self._wg.resize(w, h - 1)  # HACK: keep space for footer
         self.invalidate()
 
     def draw_footer(self) -> None:
@@ -32,11 +38,11 @@ class CursesOutput:
         info = C.COLOR_PAIRS
         pair = 30
         C.init_pair(pair, fg, bg)
+        attr = C.color_pair(pair)
 
         scr = self._scr
         hh, _ww = scr.getmaxyx()  # C.LINES
-        scr.addstr(hh - 2, 0, "---", C.color_pair(pair))
-        scr.addstr(hh - 1, 0, str(info), C.color_pair(pair))
+        scr.addstr(hh - 1, 0, f"--- {info}", attr)
 
     ## BET?
     # jquast/blessed: Blessed is an easy, practical library for making python terminal apps ⌇⡡⣛⠵⠔

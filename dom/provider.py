@@ -2,8 +2,9 @@ from subprocess import PIPE, Popen
 from typing import Iterator
 
 
+# RENAME: -> PacmanItem :: use dif. fragments based on typeof(Item)
 class Item:
-    def __init__(self, data: dict) -> None:
+    def __init__(self, data: dict[str, str]) -> None:
         self._data = data
 
     @property
@@ -11,9 +12,15 @@ class Item:
         return self._data["Name"]
 
     def __str__(self) -> str:
-        rsn = "*" if "Explicitly" in self._data["Install Reason"] else " "
+        rsn = " " if "Explicitly" in self._data["Install Reason"] else "~"
         deps = self._data["Depends On"].split()
-        return f"{rsn} {len(deps):2d} | {self.name}"
+        ## FAIL: exceptions in Item are silently ignored
+        # opls = self._data["Optional Deps"].splitlines()
+        # # FMT: i3lock: for the default screen locker [installed]
+        # omap = {p[0]: p[1] for x in opls if (p := x.split(": ", 1))}
+        # inst = [v for v in omap.values() if v.endswith(" [installed]")]
+        # return f"{len(deps):2d} ({len(inst)}/{len(omap)}) |{rsn}{self.name}"
+        return f"{len(deps):2d} |{rsn}{self.name}"
 
 
 def parse_pacman() -> Iterator[Item]:
