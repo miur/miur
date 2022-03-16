@@ -6,6 +6,7 @@ from typing import Iterator
 class Item:
     def __init__(self, data: dict[str, str]) -> None:
         self._data = data
+        self.dldsz: int = None
 
     @property
     def name(self) -> str:
@@ -20,23 +21,28 @@ class Item:
         # omap = {p[0]: p[1] for x in opls if (p := x.split(": ", 1))}
         # inst = [v for v in omap.values() if v.endswith(" [installed]")]
         # return f"{len(deps):2d} ({len(inst)}/{len(omap)}) |{rsn}{self.name}"
-        return f"{len(deps):2d} |{rsn}{self.name}"
+        sz = self._data["Installed Size"]
+        if self.dldsz:
+            sz = f"{sz:10,d}"
+        return f"{len(deps):2d} {sz:>11s}|{rsn}{self.name}"
 
 
-def parse_pacman() -> Iterator[Item]:
+def parse_pacman(cmdargs: list[str]) -> Iterator[Item]:
     # from just.iji.shell import runlines
     # self._items = list(map(Item, runlines("pacman -Qtq")))
     # TODO: lazy parse -- store whole output but parse only during scrolling
-    with Popen("pacman -Qti".split(), stdout=PIPE, bufsize=1, text=True) as proc:
+    with Popen(cmdargs, stdout=PIPE, bufsize=1, text=True) as proc:
         i = 0
         dic: dict[str, str] = {}
         pk = ""
         pv = ""
         # for i, l in enumerate(proc.stdout.readlines()):
         assert proc.stdout
-        while l := proc.stdout.readline():
+        while (l := proc.stdout.readline()) or proc.poll() is None:
             l = l.rstrip()
-            if not l and dic:
+            if not l and not dic:
+                continue
+            if not l:
                 dic[pk] = pv
                 yield Item(dic)
                 dic = {}
@@ -56,6 +62,18 @@ def parse_pacman() -> Iterator[Item]:
             yield Item(dic)
 
 
+def parse_pacman_upgrade() -> Iterator[Item]:
+    from just.iji.shell import runlines
+
+    dldout = runlines(["pacman", "-Su", "--print-format=%s %n"])
+    dldszs = {s[1]: int(s[0], 10) for x in dldout if (s := x.split(maxsplit=1))}
+    maxsznms = [k for k, v in reversed(sorted(dldszs.items()))]
+    # for x in list(parse_pacman("pacman -Qi -".split(), input="\n".join(maxsznms))):
+    for x in list(parse_pacman("pacman -Qi".split() + maxsznms)):
+        x.dldsz = dldszs[x.name]
+        yield x
+
+
 class DataProvider:
     def __init__(self) -> None:
         # self._items = list(x.rstrip() for x in sys.stdin)
@@ -65,7 +83,9 @@ class DataProvider:
         self.refresh()
 
     def refresh(self) -> None:
-        self._items = list(parse_pacman())
+        gen = parse_pacman("pacman -Qti".split())
+        # gen = reversed(sorted(parse_pacman_upgrade(), key=lambda x: x.dldsz))
+        self._items = list(gen)
 
     def __len__(self) -> int:
         # FUTURE: ret "+Inf" to indicate that it's unbounded stream -- for easier comparisons
