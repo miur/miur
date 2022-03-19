@@ -26,7 +26,7 @@ class CursesOutput:
             if h is None:
                 h = hh
         else:
-            # C.resizeterm(hh, ww)
+            # C.resizeterm(h, w)
             self._scr.resize(h, w)
         self._wg.resize(w, h - 1)  # HACK: keep space for footer
         self.invalidate()
