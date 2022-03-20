@@ -32,13 +32,18 @@ class CursesOutput:
         self.invalidate()
 
     def draw_footer(self) -> None:
-        fg = 217
-        bg = 17
-        # info = C.color_content(fg)
-        info = C.COLOR_PAIRS
         pair = 30
-        C.init_pair(pair, fg, bg)
+        C.init_pair(pair, 217, 17)
         attr = C.color_pair(pair)
+        # info = C.color_content(fg)
+        # info = C.COLOR_PAIRS
+
+        # pylint:disable=protected-access
+        pv = self._wg._scroll._provider
+        idx = self._wg.pos
+        sortby = pv._sortby
+        sortrev = "￬" if pv._sortrev else "￪"
+        info = f"{idx}/{len(pv)} | {sortby=}{sortrev}"
 
         scr = self._scr
         hh, _ww = scr.getmaxyx()  # C.LINES

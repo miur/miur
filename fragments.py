@@ -58,6 +58,11 @@ def pacman_frag(wg: Any, key: str | int) -> None:
 
         asyncio.get_running_loop().run_in_executor(None, pkguninstall)
 
+    if key == "o":  # reverse sorting
+        wg._scroll._provider.sortby(rev="!")
+    if key == "O":  # switch sorting method
+        wg._scroll._provider.sortby(arg="+")
+
 
 def move_frag(wg: Any, key: str | int) -> None:
     # ---
@@ -67,7 +72,7 @@ def move_frag(wg: Any, key: str | int) -> None:
         wg.pos -= 1
 
     # [_] FUTURE: wg.pos = -1
-    if key == "g":
+    if key in ("g", 262):  # = <Home>
         wg.pos = -len(wg)
     if key == "G":
         wg.pos = len(wg)
@@ -76,4 +81,8 @@ def move_frag(wg: Any, key: str | int) -> None:
     if key == "M":
         wg.pos = wg._scroll.height // 2
     if key == "L":
-        wg.pos = wg._scroll.height
+        wg.pos = wg._scroll.height - 1
+    if key in ("J", "\x06", 338):  # = <C-f>, <PgDn>
+        wg.pos += wg._scroll.height
+    if key in ("K", "\x02", 339):  # = <C-b>, <PgUp>
+        wg.pos -= wg._scroll.height

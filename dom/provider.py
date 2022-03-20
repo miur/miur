@@ -1,16 +1,31 @@
 from subprocess import PIPE, Popen
-from typing import Iterator
+from typing import Any, Callable, Iterator, Literal
 
 
 # RENAME: -> PacmanItem :: use dif. fragments based on typeof(Item)
 class Item:
     def __init__(self, data: dict[str, str]) -> None:
         self._data = data
-        self.dldsz: int = None
+        self.dldsz: int | None = None  # ~Upgrade Download Size~
+
+    def __getitem__(self, k: str) -> str:
+        if k == "nm":
+            return self.name
+        if k == "sz":
+            return self.size
+        if k == "bday":
+            return self["Build Date"]
+        if k == "iday":
+            return self["Install Date"]
+        return self._data[k]
 
     @property
     def name(self) -> str:
-        return self._data["Name"]
+        return self["Name"]
+
+    @property
+    def size(self) -> str:
+        return f"{self.dldsz:10,d}" if self.dldsz else self["Installed Size"]
 
     def __str__(self) -> str:
         rsn = " " if "Explicitly" in self._data["Install Reason"] else "~"
@@ -21,10 +36,7 @@ class Item:
         # omap = {p[0]: p[1] for x in opls if (p := x.split(": ", 1))}
         # inst = [v for v in omap.values() if v.endswith(" [installed]")]
         # return f"{len(deps):2d} ({len(inst)}/{len(omap)}) |{rsn}{self.name}"
-        sz = self._data["Installed Size"]
-        if self.dldsz:
-            sz = f"{sz:10,d}"
-        return f"{len(deps):2d} {sz:>11s}|{rsn}{self.name}"
+        return f"{len(deps):2d} {self.size:>11s}|{rsn}{self.name}"
 
 
 def parse_pacman(cmdargs: list[str]) -> Iterator[Item]:
@@ -75,11 +87,15 @@ def parse_pacman_upgrade() -> Iterator[Item]:
 
 
 class DataProvider:
+    sortfields = ["nm", "sz", "bday", "iday"]
+
     def __init__(self) -> None:
         # self._items = list(x.rstrip() for x in sys.stdin)
         # USAGE: $ </dev/null M
         # ALT: read_text(/home/amer/aura/items/neo/pacman/odd-pkgs.txt)
         self._items: list[Item] = []
+        self._sortby = self.sortfields[0]
+        self._sortrev = False
         self.refresh()
 
     def refresh(self) -> None:
@@ -100,3 +116,49 @@ class DataProvider:
         if isinstance(k, int):
             return self._items[k]
         return NotImplementedError
+
+    def sortby(
+        self,
+        arg: str | int | Literal["+", "-"] | Callable[[Item], Any] | None = None,
+        rev: bool | int | Literal["!"] | None = None,
+    ) -> None:
+        if arg is None:
+            field = self._sortby
+        elif isinstance(arg, int):
+            field = self.sortfields[arg]
+        elif isinstance(arg, str):
+            if arg in ("+", "-"):
+                num = len(self.sortfields)
+                idx = self.sortfields.index(self._sortby)
+                idx += 1 if arg == "+" else -1
+                if idx >= num:
+                    idx -= num
+                elif idx < 0:
+                    idx += num
+                field = self.sortfields[idx]
+            else:
+                field = arg
+        ## BAD: breaks next/prev ops for stored args
+        # elif callable(arg):
+        #     field = arg
+        else:
+            raise NotImplementedError
+
+        if rev is None or rev == 0:
+            reverse = self._sortrev
+        elif isinstance(rev, int):
+            reverse = rev > 0
+        elif isinstance(rev, bool):
+            reverse = rev
+        elif isinstance(rev, str) and rev == "!":
+            reverse = not self._sortrev
+        else:
+            raise NotImplementedError
+
+        key = field if callable(field) else lambda x, k=field: x[k]
+        self._items.sort(key=key, reverse=reverse)  # type:ignore
+
+        if field != self._sortby:
+            self._sortby = field
+        if reverse != self._sortrev:
+            self._sortrev = reverse
