@@ -28,7 +28,8 @@ class CursesOutput:
         else:
             # C.resizeterm(h, w)
             self._scr.resize(h, w)
-        self._wg.resize(w, h - 1)  # HACK: keep space for footer
+        # self._wg.resize(w, h - 1)  # HACK: keep space for footer
+        self._wg.resize(w, (h - 1) // 2)  # HACK: multi-line output
         self.invalidate()
 
     def draw_footer(self) -> None:
@@ -54,9 +55,21 @@ class CursesOutput:
     #   https://github.com/jquast/blessed
     def draw_list(self) -> None:
         i = 0
+        hh, _ww = self._scr.getmaxyx()
+        # BAD: unable to print "part" of last item
+        items = self._wg[i : i + ((hh - 1) // 2)]
+        beg, _end = self._wg._scroll.range(i)
+        for i, x in enumerate(items, start=i):
+            self._scr.addstr(i * 2, 0, f"{i:02d}| {beg + i:03d}:", C.color_pair(2))
+            attr = (C.A_REVERSE | C.A_BOLD) if i == self._wg.pos else C.color_pair(1)
+            self._scr.addstr(f" {x}", attr)
+            self._scr.addstr(i * 2 + 1, 8, f" --- {x['iday']}", attr)
+
+    def draw_list1(self) -> None:
+        i = 0
         hh, _ww = self._scr.getmaxyx()  # C.LINES
         items = self._wg[i : i + hh - 1]
-        beg, _ = self._wg._scroll.range(i)
+        beg, _end = self._wg._scroll.range(i)
         for i, x in enumerate(items, start=i):
             self._scr.addstr(i, 0, f"{i:02d}| {beg + i:03d}:", C.color_pair(2))
             attr = (C.A_REVERSE | C.A_BOLD) if i == self._wg.pos else C.color_pair(1)
