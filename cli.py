@@ -43,6 +43,9 @@ if __name__ == "__main__":
 #%% NEED %gui asyncio
 @no_type_check
 def _live():
+    enable_debug_asyncio(True)
+    __import__("atexit").register(lambda: enable_debug_asyncio(False))
+
     global app
     app = Application()
     app.startup()

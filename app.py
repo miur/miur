@@ -45,6 +45,7 @@ class Application:
 
     def __exit__(self, t=None, v=None, b=None) -> bool:  # type:ignore
         # FAIL: lifetime should not continue past __exit__()
+        # FAIL! can't call shutdown() multiple times
         del self.hotkey
         del self.canvas
         return self._stack.__exit__(t, v, b)
@@ -52,6 +53,7 @@ class Application:
     # ---
     def attach(self) -> None:
         ## BUG: overwrites Jupyter defaults and extends Application GC lifetime
+        ## FAIL: is not triggered if taskref was stored to variable [outside the loop]
         # asyncio.get_running_loop().set_exception_handler(self.handle_exception)
 
         # WARN: mainloop() should be running COS .create_task() immediately schedules
@@ -65,6 +67,13 @@ class Application:
     # FUTURE:MAYBE: wait for tasks being cancelled
     def cancel(self) -> None:
         for t in self._tasks:
+            # SRC: https://stackoverflow.com/questions/46890646/asyncio-weirdness-of-task-exception-was-never-retrieved
+            #   << exception won't be raised until taskref destroyed
+            if t.done() and (exc := t.exception()):
+                raise exc
+            # WARN:BAD: still running tasks may raise exceptions too,
+            #   but we hope they will be raised by loop itself,
+            #   because below we delete all taskrefs
             t.cancel()
         # NOTE: even if tasks won't be cancelled -- you can access them by .all_tasks()
         #   NEED: for Jupyter re-launch ++ no-op .cancel
@@ -108,8 +117,10 @@ class Application:
         asyncio.run(self.mainloop(ainit))
 
     # ---
-    # def handle_exception(self, _loop, context):  # type:ignore
-    #     msg = context.get("exception", context["message"])
-    #     logging.error(f"Caught exception: {msg}")
-    #     logging.info("Shutting down...")
-    #     asyncio.get_running_loop().call_soon(self.shutdown)
+    def handle_exception(self, _loop, context):  # type:ignore
+        import logging
+
+        msg = context.get("exception", context["message"])
+        logging.error("Caught exception: %s" % msg)
+        logging.info("Shutting down...")
+        asyncio.get_running_loop().call_soon(self.shutdown)

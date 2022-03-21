@@ -4,6 +4,8 @@ from typing import Any, Callable, Iterator, Literal
 
 # RENAME: -> PacmanItem :: use dif. fragments based on typeof(Item)
 class Item:
+    BYTESFX = {"B": 1 << 0, "KiB": 1 << 10, "MiB": 1 << 20, "GiB": 1 << 30}
+
     def __init__(self, data: dict[str, str]) -> None:
         self._data = data
         self.dldsz: int | None = None  # ~Upgrade Download Size~
@@ -24,19 +26,29 @@ class Item:
         return self["Name"]
 
     @property
-    def size(self) -> str:
-        return f"{self.dldsz:10,d}" if self.dldsz else self["Installed Size"]
+    def size(self) -> int:
+        if self.dldsz:
+            return self.dldsz
+        snum, _, sfx = self["Installed Size"].partition(" ")
+        return int(float(snum) * self.BYTESFX[sfx])
 
     def __str__(self) -> str:
         rsn = " " if "Explicitly" in self._data["Install Reason"] else "~"
-        deps = self._data["Depends On"].split()
-        ## FAIL: exceptions in Item are silently ignored
-        # opls = self._data["Optional Deps"].splitlines()
-        # # FMT: i3lock: for the default screen locker [installed]
-        # omap = {p[0]: p[1] for x in opls if (p := x.split(": ", 1))}
-        # inst = [v for v in omap.values() if v.endswith(" [installed]")]
-        # return f"{len(deps):2d} ({len(inst)}/{len(omap)}) |{rsn}{self.name}"
-        return f"{len(deps):2d} {self.size:>11s}|{rsn}{self.name}"
+        sdep = self._data["Depends On"]
+        deps = sdep.split() if sdep != "None" else []
+        sopl = self._data["Optional Deps"]
+        opls = sopl.splitlines() if sopl != "None" else []
+        ## FMT: i3lock: for the default screen locker [installed]
+        omap = {
+            p[0]: p[2]
+            for x in opls
+            if (p := x.partition(": "))[2] or (p := x.partition(" "))
+        }
+        ## DEBUG
+        # if any(x == "" for x in omap.values()):
+        #     print(self.name, omap)
+        inst = [v for v in omap.values() if v.endswith("[installed]")]
+        return f"{len(deps):2d} ({len(inst)}/{len(omap)}) {self.size:>11,d}|{rsn}{self.name}"
 
 
 def parse_pacman(cmdargs: list[str]) -> Iterator[Item]:
