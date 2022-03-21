@@ -63,7 +63,9 @@ class CursesOutput:
             self._scr.addstr(i * 2, 0, f"{i:02d}| {beg + i:03d}:", C.color_pair(2))
             attr = (C.A_REVERSE | C.A_BOLD) if i == self._wg.pos else C.color_pair(1)
             self._scr.addstr(f" {x}", attr)
-            self._scr.addstr(i * 2 + 1, 8, f" --- {x['iday']}", attr)
+            self._scr.addstr(
+                i * 2 + 1, 8, f"{x.strsize()} | {x.strdepsnum()}", C.color_pair(3)
+            )
 
     def draw_list1(self) -> None:
         i = 0

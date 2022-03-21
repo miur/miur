@@ -32,10 +32,17 @@ class Item:
         snum, _, sfx = self["Installed Size"].partition(" ")
         return int(float(snum) * self.BYTESFX[sfx])
 
-    def __str__(self) -> str:
-        rsn = " " if "Explicitly" in self._data["Install Reason"] else "~"
+    @property
+    def reason(self) -> str:
+        return " " if "Explicitly" in self._data["Install Reason"] else "~"
+
+    @property
+    def deps(self) -> list[str]:
         sdep = self._data["Depends On"]
-        deps = sdep.split() if sdep != "None" else []
+        return sdep.split() if sdep != "None" else []
+
+    @property
+    def opls(self) -> tuple[list[str], list[str]]:
         sopl = self._data["Optional Deps"]
         opls = sopl.splitlines() if sopl != "None" else []
         ## FMT: i3lock: for the default screen locker [installed]
@@ -48,7 +55,20 @@ class Item:
         # if any(x == "" for x in omap.values()):
         #     print(self.name, omap)
         inst = [v for v in omap.values() if v.endswith("[installed]")]
-        return f"{len(deps):2d} ({len(inst)}/{len(omap)}) {self.size:>11,d}|{rsn}{self.name}"
+        return list(omap), inst
+
+    def strdepsnum(self) -> str:
+        opls, inst = self.opls
+        return f"{len(self.deps):2d} ({len(inst)}/{len(opls)})"
+
+    def strsize(self) -> str:
+        return f"{self.size:>11,d}"
+
+    def strnamedecor(self) -> str:
+        return f"{self.reason}{self.name}"
+
+    def __str__(self) -> str:
+        return self.strnamedecor()
 
 
 def parse_pacman(cmdargs: list[str]) -> Iterator[Item]:
