@@ -118,6 +118,12 @@ def parse_pacman_upgrade() -> Iterator[Item]:
         yield x
 
 
+def parse_pacman_stdin() -> Iterator[Item]:
+    names = [x.rstrip() for x in __import__("sys").stdin]
+    # for x in list(parse_pacman("pacman -Qi -".split(), input="\n".join(maxsznms))):
+    return parse_pacman("pacman -Qi".split() + names)
+
+
 class DataProvider:
     sortfields = ["nm", "sz", "bday", "iday"]
 
@@ -131,8 +137,9 @@ class DataProvider:
         self.refresh()
 
     def refresh(self) -> None:
-        gen = parse_pacman("pacman -Qti".split())
+        # gen = parse_pacman("pacman -Qti".split())
         # gen = reversed(sorted(parse_pacman_upgrade(), key=lambda x: x.dldsz))
+        gen = parse_pacman_stdin()
         self._items = list(gen)
 
     def __len__(self) -> int:
