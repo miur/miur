@@ -53,6 +53,7 @@ def _live():
     # l = app.dom._items[154]._data["Optional Deps"]
 
     def _quit():
+        global app
         app.shutdown()
         del app
 
