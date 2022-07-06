@@ -1,0 +1,65 @@
+#!/usr/bin/env zsh
+#%SUMMARY: central control panel
+#%USAGE: $ ./$0 <cmd>
+set -o errexit -o noclobber -o noglob -o nounset -o pipefail
+setopt warn_nested_var warn_create_global
+setopt local_options no_function_argzero
+cd $0:A:h
+declare -A fn_alias
+
+
+fn_alias[pkg]=install-develop
+function install-develop {
+  makepkg PKGBUILD --syncdeps --clean --install --noconfirm --force
+}
+
+
+fn_alias[i]=cli
+function cli {
+  # FIXME: directly load single system inof searching whole project tree
+  # rlwrap sbcl --noinform --load ~/quicklisp/setup.lisp \
+  #     --eval "(setf ql:*local-project-directories* '(#P\"/@/miur/\"))" \
+  #     --eval '(ql:quickload "miur")'
+  # TRY:FAIL? --eval "(setf (readtable-case *readtable*) :preserve)" \
+  rlwrap sbcl --noinform --eval '(require :asdf)' --eval "(progn
+    (push '*default-pathname-defaults* asdf:*central-registry*)
+    (asdf:load-system :miur)
+  )"
+}
+
+
+fn_alias[s]=swank
+function swank {
+  print "USAGE: M-x slime-connect <Enter><Enter> DFL:(port 4005)"
+  # MAYBE: use here:  --non-interactive
+  rlwrap sbcl --noinform --eval '(require :asdf)' --eval '(require :swank)' \
+   --eval "(progn
+    (swank:create-server :port 4005 :dont-close t)
+    (push '*default-pathname-defaults* asdf:*central-registry*)
+    (asdf:load-system :miur)
+  )"
+}
+
+
+function _Main {
+  if ((!$#)); then
+    sed -rn '1d;/^(.*\\s)?#%/s///p' "$0"
+    print "VIZ: ${(k)functions}"
+    # print -lDaC2 -- ${(kv)functions_source}
+    exit 0
+  fi
+
+  local cmd=$1
+  shift
+
+  local fn=$cmd
+  while (($+fn_alias[$fn])); do fn=$fn_alias[$fn]; done
+  if ((!$+functions[$fn])); then
+    >&2 print "Err:(cmd=$cmd): not found fn=$fn"
+    exit 1
+  fi
+
+  $fn $@
+}
+
+_Main $@

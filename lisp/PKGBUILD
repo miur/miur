@@ -1,0 +1,56 @@
+# vim:ft=sh
+#
+# SPDX-FileCopyrightText: 2022 Dmytro Kolomoiets <amerlyq+code@gmail.com>
+#
+# SPDX-License-Identifier: MIT
+#
+# Maintainer: Dmytro Kolomoiets <amerlyq+code@gmail.com>
+#
+# shellcheck shell=bash disable=SC2034,SC2154
+pkgname=cl-miur-dev
+pkgver=0.0
+pkgrel=1
+pkgdesc='Semantic graph file manager'
+url='https://github.com/miur/miur/'
+license=('MIT' 'GPL-3.0-only')
+arch=('any')
+
+depends=(
+  sbcl
+  rlwrap
+  cl-swank
+
+  # OR: quicklisp
+  ## $ pacs cl-
+  cl-alexandria
+  # cl-bordeaux-threads
+  # cl-cffi
+  # cl-clx
+  # cl-global-vars
+  cl-ppcre
+  # cl-unicode
+
+  # 'cl-sdl2-airy'
+  # 'cl-defpackage-plus-airy'
+  # 'cl-trivial-channels-airy'
+  # 'cl-trivial-timeout-airy'
+
+  # cl-trivial-backtrace
+  # cl-trivial-features
+  # cl-trivial-garbage
+  # cl-trivial-gray-streams
+)
+
+optdepends=(
+  # spacemacs
+)
+
+package() {
+  # d_pj=${startdir%/*/*/*}/beatrix
+  prefix=$pkgdir/usr
+  datadir=$prefix/share
+  # cd "$d_pj" || exit
+  # # make install prefix="$prefix"
+  # install -Dm644 -t "$datadir/licenses/$pkgbase" -- $(printf 'LICENSES/%s.txt\n' "${license[@]}")
+  # install -Dm644 -t "$datadir/doc/$pkgbase" -- README.rst
+}
