@@ -6,6 +6,6 @@
   :license "GPL-3.0-only"
   :version "0.0.1"
   :serial t
-  :depends-on (:cl-ppcre)
+  :depends-on (:cl-ppcre :croatoan)
   :components ((:file "package")
                (:file "miur")))
