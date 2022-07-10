@@ -24,15 +24,16 @@
 ; (swank:create-server :port 4005 :dont-close t)
 
 
+;; BAD: blocking, single-thread NEED: multithread for !ncurses
+; (load "/@/plugins/nvim/all/vlime/lisp/start-vlime.lisp")
 ;;; OR:NEED: /@/plugins/nvim/all/vlime/lisp -> ~/quicklisp/local-projects/lisp
-; (ql:quickload :vlime)
-; (vlime:main)
-; (vlime:main :interface #(127 0 0 1)
-;             :port 7002
-;             :backend :vlime-usocket)
-; BAD: blocking, single-thread NEED: multithread
-(load "/@/plugins/nvim/all/vlime/lisp/start-vlime.lisp")
+(push #P"/@/plugins/nvim/all/vlime/lisp" ql:*local-project-directories*)
+(ql:quickload :vlime)
+(vlime:main :interface #(127 0 0 1)
+            :port 7002
+            :backend :vlime-usocket)
 
 
-; (eval-when (:execute)
-;   (main))
+(in-package :miur)
+(eval-when (:execute)
+  (main))

@@ -18,6 +18,14 @@
     (loop for line in (rest (cl-ppcre:split "(\\n+)" output))
           collect (cl-ppcre:split "(\\s+)" line))))
 
+;; DEBUG: (myinput)
+(defun myinput ()
+  (with-open-file (file #P"miur.asd")
+    (loop for i from 0
+          for line = (read-line file nil nil)
+          while line
+          collect line
+          )))
 
 ; (defun nctest ()
 ;   "Minimal example: init, output, refresh, end."
@@ -59,14 +67,42 @@
 ;     (print "=cleanup"))
 ;   (finish-output nil))
 
+;; DEBUG: (nc:submit (draw))
+(defun draw ()
+  ; BAD:(not implemented): (nc:window-size *scr*)
+  (let ((scr *scr*) (hh 8) (ww 80))
+    (nc:clear scr)
+    (nc:move scr 0 2)
+    (loop for i from 0 to (+ hh -1)
+          for v in (myinput)
+          do (nc:add-string scr v :x 0 :y i))
+    (nc:refresh scr)))
+
+    ; def draw_list(self) -> None:
+    ;     i = 0
+    ;     hh, _ww = self._scr.getmaxyx()
+    ;     # BAD: unable to print "part" of last item
+    ;     items = self._wg[i : i + ((hh - 1) // 2)]
+    ;     beg, _end = self._wg._scroll.range(i)
+    ;     for i, x in enumerate(items, start=i):
+    ;         self._scr.addstr(i * 2, 0, f"{i:02d}| {beg + i:03d}:", C.color_pair(2))
+    ;         attr = (C.A_REVERSE | C.A_BOLD) if i == self._wg.pos else C.color_pair(1)
+    ;         self._scr.addstr(f" {x}", attr)
+    ;         self._scr.addstr(
+    ;             i * 2 + 1, 8, f"{x.strsize()} | {x.strdepsnum()}", C.color_pair(3)
+    ;         )
+
 (defun main ()
   (nc:with-screen (scr :input-blocking 100 :bind-debugger-hook nil)
+    (setf *scr* scr)
+    (nc:bind scr #\c (lambda (win event) (nc:clear scr)))
     (nc:bind scr #\q 'nc:exit-event-loop)
-    (nc:run-event-loop (setf *scr* scr))))
+    (nc:run-event-loop scr)))
 
 ; (eval-when (:execute)
 ;   (progn
-;     (nc:submit (croatoan:add-string miur::*scr* "Hey!"))
+;     ; (nc:submit (croatoan:add-string miur::*scr* "Hey!"))
+;     (nc:submit (nc:add-string *scr* "Hey!"))
 ;     (nc:submit (format *swank-output* "Hellou!~%"))
 ;     (nc:submit (nc:bind *scr* #\c (lambda (win event) (nc:clear *scr*))))
 ;     (nc:submit (nc:bind *scr* :resize
