@@ -6,6 +6,7 @@
   ;   >> upgrade ASDF in SBCL (OR: quicklisp)
   (:local-nicknames (:nc :croatoan)
                     ; (:alex :alexandria)
-                    (:re :cl-ppcre))
+                    ; (:re :cl-ppcre)
+                    )
   ; (:import-from #:cl-ppcre #:split) ; single symbol
   (:export #:main))

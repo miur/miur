@@ -1,2 +1,7 @@
 miur.asd
+croatoan/croatoan.asd
+croatoan/ansi-escape.asd
 airywm/lisp-new/airywm.asd
+croatoan/croatoan-test.asd
+croatoan/ansi-escape-test.asd
+croatoan/croatoan-ncurses.asd

@@ -13,10 +13,39 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Launch
 
-(defun ps ()
-  (let ((output (uiop:run-program '("ls" "-l" "/data") :output :string)))
-    (loop for line in (rest (cl-ppcre:split "(\\n+)" output))
-          collect (cl-ppcre:split "(\\s+)" line))))
+; (defun ps ()
+;   (let ((output (uiop:run-program '("ls" "-l" "/data") :output :string)))
+;     (loop for line in (rest (cl-ppcre:split "(\\n+)" output))
+;           collect (cl-ppcre:split "(\\s+)" line))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; DOM / Database
+
+;; DEBUG: (mapcar #'sb-mop:slot-definition-name (sb-mop:class-direct-slots (class-of item)))
+;; NOTE:(nesting): "graph-id" :has "triple-id"
+(defclass fact ()
+  ((ts :initform (get-internal-real-time)) ; ALT: simply increment index
+   (subj :initarg :subj :reader fact-subj)
+   (pred :initarg :pred :reader fact-pred)
+   (obj :initarg :obj :reader fact-obj)))
+
+(defun make-fact (s p o)
+  (make-instance 'fact :subj s :pred p :obj o))
+
+;; DEBUG: (slot-value item 'ts)
+; (fact-subj item)
+; (setf (fact-subj item) 10)
+(setf item (make-fact 1 2 3))
+
+
+(defvar *db* (make-instance 'db))
+
+(defun db-get (s p o &optional (db *db*))
+  (db-fact db (make-fact/v s p o)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Input
 
 ;; DEBUG: (myinput)
 (defun myinput ()
@@ -24,7 +53,10 @@
     (loop for i from 0
           for line = (read-line file nil nil)
           while line
-          collect line
+          ; collect line
+          ; collect (write-to-string i)
+          ; collect (format nil "~d: ~a~%" i line)
+          ; collect (str:join ": " '((write-to-string i) line))
           )))
 
 ; (defun nctest ()
@@ -92,12 +124,20 @@
     ;             i * 2 + 1, 8, f"{x.strsize()} | {x.strdepsnum()}", C.color_pair(3)
     ;         )
 
+;; DEBUG: (sb-ext:quit)
 (defun main ()
   (nc:with-screen (scr :input-blocking 100 :bind-debugger-hook nil)
     (setf *scr* scr)
     (nc:bind scr #\c (lambda (win event) (nc:clear scr)))
     (nc:bind scr #\q 'nc:exit-event-loop)
+    (nc:bind scr "^D" 'sb-ext:quit)
+    (nc:bind scr " " 'draw)
     (nc:run-event-loop scr)))
+
+
+;; DEBUG: (if (fboundp '_live) (_live))
+(defun _live ()
+  (nc:submit (draw)))
 
 ; (eval-when (:execute)
 ;   (progn
