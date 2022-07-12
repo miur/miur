@@ -47,3 +47,16 @@ IDEA
   Refactoring and evolution
   Microkernel relay in fm world
   ...
+
+
+&goals:cornerstones ⌇⡘⠍⠶⡠
+  "Modern the most widely adopted file manager ever (like vim and emacs)"
+    [_] TODO: make motto and enumerate cornerstones based on Social Architecture
+  * cornerstone of structured list manipulation (in contrast to vim/emacs raw text buffer manipulation)
+  * embedded workflows for anybody (as first-rate citizens)
+  * semantic web navigation (generalized concept of filesystem tree hierarchy)
+  * self-reflections (observe and manipulate inner data in same way as other data)
+  * graph of plugins compositions and overrides
+  * self-discovery and personalized suggestion of features (?also machine learning?)
+  * offline/privacy audit log monitoring for user's self-reflections
+  + back-feeding commands outputs

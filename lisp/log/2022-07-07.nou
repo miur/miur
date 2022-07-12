@@ -1,0 +1,60 @@
+
+2022-07-07-Thu-W27
+  [%⡢⣇⡦⢛] 💜 2h50m ^⡘⠍⠶⡠ NICE: #miur (!skim) in CL ※⡢⣆⣃⡶ (no-shell ※⡢⣀⢇⢋)
+    [⡢⣇⡌⠤] 30m integrate quicklisp into WF to use more libs
+    [%] 20m INFO dif {"miur" :miur #:miur 'miur}
+      :: DEFPACKAGE string designators == all are *equivalent* to string "MIUR"
+        CLHS: Glossary-Section S ⌇⡢⣇⡇⣬
+          http://www.lispworks.com/documentation/lw60/CLHS/Body/26_glo_s.htm#string_designator
+        CLHS: Section 2.4.8 ⌇⡢⣇⡉⠵
+          http://www.lispworks.com/documentation/lw51/CLHS/Body/02_dh.htm
+        CLHS: Section 2.4.8.5 ⌇⡢⣇⡉⡀
+          http://www.lispworks.com/documentation/lw51/CLHS/Body/02_dhe.htm
+      * :symbol is actually short for KEYWORD:SYMBOL
+        = The symbols in the KEYWORD package are automatically exported and their value is themself
+      * #:foo is a notation for the reader.
+        Gensym will create a new symbol every time it is evaluated,
+        but sharp colon will only create a new symbol when it is read.
+        [≫] READ: Let Over Lambda ⌇⡢⣇⡈⢔
+          https://letoverlambda.com/index.cl/guest/chap3.html#sec_6
+    [%] 5m ALSO:FIND: async in CL
+      [≫] TRY: orthecreedence/cl-async: Asynchronous IO library for Common Lisp. ⌇⡢⣇⡊⢢
+        https://github.com/orthecreedence/cl-async
+      [_] TRY:USE: (λ () 1 2)
+        SRC: macros - Renaming lambda in Common Lisp - Stack Overflow ⌇⡢⣊⣸⠘
+          https://stackoverflow.com/questions/9557469/renaming-lambda-in-common-lisp
+        ¦ (defun λ-reader (stream char)
+        ¦   (declare (ignore char stream))
+        ¦   'LAMBDA)
+        ¦ (set-macro-character #\λ #'λ-reader)
+        ¦ ((λ (x) (* x x)) 3)
+       OR:
+        ¦ (defun lambda-char (stream char)
+        ¦   "A lambda with only ONE arg _"
+        ¦   (declare (ignore char))
+        ¦   (let ((codes (read stream nil)))
+        ¦     `(lambda (_) ,codes)))
+        ¦ (set-macro-character #\λ #'lambda-char t)
+        ¦ λ(+ 1 2 _) ; => (lambda (_) (+ 1 2 _))
+    [%] 45m run basic ncurses in CL
+      https://github.com/McParen/croatoan/blob/master/doc/slime.md
+      https://github.com/McParen/croatoan/blob/master/test/ncurses.lisp
+      https://github.com/McParen/croatoan/blob/master/ncurses/package.lisp
+    [%] 40m WTF: pkg aliases don't work --> NEED upgrade ASDF
+      :::
+        $ gc1 https://github.com/fare/asdf ~/.local/share/common-lisp/source/asdf
+        $ sbcl --eval "(load (compile-file #P\"~/.local/share/common-lisp/source/asdf/build/asdf.lisp\"))"
+      package - UIOP does not recognize local-nicknames keyword - Stack Overflow ⌇⡢⣇⡜⢠
+        https://stackoverflow.com/questions/65133993/uiop-does-not-recognize-local-nicknames-keyword
+      How do I detect the ASDF version? (ASDF Manual) ⌇⡢⣇⡜⣇
+        https://asdf.common-lisp.dev/asdf/How-do-I-detect-the-ASDF-version_003f.html
+      ASDF Manual ⌇⡢⣇⡞⡧
+        https://asdf.common-lisp.dev/asdf.html#Configuring-ASDF-to-find-your-systems
+      lisp - How to upgrade asdf version in quicklisp? - Stack Overflow ⌇⡢⣇⡞⣣
+        https://stackoverflow.com/questions/45410659/how-to-upgrade-asdf-version-in-quicklisp
+    [%] 30m WTF: package don't changed ? *package*
+      ::: ERR: looks some shit happens in !conjure itself
+      `in-package` not working for common lisp · Issue #310 · Olical/conjure ⌇⡢⣇⡣⣜
+        https://github.com/Olical/conjure/issues/310
+      [_] TRY: different slime
+    [_] FIND: #nvim CL auto-format --> bind on ,F

@@ -1,0 +1,155 @@
+
+2022-07-11-Mon-W28
+  [⡢⣌⢑⢲] 💜 6h45m /2h ^⡘⠍⠶⡠ DEV #miur !skim in CL ※⡢⣆⣃⡶
+    [X] 35m INFO: misc
+    [%] 1h30m FIND DOM backend
+    [✗⡊⣰] 20m FIND: nanosecond timestamps
+    [/] / 25m #feed:lisp READ: gamedev ※⡢⣌⠼⢫ ※⡢⣌⠼⢺
+    [X] 35m READ CLOS intro
+    [⡢⣌⡮⡜] 1h30m WF tight dev-loop // #nvim mappings, croaton-submit, etc.
+      [≫] SEE: How to Set Up a Common Lisp IDE in 2021 | by Gwang Jin Kim | Towards Data Science ⌇⡢⣌⡮⢴
+        https://towardsdatascience.com/how-to-set-up-common-lisp-ide-in-2021-5be70d88975b
+        setup/teardown tests
+    [⡢⣌⡺⡴] 50m FIND list data structs / comprehension
+    [⡢⣌⢑⢯] 1h25m TRY: create CLOS for facts
+  ***
+  [X] 35m INFO: misc
+    [⡢⣌⠰⢽] SEE comments - Lisp commenting convention - Stack Overflow ⌇⡢⣌⠰⢴
+      https://stackoverflow.com/questions/6365334/lisp-commenting-convention
+    [⡢⣌⠵⠜] Really great reference (FREE) : lisp ⌇⡢⣌⠵⠕
+      https://www.reddit.com/r/lisp/comments/vuxbbl/really_great_reference_free/
+      OFF http://clqr.boundp.org/download.html
+    [⡢⣌⠵⢴] Lulu xPress | The fastest and easiest way to Print on Demand ⌇⡢⣌⠵⠷
+      https://xpress.lulu.com/
+      NICE: $20 / 200pg напечатать свою книгу
+    [⡢⣌⡎⡪] CLiki: the-cost-of-nothing ⌇⡢⣌⡎⡡
+      https://www.cliki.net/the-cost-of-nothing
+    [_] TRY: CLiki: journal ⌇⡢⣌⠸⢔
+      https://www.cliki.net/journal
+    [_] Haskell Lisp - HaskellWiki ⌇⡢⣌⠹⢷
+      https://wiki.haskell.org/Haskell_Lisp
+      [_] NICE Shen Open Source Language ⌇⡢⣌⠹⣷
+        https://shen-language.github.io/
+        [_] Shen-Language/shen-cl: Shen for Common Lisp ⌇⡢⣌⠺⠹
+          https://github.com/Shen-Language/shen-cl
+      [_] ALT:BET? extend lisp by static typing
+        coalton-lang/coalton: Coalton is an efficient, statically typed functional programming language that supercharges Common Lisp. ⌇⡢⣌⠺⡦
+          https://github.com/coalton-lang/coalton
+    [_] CLOG And The Competition : lisp ⌇⡢⣌⠼⠲
+      https://www.reddit.com/r/lisp/comments/vtrlfy/clog_and_the_competition/
+      interactive-ssr/issr-server: The universal ISSR server compatible with <your-favorite-programming-language> ⌇⡢⣌⠼⡳
+        https://github.com/interactive-ssr/issr-server
+  [%] 1h30m DOM backend
+    [%] 50m FIND triple store
+      [⡢⣌⠡⣐] NICE Lisp, the Universe and Everything: Why RDF* Is a Mess... and How to Fix It ⌇⡢⣌⠠⣪
+        http://lisp-univ-etc.blogspot.com/2020/10/why-rdf-is-mess-and-how-to-fix-it.html
+      [⡢⣌⡺⢤] ✗ NICE:TRY: facts-db/cl-facts: Graph database in Common Lisp ⌇⡢⣌⠤⣬
+        https://github.com/facts-db/cl-facts
+          ::: FAIL: does not support "graph"/quads concepts to snapshot data iterations
+            ALSO: probably it treats all same values as same instance (BAD for nested folders with same name)
+        NICE: even has C99 re-impl (if needed)
+          facts-db/facts_db: Graph database in C99. ⌇⡢⣌⠧⡜
+            https://github.com/facts-db/facts_db
+        ::: @me DEV: probably it's easier to create my own triple-store for my purpose,
+          which will combine UUID and TS log-db with semantic graph-db at the same time
+          [>] BUT:USE: parts of the code of cl-facts
+          [_] THINK: how to add "add/del new triple" as part of the log-language to preserve in DB?
+            &why to preserve full ops history -- even when removing nodes -- do it by adding more nodes
+              COS actually I never delete anything from graph -- only modify current tip (HEAD) representation
+      VIZ: Common Lisp libraries overview ⌇⡢⣌⠣⢑
+        https://common-lisp.net/libraries
+        Dimercel/listopia: List manipulation library inspired by Haskell package Data.List ⌇⡢⣌⠥⣔
+          https://github.com/Dimercel/listopia
+        sirherrbatka/cl-data-structures: Data Structures and streaming algorithms for Common Lisp. ⌇⡢⣌⠥⣣
+          https://github.com/sirherrbatka/cl-data-structures
+        danlentz/cl-ctrie: lock-free, concurrent, key/value index with efficient memory-mapped persistence and fast transient storage models ⌇⡢⣌⠦⠑
+          https://github.com/danlentz/cl-ctrie
+        ndantam/sycamore: A fast, purely functional data structure library in Common Lisp. ⌇⡢⣌⠦⠡
+          https://github.com/ndantam/sycamore
+      kraison/vivace-graph-v3: VivaceGraph version 3. Open source Common Lisp graph database & Prolog implementation. Supersedes http://github.com/kraison/vivace-graph-v2. ⌇⡢⣌⠣⢉
+        https://github.com/kraison/vivace-graph-v3
+        NOTE: considering PERF issues, maybe don't invent the wheel
+        kraison/graph-utils: graph analysis tools in Common Lisp ⌇⡢⣌⠣⣓
+          https://github.com/kraison/graph-utils
+      CLiki: RDF ⌇⡢⣌⠨⢦
+        https://www.cliki.net/rdf
+        CLiki: swclos ⌇⡢⣌⠩⣊
+          https://www.cliki.net/swclos
+    [%] 20m TRY:USE: lmdb as a back store
+      antimer/lmdb: LMDB bindings for Common Lisp ⌇⡢⣌⠱⣦
+        https://github.com/antimer/lmdb
+        = lmdb-20220220-git
+        OLD: liblmdb-20170830-git
+      [⡢⣌⡐⢉] TODO:NICE:TUT: Using LMDB from Common Lisp ⌇⡢⣌⠴⡋
+        https://borretti.me/article/lmdb-from-common-lisp
+      [_] Re: LMDB safety under misuse ⌇⡢⣌⠹⠄
+        https://www.mail-archive.com/openldap-technical@openldap.org/msg25015.html
+    [%] 20m NICE:IDEA: store directly Lisp
+      CLiki: manardb ⌇⡢⣌⠷⣅
+        https://www.cliki.net/manardb
+        https://github.com/danlentz/manardb
+      CLiki: CommonLispPrevalence ⌇⡢⣌⠶⡼
+        https://www.cliki.net/CommonLispPrevalence
+      [_] OR: CLiki: persistence ⌇⡢⣌⠶⠁
+        https://www.cliki.net/persistence
+        Virtual-Insurance-Products/cldb ⌇⡢⣌⠶⠷
+          https://github.com/Virtual-Insurance-Products/cldb
+          BAD: only Clozure
+  ---
+  [✗⡊⣰] 20m FIND: nanosecond timestamps
+    nanosecond-resolution time stamps ⌇⡢⣌⡎⢑
+      https://emacs-devel.gnu.narkive.com/5VgL1njb/nanosecond-resolution-time-stamps
+    How to get unix epoch in milliseconds in Common Lisp - DEV Community ⌇⡢⣌⡎⣯
+      https://dev.to/veer66/how-to-get-unix-epoch-in-milliseconds-in-common-lisp-4106
+    Dates and Times ⌇⡢⣌⡏⠁
+      https://lispcookbook.github.io/cl-cookbook/dates_and_times.html
+  [•] 35m TUT CLOS
+    [_] REF Fundamentals of CLOS ⌇⡢⣌⡔⣕
+      https://lispcookbook.github.io/cl-cookbook/clos.html
+    [⡢⣌⡗⢮] TUT LISP - CLOS ⌇⡢⣌⡔⣛
+      https://www.tutorialspoint.com/lisp/lisp_clos.htm
+    [_] A Brief Guide to CLOS ⌇⡢⣌⡔⣦
+      https://www.algo.be/cl/documents/clos-guide.html
+    [⡢⣌⡘⣁] VIZ CLiki: CLOS ⌇⡢⣌⡔⣫
+      https://www.cliki.net/CLOS
+    [_] RU: Метаобъектный протокол Common Lisp на примере реализации прототипной объектной системы / Хабр ⌇⡢⣌⡔⣲
+      https://habr.com/ru/post/230619/
+    [!] ALSO: Type System ⌇⡢⣌⡻⡸
+      https://lispcookbook.github.io/cl-cookbook/type.html
+    [_] The Common Lisp Object System ⌇⡢⣌⢋⢖
+      https://courses.cs.northwestern.edu/325/readings/clos.php
+    [•] java - Class introspection in Common Lisp - Stack Overflow ⌇⡢⣌⢌⣑
+      https://stackoverflow.com/questions/742154/class-introspection-in-common-lisp
+  ~~~
+  [⡢⣌⡺⡴] 50m FIND list data structs / comprehension
+    [•] compile time - In Common Lisp, when do you need to use eval-when, and how do you know? - Stack Overflow ⌇⡢⣌⡯⢔
+      https://stackoverflow.com/questions/45665951/in-common-lisp-when-do-you-need-to-use-eval-when-and-how-do-you-know
+    [⡢⣌⡲⠂] cons - Wikipedia ⌇⡢⣌⡱⣷
+      https://en.wikipedia.org/wiki/Cons
+    [⡢⣌⡲⡊] Common Lisp/Basic topics/Lists - Wikibooks, open books for an open world ⌇⡢⣌⡲⡈
+      https://en.wikibooks.org/wiki/Common_Lisp/Basic_topics/Lists
+    [≫] Data structures ⌇⡢⣌⡲⡼
+      https://lispcookbook.github.io/cl-cookbook/data-structures.html
+    [•] lisp-list-comprehensions/list-comprehensions.lisp.md at master · fredokun/lisp-list-comprehensions ⌇⡢⣌⡴⢭
+      https://github.com/fredokun/lisp-list-comprehensions/blob/master/list-comprehensions.lisp.md
+      OR: List comprehension in Lisp : lisp ⌇⡢⣌⡴⣽
+        https://www.reddit.com/r/lisp/comments/fay664/list_comprehension_in_lisp/
+      CLiki: List Comprehension ⌇⡢⣌⡵⠨
+        https://cliki.net/List comprehension
+    [⡢⣌⡷⣶] Any ways to allocate flattened array of structure as C in Common Lisp? - Stack Overflow ⌇⡢⣌⡷⣊
+      https://stackoverflow.com/questions/29008545/any-ways-to-allocate-flattened-array-of-structure-as-c-in-common-lisp
+    [_] VIZ: CLiki: Data formats ⌇⡢⣌⡷⣔
+      https://cliki.net/data formats
+    [⡢⣌⡸⢏] ✓ Do you start with a struct or a class? ⌇⡢⣌⡸⢉
+      https://lisper.in/do-you-start-with-a-struct-or-a-class
+      ::: WF: USE "defclass" fst (for IA-redefine) and fallback to "defstruct"
+        (OR even "cons") only for PERF after that
+    [_] TRY: sellout/quid-pro-quo: A contract programming library for Common Lisp in the style of Eiffel’s Design by Contract ™. ⌇⡢⣌⢄⠠
+      https://github.com/sellout/quid-pro-quo
+  [≫] TRY:
+    hellerve/sbcli: A REPL for my SBCL needs ⌇⡢⣌⡠⠪
+      https://github.com/hellerve/sbcli
+    koji-kojiro/cl-repl: A full-featured repl implementation designed to work with Roswell ⌇⡢⣌⡠⠷
+      https://github.com/koji-kojiro/cl-repl
+    CLiki: system programming ⌇⡢⣌⡼⢂
+      https://www.cliki.net/system programming

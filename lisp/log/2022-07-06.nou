@@ -1,0 +1,60 @@
+
+2022-07-06-Wed-W27
+  [%] 💜 2h NICE: #miur (!skim) in CL ⌇⡢⣆⣃⡶
+    [X] 1h #nvim CFG !conjure lazy load ++ keymaps
+      [_] FIXME: '%' does not jump to ')' in CL
+    [⡢⣆⠎⡩] 1h &WBS ++ FIND info
+      [X] 30m WBS
+      [>⡢⣆⠔⢅] 30m dump standalone exe
+      [⪡⡊⣯] integrate quicklisp
+      [%] read stdin into items list
+        [⡢⣊⣾⠧] 30m &1st read from file
+          WARN: for live-IA it's easier to read/parse from file inof stdin
+        [%] &next read from uoip.run(cmdline)
+        [_] read from stdin -- when run from cmdline
+      [⪡⡊⣯] run ncurses in CL
+        McParen/croatoan: Common Lisp bindings for the ncurses terminal library. ⌇⡢⣆⠉⠍
+          https://github.com/McParen/croatoan
+      [⡢⣋⠌⣫] 1h show item list in ncurses
+      [⡢⣌⡘⣩] 2h30m FIND triples store for DOM
+      [•⡢⣌⡜⢮] add cursor to navigate item list on <j/k>
+        [_] IMPL list object
+        [_] IMPL cursor object
+        [_] bind into existing loop
+          (nc:bind scr #\j (lambda (win event) (nc:clear scr)))
+      [_] execute fn(item) on <CR>
+      [_] edit and execute cmdline(item) on <CR>
+        [_] IMPL shell-out
+        [_] drop into regular shell with item pre-inserted
+        [_] enter whole cmdline and substitute item by {} into newly spawned shell
+        [_] communicate entered cmdline into bkgr shell session REPL
+        [_] edit cmdline by spawned nvim
+        [_] spawn nvim into small window around item itself
+        [_] edit by connecting small window to bkgr nvim
+      [_] spy on shell-out stdout and catch back output of user cmd
+        [_] load output as single buffer
+        [_] interpret buffer as list of lines
+        [_] reinterpret list of lines back as single buffer
+        [_] parse buffer as predefined FMT preset
+      [_] open any text file as list of lines on <l>
+  ===
+  [⡢⣆⠔⢅] ↓ 30m dump standalone exe
+    [X] see size raw=45MB (zlib=12MB)
+    [X] startup time raw=8ms (zlib=115ms)
+      [_] TODO: remeasure with .zstd on newer sbcl=2.2.6
+    build - Compiling Common Lisp to an executable - Stack Overflow ⌇⡢⣆⠊⢂
+      https://stackoverflow.com/questions/14171849/compiling-common-lisp-to-an-executable
+      OFF: SBCL 2.2.6 User Manual ⌇⡢⣆⠊⢍
+        http://www.sbcl.org/manual/#Saving-a-Core-Image
+      CLiki: Creating Executables ⌇⡢⣆⠊⢙
+        https://www.cliki.net/creating executables
+      ALT: Newbie SBCL save-lisp-and-die question : Common_Lisp ⌇⡢⣆⠐⡬
+        https://www.reddit.com/r/Common_Lisp/comments/450qjl/newbie_sbcl_savelispanddie_question/
+    News - Steel Bank Common Lisp ⌇⡢⣆⠋⢌
+      https://www.sbcl.org/news.html#2.2.6
+      ¦ enhancement: core compression now uses zstd instead of zlib. (#1881089)
+      Bug #1881089 “Feature request: Zstd / lz4 compression” : Bugs : SBCL ⌇⡢⣆⠋⣊
+        https://bugs.launchpad.net/sbcl/+bug/1881089
+        SEE: snippet to enable compression
+      [_] PERF:(optimize size): Why does Lisp (SBCL) produce so huge executables? ⌇⡢⣆⠌⡈
+        https://groups.google.com/g/comp.lang.lisp/c/XOMT3E6x7WU
