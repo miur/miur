@@ -97,3 +97,10 @@
   [_] USE: for my own CFFI
     The trivial-renamer Reference Manual ⌇⡢⣊⣸⡏
       https://quickref.common-lisp.net/trivial-renamer.html
+
+
+2022-07-12-Tue-W28
+  [%] 💜 1h40m ^⡘⠍⠶⡠ DEV #miur !skim in CL ※⡢⣆⣃⡶
+    [+] 45m RFC ++ DFL=colors ++ resize() ++ info-panel
+    [⡢⣍⣧⢊] 45m colorized item list
+    [X] 10m attrs for cursor
