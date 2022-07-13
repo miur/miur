@@ -6,7 +6,7 @@
 ;;
 (in-package :miur)
 
-(defparameter *scr* nil) ;; global main screen to access from slime
+(defvar *scr* nil) ;; global main screen to access from slime
 (defparameter *swank-output* *standard-output*)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -29,6 +29,24 @@
           ; collect (str:join ": " '((write-to-string i) line))
           )))
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; DOM
+
+(defclass item ()
+  ((text :initarg :text :reader item-text)
+   ))
+
+(defun make-item (text)
+  (make-instance 'item :text text))
+
+(defmethod item-type ((x item))
+  (if (search ":" (item-text x))
+      :key :raw))
+
+
+(defparameter *dom* (mapcar 'make-item (myinput)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; View
 
@@ -39,14 +57,17 @@
     (nc:clear scr)
     (nc:move scr 0 2)
     (loop for i from 0 to (+ hh -1)
-          for v in (myinput)
-          do (let* ((beg 0) (cur 3) (attr (if (= i cur) '(:reverse :bold) '(:normal)))
+          for x in *dom*
+          do (let* ((beg 0)
+                    (cur 3)
+                    (attr (if (= i cur) '(:reverse :bold) '(:normal)))
+                    (clr (if (eql :key (item-type x)) :terminal :teal))
                     (pfx (format nil "~02a| ~03a:" i (+ beg i))))
                ;; DEBUG:
                ; (nc:submit (croatoan:add-string miur::*scr* "Hey!"))
                ; (nc:submit (format *swank-output* "Hellou!~%"))
                (nc:add-string scr pfx :x 0 :y i :fgcolor :lime :bgcolor :terminal)
-               (nc:add-string scr v :x 7 :y i :attributes attr :fgcolor :terminal :bgcolor :terminal)
+               (nc:add-string scr (item-text x) :x 7 :y i :attributes attr :fgcolor clr :bgcolor :terminal)
                ))
     (nc:refresh scr)))
 
