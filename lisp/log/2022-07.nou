@@ -104,3 +104,37 @@
     [+] 45m RFC ++ DFL=colors ++ resize() ++ info-panel
     [⡢⣍⣧⢊] 45m colorized item list
     [X] 10m attrs for cursor
+
+
+2022-07-13-Wed-W28
+  [⡢⣏⠸⡊] 💜 1h30m ^⡘⠍⠶⡠ DEV #miur !skim in CL ※⡢⣆⣃⡶
+   WBS cursor ⌇⡢⣏⣣⠄
+    [•] items
+      [_] def ifc -- list to show
+        << abstract away all DB work for future
+      [⡢⣏⠸⠨] 1h defclass items -- with props
+      [_] cvt myinput() to *items*
+      [_] attrs per item type/props
+    [_] WF
+      [_] #nvim TODO: yank-blink when submitting top-form
+    [_] cursor
+      [_] move cursor over fixed list
+      [_] scroll list on edges
+      [_] show multi-line items
+    [_] selectors for DB
+      [_] snapshot :: historical state
+      [_] node :: folder in FS tree
+      [_] kind :: files/metadata/lines
+      [_] view :: limited window viewport
+    [≫] selections
+  ---
+  [X] 30m READ defmethod
+  [_] PERF of used ops
+    common lisp - Are MAPCAR, MAPC, and MAP compiled to similar code when result is ignored? - Stack Overflow ⌇⡢⣏⠰⢌
+      https://stackoverflow.com/questions/19071338/are-mapcar-mapc-and-map-compiled-to-similar-code-when-result-is-ignored
+      (gc :full t)
+      (time
+        (progn
+          (dotimes (ignored 1000)
+            (mapcar #'+ lis1 lis2))
+          (format t "mapcar:~%")))
