@@ -17,6 +17,13 @@
 ;     (loop for line in (rest (cl-ppcre:split "(\\n+)" output))
 ;           collect (cl-ppcre:split "(\\s+)" line))))
 
+(defun runhere (&rest args)
+  (uiop:run-program args :directory (uiop:getcwd) :output :string))
+
+(defun grep (x)
+  (sort (str:lines (runhere "re" x)) 'string-lessp))
+
+
 ;; DEBUG: (myinput)
 (defun myinput ()
   (with-open-file (file #P"miur.asd")
@@ -45,7 +52,8 @@
       :key :raw))
 
 
-(defparameter *dom* (mapcar 'make-item (myinput)))
+; (defparameter *dom* (mapcar 'make-item (myinput)))
+(defparameter *dom* (mapcar 'make-item (grep "")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; View
