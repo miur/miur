@@ -113,10 +113,16 @@
       [_] def ifc -- list to show
         << abstract away all DB work for future
       [⡢⣏⠸⠨] 1h defclass items -- with props
-      [_] cvt myinput() to *items*
-      [_] attrs per item type/props
+        [%] cvt myinput() to *items*
+        [%] attrs per item type/props
+      [_] associate attr/color with item type
+        [_] allow special "raw" item type with unique out-of-table markup
     [_] WF
-      [_] #nvim TODO: yank-blink when submitting top-form
+      [✗⡢⣐⡾⢂] 30m #nvim TODO: yank-blink when submitting top-form
+        * USE vlime#ui#CurTopExpr(v:true) -> position [data, [b,c], [e,d]]
+        * manually pass vlime#plugin#SendToREPL(data) only, and use pos for hi
+        * USE lua.on_yank() to blink inside region
+          [_] FAIL: does not blink for setreg(), NEED <"zy> motion over region
     [_] cursor
       [_] move cursor over fixed list
       [_] scroll list on edges
@@ -138,3 +144,28 @@
           (dotimes (ignored 1000)
             (mapcar #'+ lis1 lis2))
           (format t "mapcar:~%")))
+
+
+2022-07-14-Thu-W28
+  [%] 💜 2h5m /1h ^⡘⠍⠶⡠ DEV #miur !skim in CL ※⡢⣏⣣⠄
+    [+] ⊞ 50m READ: quickref CL [23/57]
+    [X] 10m CHG? (defparameter *dom* (mapcar 'make-item (myinput)))
+      BAD: db should contain RAW values, which are converted to ITEM by ctx analyzer only on demand
+      BUT:FAIL: in that case we won't be able to QUERY for analyzed items -- only for RAW
+      ::: db should contain ITEMs data -- but in RDF form inof ready-to-use ITEM class instances,
+        -> [≫] USE ITEM API as a transparent proxy to DB
+      [≫] FUT:IDEA:HACK: precached db queries -- for faster gradual access to all related metadata to display in UI
+        << transient/fleeting data structure -- temporarily spend RAM for faster access
+        ex:: learn usual sequences of queries to DB
+          -- and pre-store their results during initial DB scan for first "obj"
+    [✗⡢⣐⡾⢂] 30m #nvim TODO: yank-blink when submitting top-form
+    [⡢⣐⢛⢾] 35m RQ !rg integ ASAP // feedback-loop
+  ---
+  [_] SEIZE:REF
+    lotabout/skim: Fuzzy Finder in rust! ⌇⡢⣐⢆⠢
+      https://github.com/lotabout/skim
+    junegunn/fzf: A command-line fuzzy finder ⌇⡢⣐⢆⠚
+      https://github.com/junegunn/fzf
+  [≫] IDEA: add sfx (ex:: "airy (*)") to symbolize directory with shell cmds output attached
+    << in this way I may spot in which dirs I run #miur.skim and look into its results again
+    [_] ALSO: need global flat chronology of all commands I run with their output -- to jump into any output
