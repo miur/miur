@@ -4,7 +4,7 @@
 (require "asdf")
 
 (eval-when (:compile-toplevel :execute :load-toplevel)
-  (ql:quickload '(:croatoan)))
+  (ql:quickload '(:croatoan :croatoan-ncurses)))
 
 ; FIXME: directly load single system inof searching whole project tree
 (setf ql:*local-project-directories* (list (uiop/os:getcwd)))
@@ -28,7 +28,7 @@
 ; (load "/@/plugins/nvim/all/vlime/lisp/start-vlime.lisp")
 ;;; OR:NEED: /@/plugins/nvim/all/vlime/lisp -> ~/quicklisp/local-projects/lisp
 (push #P"/@/plugins/nvim/all/vlime/lisp" ql:*local-project-directories*)
-(ql:quickload :vlime)
+(ql:quickload :vlime :silent t)
 (vlime:main :interface #(127 0 0 1)
             :port 7002
             :backend :vlime-usocket)

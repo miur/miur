@@ -7,6 +7,7 @@
 (in-package :miur)
 
 (defvar *scr* nil) ;; global main screen to access from slime
+(defparameter *swank-input* *standard-input*)
 (defparameter *swank-output* *standard-output*)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -18,7 +19,7 @@
 ;           collect (cl-ppcre:split "(\\s+)" line))))
 
 (defun runhere (&rest args)
-  (uiop:run-program args :directory (uiop:getcwd) :output :string))
+  (uiop:run-program args :force-shell nil :directory (uiop:getcwd) :output :string))
 
 (defun grep (x)
   (sort (str:lines (runhere "re" x)) 'string-lessp))
@@ -61,31 +62,51 @@
 ;; DEBUG: (nc:submit (draw *scr*))
 (defun draw (scr)
   ; BAD:(not implemented): (nc:window-size *scr*)
-  (let ((ww (nc:width scr)) (hh (nc:height scr)))
+  (let ((ww (nc:width scr))
+        (hh (nc:height scr))
+        (beg 0)
+        (cur 3))
     (nc:clear scr)
     (nc:move scr 0 2)
     (loop for i from 0 to (+ hh -1)
           for x in *dom*
-          do (let* ((beg 0)
-                    (cur 3)
-                    (attr (if (= i cur) '(:reverse :bold) '(:normal)))
+          do (let* ((attr (if (= i cur) '(:reverse :bold) '(:normal)))
                     (clr (if (eql :key (item-type x)) :terminal :teal))
-                    (pfx (format nil "~02a| ~03a:" i (+ beg i))))
+                    (pfx (format nil "~02d| ~02d" i (+ beg i))))
                ;; DEBUG:
                ; (nc:submit (croatoan:add-string miur::*scr* "Hey!"))
                ; (nc:submit (format *swank-output* "Hellou!~%"))
                (nc:add-string scr pfx :x 0 :y i :fgcolor :lime :bgcolor :terminal)
                (nc:add-string scr (item-text x) :x 7 :y i :attributes attr :fgcolor clr :bgcolor :terminal)
                ))
+    (nc:move scr cur 0)
     (nc:refresh scr)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; UIX
 
+;; DEBUG: (nc:submit (shell-out *scr*))
+(defun shell-out (scr &rest cmdline)
+  ; cmd = args or [os.environ.get("SHELL", "sh")]
+  (ncurses:def-prog-mode)  ; save current tty modes
+  (ncurses:endwin)  ; restore original tty modes
+  (format *swank-output* "Shelling out...~%")
+  (unwind-protect
+    ; (grep "xxx")
+    ; ALT:(:interactive): *swank-output* | uiop/stream:*output*
+    (uiop:run-program cmdline :force-shell nil :directory (uiop:getcwd) :input :interactive :output :interactive)
+    (format *swank-output* "...Restored~%")
+    (nc:refresh scr)  ; restore save modes, repaint screen
+    (nc:add-string scr "Returned" :x 80 :y 4)
+    ))
+
+
 ;; DEBUG: (nc:submit (keybinds *scr*))
 (defun keybinds (scr)
   (nc:bind scr " " (lambda (w ev) (draw scr) (nc:refresh scr)))
   (nc:bind scr #\c (lambda (w ev) (nc:clear scr) (nc:refresh scr)))
+  ; ALT:FAIL: ":enter" | #\Newline
+  (nc:bind scr #\o (lambda (w ev) (shell-out scr "fish")))
   (nc:bind scr #\q 'nc:exit-event-loop)
   (nc:bind scr "^D" 'sb-ext:quit)
   (nc:bind scr :resize (lambda (w ev)
