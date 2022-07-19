@@ -169,3 +169,33 @@
   [≫] IDEA: add sfx (ex:: "airy (*)") to symbolize directory with shell cmds output attached
     << in this way I may spot in which dirs I run #miur.skim and look into its results again
     [_] ALSO: need global flat chronology of all commands I run with their output -- to jump into any output
+
+
+2022-07-16-Sat-W28
+  [_] NICE:FUTURE:ARCH
+    [_] THEO: smart pipeline is bad, COS you must delete tail and re-execute to remember what are you filtering
+      BET: #miur with history snapshots to traverse back-n-forth
+      ex:: pipe into alias · Discussion #4225 · nushell/nushell ⌇⡢⣒⢴⠬
+        https://github.com/nushell/nushell/discussions/4225
+    [_] IDEA: reuse their cheatsheets for my cmdlists
+      denisidoro/navi: An interactive cheatsheet tool for the command-line ⌇⡢⣒⣩⢖
+        https://github.com/denisidoro/navi
+
+
+2022-07-17-Sun-W28
+  [!] ENH
+    [≫] DFL: inof all lines (rg "") -- find and print all filenames (PERF)
+      << NOTE: already did in !fzf by using "initial query"
+    [_] switch between search snapshots -- to search iteratively in same textlines
+      [_] NOTE:USE: !rg --context to include more lines around match into next iteration search
+        [_] NEED: multiline items to show everything at once
+        [_] NEED: separate "name" and "text" for each item
+      [_] SEE: how !ranger WF looks like for <;> filters
+    [_] TODO on <F> strip line information and keep only filenames
+      -- to search in same set of files, but on all lines inof only printed ones
+
+
+2022-07-18-Mon-W29
+  [_] REF reuse code
+    minad/affe: affe.el - Asynchronous Fuzzy Finder for Emacs ⌇⡢⣕⡇⡥
+      https://github.com/minad/affe
