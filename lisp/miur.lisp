@@ -10,6 +10,8 @@
 (defparameter *swank-input* *standard-input*)
 (defparameter *swank-output* *standard-output*)
 
+(defparameter *editor* (uiop:getenv "EDITOR"))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Input
 
@@ -23,6 +25,37 @@
 
 (defun grep (x)
   (sort (str:lines (runhere "re" x)) 'string-lessp))
+
+;; DEP: vim-fetch -- to be able to directly open spec "/path/to/file:15:20:"
+;;   OR:  nvim -c "call setpos('.',[0,line,col,0])"
+(defun filespec (grepline)
+  ; FUTURE: support optional linenum/columns
+  (nth-value 0 (re:scan-to-strings "^.*:\\d+:\\d+(?::|$)" grepline)))
+
+(defun runshell ()
+  (shell-out *scr* nil (uiop:getenv "SHELL")))
+
+(defun runeditor ()
+  (shell-out *scr* nil *editor* "--" (filespec (item-text (nth 3 *dom*)))))
+
+
+;; FAIL: stdin redir total trash -- try using temp files in /run
+;;   << most likely redir is impossible w/o bkgr thread to supply data
+; (with-input-from-string (text "some\nelse")
+;   (shell-out *scr* :stream "ifne" *editor*
+;             "-" "-c" "setl bt=nofile nowrap efm=%f:%l:%c:%m | cbuffer"
+;             ))
+(defun runquickfix ()
+  (let ((tmp "/run/user/1000/miur/tmp"))
+    (uiop:ensure-pathname tmp :ensure-directories-exist t)
+    (with-open-file (fd tmp
+                     :direction :output
+                     :if-exists :supersede
+                     :if-does-not-exist :create)
+    (dolist (line (mapcar 'item-text *dom*))
+      (write-line line fd)))
+    (shell-out *scr* nil *editor* "-c" "setl bt=nofile nowrap efm=%f:%l:%c:%m | cbuffer"
+               "--" tmp)))
 
 
 ;; DEBUG: (myinput)
@@ -86,7 +119,9 @@
 ;;; UIX
 
 ;; DEBUG: (nc:submit (shell-out *scr*))
-(defun shell-out (scr &rest cmdline)
+;; FAIL: can't
+; (defun shell-out (scr &rest cmdline &key input &allow-other-keys)
+(defun shell-out (scr input &rest cmdline)
   ; cmd = args or [os.environ.get("SHELL", "sh")]
   (ncurses:def-prog-mode)  ; save current tty modes
   (ncurses:endwin)  ; restore original tty modes
@@ -94,26 +129,39 @@
   (unwind-protect
     ; (grep "xxx")
     ; ALT:(:interactive): *swank-output* | uiop/stream:*output*
-    (uiop:run-program cmdline :force-shell nil :directory (uiop:getcwd) :input :interactive :output :interactive)
+    (uiop:run-program cmdline
+                      :force-shell nil
+                      :directory (uiop:getcwd)
+                      :input (or input :interactive)
+                      :output :interactive)
     (format *swank-output* "...Restored~%")
     (nc:refresh scr)  ; restore save modes, repaint screen
     (nc:add-string scr "Returned" :x 80 :y 4)
-    ))
+    )
+  )
+
+
+(defun drawkeyinfo (w ev)
+  (nc:add-string *scr* (write-to-string
+                       (list (nc:event-key ev)
+                             (nc:event-code ev)))
+                 :x 80 :y 0))
 
 
 ;; DEBUG: (nc:submit (keybinds *scr*))
 (defun keybinds (scr)
   (nc:bind scr " " (lambda (w ev) (draw scr) (nc:refresh scr)))
   (nc:bind scr #\c (lambda (w ev) (nc:clear scr) (nc:refresh scr)))
-  ; ALT:FAIL: ":enter" | #\Newline
-  (nc:bind scr #\o (lambda (w ev) (shell-out scr "fish")))
+  (nc:bind scr #\s (lambda (w ev) (runshell)))
+  (nc:bind scr #\Newline (lambda (w ev) (runeditor)))
+  (nc:bind scr #\o (lambda (w ev) (runquickfix)))
   (nc:bind scr #\q 'nc:exit-event-loop)
   (nc:bind scr "^D" 'sb-ext:quit)
   (nc:bind scr :resize (lambda (w ev)
       (nc:add-string scr (format nil "Resize: WxH=~a ~a    "
                                  (nc:width w) (nc:height w)) :x 80 :y 1)
       (nc:refresh scr)))
-  (nc:bind scr t (lambda (w ev) (nc:add-string scr (write-to-string ev) :x 80 :y 0))))
+  (nc:bind scr t #'drawkeyinfo))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -122,6 +170,7 @@
 ;; DEBUG: (sb-ext:quit)
 (defun main ()
   (print "=main")
+  (setf (uiop:getenv "MIUR_LVL") (write-to-string 1))
   (finish-output nil)
   (nc:with-screen (scr :input-echoing nil
                        :enable-colors t

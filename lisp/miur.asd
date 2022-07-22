@@ -7,9 +7,10 @@
   :version "0.0.1"
   :serial t
   :depends-on (:str
+               :cl-ppcre
                :croatoan
                :croatoan-ncurses
-               ; :cl-ppcre :lmdb
+               ; :lmdb
                )
   :components ((:file "package")
                (:file "miur")))
