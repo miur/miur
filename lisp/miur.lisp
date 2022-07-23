@@ -36,7 +36,8 @@
   (shell-out *scr* nil (uiop:getenv "SHELL")))
 
 (defun runeditor ()
-  (shell-out *scr* nil *editor* "--" (filespec (item-text (nth 3 *dom*)))))
+  (shell-out *scr* nil *editor* "--"
+             (filespec (item-text (undercursor)))))
 
 
 ;; FAIL: stdin redir total trash -- try using temp files in /run
@@ -52,7 +53,7 @@
                      :direction :output
                      :if-exists :supersede
                      :if-does-not-exist :create)
-    (dolist (line (mapcar 'item-text *dom*))
+    (dolist (line (mapcar 'item-text (dbslice)))
       (write-line line fd)))
     (shell-out *scr* nil *editor* "-c" "setl bt=nofile nowrap efm=%f:%l:%c:%m | cbuffer"
                "--" tmp)))
@@ -89,6 +90,28 @@
 ; (defparameter *dom* (mapcar 'make-item (myinput)))
 (defparameter *dom* (mapcar 'make-item (grep "")))
 
+; TEMP: caching database for filesystem -- preload requested info only on-demand
+(defun lazydatabase ()
+  *dom*)
+
+(defun dbslice ()
+  "Horizontal query to get current 'folder' view of chosen elements"
+  (lazydatabase))
+
+; HACK: both dbsclice and viewport can be combined into single direct query to DB
+;   << this would allow us to work with infinite lists like "chats", etc.
+(defun viewport (beg end)
+  "Vertical query -- to preview necessary part of the list
+    BUT: only after all filters were applied"
+  (subseq (dbslice) beg end))
+
+(defun scrollwidget ()
+  "Scroll widget"
+  (viewport 0 8))
+
+(defun undercursor ()
+  (nth 3 (scrollwidget)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; View
 
@@ -102,7 +125,7 @@
     (nc:clear scr)
     (nc:move scr 0 2)
     (loop for i from 0 to (+ hh -1)
-          for x in *dom*
+          for x in (scrollwidget)
           do (let* ((attr (if (= i cur) '(:reverse :bold) '(:normal)))
                     (clr (if (eql :key (item-type x)) :terminal :teal))
                     (pfx (format nil "~02d| ~02d" i (+ beg i))))
