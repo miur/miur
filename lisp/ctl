@@ -36,11 +36,8 @@ function mkexe {
   # --no-sysinit --no-userinit
   # (sb-ext:disable-debugger)
   # :compression t
-  sbcl --noinform --non-interactive --disable-debugger \
-    --eval "(require :asdf)" \
-    --eval "(push '*default-pathname-defaults* asdf:*central-registry*)" \
-    --eval "(asdf:load-system :miur)" \
-    --eval "(sb-ext:save-lisp-and-die \"miur.bin\" :toplevel 'miur:main :executable t :purify t)"
+
+  sbcl --noinform --non-interactive --disable-debugger --load ./compiler.lisp
 }
 
 

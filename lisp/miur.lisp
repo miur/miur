@@ -55,6 +55,7 @@
                      :if-does-not-exist :create)
     (dolist (line (mapcar 'item-text (coerce (sw-visible *sw*) 'list)))
       (write-line line fd)))
+    ;; TODO:CHG: "%m" -> "%r|%s" (ERR?)
     (shell-out *scr* nil *editor* "-c" "setl bt=nofile nowrap efm=%f:%l:%c:%m | cbuffer"
                "--" tmp)))
 
