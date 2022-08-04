@@ -183,48 +183,52 @@
     (error "Limit is out of bounds"))
   (setf (slot-value x 'limit) v))
 
+; ALSO:TODO: sw-curinc -- set pos relative to current cursor position
 (defmethod (setf sw-currel) (v (x scrollwidget))
   "Set cursor position relative to viewport"
   (setf (sw-curabs x) (+ v (slot-value x 'offset))))
 
+(sw-offset *sw*)
+(sw-limit *sw*)
 (defmethod (setf sw-curabs) (v (x scrollwidget))
   "Set cursor absolute position relative to snapshot -- and move window"
-  (let* ((keep 3)
+  (let* ((keep 2)
          (beg 0)
          (bot (+ beg keep))
          (off (sw-offset x))
          (low (+ off keep))
          (lim (sw-limit x))
-         ; (upp (1- (+ off lim (- keep)))
-         (upp (+ off lim (- keep)))
+         ;; FIXME: when {lim/wnd < keep*2}
+         (upp (- (+ off lim) keep 1))
          (end (1- (length (sw-all x))))
+         (mst (1+ (- end lim)))
          (top (- end keep)))
     (multiple-value-bind (wnd abs)
         (cond
           ; HACK: jump to last element
-          ((null v) (values (- end lim) end))
+          ((null v) (values mst end))
           ((< v beg) (values beg beg))
           ((< v bot) (values beg v))
           ((< v low) (values (- v keep) v))
-          ((< v upp) (values off v))
-          ; ((< v top) (values (1- (+ v keep (- lim))) v))
-          ((< v top) (values (+ v keep (- lim)) v))
-          ((< v end) (values (- end lim) v))
-          (t (values (- end lim) end)))
+          ((<= v upp) (values off v))
+          ((<= v top) (values (1+ (+ v (- lim) keep)) v))
+          ((<= v end) (values mst v))
+          (t (values mst end)))
       ; MAYBE:ALT: multiple-value-setq
       (unless (= off wnd) (setf (slot-value x 'offset) wnd))
       (setf (slot-value x 'curabs) abs)
       )))
 
+; FIXME
 (defmethod (setf sw-offset) (v (x scrollwidget))
   "Set window absolute position relative to snapshot -- and move cursor"
-  (let* ((keep 3)
+  (let* ((keep 2)
          (bot 0)
          (cur (sw-curabs x))
          (off (sw-offset x))
          (low (+ off keep))
          (lim (sw-limit x))
-         (upp (+ off lim (- keep)))
+         (upp (- (+ off lim) keep 1))
          (end (1- (length (sw-all x))))
          (top (- end lim)))
     (multiple-value-bind (wnd abs)
@@ -232,7 +236,7 @@
           ; HACK: jump to last element
           ((null v) (values (- end lim) (max low (min end cur))))
           ((< v bot) (values bot (max bot (min upp cur))))
-          ((< v top) (values v (max low (min upp cur))))
+          ((<= v top) (values v (max low (min upp cur))))
           (t (values (- end lim) (max low (min end cur)))))
       ; MAYBE:ALT: multiple-value-setq
       (unless (= off wnd) (setf (slot-value x 'offset) wnd))
@@ -358,4 +362,5 @@
 
 ;; DEBUG: (if (fboundp '_live) (_live))
 (defun _live ()
+  (nc:clear *scr*)
   (nc:submit (draw *scr*)))
