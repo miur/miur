@@ -35,6 +35,14 @@
 (defun runshell ()
   (shell-out *scr* nil (uiop:getenv "SHELL")))
 
+;; HACK: #miur※⡢⣯⢁⢏ pre-fill prompt (inof running) by specified cmdline on ZSH startup
+;; RQ:(~/.zshrc): if [[ -n ${ZSH_BUFFER-} ]]; then print -z "$ZSH_BUFFER" && unset ZSH_BUFFER; fi
+(defun runzshprompt (&optional cmdline)
+  ; SBCL※⡢⣱⡒⡄ (non-portable) :environment (list "KEY=value1 and value2")
+  ;; HACK: set app env before shell-out to inherit ENV by child
+  (if cmdline (setf (uiop:getenv "ZSH_BUFFER") cmdline))
+  (shell-out *scr* nil (uiop:getenv "SHELL")))
+
 (defun runeditor ()
   (shell-out *scr* nil *editor* "--"
              (filespec (item-text (sw-curitem *sw*)))))
@@ -188,8 +196,8 @@
   "Set cursor position relative to viewport"
   (setf (sw-curabs x) (+ v (slot-value x 'offset))))
 
-(sw-offset *sw*)
-(sw-limit *sw*)
+; (sw-offset *sw*)
+; (sw-limit *sw*)
 (defmethod (setf sw-curabs) (v (x scrollwidget))
   "Set cursor absolute position relative to snapshot -- and move window"
   (let* ((keep 2)
@@ -272,7 +280,7 @@
     (nc:move scr 0 2)
     (loop for x across (sw-visible *sw*) and i from 0
           do (drawline scr i x ww cur off))
-    (nc:move scr cur 0)
+    (nc:move scr cur 6)
     (nc:refresh scr)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -280,24 +288,27 @@
 
 ;; DEBUG: (nc:submit (shell-out *scr*))
 ;; FAIL: can't
-; (defun shell-out (scr &rest cmdline &key input &allow-other-keys)
+;; (defun shell-out (scr &rest cmdline &key input &allow-other-keys)
 (defun shell-out (scr input &rest cmdline)
   ; cmd = args or [os.environ.get("SHELL", "sh")]
+  ; MAYBE: (nc:clear scr)
   (ncurses:def-prog-mode)  ; save current tty modes
   (ncurses:endwin)  ; restore original tty modes
   (format *swank-output* "Shelling out...~%")
-  (unwind-protect
-    ; ALT:(:interactive): *swank-output* | uiop/stream:*output*
-    (uiop:run-program cmdline
-                      :force-shell nil
-                      :directory (uiop:getcwd)
-                      :input (or input :interactive)
-                      :output :interactive)
-    (format *swank-output* "...Restored~%")
-    (nc:refresh scr)  ; restore save modes, repaint screen
-    (nc:add-string scr "Returned" :x 80 :y 4)
-    )
-  )
+  (let ((ret))
+    (unwind-protect
+      ; ALT:(:interactive): *swank-output* | uiop/stream:*output*
+      (setf ret (nth-value 2 (uiop:run-program cmdline
+                                               :force-shell nil
+                                               :directory (uiop:getcwd)
+                                               :input (or input :interactive)
+                                               :output :interactive
+                                               :ignore-error-status t)))  ; don't error-out if last SHELL cmd had err!=0
+      (format *swank-output* "...Restored~%")
+      (nc:refresh scr)  ; restore save modes, repaint screen
+      (nc:add-string scr (format nil "Returned (~a)" ret) :x (- (nc:width scr) 15) :y 4)
+      )
+  ))
 
 
 (defun drawkeyinfo (w ev)
@@ -313,6 +324,7 @@
   (nc:bind scr #\q 'nc:exit-event-loop)
   (nc:bind scr #\c (lambda (w ev) (nc:clear scr) (nc:refresh scr)))
   (nc:bind scr " " (lambda (w ev) (draw scr)))
+  (nc:bind scr #\a (lambda (w ev) (runzshprompt (concatenate 'string " " (item-text (sw-curitem *sw*))))))
   (nc:bind scr #\s (lambda (w ev) (runshell)))
   (nc:bind scr #\Newline (lambda (w ev) (runeditor)))
   (nc:bind scr #\o (lambda (w ev) (runquickfix)))
@@ -327,7 +339,7 @@
   (nc:bind scr :resize (lambda (w ev)
                          (setf (sw-limit *sw*) (nc:height w))
                          (nc:add-string scr (format nil "Resize: WxH=~a ~a    "
-                                                    (nc:width w) (nc:height w)) :x 80 :y 1)
+                                                    (nc:width w) (nc:height w)) :x (- (nc:width scr) 20) :y 1)
                          (nc:refresh scr)))
   (nc:bind scr t #'drawkeyinfo))
 
