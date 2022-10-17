@@ -43,30 +43,6 @@
   (if cmdline (setf (uiop:getenv "ZSH_BUFFER") cmdline))
   (shell-out *scr* nil (uiop:getenv "SHELL")))
 
-(defun runeditor ()
-  (shell-out *scr* nil *editor* "--"
-             (filespec (item-text (sw-curitem *sw*)))))
-
-
-;; FAIL: stdin redir total trash -- try using temp files in /run
-;;   << most likely redir is impossible w/o bkgr thread to supply data
-; (with-input-from-string (text "some\nelse")
-;   (shell-out *scr* :stream "ifne" *editor*
-;             "-" "-c" "setl bt=nofile nowrap efm=%f:%l:%c:%m | cbuffer"
-;             ))
-(defun runquickfix ()
-  (let ((tmp "/run/user/1000/miur/tmp"))
-    (uiop:ensure-pathname tmp :ensure-directories-exist t)
-    (with-open-file (fd tmp
-                     :direction :output
-                     :if-exists :supersede
-                     :if-does-not-exist :create)
-    (dolist (line (mapcar 'item-text (coerce (sw-visible *sw*) 'list)))
-      (write-line line fd)))
-    ;; TODO:CHG: "%m" -> "%r|%s" (ERR?)
-    (shell-out *scr* nil *editor* "-c" "setl bt=nofile nowrap efm=%f:%l:%c:%m | cbuffer"
-               "--" tmp)))
-
 
 ;; DEBUG: (myinput)
 #+(or)
@@ -106,14 +82,14 @@
 (defclass snapshot ()
   ((items :reader snapshot-items
           :initarg :items
-          :type '(array item)
+          ; :type '(array item)
           :documentation "Persistent copies of transient items")
    ) (:documentation "Cached Snapshot of query results"))
 
 ; TODO: apply all sort/filter actions first -- only then slice it"
 (defmethod snapshot-slice ((x snapshot) &optional (beg 0) (end nil))
   "Vertical query -- to preview necessary part of the list"
-  (subseq (snapshot-items) beg end))
+  (subseq (snapshot-items x) beg end))
 
 
 ; TEMP: lazy caching database for filesystem
@@ -123,7 +99,9 @@
   ((data :reader db-all
          :initarg :data
          ; :initform nil
-         :type '(array item)
+         ;; BAD:(SBCL ignores :type)
+         ;;   https://stackoverflow.com/questions/23060868/defclass-type-information-for-performance
+         ; :type '(array item)
          :documentation "Convert all db data to item list")
    ) (:documentation "Cached Knowledge Database"))
 
@@ -152,7 +130,7 @@
 (defclass scrollwidget ()
   ((provider :reader sw-all
              :initarg :provider
-             :type snapshot
+             ; :type snapshot
              :documentation "Snapshot items")
   (offset :reader sw-offset
           :initarg :offset
@@ -252,7 +230,36 @@
       )))
 
 (defparameter *db* (make-db (myinput)))
+; (defparameter *sw* (make-scrollwidget (make-instance 'snapshot :items (db-query *db*)) 10))
 (defparameter *sw* (make-scrollwidget (db-query *db*) 10))
+
+
+(defun runeditor ()
+  (shell-out *scr* nil *editor* "--"
+             (filespec (item-text (sw-curitem *sw*)))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Action
+
+;; FAIL: stdin redir total trash -- try using temp files in /run
+;;   << most likely redir is impossible w/o bkgr thread to supply data
+; (with-input-from-string (text "some\nelse")
+;   (shell-out *scr* :stream "ifne" *editor*
+;             "-" "-c" "setl bt=nofile nowrap efm=%f:%l:%c:%m | cbuffer"
+;             ))
+(defun runquickfix ()
+  (let ((tmp "/run/user/1000/miur/tmp"))
+    (uiop:ensure-pathname tmp :ensure-directories-exist t)
+    (with-open-file (fd tmp
+                     :direction :output
+                     :if-exists :supersede
+                     :if-does-not-exist :create)
+    (dolist (line (mapcar 'item-text (coerce (sw-visible *sw*) 'list)))
+      (write-line line fd)))
+    ;; TODO:CHG: "%m" -> "%r|%s" (ERR?)
+    (shell-out *scr* nil *editor* "-c" "setl bt=nofile nowrap efm=%f:%l:%c:%m | cbuffer"
+               "--" tmp)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; View
@@ -312,6 +319,7 @@
 
 
 (defun drawkeyinfo (w ev)
+  (declare (ignore w))
   (nc:add-string *scr* (write-to-string
                        (list (nc:event-key ev)
                              (nc:event-code ev)))
@@ -322,21 +330,22 @@
 (defun keybinds (scr)
   (nc:bind scr "^D" 'sb-ext:quit)
   (nc:bind scr #\q 'nc:exit-event-loop)
-  (nc:bind scr #\c (lambda (w ev) (nc:clear scr) (nc:refresh scr)))
-  (nc:bind scr " " (lambda (w ev) (draw scr)))
-  (nc:bind scr #\a (lambda (w ev) (runzshprompt (concatenate 'string " " (item-text (sw-curitem *sw*))))))
-  (nc:bind scr #\s (lambda (w ev) (runshell)))
-  (nc:bind scr #\Newline (lambda (w ev) (runeditor)))
-  (nc:bind scr #\o (lambda (w ev) (runquickfix)))
+  (nc:bind scr #\c (lambda () (nc:clear scr) (nc:refresh scr)))
+  (nc:bind scr " " (lambda () (draw scr)))
+  (nc:bind scr #\a (lambda () (runzshprompt (concatenate 'string " " (item-text (sw-curitem *sw*))))))
+  (nc:bind scr #\s (lambda () (runshell)))
+  (nc:bind scr #\Newline (lambda () (runeditor)))
+  (nc:bind scr #\o (lambda () (runquickfix)))
 
-  (nc:bind scr #\J (lambda (w ev) (incf (sw-offset *sw*)  1) (draw scr)))
-  (nc:bind scr #\K (lambda (w ev) (incf (sw-offset *sw*) -1) (draw scr)))
-  (nc:bind scr #\j (lambda (w ev) (incf (sw-currel *sw*)  1) (draw scr)))
-  (nc:bind scr #\k (lambda (w ev) (incf (sw-currel *sw*) -1) (draw scr)))
-  (nc:bind scr #\g (lambda (w ev) (setf (sw-curabs *sw*)  0) (draw scr)))
-  (nc:bind scr #\G (lambda (w ev) (setf (sw-curabs *sw*) nil) (draw scr)))
+  (nc:bind scr #\J (lambda () (incf (sw-offset *sw*)  1) (draw scr)))
+  (nc:bind scr #\K (lambda () (incf (sw-offset *sw*) -1) (draw scr)))
+  (nc:bind scr #\j (lambda () (incf (sw-currel *sw*)  1) (draw scr)))
+  (nc:bind scr #\k (lambda () (incf (sw-currel *sw*) -1) (draw scr)))
+  (nc:bind scr #\g (lambda () (setf (sw-curabs *sw*)  0) (draw scr)))
+  (nc:bind scr #\G (lambda () (setf (sw-curabs *sw*) nil) (draw scr)))
 
   (nc:bind scr :resize (lambda (w ev)
+                         (declare (ignore ev))
                          (setf (sw-limit *sw*) (nc:height w))
                          (nc:add-string scr (format nil "Resize: WxH=~a ~a    "
                                                     (nc:width w) (nc:height w)) :x (- (nc:width scr) 20) :y 1)

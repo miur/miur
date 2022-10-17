@@ -17,18 +17,23 @@ function install-develop {
 fn_alias[i]=cli
 function cli {
   # TRY:FAIL? --eval "(setf (readtable-case *readtable*) :preserve)" \
-  rlwrap sbcl --noinform --eval '(require :asdf)' --eval "(progn
-    (push '*default-pathname-defaults* asdf:*central-registry*)
-    (asdf:load-system :miur)
-  )"
+  # rlwrap sbcl --noinform --eval '(require :asdf)' --eval "(progn
+  #   (push '*default-pathname-defaults* asdf:*central-registry*)
+  #   (asdf:load-system :miur)
+  # )"
+  # FIXED? different ":cl" package handling between Common Lisp implementations - Stack Overflow ⌇⡣⡍⢩⡋
+  #   https://stackoverflow.com/questions/61378192/different-cl-package-handling-between-common-lisp-implementations
+  exec rlwrap sbcl --noinform --core /cache/miur.core --eval '(use-package :cl)'
 }
 
 
 fn_alias[s]=swank
 function swank {
-  print "USAGE: M-x slime-connect <Enter><Enter> DFL:(port 4005)"
-  # MAYBE: use here:  --non-interactive
-  exec sbcl --noinform --load ./loader.lisp
+  # print "USAGE: M-x slime-connect <Enter><Enter> DFL:(port 4005)"
+  # exec sbcl --noinform --non-interactive --load ./loader.lisp  # =NIA
+  # exec rlwrap sbcl --noinform --load ./loader.lisp  # =IA
+  exec sbcl --noinform --core /cache/miur.core --non-interactive --load ./loader.lisp  # =CORE
+  # --dynamic-space-size 8GB
 }
 
 fn_alias[b]=mkexe
@@ -36,8 +41,13 @@ function mkexe {
   # --no-sysinit --no-userinit
   # (sb-ext:disable-debugger)
   # :compression t
+  sbcl --noinform --non-interactive --load ./compiler.lisp
+}
 
-  sbcl --noinform --non-interactive --disable-debugger --load ./compiler.lisp
+
+fn_alias[c]=mkcore
+function mkcore {
+  sbcl --noinform --load ./coreimg.lisp
 }
 
 
