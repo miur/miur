@@ -53,18 +53,16 @@
 ;;
 ;; OR: no-swank runtime
 ;;
-(defun my-debug (condition hook)
-  ; (declare (ignore hook))
-  ; (print condition)
-  ; (abort)
-  (ncurses:def-prog-mode)  ; save current tty modes
-  (ncurses:endwin)  ; restore original tty modes
-  (unwind-protect
-    (if hook (funcall hook condition nil))
-    (nc:refresh *scr*)  ; restore save modes, repaint screen
-  )
-  )
-(setf *debugger-hook* #'my-debug)
+; (defun my-debug (condition hook)
+;   ; (declare (ignore hook))
+;   ; (print condition)
+;   ; (abort)
+;   (ncurses:def-prog-mode)  ; save current tty modes
+;   (ncurses:endwin)  ; restore original tty modes
+;   (unwind-protect
+;     (if hook (funcall hook condition nil))
+;     (nc:refresh *scr*)))  ; restore save modes, repaint screen
+; (setf *debugger-hook* #'my-debug)
 
 
 ;; BAD: blocking, single-thread NEED: multithread for !ncurses
@@ -72,12 +70,8 @@
 ;;; OR:NEED: /@/plugins/nvim/all/vlime/lisp -> ~/quicklisp/local-projects/lisp
 ; (push #P"/@/plugins/nvim/all/vlime/lisp" ql:*local-project-directories*)
 ; (ql:quickload :vlime :silent t)
-; (vlime:main :interface #(127 0 0 1)
-;             :port 7002
-;             :backend :vlime-usocket)
+(vlime:main :interface #(127 0 0 1)
+            :port 7002
+            :backend :vlime-usocket)
 
-; (use-package :cl)
-; (in-package :miur)
-; (eval-when (:execute)
-;   (main))
-(main)
+(miur:main)

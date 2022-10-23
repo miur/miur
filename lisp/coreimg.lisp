@@ -43,8 +43,8 @@
                   ; "trivial-garbage"
                   ; "trivial-macroexpand-all"
                   ; "trivial-package-local-nicknames"
-                  ;; ...
-                  ))
+                  "vlime"))
+
   (ql:quickload system))
 
 
