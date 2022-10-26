@@ -6,11 +6,14 @@
 ;;
 (in-package :miur)
 
-(defvar *scr* nil) ;; global main screen to access from slime
 (defparameter *swank-input* *standard-input*)
 (defparameter *swank-output* *standard-output*)
-
 (defparameter *editor* (uiop:getenv "EDITOR"))
+
+(defvar *scr* nil) ;; global main screen to access from slime
+(defparameter *quit* nil)
+(defparameter *menu* 'menu-navi)
+(defparameter *textinput* "")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Input
@@ -287,6 +290,8 @@
     (nc:move scr 0 2)
     (loop for x across (sw-visible *sw*) and i from 0
           do (drawline scr i x ww cur off))
+    (nc:add-string scr (concatenate 'string "> " *textinput*)
+                   :x 0 :y (sw-limit *sw*) :fgcolor :yellow :bgcolor :terminal)
     (nc:move scr cur 6)
     (nc:refresh scr)))
 
@@ -326,32 +331,57 @@
                  :x 80 :y 0))
 
 
-;; DEBUG: (nc:submit (keybinds *scr*))
-(defun keybinds (scr)
-  (nc:bind scr "^D" 'sb-ext:quit)
-  (nc:bind scr #\q 'nc:exit-event-loop)
-  (nc:bind scr #\c (lambda () (nc:clear scr) (nc:refresh scr)))
-  (nc:bind scr " " (lambda () (draw scr)))
-  (nc:bind scr #\a (lambda () (runzshprompt (concatenate 'string " " (item-text (sw-curitem *sw*))))))
-  (nc:bind scr #\s (lambda () (runshell)))
-  (nc:bind scr #\Newline (lambda () (runeditor)))
-  (nc:bind scr #\o (lambda () (runquickfix)))
+(defun menu-navi (scr key)
+  (case key
+    ("^D" (sb-ext:quit))
+    (#\q (setf *quit* t))  ; OR: (throw scr :exit-event-loop)  // (catch scr ... (do ...))
 
-  (nc:bind scr #\J (lambda () (incf (sw-offset *sw*)  1) (draw scr)))
-  (nc:bind scr #\K (lambda () (incf (sw-offset *sw*) -1) (draw scr)))
-  (nc:bind scr #\j (lambda () (incf (sw-currel *sw*)  1) (draw scr)))
-  (nc:bind scr #\k (lambda () (incf (sw-currel *sw*) -1) (draw scr)))
-  (nc:bind scr #\g (lambda () (setf (sw-curabs *sw*)  0) (draw scr)))
-  (nc:bind scr #\G (lambda () (setf (sw-curabs *sw*) nil) (draw scr)))
+    (#\c (nc:clear scr) (nc:refresh scr))
+    (#\Space (draw scr))
+    (#\a (runzshprompt (concatenate 'string " " (item-text (sw-curitem *sw*)))))
+    (#\s (runshell))
+    (#\Newline (runeditor))
+    (#\o (runquickfix))
+    (#\/ (setf *menu* 'menu-input))
 
-  (nc:bind scr :resize (lambda (w ev)
-                         (declare (ignore ev))
-                         (setf (sw-limit *sw*) (nc:height w))
-                         (nc:add-string scr (format nil "Resize: WxH=~a ~a    "
-                                                    (nc:width w) (nc:height w)) :x (- (nc:width scr) 20) :y 1)
-                         (nc:refresh scr)))
-  (nc:bind scr t #'drawkeyinfo))
+    ; FIXME: J/K should keep wnd-rel position same
+    (#\J (incf (sw-offset *sw*)  1) (draw scr))
+    (#\K (incf (sw-offset *sw*) -1) (draw scr))
+    (#\j (incf (sw-currel *sw*)  1) (draw scr))
+    (#\k (incf (sw-currel *sw*) -1) (draw scr))
+    (#\g (setf (sw-curabs *sw*)  0) (draw scr))
+    (#\G (setf (sw-curabs *sw*) nil) (draw scr))
+    (#\l (incf (sw-currel *sw*)  10) (draw scr))
+    (#\h (incf (sw-currel *sw*) -10) (draw scr))
+  ))
 
+
+(defun menu-input (scr key)
+  (case key
+    (#\Bel (setf *menu* 'menu-navi)) ; = "^G"
+    (:backspace (setf *textinput* "")) ; (str:substring 2 t *textinput*)
+    ; SEE https://twiserandom.com/lisp/characters-in-lisp-a-tutorial/index.html#Character_comparison
+    (otherwise (when (standard-char-p key)
+                 (setf *textinput* (concatenate 'string *textinput* (string key)))
+                 (draw scr)))
+  ))
+
+
+(defun event-dispatch (scr ev)
+  (let ((key (nc:event-key ev)))
+    (case key
+      (nil t)
+      (:resize
+        (setf (sw-limit *sw*) (1- (nc:height scr)))
+        (nc:add-string scr (format nil "Resize: WxH=~a ~a    "
+                                    (nc:width scr) (nc:height scr))
+                        :x (- (nc:width scr) 20) :y 1)
+        (nc:refresh scr))
+      (otherwise (or (funcall *menu* scr key)
+                    ; (menu-navi scr key)
+                    (drawkeyinfo nil ev))))))
+  ; (format *swank-output* "~a~%" (nc:event-key ev))
+  ; (princ ev scr)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Main
@@ -364,19 +394,21 @@
   (nc:with-screen (scr :input-echoing nil
                        :enable-colors t
                        :use-terminal-colors t
-                       :input-blocking 100
+                       ; :input-blocking 100
+                       :input-blocking t
                        :bind-debugger-hook nil)
     (setf *scr* scr)
-    (setf (sw-limit *sw*) (nc:height scr))
+    (setf (sw-limit *sw*) (1- (nc:height scr)))
     ; (setf (nc:attributes scr) '(:bold))
     ; (setf (nc:color-pair scr) '(:yellow :red))
     (nc:clear scr)
-    (keybinds scr)
-    ; (event-case (scr event)
-    ;   (#\q (return-from event-case))
-    ;   (otherwise (princ event scr)
-    ;              (nc:refresh scr)))
-    (nc:run-event-loop scr))
+    ; (keybinds scr)
+    ; (nc:run-event-loop scr)
+    (do () (*quit*)
+      (let ((ev (nc:get-wide-event scr)))
+        (event-dispatch scr ev)))
+    ; (print (nc:event-key (nc:get-wide-event scr)))
+    )
   (print "=cleanup")
   (finish-output nil))
 

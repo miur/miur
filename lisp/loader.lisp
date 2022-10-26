@@ -40,30 +40,37 @@
 ;; HACK: redefine *debug-hook* in SWANK for !ncurses cleanup
 ; SRC: https://stackoverflow.com/questions/34523512/how-do-i-prevent-slime-from-starting-sldb-on-certain-errors
 ; (in-package swank)
-; (setq swank-debugger-hook-orig #'swank-debugger-hook)
+; (defvar swank-debugger-hook-orig #'swank-debugger-hook)
 ; (defun swank-debugger-hook (condition hook)
-;   (etypecase condition
-;     (sb-int:simple-stream-error
-;       (progn
-;         (princ "*** Stream error" *error-output*)
-;         (abort)))
-;     (t (funcall swank-debugger-hook-orig condition hook))))
+;   ; (etypecase condition
+;   ;   (sb-int:simple-stream-error
+;   ;     (progn
+;   ;       (princ "*** Stream error" *error-output*)
+;   ;       (abort)))
+;   ;   (t (funcall swank-debugger-hook-orig condition hook)))
+;   (ncurses:def-prog-mode)  ; save current tty modes
+;   (ncurses:endwin)  ; restore original tty modes
+;   ; (print "HELLOAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+;   (unwind-protect
+;     (funcall swank-debugger-hook-orig condition hook)
+;     (ncurses:refresh)))  ; restore save modes, repaint screen
 ; (in-package cl-user)
 ; (swank:create-server :port 4008 :dont-close t)
 ;;
-;; OR: no-swank runtime
+;; OR: no-swank runtime // only for main thread
 ;;
-; (defun my-debug (condition hook)
-;   ; (declare (ignore hook))
-;   ; (print condition)
-;   ; (abort)
-;   (ncurses:def-prog-mode)  ; save current tty modes
-;   (ncurses:endwin)  ; restore original tty modes
-;   (unwind-protect
-;     (if hook (funcall hook condition nil))
-;     (nc:refresh *scr*)))  ; restore save modes, repaint screen
-; (setf *debugger-hook* #'my-debug)
+(defun my-debug (condition hook)
+  ; (declare (ignore hook))
+  ; (print condition)
+  ; (abort)
+  (ncurses:def-prog-mode)  ; save current tty modes
+  (ncurses:endwin)  ; restore original tty modes
+  (unwind-protect
+    (if hook (funcall hook condition nil))
+    (ncurses:refresh)))  ; restore save modes, repaint screen
+(setf *debugger-hook* #'my-debug)
 
+(in-package :miur)
 
 ;; BAD: blocking, single-thread NEED: multithread for !ncurses
 ; (load "/@/plugins/nvim/all/vlime/lisp/start-vlime.lisp")
