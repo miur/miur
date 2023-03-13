@@ -1,13 +1,1 @@
 miur.asd
-vlime/lisp/vlime.asd
-croatoan/croatoan.asd
-croatoan/ansi-escape.asd
-vlime/lisp/vlime-sbcl.asd
-vlime/lisp/vlime-test.asd
-airywm/lisp-new/airywm.asd
-croatoan/croatoan-test.asd
-vlime/lisp/vlime-patched.asd
-vlime/lisp/vlime-usocket.asd
-croatoan/ansi-escape-test.asd
-croatoan/croatoan-ncurses.asd
-vlime/lisp/vlime-sbcl-test.asd
