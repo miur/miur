@@ -2,7 +2,7 @@ import asyncio
 from typing import Any, no_type_check
 
 from just.ext.asyncio import cancel_all, enable_debug_asyncio
-from just.iji.main import Context
+from just.use.iji.main import Context
 
 from .app import Application
 

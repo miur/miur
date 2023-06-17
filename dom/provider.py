@@ -107,7 +107,7 @@ def parse_pacman(cmdargs: list[str]) -> Iterator[Item]:
 
 
 def parse_pacman_upgrade() -> Iterator[Item]:
-    from just.iji.shell import runlines
+    from just.use.iji.shell import runlines
 
     dldout = runlines(["pacman", "-Su", "--print-format=%s %n"])
     dldszs = {s[1]: int(s[0], 10) for x in dldout if (s := x.split(maxsplit=1))}

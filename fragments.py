@@ -3,7 +3,7 @@ import asyncio
 import subprocess as P
 from typing import Any
 
-from just.iji.shell import runlines
+from just.use.iji.shell import runlines
 
 
 def handle_keybindings(wg: Any, key: str | int) -> None:
