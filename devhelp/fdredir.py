@@ -83,12 +83,16 @@ def rebind_sysio_to_fd(nm: str, fdold: int, fdnew: int) -> Iterator[int]:
 #    :: must redirect fd1 even if passing "ttyfd" into setupterm()
 # [$] MAYBE:HACK: reassign 0/1 only during initscr()
 #   FAIL:ERR:(write): we should keep 0/1 redirected until !curses exit
-## DISABLED:(sys.stderr): keep newterm stderr inside Jupyter too
 @contextmanager
 def bind_fd01_from_tty(rtty: TextIO, wtty: TextIO) -> Iterator[tuple[int, int]]:
     with (
         rebind_sysio_to_fd("stdin", 0, rtty.fileno()) as temp0,
         rebind_sysio_to_fd("stdout", 1, wtty.fileno()) as temp1,
+        ## DISABLED:(sys.stderr): keep newterm stderr inside Jupyter too
+        #   NICE: prevents trashing !st curses by error messages
+        #   BAD: !pacman prints text to !st and prompt to !jupyter
+        #     FIXED: redirect stdin/stdout individually for !pacman
+        # rebind_sysio_to_fd("stderr", 2, wtty.fileno()) as temp2,
     ):
         ## DEBUG
         # print(

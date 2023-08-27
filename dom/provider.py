@@ -137,9 +137,9 @@ class DataProvider:
         self.refresh()
 
     def refresh(self) -> None:
-        # gen = parse_pacman("pacman -Qti".split())
+        gen = parse_pacman("pacman -Qti".split())
         # gen = reversed(sorted(parse_pacman_upgrade(), key=lambda x: x.dldsz))
-        gen = parse_pacman_stdin()
+        # gen = parse_pacman_stdin()
         self._items = list(gen)
 
     def __len__(self) -> int:

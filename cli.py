@@ -43,14 +43,20 @@ if __name__ == "__main__":
 #%% NEED %gui asyncio
 @no_type_check
 def _live():
-    enable_debug_asyncio(True)
-    __import__("atexit").register(lambda: enable_debug_asyncio(False))
-
-    global app
-    app = Application()
-    app.startup()
-    app.canvas.resize(58, 17)
-    # l = app.dom._items[154]._data["Optional Deps"]
+    def _init():
+        enable_debug_asyncio(True)
+        __import__("atexit").register(lambda: enable_debug_asyncio(False))
+        global app
+        app = Application()
+        app.startup()
+        # app.__enter__()
+        ## app.iodev = stack.enter_context(CursesDevice())  # OR: self.ctx()
+        ## app.canvas = CursesOutput(self.iodev, self.wg)
+        ## app.hotkey = CursesInput(self, self.iodev, self.canvas)
+        # app.attach()
+        # app.canvas.resize()
+        # app.canvas.resize(58, 17)
+        # l = app.dom._items[154]._data["Optional Deps"]
 
     def _quit():
         global app
@@ -58,5 +64,5 @@ def _live():
         del app
 
     def _debug():
-        cancel_all()
         asyncio.all_tasks()
+        cancel_all()

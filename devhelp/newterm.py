@@ -30,11 +30,13 @@ def open_tty(ttynm: str) -> tuple[TextIO, TextIO]:
 def newtermwindow() -> Iterator[tuple[TextIO, TextIO]]:
     # TEMP:HACK: spawn new terminal to prevent crashing/corrupting any existing ones
     #   TRY: os.getpty()
-    # MAYBE: replace "sleep" by "wait for unix signal" or "until file deleted"
-    bgtty = Popen(["st", "-M", "sh", "-c", "tty|tee /tmp/miurttynm; sleep 1d"])
-    # MAYBE: replace by asyncinotify
+    # NOTE: use tempfile() to auto-delete opened file on .close()
+    tmpf = __import__("tempfile").NamedTemporaryFile(mode='r')
+    sh_script = 'tty > "$0"; inotifywait -qq -e delete_self "$0"'  # OR: "sleep 1d" / wait SIGUSR1
+    bgtty = Popen(["st", "-M", "sh", "-c", sh_script, tmpf.name])
+    # MAYBE: replace by asyncinotify (on file write+close) OR loop until non-empty
     time.sleep(0.5)
-    ttynm = __import__("pathlib").Path("/tmp/miurttynm").read_text().strip()
+    ttynm = tmpf.read().strip()
     # HACK: replace jupyter/ipykernel hardcoded TERM for proper curses init
     os.environ["TERM"] = "st-256color"
     try:
@@ -44,5 +46,6 @@ def newtermwindow() -> Iterator[tuple[TextIO, TextIO]]:
     finally:
         rtty.close()
         wtty.close()
-        bgtty.terminate()
+        tmpf.close()  # OR: bgtty.terminate()
         bgtty.wait()
+        print("[offterm]")

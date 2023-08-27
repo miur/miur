@@ -1,6 +1,6 @@
 import asyncio
 from contextlib import ExitStack
-from typing import Any
+from typing import Any, Self, Callable
 
 from .curses.device import CursesDevice
 from .curses.input import CursesInput
@@ -34,7 +34,7 @@ class Application:
         # self.aws: list[Awaitable] = []
 
     # ---
-    def __enter__(self) -> "Application":
+    def __enter__(self) -> Self:
         with ExitStack() as stack:
             self.iodev = stack.enter_context(CursesDevice())  # OR: self.ctx()
             # FAIL: lifetime should not continue past __exit__()
@@ -102,7 +102,7 @@ class Application:
         assert not pending, pending
         assert done == set(aws), (done, aws)
 
-    async def mainloop(self, ainit: Any = None) -> None:
+    async def mainloop(self, ainit: Callable[[], None] = None) -> None:
         if ainit:
             ainit()
         self.attach()
@@ -113,7 +113,7 @@ class Application:
             # if ainit:
             #     ainit(False)
 
-    def run(self, ainit: Any = None) -> None:
+    def run(self, ainit: Callable[[], None] = None) -> None:
         asyncio.run(self.mainloop(ainit))
 
     # ---

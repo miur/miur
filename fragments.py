@@ -3,7 +3,8 @@ import asyncio
 import subprocess as P
 from typing import Any
 
-from just.use.iji.shell import runlines
+# from just.use.iji.shell import runlines
+from just.use.airy.secu import sudorun
 
 
 def handle_keybindings(wg: Any, key: str | int) -> None:
@@ -15,7 +16,10 @@ def pacman_frag(wg: Any, key: str | int) -> None:
     # TRY: async wait for subprocess result
     # https://docs.python.org/3/library/asyncio-subprocess.html#asyncio.create_subprocess_exec
     def exe(cmdline: str) -> None:
-        print("\n".join(runlines(cmdline.split() + [wg.item.name])))
+        # NOTE: capture and combine interspersed stdout/stderr
+        #   BAD: can't add prefix to all stderr lines
+        cmd = cmdline.split() + [wg.item.name]
+        print(P.run(cmd, check=True, stdout=P.PIPE, stderr=P.STDOUT, text=True).stdout)
 
     if key == "\n":
         exe("echo")
@@ -42,16 +46,13 @@ def pacman_frag(wg: Any, key: str | int) -> None:
         def pkguninstall() -> None:
             import sys
 
-            # [_] FIXME:FIND: work with sudo in python
+            # [_] FIXME:FIND: work with sudo in python/jupyter
             # exe("sudo pacman -Rsu")
             # WKRND: total mess with input when redirecting fd0/fd1 into separate newterm
-            _ret = P.run(
-                "sudo pacman -Rsu".split() + [wg.item.name],
-                stdin=sys.stdin,
-                stdout=sys.stdout,
-                stderr=sys.stderr,
-                check=True,
-            )
+            # BAD:ERR: Future exception was never retrieved
+            # FIXED: why only one of stdout/stderr is redirected to !jupyter and another to !st ?
+            # sudorun("sudo pacman -Rsu".split() + [wg.item.name], stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr)
+            P.run("sudo pacman -Rsu".split() + [wg.item.name], stdin=sys.stdin)
             wg._scroll._provider.refresh()
             # event.set()
             print("[DONE]")
