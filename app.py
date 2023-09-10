@@ -24,11 +24,11 @@ class Application:
     hotkey: CursesInput
     _stack: ExitStack
 
-    def __init__(self) -> None:
+    def __init__(self, variant: str) -> None:
         # RENAME: dom
         #   BUT: dom(wg) is common only between all list-like displays
         #     -- concept of cursor won't have any sense in API, CLI, or AUDIO
-        self.dom = DataProvider()
+        self.dom = DataProvider(variant)
         self.wg = CursorViewWidget(ScrollListWidget(self.dom))
         self._tasks: list[asyncio.Task] = []
         # self.aws: list[Awaitable] = []

@@ -52,6 +52,7 @@ IDEA
 &goals:cornerstones ⌇⡘⠍⠶⡠
   "Modern the most widely adopted file manager ever (like vim and emacs)"
     [_] TODO: make motto and enumerate cornerstones based on Social Architecture
+      [⡤⣳⠴⢦] &mission Manipulate list-based interface to everything [in the IT universe]
   * cornerstone of structured list manipulation (in contrast to vim/emacs raw text buffer manipulation)
   * embedded workflows for anybody (as first-rate citizens)
   * semantic web navigation (generalized concept of filesystem tree hierarchy)

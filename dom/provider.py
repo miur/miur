@@ -1,9 +1,59 @@
+from abc import ABCMeta, abstractmethod
+from pathlib import Path
 from subprocess import PIPE, Popen
-from typing import Any, Callable, Iterator, Literal
+from typing import Any, Callable, Iterable, Literal
 
 
-# RENAME: -> PacmanItem :: use dif. fragments based on typeof(Item)
-class Item:
+class Item(metaclass=ABCMeta):
+    @property
+    @abstractmethod
+    def name(self) -> str:
+        raise NotImplementedError
+
+    @property
+    @abstractmethod
+    def size(self) -> int:
+        raise NotImplementedError
+
+    @abstractmethod
+    def __str__(self) -> str:
+        raise NotImplementedError
+
+
+class TextItem(Item):
+    def __init__(self, data: str) -> None:
+        self._data = data
+
+    @property
+    def name(self) -> str:
+        return self._data
+
+    @property
+    def size(self) -> int:
+        return len(self._data)
+
+    def __str__(self) -> str:
+        return f"[{self._data}]"
+
+
+class PathItem(Item):
+    def __init__(self, path: Path) -> None:
+        self._path = path
+
+    @property
+    def name(self) -> str:
+        return str(self._path)
+
+    @property
+    def size(self) -> int:
+        return int(self._path.stat().st_size)
+
+    # def __str__(self) -> str:
+    #     return f"[{self._data}]"
+
+
+# use dif. fragments based on typeof(Item)
+class PacmanItem(Item):
     BYTESFX = {"B": 1 << 0, "KiB": 1 << 10, "MiB": 1 << 20, "GiB": 1 << 30}
 
     def __init__(self, data: dict[str, str]) -> None:
@@ -71,7 +121,7 @@ class Item:
         return self.strnamedecor()
 
 
-def parse_pacman(cmdargs: list[str]) -> Iterator[Item]:
+def parse_pacman(cmdargs: list[str]) -> Iterable[PacmanItem]:
     # from just.iji.shell import runlines
     # self._items = list(map(Item, runlines("pacman -Qtq")))
     # TODO: lazy parse -- store whole output but parse only during scrolling
@@ -88,7 +138,7 @@ def parse_pacman(cmdargs: list[str]) -> Iterator[Item]:
                 continue
             if not l:
                 dic[pk] = pv
-                yield Item(dic)
+                yield PacmanItem(dic)
                 dic = {}
             elif l.startswith(" "):
                 pv += "\n" + l.lstrip()
@@ -103,10 +153,10 @@ def parse_pacman(cmdargs: list[str]) -> Iterator[Item]:
                     pv = pv.strip()
             i += 1
         if dic:
-            yield Item(dic)
+            yield PacmanItem(dic)
 
 
-def parse_pacman_upgrade() -> Iterator[Item]:
+def parse_pacman_upgrade() -> Iterable[PacmanItem]:
     from just.use.iji.shell import runlines
 
     dldout = runlines(["pacman", "-Su", "--print-format=%s %n"])
@@ -118,7 +168,7 @@ def parse_pacman_upgrade() -> Iterator[Item]:
         yield x
 
 
-def parse_pacman_stdin() -> Iterator[Item]:
+def parse_pacman_stdin() -> Iterable[PacmanItem]:
     names = [x.rstrip() for x in __import__("sys").stdin]
     # for x in list(parse_pacman("pacman -Qi -".split(), input="\n".join(maxsznms))):
     return parse_pacman("pacman -Qi".split() + names)
@@ -127,20 +177,38 @@ def parse_pacman_stdin() -> Iterator[Item]:
 class DataProvider:
     sortfields = ["nm", "sz", "bday", "iday"]
 
-    def __init__(self) -> None:
-        # self._items = list(x.rstrip() for x in sys.stdin)
-        # USAGE: $ </dev/null M
-        # ALT: read_text(/home/amer/aura/items/neo/pacman/odd-pkgs.txt)
+    def __init__(self, variant: str) -> None:
         self._items: list[Item] = []
         self._sortby = self.sortfields[0]
         self._sortrev = False
+        self._gen: Callable[[], Iterable[Item]]
+        self._setup(variant)
         self.refresh()
 
+    def _setup(self, variant: str) -> None:
+        from sys import stdin
+
+        if variant == "auto":
+            if stdin.isatty():
+                variant = "fm"
+            else:
+                variant = "text"
+
+        if variant == "fm":
+            self._gen = lambda: map(PathItem, Path.cwd().iterdir())
+        elif variant == "text":
+            # USAGE: $ </dev/null M
+            # ALT: read_text(/home/amer/aura/items/neo/pacman/odd-pkgs.txt)
+            self._gen = lambda: (TextItem(x.rstrip()) for x in stdin)
+        elif variant == "pkgs":
+            self._gen = lambda: parse_pacman("pacman -Qti".split())
+            # gen = reversed(sorted(parse_pacman_upgrade(), key=lambda x: x.dldsz))
+            # gen = parse_pacman_stdin()
+        else:
+            raise NotImplementedError
+
     def refresh(self) -> None:
-        gen = parse_pacman("pacman -Qti".split())
-        # gen = reversed(sorted(parse_pacman_upgrade(), key=lambda x: x.dldsz))
-        # gen = parse_pacman_stdin()
-        self._items = list(gen)
+        self._items = list(self._gen())
 
     def __len__(self) -> int:
         # FUTURE: ret "+Inf" to indicate that it's unbounded stream -- for easier comparisons

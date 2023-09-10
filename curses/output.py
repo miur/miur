@@ -79,7 +79,14 @@ class CursesOutput:
 
     def draw_all(self) -> None:
         self._scr.clear()
-        self.draw_list()
+
+        # BAD: "way to draw" should be part of PacmanItem itself
+        # ALSO: mixed list should draw each item differently (or force unified view)
+        if self._wg[0].__class__.__name__ == 'PacmanItem':
+            self.draw_list()
+        else:
+            self.draw_list1()
+
         self.draw_footer()
         # ALSO:(force-full-redraw): self._scr.touchwin()
         #   BET: redraw = lambda: wrefresh(curscr)
