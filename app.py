@@ -24,11 +24,12 @@ class Application:
     hotkey: CursesInput
     _stack: ExitStack
 
-    def __init__(self, variant: str) -> None:
+    def __init__(self, variant: str, innewtermmode: bool = None) -> None:
         # RENAME: dom
         #   BUT: dom(wg) is common only between all list-like displays
         #     -- concept of cursor won't have any sense in API, CLI, or AUDIO
         self.dom = DataProvider(variant)
+        self._innewtermmode = innewtermmode
         self.wg = CursorViewWidget(ScrollListWidget(self.dom))
         self._tasks: list[asyncio.Task] = []
         # self.aws: list[Awaitable] = []
@@ -36,11 +37,13 @@ class Application:
     # ---
     def __enter__(self) -> Self:
         with ExitStack() as stack:
-            self.iodev = stack.enter_context(CursesDevice())  # OR: self.ctx()
+            self.iodev = stack.enter_context(CursesDevice(self._innewtermmode))  # OR: self.ctx()
             # FAIL: lifetime should not continue past __exit__()
             self.canvas = CursesOutput(self.iodev, self.wg)
             self.hotkey = CursesInput(self, self.iodev, self.canvas)
             self._stack = stack.pop_all()
+        # NOTE: adjust widget area to term size
+        self.canvas.resize()
         return self
 
     def __exit__(self, t=None, v=None, b=None) -> bool:  # type:ignore

@@ -47,7 +47,7 @@ class CursesInput:
             C.ungetch(ch)
             key = self.scr.get_wch()
             # key = scr.getkey()
-            print(repr(key), file=__import__("sys").stderr)
+            print(key, end='', file=__import__("sys").stderr)
 
             ## DEP:configure(--enable-sigwinch)
             # BAD: does not work inside jupyter
@@ -55,6 +55,7 @@ class CursesInput:
             # REGR: redraw() during KEY_RESIZE results in ncurses crash
             #   THINK: how to prevent/block redraw in that case?
             if key == C.KEY_RESIZE:
+                print('(RESIZE)', end='', file=__import__("sys").stderr)
                 self.canvas.resize()
                 continue
 

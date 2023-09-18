@@ -20,6 +20,7 @@ class CursesOutput:
     def resize(self, w: int = None, h: int = None) -> None:
         if w is None or h is None:
             # C.update_lines_cols()
+            # hh, ww = C.COLS, C.LINES
             hh, ww = self._scr.getmaxyx()
             if w is None:
                 w = ww
@@ -28,9 +29,11 @@ class CursesOutput:
         else:
             # C.resizeterm(h, w)
             self._scr.resize(h, w)
+        # self._scr.clear()
         # self._wg.resize(w, h - 1)  # HACK: keep space for footer
         self._wg.resize(w, (h - 1) // 2)  # HACK: multi-line output
         self.invalidate()
+        # self._scr.refresh()
 
     def draw_footer(self) -> None:
         pair = 30
@@ -41,7 +44,7 @@ class CursesOutput:
 
         # pylint:disable=protected-access
         pv = self._wg._scroll._provider
-        idx = self._wg.pos
+        idx = 1 + self._wg.curabs
         sortby = pv._sortby
         sortrev = "￬" if pv._sortrev else "￪"
         info = f"{idx}/{len(pv)} | {sortby=}{sortrev}"
@@ -59,9 +62,11 @@ class CursesOutput:
         # BAD: unable to print "part" of last item
         items = self._wg[i : i + ((hh - 1) // 2)]
         beg, _end = self._wg._scroll.range(i)
+        pos = self._wg.currel
         for i, x in enumerate(items, start=i):
-            self._scr.addstr(i * 2, 0, f"{i:02d}| {beg + i:03d}:", C.color_pair(2))
-            attr = (C.A_REVERSE | C.A_BOLD) if i == self._wg.pos else C.color_pair(1)
+            idx = 1 + beg + i
+            self._scr.addstr(i * 2, 0, f"{i + 1:02d}| {idx:03d}:", C.color_pair(2))
+            attr = (C.A_REVERSE | C.A_BOLD) if i == pos else C.color_pair(1)
             self._scr.addstr(f" {x}", attr)
             self._scr.addstr(
                 i * 2 + 1, 8, f"{x.strsize()} | {x.strdepsnum()}", C.color_pair(3)
@@ -72,9 +77,11 @@ class CursesOutput:
         hh, _ww = self._scr.getmaxyx()  # C.LINES
         items = self._wg[i : i + hh - 1]
         beg, _end = self._wg._scroll.range(i)
+        pos = self._wg.currel
         for i, x in enumerate(items, start=i):
-            self._scr.addstr(i, 0, f"{i:02d}| {beg + i:03d}:", C.color_pair(2))
-            attr = (C.A_REVERSE | C.A_BOLD) if i == self._wg.pos else C.color_pair(1)
+            idx = 1 + beg + i
+            self._scr.addstr(i, 0, f"{i + 1:02d}| {idx:03d}:", C.color_pair(2))
+            attr = (C.A_REVERSE | C.A_BOLD) if i == pos else C.color_pair(1)
             self._scr.addstr(f" {x}", attr)
 
     def draw_all(self) -> None:
@@ -94,7 +101,7 @@ class CursesOutput:
 
     # PERF: don't bind "draw" and "handle" in single loop pass
     async def drawloop(self) -> None:
-        self.resize()
+        # self.resize()
         # HACK: reduce CPU consumption in laptop powersave mode
         dtframe = 1 / 15  # 60
         monotime = asyncio.get_running_loop().time

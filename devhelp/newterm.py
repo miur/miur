@@ -27,13 +27,24 @@ def open_tty(ttynm: str) -> tuple[TextIO, TextIO]:
 
 
 @contextmanager
+def newttyconn(ttynm: str | None = None) -> Iterator[tuple[TextIO, TextIO]]:
+    try:
+        rtty, wtty = open_tty(get_ttynm(ttynm))
+        yield (rtty, wtty)
+    finally:
+        rtty.close()
+        wtty.close()
+        print("[nottyconn]")
+
+
+@contextmanager
 def newtermwindow() -> Iterator[tuple[TextIO, TextIO]]:
     # TEMP:HACK: spawn new terminal to prevent crashing/corrupting any existing ones
     #   TRY: os.getpty()
     # NOTE: use tempfile() to auto-delete opened file on .close()
     tmpf = __import__("tempfile").NamedTemporaryFile(mode='r')
     sh_script = 'tty > "$0"; inotifywait -qq -e delete_self "$0"'  # OR: "sleep 1d" / wait SIGUSR1
-    bgtty = Popen(["st", "-M", "sh", "-c", sh_script, tmpf.name])
+    bgtty = Popen(["st", "-M", "-e", "sh", "-c", sh_script, tmpf.name])
     # MAYBE: replace by asyncinotify (on file write+close) OR loop until non-empty
     time.sleep(0.5)
     ttynm = tmpf.read().strip()

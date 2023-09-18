@@ -83,6 +83,7 @@ def rebind_sysio_to_fd(nm: str, fdold: int, fdnew: int) -> Iterator[int]:
 #    :: must redirect fd1 even if passing "ttyfd" into setupterm()
 # [$] MAYBE:HACK: reassign 0/1 only during initscr()
 #   FAIL:ERR:(write): we should keep 0/1 redirected until !curses exit
+## USE:CASE: allow piping stdin/stdout for curses TUI
 @contextmanager
 def bind_fd01_from_tty(rtty: TextIO, wtty: TextIO) -> Iterator[tuple[int, int]]:
     with (

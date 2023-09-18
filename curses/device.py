@@ -4,7 +4,7 @@ from contextlib import ExitStack, contextmanager
 from typing import Any, Iterator
 
 from ..devhelp.fdredir import bind_fd01_from_tty
-from ..devhelp.newterm import newtermwindow
+from ..devhelp.newterm import newtermwindow, newttyconn
 
 
 @contextmanager
@@ -35,15 +35,21 @@ def makestdscr() -> Iterator[C.window]:
 
 
 class CursesDevice:
-    def __init__(self) -> None:
-        self.rwtty: Any
+    def __init__(self, innewtermmode: bool | None = None) -> None:
+        self._innewtermmode = innewtermmode
+        self._rwtty: Any
         self.scr: C.window
         self._stack: ExitStack
 
     def __enter__(self) -> "CursesDevice":
         with ExitStack() as stack:
-            self.rwtty = stack.enter_context(newtermwindow())
-            stack.enter_context(bind_fd01_from_tty(*self.rwtty))
+            # HACK:OPT: newterm vs
+            if self._innewtermmode:
+                self._rwtty = stack.enter_context(newtermwindow())
+            else:
+                # NOTE: allow piping stdin/stdout for curses TUI
+                self._rwtty = stack.enter_context(newttyconn())
+            stack.enter_context(bind_fd01_from_tty(*self._rwtty))
             self.scr = stack.enter_context(makestdscr())
             self._stack = stack.pop_all()
         self._init(self.scr)

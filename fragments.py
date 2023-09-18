@@ -68,15 +68,21 @@ def pacman_frag(wg: Any, key: str | int) -> None:
 def move_frag(wg: Any, key: str | int) -> None:
     # ---
     if key == "j":
-        wg.pos += 1
+        wg.currel += 1
     if key == "k":
-        wg.pos -= 1
+        wg.currel -= 1
+    if key == "h":
+        wg.currel -= 10
+    if key == "l":
+        wg.currel += 10
 
     # [_] FUTURE: wg.pos = -1
     if key in ("g", 262):  # = <Home>
-        wg.pos = -len(wg)
+        # wg.pos = -len(wg)
+        wg.curabs = 0
     if key == "G":
-        wg.pos = len(wg)
+        # wg.pos = len(wg)
+        wg.curabs = None
     if key == "H":
         wg.pos = 0
     if key == "M":
@@ -84,6 +90,8 @@ def move_frag(wg: Any, key: str | int) -> None:
     if key == "L":
         wg.pos = wg._scroll.height - 1
     if key in ("J", "\x06", 338):  # = <C-f>, <PgDn>
-        wg.pos += wg._scroll.height
+        # wg.pos += wg._scroll.height
+        wg.curoff += 1
     if key in ("K", "\x02", 339):  # = <C-b>, <PgUp>
-        wg.pos -= wg._scroll.height
+        # wg.pos -= wg._scroll.height
+        wg.curoff -= 1

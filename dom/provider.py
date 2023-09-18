@@ -1,3 +1,5 @@
+from typing import overload
+
 from abc import ABCMeta, abstractmethod
 from pathlib import Path
 from subprocess import PIPE, Popen
@@ -48,8 +50,8 @@ class PathItem(Item):
     def size(self) -> int:
         return int(self._path.stat().st_size)
 
-    # def __str__(self) -> str:
-    #     return f"[{self._data}]"
+    def __str__(self) -> str:
+        return self._path.as_posix()
 
 
 # use dif. fragments based on typeof(Item)
@@ -214,7 +216,15 @@ class DataProvider:
         # FUTURE: ret "+Inf" to indicate that it's unbounded stream -- for easier comparisons
         return len(self._items)
 
+    @overload
     def __getitem__(self, k: slice) -> list[Item]:
+        ...
+
+    @overload
+    def __getitem__(self, k: int) -> Item:
+        ...
+
+    def __getitem__(self, k: slice | int) -> list[Item] | Item:
         if isinstance(k, slice):
             # assert k.stop < len(self._items)
             beg = k.start
