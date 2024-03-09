@@ -6,7 +6,16 @@ from typing import Iterable, Self
 # pylint:disable=too-few-public-methods
 
 
+# NOTE: entity may have no "name" if it's simply unnamed VM memory areas
+#   WARN: entity may not have even "luid" (like addr local to specific VM)
+#     e.g. network pkts in socket can be identical and yet different (like "was_invalidated" ntf)
+#   WARN: entity may not have enen characteristic of "order" e.g. for randomly delivered UDP pkts
 class Entity(metaclass=ABCMeta):
+    # NOTE: "preferred" only has sense in the ctx of viewer/widget/workflow
+    #   i.e. we may have different "preferred" actions based on current widget
+    #     IDEA: use dict() when you have more than one preferred value
+    #   USAGE: widget overlay should fallback to "most logical defaults", which is "preferred"
+    #     RENAME? → "default="
     preferred = "actions"
     # @property
     # @abstractmethod
@@ -70,9 +79,11 @@ class FileEntity(InodeEntity):
 # DECI: name after "outer container" (=DirectoryListing) ?
 #   OR after "common ancestor of elements" (=InodeListing)
 #   BUT: how to re-iterate over *generated* listing -- should we cache items inside XXXListing ?
-#     BUT: for very long folders/IRC -- we shouldn't cache whole lists (more RAM, more latency)
+#     BUT: for very long folders/IRC -- we shouldn't cache whole lists at once (more RAM, more latency)
+#         ~~ MAYBE: store only str(paths) w/o converting them to Entity/CachedProxy to reduce RAM footprint
 #       BUT: lists usually need to be sorted -- it's hard to not get whole list first to sort once
 #         ~~ though, IRC is ts-appended, and file listing can be insert-sorted...
+# RENAME? FSEntryEntity, PathEntry
 class InodeListing(object):
     def __init__(self, path: Path) -> None:
         self._path = path
