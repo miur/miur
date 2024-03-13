@@ -111,6 +111,10 @@ class AsyncListingView(Entity):
         #   BET:SEP: `Transform to independent class, and allow reversed(AsyncListing)
         #     NICE: we can optimize underlying proto to start requesting items from back
         #     SEE: my older attempts to create Transform cls in #miur and #pa3arch
+        #   WARN: `TransformedView should definitely be `Cached
+        #     << COS sorted() is very slow, when we need to redraw `Widget many times
+        #     BUT:ALSO: order/filter ops should be very fast
+        #      >> so underlying `Listing should be `Cached too
         if self.reversed:
             return reversed(xs)
         return xs
@@ -162,11 +166,10 @@ class PrinterDevice:
 # RENAME? Widget -> Presenter/Adapter
 # TODO:(inheritance hierarchy): DirWidget(GenericEntityWidget(Entity))
 class DirWidget:
-    # _ent: DirEntity
-    # _lst: AsyncListingView
-
     def __init__(self, ent: DirEntity | None = None) -> None:
         # self._show = "LsInodes"  # = «default action name»
+        self._ent: DirEntity
+        self._lst: AsyncListingView
         if ent:
             self.set_entity(ent)
 
@@ -175,8 +178,15 @@ class DirWidget:
         self._ent = ent
         # act = ent.LsinodesAction
         # view = AsyncListingView(act)
+
+        ## NOTE: we imeediately do {Action.exec()->Listing} here in `Widget
+        #   so it may seem tempting to combine Entity+Listing
+        #    BUT(in general): we don't exec() any item in _lst itself,
+        #     until it's passed to some `Widget or `Script,
+        #     so separation of concepts is justified
         ## DISABLED: It's too early for «short-circuiting»
         # self._lst = self._ent[self._show]()
+        self._lst = self._ent()
 
     def render_to(self, odev: PrinterDevice) -> None:
         # IDEA:(sparse API): use ERROR placeholders if Entity doesn't have some of DirEntity methods
