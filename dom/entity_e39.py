@@ -2,7 +2,7 @@ import os
 from abc import ABCMeta, abstractmethod
 from collections import deque
 from pathlib import Path
-from typing import Any, Callable, Iterable, Protocol, Self, Sequence
+from typing import Any, Callable, Iterable, Iterator, Protocol, Self, Sequence, overload
 
 from typing_extensions import ParamSpec
 
@@ -43,6 +43,11 @@ class Action(Entity):
         raise NotImplementedError
 
 
+# class ShowAllActions(Action):
+#     def __call__(self, wdg: DirWidget) -> None:
+#         wdg.set_entity(ent)  # OR wdg.ent
+
+
 class InodeEntity(Entity):
     def __init__(self, path: str | Path) -> None:
         self._path = Path(path)
@@ -81,53 +86,18 @@ class DirEntity(InodeEntity):
         raise NotImplementedError
 
 
-# FIXED:RENAME: DirView -> AsyncListingView
+# FIXED:RENAME: DirView -> AsyncCachedListing
 #   * we shouldn't cache both DirEntity and generic Listing with STD list-trfm API in single DirView
-class AsyncListingView(Entity):
+class AsyncCachedListing(Entity):
     def __init__(self, act: Action) -> None:
         self._act = act
         # lst = self._act()
+        # NOTE:(cache): is SparseCache which we splice() to replace placeholders "[...]/<loading>"
         self._cache: deque[Entity] = deque()
-        self.sorted: bool | Callable[[Entity], SupportsLessThan] | None = False
-        self.reversed = False
 
     @property
     def name(self) -> str:
         return self._act.name + ".Listing"
-
-    # THINK: maybe cache transformed results too?
-    #   NEED: propagate changes/events in underlying FS till transformed results
-    #     BUT: only if those changes are reflected in xfm, otherwise ignore them
-    # DISABLED:WAIT: !python>=3.12
-    # def _transform[Ts: Iterable[Entity]](self, xs: Ts) -> Ts:
-    def _transform(self, xs: Sequence[Entity]) -> Iterable[Entity]:
-        """[View.API] Apply stateful transformation."""
-        if self.sorted:
-            fkey = None if isinstance(self.sorted, bool) else self.sorted
-            return sorted(xs, key=fkey, reverse=self.reversed)
-        # ALT:MAYBE: directly allow applying reversed(AsyncListing[ReversibleSequence])
-        #   BUT: in that case I will still be forced to keep ViewState somewhere
-        #     e.g. to pick when to apply reversed() and when not
-        #   BET:SEP: `Transform to independent class, and allow reversed(AsyncListing)
-        #     NICE: we can optimize underlying proto to start requesting items from back
-        #     SEE: my older attempts to create Transform cls in #miur and #pa3arch
-        #   WARN: `TransformedView should definitely be `Cached
-        #     << COS sorted() is very slow, when we need to redraw `Widget many times
-        #     BUT:ALSO: order/filter ops should be very fast
-        #      >> so underlying `Listing should be `Cached too
-        if self.reversed:
-            return reversed(xs)
-        return xs
-
-    def __iter__(self) -> Iterable[Entity]:
-        """[Sync.API] Return all currently present (cached) items."""
-        # IDEA: allow `Cache to contain only «args» inof whole Entity,
-        #    and create actual entries only when yielding items
-        #  e.g. store only "str(Path)" inof InodeEntity for each item in DirListing
-        #  COS: &why Reduce RAM consumption and CPU latency on unnecessary Entity creation
-        #  BUT: assuming that View will be cached in Widget, we won't benefit much
-        #  BAD: listing obtained twice will yield two different instances of `Entity
-        return self._transform(self._cache)
 
     # def prefetch(beg:int, end:int):
     #     """[Async.API] Clear cached items. NOTE: re-fetching should be initiated separately."""
@@ -147,7 +117,7 @@ class LsinodesAction(Action):
     def __init__(self, ent: DirEntity) -> None:
         self._ent = ent
 
-    def __call__(self, *_args: P.args, **_kwds: P.kwargs) -> AsyncListingView:
+    def __call__(self, *_args: P.args, **_kwds: P.kwargs) -> AsyncCachedListing:
         # FIXME: should be stateful [Async.API]
         with os.scandir(self._ent._path) as it:
             # THINK: construct new `*Entity directly here (to include ctx)
@@ -158,6 +128,112 @@ class LsinodesAction(Action):
             return [e.name for e in it]
 
 
+class Transformer:
+    # RENAME:(action-like): sortby, reverse
+    sorted: bool | Callable[[Entity], SupportsLessThan] | None
+    reversed: bool
+    # - clip (head/tail/mid)
+    # - filter
+    # - flatten
+    # - groupby
+    # - annotate/enrich
+
+    def __init__(self) -> None:
+        self.sorted = False
+        self.reversed = False
+
+    # THINK: maybe cache transformed results too?
+    #   NEED: propagate changes/events in underlying FS till transformed results
+    #     BUT: only if those changes are reflected in xfm, otherwise ignore them
+    # DISABLED:WAIT: !python>=3.12
+    # def _transform[Ts: Iterable[Entity]](self, xs: Ts) -> Ts:
+    def __call__(self, xs: Sequence[Entity]) -> Iterable[Entity]:
+        """[View.API] Apply stateful transformation."""
+        if self.sorted:
+            fkey = None if isinstance(self.sorted, bool) else self.sorted
+            return sorted(xs, key=fkey, reverse=self.reversed)
+        # ALT:MAYBE: directly allow applying reversed(AsyncListing[ReversibleSequence])
+        #   BUT: in that case I will still be forced to keep ViewState somewhere
+        #     e.g. to pick when to apply reversed() and when not
+        #   BET:SEP: `Transform to independent class, and allow reversed(AsyncListing)
+        #     NICE: we can optimize underlying proto to start requesting items from back
+        #     SEE: my older attempts to create Transform cls in #miur and #pa3arch
+        #   WARN: `TransformedView should definitely be `Cached
+        #     << COS sorted() is very slow, when we need to redraw `Widget many times
+        #     BUT:ALSO: order/filter ops should be very fast
+        #      >> so underlying `Listing should be `Cached too
+        if self.reversed:
+            return reversed(xs)
+        return xs
+
+    # NOTE: to be able to mutate CachedXfm in-place
+    def apply_to(self, lst: list[Entity]) -> None:
+        if self.sorted:
+            fkey = None if isinstance(self.sorted, bool) else self.sorted
+            lst.sort(key=fkey, reverse=self.reversed)
+        if self.reversed:
+            lst.reverse()
+
+
+# RENAME? [Shallow]CachedXfm[=Transformer]
+class CachedXfm:
+    def __init__(self, als: AsyncCachedListing, tfmr: Transformer) -> None:
+        self._als = als
+        self._tfmr = tfmr
+        self._cache = list(self._tfmr(self._als))
+
+        # TODO: repeat on each update() of als ALSO update() on tfmr .fields change
+        # FUT:ENH: make a protocol to update incrementally only whatever changed
+        # self._tfmr.apply_to(self._cache)
+
+    def __iter__(self) -> Iterator[Entity]:
+        """[Sync.API] Return all currently present (cached) items."""
+        # IDEA: allow `Cache to contain only «args» inof whole Entity,
+        #    and create actual entries only when yielding items
+        #  e.g. store only "str(Path)" inof InodeEntity for each item in DirListing
+        #  COS: &why Reduce RAM consumption and CPU latency on unnecessary Entity creation
+        #  BUT: assuming that View will be cached in Widget, we won't benefit much
+        #  BAD: listing obtained twice will yield two different instances of `Entity
+        return iter(self._cache)
+
+    @overload
+    def __getitem__(self, kx: slice) -> list[Entity]:
+        ...
+
+    @overload
+    def __getitem__(self, kx: int) -> Entity:
+        ...
+
+    def __getitem__(self, kx: slice | int) -> list[Entity] | Entity:
+        if isinstance(kx, (slice, int)):
+            return self._cache[kx]
+        # NICE: get list of items inof single one
+        if isinstance(kx, tuple):
+            return [self._cache[i] for i in kx]
+        return NotImplementedError
+
+
+# [_] TODO:RFC:USE:(python=3.12): View[T] ; CachedXfm[T] ; Entity → T
+class View:
+    _beg: int
+    _num: int
+
+    # ALT:SEE:(3-way):IMPL: just.reelf.dom.AddrRange(beg,sz,end)
+    def __init__(self, xfm: CachedXfm, beg: int = 0, num: int = 0) -> None:
+        self._xfm = xfm
+        assert all(isinstance(x, int) for x in (beg, num))
+        self.set_span(beg, num)
+
+    def set_span(self, beg: int | None = None, num: int | None = None) -> None:
+        if beg is not None:
+            self._beg = beg
+        if num is not None:
+            self._num = num
+
+    def __iter__(self) -> Iterable[Entity]:
+        return self._xfm[self._beg : self._beg + self._num]
+
+
 class PrinterDevice:
     def add_line(self, x: int, y: int, s: str) -> None:
         print("  " * x + str(y) + ": " + s)
@@ -166,10 +242,12 @@ class PrinterDevice:
 # RENAME? Widget -> Presenter/Adapter
 # TODO:(inheritance hierarchy): DirWidget(GenericEntityWidget(Entity))
 class DirWidget:
+    _ent: DirEntity
+    _vw: AsyncCachedListing
+
     def __init__(self, ent: DirEntity | None = None) -> None:
         # self._show = "LsInodes"  # = «default action name»
-        self._ent: DirEntity
-        self._lst: AsyncListingView
+        self._tfmr = Transformer()
         if ent:
             self.set_entity(ent)
 
@@ -177,7 +255,7 @@ class DirWidget:
         # WARN: should probably be DirCachedProxy to cache fetched and generated results
         self._ent = ent
         # act = ent.LsinodesAction
-        # view = AsyncListingView(act)
+        # view = AsyncCachedListing(act)
 
         ## NOTE: we imeediately do {Action.exec()->Listing} here in `Widget
         #   so it may seem tempting to combine Entity+Listing
@@ -186,12 +264,17 @@ class DirWidget:
         #     so separation of concepts is justified
         ## DISABLED: It's too early for «short-circuiting»
         # self._lst = self._ent[self._show]()
-        self._lst = self._ent()
+        # [_] WARN: when you re-assign _lst -- it shouldn't be destroyed
+        #   >> WF: so you could switch back-n-forth previous assigned lists in same widget
+        #   !! i.e. they should be in `CachePool first, and only handle assigned to self._lst
+        #   ?? should I wrap all of them into ProxyToPool() to give back existing instance OR make a new
+        #     COS when it's deleted from Pool to fit memory limits -- we need to know and drop or recreate
+        self._view = View(CachedXfm(AsyncCachedListing(self._ent.ShowAllActions()), self._tfmr))
 
     def render_to(self, odev: PrinterDevice) -> None:
         # IDEA:(sparse API): use ERROR placeholders if Entity doesn't have some of DirEntity methods
         odev.add_line(0, 0, self._ent.name)
-        for i, ent in enumerate(self._lst, start=1):
+        for i, ent in enumerate(self._view, start=1):
             odev.add_line(1, i, ent)
 
     def handle_keypress(self, key: str) -> None:
