@@ -1,6 +1,7 @@
 import os
 from abc import ABCMeta, abstractmethod
 from collections import deque
+from functools import cached_property
 from pathlib import Path
 from typing import Any, Callable, Iterable, Iterator, Protocol, Self, Sequence, overload
 
@@ -19,8 +20,39 @@ class SupportsLessThan(Protocol):
 ### ARCH
 
 
+# FIXED:RENAME: DirView -> AsyncCachedListing
+#   * we shouldn't cache both DirEntity and generic Listing with STD list-trfm API in single DirView
+class AsyncCachedListing:
+    def __init__(self, act: Action) -> None:
+        self._act = act
+        # lst = self._act()
+        # NOTE:(cache): is SparseCache which we splice() to replace placeholders "[...]/<loading>"
+        self._cache: deque[Entity] = deque()
+
+    @property
+    def name(self) -> str:
+        return self._act.name + ".Listing"
+
+    # def prefetch(beg:int, end:int):
+    #     """[Async.API] Clear cached items. NOTE: re-fetching should be initiated separately."""
+    # def clear():
+    #     """Clear cached items. NOTE: re-fetching should be initiated separately."""
+    # def wait_done(timeout=None):
+    #     """Block until *requested* ranges were fetched."""
+    # def wait_any_event(timeout=None):
+    #     """Block until any new event received e.g. listing state update."""
+    # def wait_accumulated(timespan):
+    #     """Block for exactly dt seconds to get efficient batch xfr from remote."""
+
+
 class Entity(metaclass=ABCMeta):
     # default = "actionlist"
+    # _als: AsyncCachedListing
+
+    @cached_property  # NOTE: use delattr(obj, 'actions') to recalc the list
+    @abstractmethod
+    def actions(self) -> AsyncCachedListing:
+        raise NotImplementedError
 
     # ALT: uid()  // = and avoid duplicate names
     # ALT: __str__()
@@ -69,6 +101,11 @@ class DirEntity(InodeEntity):
     #     yield ShowActionEntity("VirtualListWidget", "EntityView", "get_actions")
     #     pass
 
+    @cached_property
+    @abstractmethod
+    def actions(self) -> AsyncCachedListing:
+        raise AsyncCachedListing(LsinodesAction(self))
+
     def _actions(self) -> Iterable[Action]:
         # CHG: don't generate new ones each time, simply traverse over existing CachedListingAction
         # THINK:DECI: early binding in __init__(), later in __getitem__, OR defer until Listing/Widget ?
@@ -84,31 +121,6 @@ class DirEntity(InodeEntity):
             if act.name == "LsInodes":
                 return act
         raise NotImplementedError
-
-
-# FIXED:RENAME: DirView -> AsyncCachedListing
-#   * we shouldn't cache both DirEntity and generic Listing with STD list-trfm API in single DirView
-class AsyncCachedListing(Entity):
-    def __init__(self, act: Action) -> None:
-        self._act = act
-        # lst = self._act()
-        # NOTE:(cache): is SparseCache which we splice() to replace placeholders "[...]/<loading>"
-        self._cache: deque[Entity] = deque()
-
-    @property
-    def name(self) -> str:
-        return self._act.name + ".Listing"
-
-    # def prefetch(beg:int, end:int):
-    #     """[Async.API] Clear cached items. NOTE: re-fetching should be initiated separately."""
-    # def clear():
-    #     """Clear cached items. NOTE: re-fetching should be initiated separately."""
-    # def wait_done(timeout=None):
-    #     """Block until *requested* ranges were fetched."""
-    # def wait_any_event(timeout=None):
-    #     """Block until any new event received e.g. listing state update."""
-    # def wait_accumulated(timespan):
-    #     """Block for exactly dt seconds to get efficient batch xfr from remote."""
 
 
 class LsinodesAction(Action):
@@ -270,7 +282,9 @@ class DirWidget:
         #   !! i.e. they should be in `CachePool first, and only handle assigned to self._lst
         #   ?? should I wrap all of them into ProxyToPool() to give back existing instance OR make a new
         #     COS when it's deleted from Pool to fit memory limits -- we need to know and drop or recreate
-        self._view = View(CachedXfm(AsyncCachedListing(self._ent.ShowAllActions()), self._tfmr))
+        self._view = View(
+            CachedXfm(AsyncCachedListing(self._ent.ShowAllActions()), self._tfmr)
+        )
 
     def render_to(self, odev: PrinterDevice) -> None:
         # IDEA:(sparse API): use ERROR placeholders if Entity doesn't have some of DirEntity methods
