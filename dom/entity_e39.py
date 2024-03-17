@@ -180,6 +180,7 @@ class CachedXfm:
     def __init__(self, als: AsyncCachedListing, tfmr: Transformer) -> None:
         self._als = als
         self._tfmr = tfmr
+        # self._anno = Annotate(PersistentDB)  # = separate enricher
         self._cache = list(self._tfmr(self._als))
 
         # TODO: repeat on each update() of als ALSO update() on tfmr .fields change
