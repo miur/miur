@@ -304,14 +304,19 @@ class DirWidget:
             raise NotImplementedError
 
 
-def _live() -> None:
-    dtmp = Path("/t")  # =/tmp/testmiur
+def _testenv() -> None:
+    dtmp = Path("/tmp/testmiur")
     dtmp.mkdir(exist_ok=True)
     for c in "abc":
         dtmp.joinpath(c).touch(exist_ok=True)
+    dnst = dtmp / "d"
+    dnst.mkdir(exist_ok=True)
+    for c in "123":
+        dnst.joinpath(c).touch(exist_ok=True)
 
-    wdg = DirWidget(DirEntity("/t"))
 
+def _live() -> None:
+    wdg = DirWidget(DirEntity("/tmp/testmiur"))
     odev = PrinterDevice()
     wdg.render_to(odev)
 
