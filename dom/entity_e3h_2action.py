@@ -22,6 +22,18 @@ class Entity(metaclass=ABCMeta):
         ...
 
 
+class Action(Entity, metaclass=ABCMeta):
+    @property
+    def name(self) -> str:
+        return self.__class__.__name__.removesuffix("Action")
+
+    # [X] CHG? actually, actions *may* produce other actions e.g. in «grouped actions» hierarchy
+    #   OR:NICE:IDEA: parametrized Action will produce Actions with specific bound values/sliders
+    # @abstractmethod
+    # def __call__(self, *_args: P.args, **_kwds: P.kwargs) -> Iterable[Entity]:
+    #     ...
+
+
 class Entry(Entity, metaclass=ABCMeta):
     @property
     def name(self) -> str:
@@ -29,19 +41,12 @@ class Entry(Entity, metaclass=ABCMeta):
         # TODO? should instead access internal value e.g. _path
         return f"{cls}({self})"
 
-    @abstractmethod
-    def __call__(self, *_args: P.args, **_kwds: P.kwargs) -> Iterable[Action]:
-        ...
-
-
-class Action(Entity, metaclass=ABCMeta):
-    @property
-    def name(self) -> str:
-        return self.__class__.__name__.removesuffix("Action")
-
-    @abstractmethod
-    def __call__(self, *_args: P.args, **_kwds: P.kwargs) -> Iterable[Entry]:
-        ...
+    # [$] CHG? actually, entries *may* produce other entries e.g. in «grouped listing» view
+    #   ~~ however, that ‹group criteria› will probably be an `Action itself…
+    #   === duality of `GroupBySfx_Action vs `SfxGroup_Entity -- are they the same?
+    # @abstractmethod
+    # def __call__(self, *_args: P.args, **_kwds: P.kwargs) -> Iterable[Action]:
+    #     ...
 
 
 # class ListInodesAction(Action):
@@ -59,15 +64,19 @@ class Action(Entity, metaclass=ABCMeta):
 
 # NOTE: same as Monadic {Ma->f(x)->Mb}
 class ListInodesAction(Action):
-    def __call__(self, path: str) -> Iterable[FSEntry]:
-        with os.scandir(path) as it:
-            return [FSEntry(e.path) for e in it]
+    def __call__(self, *_args: P.args, **_kwds: P.kwargs) -> Iterable[FSEntry]:
+        return [FSEntry("/t")]
+        # with os.scandir(path) as it:
+        #     return [FSEntry(e.path) for e in it]
 
 
 class FSEntry(Entry):
     def __init__(self, path: str) -> None:
         self._path = path
 
+    # FAIL: dif signature, dif return type
+    #   [_] THINK: what can we do here?
+    #     ? pack all args into sep class?  OR:(same):USE "Any" ?
     def __call__(self) -> Iterable[Action]:
         return [ListInodesAction()]
 
