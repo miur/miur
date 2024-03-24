@@ -1,49 +1,75 @@
-import os
-from abc import ABCMeta, abstractmethod
-from typing import Iterable
+# import os
+from abc import ABCMeta  # , abstractmethod
+from typing import Callable, Generic, Iterable, Protocol, Self, TypeVar, TYPE_CHECKING
 
 from typing_extensions import ParamSpec
 
+if not TYPE_CHECKING:
+    reveal_type = print
+
+T = TypeVar("T")
+R = TypeVar("R")
 P = ParamSpec("P")
 
 # pylint:disable=too-few-public-methods
 
+# Generic[T]
+# class ImplementsPointed(Protocol):
+#     def __init__(self, x: T) -> None:
+#         ...
+#
+# class ImplementsFunctor(Protocol):
+#     def fmap(self, fn: Callable[[T]]) -> T:
+#         ...
+#
+# class Entity(metaclass=ABCMeta):
+#     @abstractmethod
+#     def __call__(self, *_args: P.args, **_kwds: P.kwargs) -> Iterable["Entity"]: ...
+#
+# # RENAME? "Named|BeingNamed"
+# class HasName(Protocol):
+#     @property
+#     # @abstractmethod
+#     def name(self) -> str:
+#         ...
+#         # cls = type(self).__name__.removesuffix("Entry")  # "Action"
+#         # return f"{cls}({repr(self._x)})"
+
 
 # RENAME?= Fractal, Junction, Branching, Composable, Discoverable, Unwrappable, Expandable
 #   BAD: I want to use "Entity" everywhere in SRC, not some other word
-class Entity(metaclass=ABCMeta):
-    @property
-    @abstractmethod
-    def name(self) -> str:
-        ...
+class CallComposable(Generic[T]):  # , metaclass=ABCMeta
+    def __init__(self, x: T) -> None:
+        self._x = x
 
-    @abstractmethod
-    def __call__(self, *_args: P.args, **_kwds: P.kwargs) -> Iterable["Entity"]:
-        ...
+    def __call__(self, fsp: Callable[[T], "CallComposable[R]"]) -> "CallComposable[R]":
+        return fsp(self._x)
+
+    # def __call__(self, fsp: Callable[[T], "Entity[R]"]) -> "Entity[R]":
+    #     return fsp(self._x)
+    #
+    # NOTE "python-returns" makes it @abstractmethod COS Monads are different
+    #   SEE: how it actually accomplished (T->R) return type in mypy
+    #     /d/research/miur/functional/returns/returns
+    # _Self = TypeVar("_Self", bound="Entity[T]")
+    # def fmap(self: _Self, fn: Callable[[T], R]) -> _Self:
+    #     return type(self)(fn(self._x))
+
+
+class Entity(CallComposable[T]):
+    pass
 
 
 class Action(Entity, metaclass=ABCMeta):
-    @property
-    def name(self) -> str:
-        return self.__class__.__name__.removesuffix("Action")
-
-    # [X] CHG? actually, actions *may* produce other actions e.g. in «grouped actions» hierarchy
-    #   OR:NICE:IDEA: parametrized Action will produce Actions with specific bound values/sliders
+    pass
     # @abstractmethod
     # def __call__(self, *_args: P.args, **_kwds: P.kwargs) -> Iterable[Entity]:
     #     ...
 
 
 class Entry(Entity, metaclass=ABCMeta):
-    @property
-    def name(self) -> str:
-        cls = self.__class__.__name__.removesuffix("Entry")
-        # TODO? should instead access internal value e.g. _path
-        return f"{cls}({self})"
+    pass
 
-    # [$] CHG? actually, entries *may* produce other entries e.g. in «grouped listing» view
-    #   ~~ however, that ‹group criteria› will probably be an `Action itself…
-    #   === duality of `GroupBySfx_Action vs `SfxGroup_Entity -- are they the same?
     # @abstractmethod
     # def __call__(self, *_args: P.args, **_kwds: P.kwargs) -> Iterable[Action]:
     #     ...
