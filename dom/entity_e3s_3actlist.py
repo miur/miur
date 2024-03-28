@@ -20,7 +20,7 @@ _REntity_co = TypeVar("_REntity_co", bound="Entity[Any]", covariant=True)
 
 ########################################
 class Composable(Protocol[_Tx_co]):
-    def __mul__(self, fsp: Callable[[_Tx_co], _REntity_co], /) -> _REntity_co: ...
+    def __mul__(self, sfn: Callable[[_Tx_co], _REntity_co], /) -> _REntity_co: ...
 
 
 # Entity[Inner] = Pointed + Composable + Named
@@ -29,8 +29,8 @@ class Entity(Composable[_Tx_co], metaclass=ABCMeta):
         self._x = x
 
     # @abstractmethod
-    def __mul__(self, fsp: Callable[[_Tx_co], _REntity_co], /) -> _REntity_co:
-        return fsp(self._x)
+    def __mul__(self, sfn: Callable[[_Tx_co], _REntity_co], /) -> _REntity_co:
+        return sfn(self._x)
 
     @property
     def name(self) -> str:
@@ -86,18 +86,12 @@ class Keyval(Entity[tuple[str, _Tx_co]]):
         return self._x[0] + ": " + repr(self._x[1])
 
 
-class ListFSStats(Entity[None]):
+class ListFSStats(Action[None, str]):
     def __call__(self, path: str) -> CachedListing[Keyval[int]]:
         st = __import__("os").lstat(path)
         return CachedListing(
             Keyval(k, getattr(st, k)) for k in dir(st) if k.startswith("st_")
         )
-
-
-########################################
-# RENAME? List[Available|Supported|Implemented]Actions
-class ListActions(Entity[None]):
-    pass
 
 
 ########################################
