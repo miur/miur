@@ -28,6 +28,7 @@ class Entity(Composable[_Tx_co], metaclass=ABCMeta):
     def __init__(self, x: _Tx_co, /) -> None:
         self._x = x
 
+    # NOTE: = .apply_immediately() inof .bind() for deferred (like Future)
     # @abstractmethod
     def __mul__(self, sfn: Callable[[_Tx_co], _REntity_co], /) -> _REntity_co:
         return sfn(self._x)
@@ -74,6 +75,50 @@ class ListFSEntries(Action[None, str]):
     def __call__(self, path: str) -> CachedListing[FSEntry]:
         with __import__("os").scandir(path) as it:
             return CachedListing(FSEntry(e.path) for e in it)
+
+
+########################################
+class Applicative(Protocol[_Tx_contra]):
+    def __call__(self, ent: Composable[_Tx_contra], /) -> Composable[Any]: ...
+
+
+class ActionM(Entity[_Tx_co], Applicative[_Tx_contra]):
+    def __call__(self, ent: Composable[_Tx_contra], /) -> Entity[Any]:
+        return ent * self._sfn
+
+    # _sfn: Applicable[_Tx_contra]
+    # BAD: can't rename args in derived class, unless I use trailing "/"
+    @abstractmethod
+    def _sfn(self, x: _Tx_contra, /) -> Entity[Any]: ...
+
+
+class ListFSEntriesM(ActionM[None, str]):
+    def _sfn(self, path: str, /) -> CachedListing[FSEntry]:
+        with __import__("os").scandir(path) as it:
+            return CachedListing(FSEntry(e.path) for e in it)
+
+
+def _live2() -> None:
+    en0 = FSEntry("/etc/udev")
+    ac1 = ListFSEntriesM(None)
+    ac2 = GetByIndex(1)
+    # FIXME: ac* should inherit from ActionM for this to work
+    _en1: FSEntry = ac2(ac1(en0))
+
+
+# RENAME? List[Available|Supported|Implemented]Actions
+class ListActions(ActionM[None, type]):
+    def __call__(
+        self, ent: Composable[_Tx_contra], /
+    ) -> CachedListing[ActionM[None, None]]:
+        return self._sfn(type(ent))
+
+    def _sfn(self, cls: type, /) -> CachedListing[ActionM[None, None]]:
+        return CachedListing(cls.get_insts())
+        # * list bound to FSEntity
+        # * list bound to all super(FSEntity)
+        # * list all Protocol compatible with FSEntity
+        # * list all compatible with Inner value type of FSEntity
 
 
 ########################################
