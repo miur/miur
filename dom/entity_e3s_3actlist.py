@@ -1,10 +1,12 @@
 from abc import ABCMeta, abstractmethod
+from inspect import signature
 from typing import (
     Annotated,
     Any,
     Callable,
     Iterable,
     Iterator,
+    NewType,
     Protocol,
     Sequence,
     TypeVar,
@@ -39,17 +41,6 @@ class Entity(Composable[_Tx_co], metaclass=ABCMeta):
 
 
 ########################################
-class Applicable(Protocol[_Tx_contra]):
-    def __call__(self, x: _Tx_contra, /) -> Composable[Any]: ...
-
-
-# Action = Entity[Context] + SpecialFunction
-class Action(Entity[_Tx_co], Applicable[_Tx_contra]):
-    @abstractmethod
-    def __call__(self, x: _Tx_contra, /) -> Entity[Any]: ...
-
-
-########################################
 # EVO: CachedAsyncListingProxy with non-"list" IMPL
 class CachedListing(Entity[Sequence[T]]):
     def __init__(self, xs: Iterable[T]) -> None:
@@ -59,66 +50,68 @@ class CachedListing(Entity[Sequence[T]]):
         return iter(self._x)
 
 
-class GetByIndex(Action[int, Sequence[Entity[Any]]]):
+########################################
+class Applicable(Protocol[_Tx_contra]):
+    def __call__(self, x: _Tx_contra, /) -> Composable[Any]: ...
+
+
+_g_actions: dict[type, list[type]] = {}
+
+
+# Action = Entity[Context] + SpecialFunction
+class Action(
+    Entity[Annotated[_Tx_co, "Context"]],
+    Applicable[Annotated[_Tx_contra, "Inner"]],
+):
+    # ALT: recursively inspect Action.__subclasses__()
+    #   ALT: walk through whole runtime code and inspect everything in existence
+    def __init_subclass__(cls) -> None:
+        super().__init_subclass__()
+        ta = tuple(signature(cls.__call__).parameters.values())[1].annotation
+        _g_actions.setdefault(ta, []).append(cls)
+
+    @abstractmethod
+    def __call__(self, x: _Tx_contra, /) -> Entity[Any]: ...
+
+
+# RENAME? List[All|Available|Supported|Implemented|Accepted]Actions
+class ListActions(Action[None, Any]):
+    # BAD: we should have specific "ActionType" inof "type" here
+    def __call__(self, x: Any, /) -> CachedListing[type]:
+        """Look for actions bound to specific `*Entity instance or any of its base classes"""
+        # [_] ALSO: should match CachedListing[Sequence[T]] onto Sequence[Entity] bound type
+        hier = [x, *type(x).mro()]
+        # FAIL: PathLike NewType is stored as simple "str" inside Entity >> so no runtime introspection
+        print("T:", type(x))
+        return CachedListing(a for t in hier for a in _g_actions.get(t, []))
+
+
+class GetByIndex(Action[int, Sequence[Any]]):
     def __call__(self, xs: Sequence[_REntity_co]) -> _REntity_co:
         return xs[self._x]
 
 
 ########################################
-class FSEntry(Entity[str]):
-    _x: Annotated[str, "Path"]
+
+# AnyPath = Union[str, bytes, PathLike[str], PathLike[bytes]] | int(fd) | Path
+# PathLike = NewType("PathLike", str)
+# class PathLike(str):
+#     pass
+from pathlib import Path
+PathLike = Path
+
+class FSEntry(Entity[PathLike]):
+    # _x: Annotated[str, "Path"]
     # def __init__(self, path: str) -> None:
     #     super().__init__(path)
+    pass
 
 
-class ListFSEntries(Action[None, str]):
-    def __call__(self, path: str) -> CachedListing[FSEntry]:
+# [_] THINK: how to stop annotating *class itself* by actual types
+class ListFSEntries(Action[None, PathLike]):
+    def __call__(self, path: PathLike) -> CachedListing[FSEntry]:
         with __import__("os").scandir(path) as it:
             return CachedListing(FSEntry(e.path) for e in it)
-
-
-########################################
-class Applicative(Protocol[_Tx_contra]):
-    def __call__(self, ent: Composable[_Tx_contra], /) -> Composable[Any]: ...
-
-
-class ActionM(Entity[_Tx_co], Applicative[_Tx_contra]):
-    def __call__(self, ent: Composable[_Tx_contra], /) -> Entity[Any]:
-        return ent * self._sfn
-
-    # _sfn: Applicable[_Tx_contra]
-    # BAD: can't rename args in derived class, unless I use trailing "/"
-    @abstractmethod
-    def _sfn(self, x: _Tx_contra, /) -> Entity[Any]: ...
-
-
-class ListFSEntriesM(ActionM[None, str]):
-    def _sfn(self, path: str, /) -> CachedListing[FSEntry]:
-        with __import__("os").scandir(path) as it:
-            return CachedListing(FSEntry(e.path) for e in it)
-
-
-def _live2() -> None:
-    en0 = FSEntry("/etc/udev")
-    ac1 = ListFSEntriesM(None)
-    ac2 = GetByIndex(1)
-    # FIXME: ac* should inherit from ActionM for this to work
-    _en1: FSEntry = ac2(ac1(en0))
-
-
-# RENAME? List[Available|Supported|Implemented]Actions
-class ListActions(ActionM[None, type]):
-    def __call__(
-        self, ent: Composable[_Tx_contra], /
-    ) -> CachedListing[ActionM[None, None]]:
-        return self._sfn(type(ent))
-
-    def _sfn(self, cls: type, /) -> CachedListing[ActionM[None, None]]:
-        return CachedListing(cls.get_insts())
-        # * list bound to FSEntity
-        # * list bound to all super(FSEntity)
-        # * list all Protocol compatible with FSEntity
-        # * list all compatible with Inner value type of FSEntity
 
 
 ########################################
@@ -131,8 +124,8 @@ class Keyval(Entity[tuple[str, _Tx_co]]):
         return self._x[0] + ": " + repr(self._x[1])
 
 
-class ListFSStats(Action[None, str]):
-    def __call__(self, path: str) -> CachedListing[Keyval[int]]:
+class ListFSStats(Action[None, PathLike]):
+    def __call__(self, path: PathLike) -> CachedListing[Keyval[int]]:
         st = __import__("os").lstat(path)
         return CachedListing(
             Keyval(k, getattr(st, k)) for k in dir(st) if k.startswith("st_")
@@ -168,8 +161,19 @@ class ListWidget:
 
 ########################################
 def _live() -> None:
-    wdg = ListWidget(FSEntry("/etc/udev"))
+    en0 = FSEntry(PathLike("/etc/udev"))
+    ac1 = ListFSEntries(None)
+    ac2 = GetByIndex(1)
+    # en1: FSEntry = ac2(ac1(en0))  # =if(ac*:Applicative)
+    en1: FSEntry = en0 * ac1 * ac2
+
+    print(_g_actions)
+    print(_g_actions[PathLike])
+    print(list(en1 * ListActions(None)))
+
+    wdg = ListWidget(en0)
     odev = PrinterDevice()
     wdg.render_to(odev)
+    assert en1 is wdg[1]
     wdg.set_entity(wdg[1])
     wdg.render_to(odev)
