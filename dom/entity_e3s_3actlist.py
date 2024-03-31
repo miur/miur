@@ -1,12 +1,12 @@
 from abc import ABCMeta, abstractmethod
 from inspect import signature
+from pathlib import Path
 from typing import (
     Annotated,
     Any,
     Callable,
     Iterable,
     Iterator,
-    NewType,
     Protocol,
     Sequence,
     TypeVar,
@@ -29,6 +29,21 @@ class Composable(Protocol[_Tx_co]):
 class Entity(Composable[_Tx_co], metaclass=ABCMeta):
     def __init__(self, x: _Tx_co, /) -> None:
         self._x = x
+        # print(f"{x!r}")
+
+    def __repr__(self) -> str:
+        ot = type(self).__name__  # __qualname__
+        it = type(self._x).__name__
+        sv = repr(self._x)
+        if not sv.startswith(it):
+            sv = f"{it}({sv})"
+        return f"{ot}({sv})"  # f'{ot}<{sv}>'
+
+    def __eq__(self, other: Any) -> bool:
+        # isinstance(other, Entity) and
+        if type(self) is type(other):
+            return bool(self._x == other._x)
+        return NotImplemented
 
     # NOTE: = .apply_immediately() inof .bind() for deferred (like Future)
     # @abstractmethod
@@ -77,13 +92,15 @@ class Action(
 # RENAME? List[All|Available|Supported|Implemented|Accepted]Actions
 class ListActions(Action[None, Any]):
     # BAD: we should have specific "ActionType" inof "type" here
-    def __call__(self, x: Any, /) -> CachedListing[type]:
+    def __call__(self, x: Any, /) -> CachedListing[Action[None, type]]:
         """Look for actions bound to specific `*Entity instance or any of its base classes"""
         # [_] ALSO: should match CachedListing[Sequence[T]] onto Sequence[Entity] bound type
         hier = [x, *type(x).mro()]
-        # FAIL: PathLike NewType is stored as simple "str" inside Entity >> so no runtime introspection
-        print("T:", type(x))
-        return CachedListing(a for t in hier for a in _g_actions.get(t, []))
+        # BAD: how to *defer* creation of actions OR pass ctor(ctx) directly here
+        #   BAD: ctor(ctx) may be different for dif Actions
+        #   WARN: ListActions() should alway sreturn `Entity -- to be able to show them in `Widget
+        #   MAYBE:IDEA: wrap each "Action class" into Entity[type], inof returning instantiated Actions
+        return CachedListing(a(None) for t in hier for a in _g_actions.get(t, []))
 
 
 class GetByIndex(Action[int, Sequence[Any]]):
@@ -94,24 +111,29 @@ class GetByIndex(Action[int, Sequence[Any]]):
 ########################################
 
 # AnyPath = Union[str, bytes, PathLike[str], PathLike[bytes]] | int(fd) | Path
+## FAIL: PathLike NewType is stored as simple "str" inside Entity >> so no runtime introspection
 # PathLike = NewType("PathLike", str)
+## BET: totally opaque container type
+#   -- used only to attach related Actions
 # class PathLike(str):
 #     pass
-from pathlib import Path
 PathLike = Path
+
 
 class FSEntry(Entity[PathLike]):
     # _x: Annotated[str, "Path"]
-    # def __init__(self, path: str) -> None:
-    #     super().__init__(path)
-    pass
+    def __init__(self, path: PathLike) -> None:
+        assert isinstance(path, PathLike)
+        super().__init__(path)
 
 
 # [_] THINK: how to stop annotating *class itself* by actual types
 class ListFSEntries(Action[None, PathLike]):
     def __call__(self, path: PathLike) -> CachedListing[FSEntry]:
         with __import__("os").scandir(path) as it:
-            return CachedListing(FSEntry(e.path) for e in it)
+            # WTF: why !mypy not forces to wrap into Path
+            # return CachedListing(FSEntry(e.path) for e in it)
+            return CachedListing(FSEntry(PathLike(e.path)) for e in it)
 
 
 ########################################
@@ -162,18 +184,30 @@ class ListWidget:
 ########################################
 def _live() -> None:
     en0 = FSEntry(PathLike("/etc/udev"))
+
+    # print("---")
+    # print(f"E0: {en0!r}")
+
     ac1 = ListFSEntries(None)
     ac2 = GetByIndex(1)
     # en1: FSEntry = ac2(ac1(en0))  # =if(ac*:Applicative)
     en1: FSEntry = en0 * ac1 * ac2
+    _ls2 = en1 * ListActions(None) * GetByIndex(1)
 
-    print(_g_actions)
-    print(_g_actions[PathLike])
-    print(list(en1 * ListActions(None)))
+    # ls1 = en0 * ac1
+    # print(f"A1: {ac1!r}")
+    # print(f"L1: {ls1!r}")
+    # print(f"E1: {en1!r}")
+
+    # print(f"{_g_actions=}\n")
+    # print("_g_actions={" + "".join(f"\n  {k} = {v}" for k,v in _g_actions.items()) + "\n}\n")
+    # print(f"{_g_actions[PathLike]=}\n")
+    # print(en1 * ListActions(None))
+
 
     wdg = ListWidget(en0)
     odev = PrinterDevice()
     wdg.render_to(odev)
-    assert en1 is wdg[1]
+    assert en1 == wdg[1], (en1, wdg[1])
     wdg.set_entity(wdg[1])
     wdg.render_to(odev)
