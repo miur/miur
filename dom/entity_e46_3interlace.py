@@ -1,4 +1,5 @@
 from abc import ABCMeta, abstractmethod
+from functools import singledispatch
 from inspect import signature
 from pathlib import Path
 from typing import (
@@ -10,6 +11,7 @@ from typing import (
     Protocol,
     Sequence,
     TypeVar,
+    runtime_checkable,
 )
 
 # pylint:disable=too-few-public-methods
@@ -108,6 +110,20 @@ class GetByIndex(Action[int, Sequence[Any]]):
         return xs[self._x]
 
 
+# RENAME? OLD=BoundActionEntity NEW=«Explorable» (better than «Expandable»)
+# class LiftedClosure(Entity[Callable[[_Tx_co], _REntity_co]]): ...
+# [?] ALT:IDEA: directly store Action inof Callable
+@runtime_checkable
+class LiftedClosure(Protocol[_Tx_contra, T]):
+    def __mul__(self, sfn: Callable[[Callable[[_Tx_contra], T]], T], /) -> T: ...
+
+
+# RENAME? OLD=ExecAction,WrappedContext
+class ExecWithContext(Action[_Tx_co, Callable[[_Tx_co], _REntity_co]]):
+    def __call__(self, xfn: Callable[[_Tx_co], _REntity_co], /) -> _REntity_co:
+        return xfn(self._x)
+
+
 ########################################
 
 # AnyPath = Union[str, bytes, PathLike[str], PathLike[bytes]] | int(fd) | Path
@@ -123,8 +139,18 @@ PathLike = Path
 class FSEntry(Entity[PathLike]):
     # _x: Annotated[str, "Path"]
     def __init__(self, path: PathLike) -> None:
+        # [_] TODO: use some type-frwk for runtime-checks?
         assert isinstance(path, PathLike)
         super().__init__(path)
+
+
+# THINK: how to inherit from LiftedClosure ?
+# ALT?
+# class FSLifted(Entity[Action[None, Callable[[PathLike], CachedListing[FSEntry]]]]):
+# class FSLifted(Entity[ExecWithContext[PathLike, CachedListing[FSEntry]]]):
+class FSLifted(Entity[Callable[[PathLike], CachedListing[FSEntry]]]):
+    pass
+
 
 
 # [_] THINK: how to stop annotating *class itself* by actual types
@@ -155,6 +181,26 @@ class ListFSStats(Action[None, PathLike]):
 
 
 ########################################
+@singledispatch
+def default_action(ent: Entity[Any], ctx: Any) -> CachedListing[Any]:
+    raise NotImplementedError
+
+
+@default_action.register
+def _(ent: FSEntry, ctx: None) -> CachedListing[FSEntry]:
+    return ent * ListFSEntries(ctx)
+
+
+# @default_action.register
+# def _(ent: FSEntry, ctx: None) -> CachedListing[Keyval[int]]:
+#     return ent * ListFSStats(ctx)
+
+# @default_action.register
+# def _(ent: FSEntry, ctx: None) -> CachedListing[Action[None, type]]:
+#     return ent * ListFSStats(ctx)
+
+
+########################################
 class PrinterDevice:
     def add_line(self, x: int, y: int, s: str) -> None:
         print("  " * x + str(y) + ": " + s)
@@ -162,17 +208,27 @@ class PrinterDevice:
 
 # NOTE: generalized viewer COS it may contain mix of different `*Entities
 class ListWidget:
-    _ent: FSEntry
-    _lst: CachedListing[FSEntry]
+    _ent: FSEntry | FSLifted
+    # NOTE: actions and entities can be mixed in some WF for better usability
+    _lst: CachedListing[FSEntry | FSLifted]
 
-    def __init__(self, ent: FSEntry) -> None:
-        self.set_entity(ent)
+    # _default_action: Mapping[Entity[Any], Action[Any, Any]] = {FSEntry: ListFSEntries}
 
-    def set_entity(self, ent: FSEntry) -> None:
+    # def __init__(self, ent: FSEntry) -> None:
+    #     self.set_entity(ent)
+
+    def set_entity(self, ent: FSEntry | FSLifted) -> None:
         self._ent = ent
-        self._lst = ent * ListFSEntries(None)
+        # self._lst = ent * ListWidget._default_action.get(type(ent), ListActions)(None)
+        # self._lst = default_action(ent, None)
+        # FAIL: we need to get actions *already bound to each entry*,
+        #   otherwise we can't pass both FSEntry and Action here
+        if isinstance(ent, FSLifted):
+            self._lst = ent * ExecWithContext(self)
+        else:
+            self._lst = ent * ListActions(None)
 
-    def __getitem__(self, idx: int) -> FSEntry:  # TEMP:API
+    def __getitem__(self, idx: int) -> FSEntry | FSLifted:  # TEMP:API
         return self._lst * GetByIndex(idx)
 
     def render_to(self, odev: PrinterDevice) -> None:
@@ -204,10 +260,16 @@ def _live() -> None:
     # print(f"{_g_actions[PathLike]=}\n")
     # print(en1 * ListActions(None))
 
-
-    wdg = ListWidget(en0)
+    wdg = ListWidget()
+    wdg.set_entity(en0)
     odev = PrinterDevice()
     wdg.render_to(odev)
-    assert en1 == wdg[1], (en1, wdg[1])
-    wdg.set_entity(wdg[1])
+    # assert en1 == wdg[1], (en1, wdg[1])
+    # [_] BET: inof lambda -- store ClosureStruct and then call yourself, as lambda are always the same
+    #   NICE: explorable ClosureStruct ++ no need to infer lambda type
+    # bnd = FSLifted(lambda ctx, ent=en0: wdg[1](ctx)(ent))
+    def _xfn(ctx: ListWidget) -> CachedListing[FSEntry]:
+        return en0 * wdg[1](ctx)
+    bnd = FSLifted(_xfn)
+    wdg.set_entity(bnd)
     wdg.render_to(odev)
