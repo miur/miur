@@ -1,5 +1,7 @@
 # pylint:disable=too-few-public-methods
-from typing import (  # Any, Iterator, overload,
+from concurrent.futures import Executor, Future, ThreadPoolExecutor
+from typing import (  # Iterator, overload,
+    Any,
     Callable,
     Generic,
     Iterable,
@@ -99,10 +101,22 @@ class ListCachingProxy(list[T]):
     pass
 
 
-FutureHandle = NewType("FutureHandle", int)
-WaitingPlaceholder = NewType("WaitingPlaceholder", FutureHandle)
+WaitingPlaceholder = NewType("WaitingPlaceholder", Future[Any])
 RequestPlaceholder = NewType("RequestPlaceholder", object)
-ProxyEvent = NewType("ProxyEvent", object)
+
+
+class ProxyEvent:
+    pass
+
+
+# RENAME? ResponseValue
+class UpdatedValue(Generic[T], ProxyEvent):
+    def __init__(self, value: T) -> None:
+        self._value = value
+
+    @property
+    def value(self) -> T:
+        return self._value
 
 
 # NOTE: next EVO is DictCachingProxy (for dashboards), as AsyncList is much more complex
@@ -110,35 +124,42 @@ ProxyEvent = NewType("ProxyEvent", object)
 #   :: pass _fn to `ThreadPool for deferred calcs
 #     OR eval _fn in-place to send request through `RPCFacade for *delegated* calcs
 #   BET?TRY: hide `Evaluator in _fn and always eval
+# RENAME? `AsyncFuture
 class ValueCachingProxy(Generic[T]):
     # MAYBE:CHG: fn -> smth to send msg/req to and wait for response
     #   BUT: we still need smth (thread/queue) to WAIT for response
-    def __init__(self, fn_req: Callable[[Callable[[ProxyEvent], None]], FutureHandle]) -> None:
+    def __init__(
+        self, fn_req: Callable[[Callable[[ProxyEvent], None]], Future[T]]
+    ) -> None:
         # TODO: need to register proxy's incoming queue for notifications
         self._fn = fn_req
         # ALT: return placeholder (DECI: by spec)
-        self._cache: T | None = None
+        # NOTE: intentionally don't assign None to avoid dealing with Optional[T] where T is expected
+        self._cache: T
         # MOVE: to FSMMixin
-        self._state: FutureHandle | bool = False
-        self._subscribers: list[Callable[[ProxyEvent], None]] = []
+        self._state: Future[T] | bool = False
+        self._subscribers: list[Callable[[UpdatedValue[T]], None]] = []
 
     # MAYBE:NEED: comm_chan_id -- to distinguish earlier and newer async comm sessions
     #   BUT: are two simultaneous sessions even make sense here ?
     def _listener(self, ev: ProxyEvent) -> None:
-        if ev.type == ResponseValue:
+        if isinstance(ev, UpdatedValue):
             self._cache = ev.value
             self._state = True
             for fsub in self._subscribers:
                 fsub(UpdatedValue(self._cache))
 
     # OR: return awaitable object (blocking with timeout)
-    def request_async(self, fsub: Callable[[ProxyEvent], None]) -> None:
+    def request_async(self, fsub: Callable[[UpdatedValue[T]], None]) -> None:
         # BAD: should only request eval, but not calc it immediately in-place here
         # MAYBE: return different placeholder comparing to before to indicate ongoing processing
         # [_] WARN:NEED: mutex
         if self._state is False:
             # NOTE: _fn should remember listener to return both oneshot and multipart responses
             self._state = self._fn(self._listener)
+            # OR:(for regular `Futures): self._state.add_done_callback(lambda fut: self._listener(fut.result()))
+        # BAD? additional responsibility in this function
+        #   ALSO: self._fsub may be not available in a place where you are calling .request_async()
         if fsub not in self._subscribers:
             self._subscribers.append(fsub)
 
@@ -151,27 +172,30 @@ class ValueCachingProxy(Generic[T]):
                     "Broken invariant: cached value shouldn't be None"
                     " when FSM request state had transitioned to True"
                 )
-            case FutureHandle(_):
+            case Future():
                 return WaitingPlaceholder(self._state)
             case False:
                 return RequestPlaceholder(self.request_async)
+            case _:
+                raise RuntimeError("Unsupported state", self._state)
 
 
 class Sfn(Representable, Generic[_Tx_co]):
-    def __init__(self, sfn: Callable[[], ListCachingProxy[_Tx_co]]) -> None:
+    def __init__(self, sfn: Callable[[Any], ListCachingProxy[_Tx_co]]) -> None:
         self._sfn = sfn
 
     @property
     def name(self) -> str:
         return repr(self._sfn)
 
-    def __call__(self) -> ListCachingProxy[_Tx_co]:
-        return self._sfn()
+    def __call__(self, ctx: Any) -> ListCachingProxy[_Tx_co]:
+        return self._sfn(ctx)
 
 
 # NOTE: `BoundActionEntity is actually the `Widget itself with all choices done
 #   ~~ COS if MillerWidget needs x3 _lst -- it will bleed into BoundActionEntity
 class ListWidget:
+    ## VIZ: all of vars -- are `*Proxy used by `Dashboard(Layout)
     # SEP? InteractionModel[+Workflow] | {class DisplayableContext}
     #   COS: smth ought to decide what to show and how to .advance whatever shown
     _ent: Representable
@@ -180,34 +204,62 @@ class ListWidget:
     #   as they will be closured into _lst itself (o/w you won't be able to "refresh" _lst)
     #   [_] IDEA: call `Transmission as `Link [bw filter-entities] or `Stream
     _lstpxy: ListCachingProxy[Representable]
+    _valpxy: ValueCachingProxy[int]
     # _ctx: self
+
+    def __init__(self, pool: Executor) -> None:
+        self._pool = pool
+
+    # RENAME? actualize
+    def pick(self, i: int) -> None:
+        self.set_entity(self._lstpxy[i])
 
     # RENAME? focus()
     def set_entity(self, ent: Representable) -> None:
         self._ent = ent
         # SEP: {class NaviHeuristics} (then we don't need dedicated .api OR .exec at all)
         if callable(ent):
-            self._act = lambda: ent()  # pylint:disable=unnecessary-lambda
+            self._act = lambda: ent(ctx=self)
         else:
             self._act = lambda: ListCachingProxy(
                 Sfn(getattr(ent, k)) for k in dir(ent) if k == "explore"
             )
         self._lstpxy = self._act()
 
-    # RENAME? actualize
-    def pick(self, i: int) -> None:
-        self.set_entity(self._lstpxy[i])
+        ## BAD: too complex fcalc() for user -- I need simpler evaluators
+        ##   BUT: if I wish for something "chainable" -- is this complexity avoidable?
+        # pylint:disable=unnecessary-lambda-assignment
+        # : Callable[[Callable[[ProxyEvent], None]], None]
+        fcalc = lambda cb: cb(UpdatedValue(len(self._lstpxy)))
+        fpost = lambda cb: self._pool.submit(fcalc, cb)
+        self._valpxy = ValueCachingProxy(fpost)
+        self._valpxy.request_async(self._listen_events)
+
+    # RENAME? parse_events
+    def _listen_events(self, ev: UpdatedValue[int]) -> None:
+        # THINK: do we really need this long mapping ? What flexibility does it stands for ?
+        #   :: Future → _listen_cb() → Event[int[1]] → self._valpxy.get() → redraw_footer()
+        #   MAYBE: directly call redraw_footer() in lambda after is updated
+        #     BAD: we lose single common point to log/audit
+        if ev.value == 1:
+            self.redraw_footer()
+
+    def redraw_footer(self) -> None:
+        # e.g. curses_area_clean_and_redraw()
+        print("\r{:10d}", self._valpxy)
 
     def render(self) -> None:
         print("  " * 0 + str(0) + ": " + self._ent.name)
         for i, x in enumerate(self._lstpxy, start=1):
             print("  " * 1 + str(i) + ": " + x.name)
+        self.redraw_footer()
 
 
 ########################################
 def _live() -> None:
-    wdg = ListWidget()
-    wdg.set_entity(FSEntry("/etc/udev"))
-    wdg.render()
-    wdg.pick(0)
-    wdg.render()
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        wdg = ListWidget(pool)
+        wdg.set_entity(FSEntry("/etc/udev"))
+        wdg.render()
+        wdg.pick(0)
+        wdg.render()
