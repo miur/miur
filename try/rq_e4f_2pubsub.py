@@ -1,7 +1,7 @@
 # pylint:disable=too-few-public-methods
 import time
-from threading import Event
 from concurrent.futures import Executor, Future, ThreadPoolExecutor
+from threading import Event
 from typing import (  # Iterator, overload,
     Any,
     Callable,
@@ -54,6 +54,16 @@ class FSEntry(Representable):
         #  ALT:FUT: rfc code to allow *some* homogeneous entries behind FSAdapter to reduce RAM consumption
         with __import__("os").scandir(self._x) as it:
             return [FSEntry(e.path) for e in it]
+
+
+class EmptyFailure(Representable):
+    @property
+    def name(self) -> str:
+        return self.__class__.__name__
+
+    def explore(self) -> Iterable[str]:
+        # OR: return [] and print "Empty" through Widget.render()
+        return ["EmptyList"]
 
 
 ########################################
@@ -200,6 +210,8 @@ class ValueCachingProxy(Generic[T]):
 ########################################
 class Counter:
     def __init__(self, flag_running: Event) -> None:
+        # ALT: inherit Counter(Task) and directly provide atomic flag and
+        #   .stop() method using inof Event() arg
         self._running = flag_running
         self._i = 0
         # RENAME? connections, awaiters, links, nodes, sinks
@@ -245,6 +257,12 @@ class ListWidget:
 
     def __init__(self, pool: Executor) -> None:
         self._pool = pool
+        # NOTE: should be OK state -- to represent empty/failure node
+        #   ALT:BET? supply actual `Representable failure Entity to avoid special cases?
+        #   BUT: we may still need to change way how rendering for failure nodes goes
+        #     NICE: dashboards for all failure nodes may be rendered similarly,
+        #       so `RepresentableFailureEntity is OK to avoid special None and dealing with Optional
+        self.set_entity(EmptyFailure())
 
     # RENAME? actualize
     def pick(self, i: int) -> None:
@@ -261,6 +279,12 @@ class ListWidget:
                 Sfn(getattr(ent, k)) for k in dir(ent) if k == "explore"
             )
         self._lstpxy = self._act()
+        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        if self._valpxy:
+            # THINK: ref-count listeners and then unsubscribe from `Counter too ?
+            #   OR: always keep sub active in bkgr for hot-swap back to this valpxy
+            #     i.e. until rention policy cleanups old detached _valpxy
+            self._valpxy.unsubscribe(self._listen_events)
 
         ## BAD: too complex fcalc() for user -- I need simpler evaluators
         ##   BUT: if I wish for something "chainable" -- is this complexity avoidable?
@@ -282,7 +306,7 @@ class ListWidget:
 
     def redraw_footer(self) -> None:
         # e.g. curses_area_clean_and_redraw()
-        s = str(v) if isinstance((v:=self._valpxy.get()), int) else repr(v)
+        s = str(v) if isinstance((v := self._valpxy.get()), int) else repr(v)
         print("\r" + s)
 
     def render(self) -> None:
