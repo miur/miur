@@ -328,7 +328,7 @@ def _live() -> None:
         wdg = ListWidget(pool)
         wdg.set_entity(FSEntry("/etc/udev"))
         # BAD: should be "more automatic", BUT:THINK: where to do that?
-        cnt.subscribe(lambda i: wdg._valpxy._listener(UpdatedValue(i)))
+        cnt.subscribe(lambda i: wdg._valpxy._listener(UpdatedValue(i)))  # pylint:disable=protected-access
         wdg.render()
         wdg.pick(0)
         wdg.render()
