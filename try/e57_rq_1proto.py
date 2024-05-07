@@ -2,6 +2,7 @@
 from abc import abstractmethod
 from dataclasses import dataclass
 from enum import Enum, auto
+from time import time_ns
 from typing import Any, Generic, TypeVar, override, Protocol
 
 T = TypeVar("T")
@@ -22,9 +23,9 @@ class ObjectChangeNotification(Generic[T]):
     ts: int  # USE: time.time_ns()
     kind: ObjectChangeKind
     xpath: T  # NOTE: interpreted by dst `*ContainerStructure class
-    newval: Any | None
-    oldval: Any | None
-    object: Any | None  # optional backref to full origin (parent) object
+    newval: Any = None
+    oldval: Any = None
+    object: Any = None  # optional backref to full origin (parent) object
 
 
 # RENAME: Notifiable(notify) | Subscriptable(process) Listening(accept)
@@ -45,6 +46,9 @@ class PropagationMixin:
     _subs: dict[Notifiable, bool]
 
     # RENAME? .sync_to() OR .link_to() OR .announce_to
+    # ALT: inof obj:Notifiable, directly store fntf=obj.notify:Callable
+    #   BUT: then we should manually match full/incr fns vs updates during .sub
+    #   ALSO:BAD: hard to infer actual graph of communicating objects
     def sub(self, obj: Notifiable, proto: OCRequestKind) -> None:
         if not hasattr(self, "_subs"):
             self._subs = {}
@@ -64,9 +68,25 @@ class PropagationMixin:
                 case OCRequestKind.none:
                     continue
                 case OCRequestKind.full:
-                    obj.notify(self)
+                    obj.notify(
+                        ObjectChangeNotification(
+                            ts=time_ns(),
+                            # reqt=OCRequestKind.full
+                            kind=ObjectChangeKind.change,
+                            xpath=None,
+                            object=self,
+                        )
+                    )
                 case OCRequestKind.incr:
-                    obj.notify_incr(self)
+                    obj.notify_incr(
+                        ObjectChangeNotification(
+                            ts=time_ns(),
+                            # reqt=OCRequestKind.incr
+                            kind=ObjectChangeKind.change,
+                            xpath=None,
+                            object=self,
+                        )
+                    )
                 case _:
                     raise NotImplementedError(proto)
 
@@ -158,9 +178,9 @@ def _live() -> None:
     w1 = Variable(1)
     c1 = Plus3(w1)
     c2 = Plus3(c1)
-    ## conn_graph
+    ## conn_graph (`*Chain)
     w1.sub(c1, OCRequestKind.full)
     c1.sub(c2, OCRequestKind.full)
-    ## vflow_graph
+    ## vflow_graph (`EventLog)
     w1.update(5)  # NOTE: change value and trigger Propagation
     print(c2.result)
