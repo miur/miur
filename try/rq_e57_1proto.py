@@ -1,21 +1,51 @@
 # pylint:disable=too-few-public-methods
 from abc import abstractmethod
+from dataclasses import dataclass
+from enum import Enum, auto
 from typing import Any, Generic, TypeVar, override, Protocol
 
 T = TypeVar("T")
 
 
+class ObjectChangeKind(Enum):
+    # pylint:disable=invalid-name
+    insert = auto()
+    remove = auto()
+    change = auto()  # RENAME? .replace .assign .modify
+    # move/swap (=chg xpath)
+    # incr/decr (included in "change" together with .assign)
+
+
+# T=(int,slice[int],list[int]|str,tuple[str],list[str] || Predicate|Filter)
+@dataclass(frozen=True, kw_only=True)
+class ObjectChangeNotification(Generic[T]):
+    ts: int  # USE: time.time_ns()
+    kind: ObjectChangeKind
+    xpath: T  # NOTE: interpreted by dst `*ContainerStructure class
+    newval: Any | None
+    oldval: Any | None
+    object: Any | None  # optional backref to full origin (parent) object
+
+
 # RENAME: Notifiable(notify) | Subscriptable(process) Listening(accept)
 class Notifiable(Protocol):
-    # FUT: only accept Notification() msgs
-    def notify(self, msg: Any) -> None: ...
+    def notify(self, msg: ObjectChangeNotification) -> None: ...
+
+
+# ALT(proto/enum) -> Filter/ProtocolObject(spec)
+class OCRequestKind(Enum):
+    # pylint:disable=invalid-name
+    none = auto()
+    full = auto()
+    incr = auto()
+    # auto = ...  # MAYBE: to auto-pick full/incr whatever supported (by processing methods presence)
 
 
 class PropagationMixin:
     _subs: dict[Notifiable, bool]
 
-    # CHG(proto) -> enum/ProtocolObject(spec)
-    def sub(self, obj: Notifiable, proto: bool = True) -> None:
+    # RENAME? .sync_to() OR .link_to() OR .announce_to
+    def sub(self, obj: Notifiable, proto: OCRequestKind) -> None:
         if not hasattr(self, "_subs"):
             self._subs = {}
         self._subs[obj] = proto
@@ -30,19 +60,15 @@ class PropagationMixin:
         if not hasattr(self, "_subs"):
             return
         for obj, proto in self._subs.items():
-            if proto is True:
-                obj.notify(self)
-
-
-# RENAME: CachedVariablePropagation
-#   !! same as PostulatingComputation
-# class Variable(Generic[T]):
-#     def __init__(self, x: T) -> None:
-#         self._x = x
-#
-#     @property
-#     def value(self) -> T:
-#         return self._x
+            match proto:
+                case OCRequestKind.none:
+                    continue
+                case OCRequestKind.full:
+                    obj.notify(self)
+                case OCRequestKind.incr:
+                    obj.notify_incr(self)
+                case _:
+                    raise NotImplementedError(proto)
 
 
 class ResultMixin(Generic[T]):
@@ -73,16 +99,35 @@ class Computation(ResultMixin[T], Notifiable, PropagationMixin):
         self._refresh()
         return self._result  # XPMT: do we need this sugar ?
 
-    def notify(self, _msg: Any) -> None:
+    def notify(self, _msg: ObjectChangeNotification) -> None:
+        # TODO: assert msg.kind == ObjectChangeKind.change
         self._refresh()
 
 
+# RENAME? same as PostulatingComputation
 class Value(Computation[T]):
     def __init__(self, value: T) -> None:
         self._result = value
 
     @override
     def update(self) -> T:
+        return self._result
+
+    @override
+    def _body(self) -> T:
+        pass
+
+
+# RENAME? CachedVariablePropagation
+#   ALT: .value inof .result (SEP class from `Computation)
+class Variable(Computation[T]):
+    def __init__(self, value: T) -> None:
+        self.update(value)
+
+    @override
+    def update(self, value: T, /) -> T:
+        self._result = value
+        self._publish()
         return self._result
 
     @override
@@ -110,13 +155,12 @@ def _live() -> None:
 
     ### Push
     ## deps_graph
-    v1 = Value(1)
-    c1 = Plus3(v1)
+    w1 = Variable(1)
+    c1 = Plus3(w1)
     c2 = Plus3(c1)
     ## conn_graph
-    v1.sub(c1)
-    c1.sub(c2)
+    w1.sub(c1, OCRequestKind.full)
+    c1.sub(c2, OCRequestKind.full)
     ## vflow_graph
-    # TODO: Variable.update(5) to change value and trigger Propagation
-    v1._publish()
+    w1.update(5)  # NOTE: change value and trigger Propagation
     print(c2.result)
