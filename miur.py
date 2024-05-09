@@ -1,0 +1,77 @@
+import sys
+import curses as C
+
+# from contextlib import ExitStack, contextmanager
+# from typing import Self
+
+# from just.ext.logging import logcfg, L
+
+from .log import log
+
+# @contextmanager
+# def makestdscr() -> Iterator[C.window]:
+#     try:
+#         stdscr = C.initscr()
+#         yield stdscr
+#     finally:
+#         C.endwin()
+
+
+def write_curses_mainscreen(stdscr: C.window, msg: str):
+    ## NICE: redirect all logs to primary alternative screen
+    C.def_prog_mode()  # save current tty modes
+    C.endwin()  # restore original tty modes
+
+    ## FAIL: clears bkgr, moves cursor, +/- doesn't show old buffer
+    # clear = "\033[H"
+    # mainscr = "\033[?1049l"
+    # altscr = "\033[?1049h"
+    # print(mainscr + "mylogline" + altscr, end="", file=__import__("sys").stderr)
+    try:
+        sys.stdout.write(msg)
+        sys.stdout.flush()
+    finally:
+        stdscr.refresh()  # restore save modes, repaint screen
+
+
+def drawloop(stdscr: C.window) -> None:
+    log.config(write=lambda msg: write_curses_mainscreen(stdscr, msg))
+
+    if not C.has_extended_color_support():
+        raise NotImplementedError
+    try:
+        # stdscr.nodelay(True)
+        # self._loop.add_reader(fd=self.STDIN_FILENO, callback=self.process_input)
+        while True:
+            try:
+                wch = stdscr.get_wch()
+            except C.error:
+                break
+            except KeyboardInterrupt:
+                break
+            if wch == "q":
+                break
+            log.warning(lambda: f"{wch}")
+
+    finally:
+        stdscr.nodelay(False)
+
+
+# class Application:
+#     @C.wrapper
+#     def __enter__(self) -> Self:
+#         return self
+#
+#     def __exit__(self, *exc_details) -> bool:
+#         return self._stack.__exit__(*exc_details)
+
+
+# TBD: frontend to various ways to run miur API with different UI
+def miur(cwd: str) -> None:
+    log.info(f"{cwd=}")
+    # with Application() as app:
+    return C.wrapper(drawloop)
+
+
+def _live() -> None:
+    pass
