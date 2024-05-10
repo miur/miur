@@ -1,8 +1,9 @@
 import sys
+import os
+from subprocess import run
 import curses as C
-
-# from contextlib import ExitStack, contextmanager
-# from typing import Self
+from contextlib import contextmanager  # ExitStack,
+from typing import Iterator, Iterable
 
 # from just.ext.logging import logcfg, L
 
@@ -17,8 +18,9 @@ from .log import log
 #         C.endwin()
 
 
-def write_curses_mainscreen(stdscr: C.window, msg: str):
-    ## NICE: redirect all logs to primary alternative screen
+@contextmanager
+def curses_altscreen(stdscr: C.window) -> Iterator[None]:
+    ## NICE: redirect all logs to primary altscreen
     C.def_prog_mode()  # save current tty modes
     C.endwin()  # restore original tty modes
 
@@ -28,14 +30,27 @@ def write_curses_mainscreen(stdscr: C.window, msg: str):
     # altscr = "\033[?1049h"
     # print(mainscr + "mylogline" + altscr, end="", file=__import__("sys").stderr)
     try:
-        sys.stdout.write(msg)
-        sys.stdout.flush()
+        yield
     finally:
         stdscr.refresh()  # restore save modes, repaint screen
 
 
+def shell_out(stdscr: C.window, cmdv: Iterable[str] = (), **envkw: str) -> None:
+    cmd = cmdv or [os.environ.get("SHELL", "sh")]
+    envp = dict(os.environ, **envkw)
+    with curses_altscreen(stdscr):
+        _rc = run(cmd, env=envp, check=True)
+
+
+def print_curses_altscreen(stdscr: C.window, msg: str):
+    with curses_altscreen(stdscr):
+        sys.stdout.write(msg)
+        # ATT: force immediate output before you switch back to curses alt-screen
+        sys.stdout.flush()
+
+
 def drawloop(stdscr: C.window) -> None:
-    log.config(write=lambda msg: write_curses_mainscreen(stdscr, msg))
+    log.config(write=lambda text: print_curses_altscreen(stdscr, text))
 
     if not C.has_extended_color_support():
         raise NotImplementedError
@@ -51,6 +66,8 @@ def drawloop(stdscr: C.window) -> None:
                 break
             if wch == "q":
                 break
+            if wch == "s":
+                shell_out(stdscr)
             log.warning(lambda: f"{wch}")
 
     finally:
