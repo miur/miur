@@ -15,10 +15,10 @@ class LogLevel(enum.IntEnum):
     WARNING = 40
     INFO = 30  # +NOTICE | SUCCESS = 25
     # DEBUG = 20
-    # VERBOSE = 15
-    # DETAILED = 10
+    # OPTIONAL = 15
+    # VERBOSE = 10  # DETAILED = 10
     # TRACE = TR1..TR9 =
-    ANYTHING = 0
+    ANYTHING = 0  # OR: lvl=None
 
 
 TERMSTYLE = {
@@ -58,7 +58,7 @@ class Logger:
     def info(self, fmt: str | Callable[[], str]) -> None:
         self.at(LogLevel.INFO, fmt)
 
-    # @profile
+    # @profileit  # BAD: ~1ms/call (mostly due to !curses.*)
     def at(self, lvl: LogLevel, fmt: str | Callable[[], str]) -> None:
         if lvl < self.minlevel:
             return

@@ -7,7 +7,7 @@ from typing import Iterator, Iterable
 
 # from just.ext.logging import logcfg, L
 
-from .log import log
+from .util.log import log
 
 # @contextmanager
 # def makestdscr() -> Iterator[C.window]:
