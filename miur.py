@@ -3,15 +3,20 @@ import os
 import selectors
 import signal
 import sys
-from argparse import Namespace
 from contextlib import ExitStack, contextmanager
-from typing import Any, Final, Iterator, Never
+from typing import TYPE_CHECKING, Any, Final, Iterator
 
 from . import curses_ext as CE
 from .curses_cmds import input_handlers
 from .util.exc import log_excepthook
 from .util.log import log
 from .util.sig import route_signals_to_fd
+
+if TYPE_CHECKING:
+    from argparse import Namespace
+
+# CHG: XDG_RUNTIME_DIR=/run/user/1000 + /miur/pid
+PIDFILE: Final = "/t/miur.pid"
 
 
 def mainloop(stdscr: C.window) -> None:
@@ -96,20 +101,23 @@ def miur_envlevel(varname: str) -> Iterator[int]:
         os.environ[varname] = str(lvl)
 
 
-# TBD: frontend to various ways to run miur API with different UI
-def miur(opts: Namespace) -> None:
-    # CHG: XDG_RUNTIME_DIR=/run/user/1000 + /miur/pid
-    pidfile: Final = "/t/miur.pid"
+def miur_none() -> None:
+    # with Application() as app:
+    with miur_envlevel("MIUR_LEVEL"), temp_pidfile(PIDFILE), log_excepthook():
+        return C.wrapper(mainloop)
 
+
+# TBD: frontend to various ways to run miur API with different UI
+def miur_opts(opts: "Namespace") -> None:
     if sig := opts.signal:
         # MAYBE: check by short LOCK_EX if any LOCK_SH present (i.e. main miur running)
         try:
             # SEIZE: trbs/pid: Pidfile featuring stale detection and file-locking ⌇⡦⠿⣢⢔
             #   https://github.com/trbs/pid
-            with open(pidfile, "r", encoding="utf-8") as f:
+            with open(PIDFILE, "r", encoding="utf-8") as f:
                 pid = int(f.read())
         except FileNotFoundError as exc:
-            log.error(f"fail {pidfile=} | {exc}")
+            log.error(f"fail {PIDFILE=} | {exc}")
             sys.exit(1)
 
         log.warning(f"sending signal={sig} to {pid=}")
@@ -120,10 +128,8 @@ def miur(opts: Namespace) -> None:
             sys.exit(1)
         sys.exit(0)
 
-    # with Application() as app:
-    with miur_envlevel("MIUR_LEVEL"), temp_pidfile(pidfile), log_excepthook():
-        log.info(f"cwd={opts.cwd}")
-        return C.wrapper(mainloop)
+    log.info(f"cwd={opts.cwd}")
+    return miur_none()
 
 
 def _live() -> None:
