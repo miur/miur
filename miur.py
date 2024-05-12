@@ -3,14 +3,15 @@ import os
 import selectors
 import signal
 import sys
-from contextlib import contextmanager  # closing  ExitStack,
-from typing import Any, Final, Iterator
+from argparse import Namespace
+from contextlib import ExitStack, contextmanager
+from typing import Any, Final, Iterator, Never
 
 from . import curses_ext as CE
 from .curses_cmds import input_handlers
+from .util.exc import log_excepthook
 from .util.log import log
-from .util.exc import custom_excepthook_log
-# from .util.sig import route_signals_to_fd
+from .util.sig import route_signals_to_fd
 
 
 def mainloop(stdscr: C.window) -> None:
@@ -20,20 +21,40 @@ def mainloop(stdscr: C.window) -> None:
     if not C.has_extended_color_support():
         raise NotImplementedError
 
-    # stdscr.refresh()
-
-    # route_signals_to_fd() as sigfd,
-    with selectors.DefaultSelector() as sel:
+    with route_signals_to_fd() as sigfd, selectors.DefaultSelector() as sel:
         sel.register(sys.stdin.fileno(), selectors.EVENT_READ, data=None)
-        # sel.register(sigfd, selectors.EVENT_READ, data=None)
+        sel.register(sigfd, selectors.EVENT_READ, data=None)
+
         stdscr.nodelay(True)
         try:
             while True:
                 for key, events in sel.select():
-                    # if key.fd == sigfd:
-                    #     assert events == selectors.EVENT_READ
-                    #     sig = os.read(sigfd, 1)
-                    #     log.info(sig)
+
+                    # &next BET:RFC:
+                    #   * give up on sigfd -- it's unreliable, as it requires some sigaction() anyway
+                    #   * set flag in handler -- COS we need refresh only once for all signals
+                    #   * propagate signal from handler to Epoll -- for timely .refresh
+                    if key.fd == sigfd:
+                        assert events == selectors.EVENT_READ
+
+                        who = sel.__class__.__name__
+                        si = int.from_bytes(os.read(sigfd, 1))
+                        snm = signal.Signals(si).name
+                        sdesc = signal.strsignal(si)
+                        log.warning(f"{who} {snm}={si}: {sdesc}")
+
+                        ## HACK:SRC: https://stackoverflow.com/questions/1022957/getting-terminal-width-in-c
+                        ##   >> make curses to calc sizes by itself (as it does on each .refresh)
+                        ## INFO: actually, "log.*" already does the same, but its IMPL is subject to change
+                        with CE.curses_altscreen(stdscr):
+                            pass
+
+                        ## FAIL: get KEY_RESIZE immediately, don't make Epoll wait until next keypress
+                        # ch = stdscr.getch()
+                        # assert ch == C.KEY_RESIZE, ch
+
+                        continue
+
                     if key.fd == sys.stdin.fileno():
                         assert events == selectors.EVENT_READ
                         wch = stdscr.get_wch()
@@ -43,29 +64,44 @@ def mainloop(stdscr: C.window) -> None:
                         if cmd:
                             # WARN: last stmt in loop COS: may raise SystemExit
                             cmd(stdscr)
-                    else:
-                        log.error((key, events))
+                        continue
+
+                    log.error((key, events))
         except KeyboardInterrupt:
             pass
         finally:
             stdscr.nodelay(False)
 
 
-# class Application:
-#     @C.wrapper
-#     def __enter__(self) -> Self:
-#         return self
-#
-#     def __exit__(self, *exc_details) -> bool:
-#         return self._stack.__exit__(*exc_details)
+@contextmanager
+def temp_pidfile(pidfile: str) -> Iterator[None]:
+    with open(pidfile, "w", encoding="utf-8") as f:
+        f.write(str(os.getpid()))
+    try:
+        yield
+    finally:
+        os.remove(pidfile)
+
+
+@contextmanager
+def miur_envlevel(varname: str) -> Iterator[int]:
+    lvl = int(os.environ.get(varname, "0"))
+    if lvl != 0:
+        log.error(f"avoid nesting {lvl=}")
+        sys.exit(1)
+    os.environ[varname] = str(lvl + 1)
+    try:
+        yield lvl
+    finally:
+        os.environ[varname] = str(lvl)
 
 
 # TBD: frontend to various ways to run miur API with different UI
-def miur(arg: str) -> None:
+def miur(opts: Namespace) -> None:
     # CHG: XDG_RUNTIME_DIR=/run/user/1000 + /miur/pid
     pidfile: Final = "/t/miur.pid"
 
-    if arg.startswith("-SIG"):
+    if sig := opts.signal:
         # MAYBE: check by short LOCK_EX if any LOCK_SH present (i.e. main miur running)
         try:
             # SEIZE: trbs/pid: Pidfile featuring stale detection and file-locking ⌇⡦⠿⣢⢔
@@ -76,33 +112,18 @@ def miur(arg: str) -> None:
             log.error(f"fail {pidfile=} | {exc}")
             sys.exit(1)
 
-        log.warning(f"sending signal={arg} to {pid}")
+        log.warning(f"sending signal={sig} to {pid=}")
         try:
-            os.kill(pid, getattr(signal, arg[1:]))
+            os.kill(pid, sig)
         except ProcessLookupError as exc:
             log.error(f"fail {pid=} | {exc}")
             sys.exit(1)
         sys.exit(0)
 
-    lvl = int(os.environ.get("MIUR_LEVEL", "0"))
-    if lvl != 0:
-        log.error(f"avoid nesting {lvl=}")
-        sys.exit(1)
-    os.environ["MIUR_LEVEL"] = str(lvl + 1)
-
-    # IDEA: force-notify epoll as if new data arrived inof actual fd
-    signal.signal(signal.SIGWINCH, lambda si,fr:
-        log.warning(f"{signal.Signals(si).name}={si}: {signal.strsignal(si)} during <{fr.f_code.co_filename}:{fr.f_lineno}>"))
-
-    with open(pidfile, "w", encoding="utf-8") as f:
-        f.write(str(os.getpid()))
-    try:
-        # with Application() as app:
-        log.info(f"cwd={arg}")
-        with custom_excepthook_log():
-            return C.wrapper(mainloop)
-    finally:
-        os.remove(pidfile)
+    # with Application() as app:
+    with miur_envlevel("MIUR_LEVEL"), temp_pidfile(pidfile), log_excepthook():
+        log.info(f"cwd={opts.cwd}")
+        return C.wrapper(mainloop)
 
 
 def _live() -> None:

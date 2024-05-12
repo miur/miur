@@ -9,7 +9,7 @@ import time
 from typing import Any, Callable, TypeAlias
 
 _Loggable: TypeAlias = Any
-_LAMBDA = lambda: ""
+_LAMBDA = lambda: ""  # pylint:disable=unnecessary-lambda-assignment
 
 
 @enum.unique
@@ -26,6 +26,7 @@ class LogLevel(enum.IntEnum):
     ANYTHING = 0  # OR: lvl=None
 
 
+# TODO: make it a part of supplied .write(sys.stdout/stderr)
 TERMSTYLE = {
     # LogLevel.CRITICAL: "\033[1;37m;41m",  # bold-white-on-red
     LogLevel.ERROR: "\033[31m",  # regul-red-on-dfl
@@ -44,6 +45,8 @@ TERMSTYLE = {
 class Logger:
     minlevel: LogLevel = LogLevel.INFO
     write: Callable[[str], Any] = sys.stdout.write
+    # TODO: make it a part of supplied .write()
+    termcolor: bool = True
 
     def __init__(self) -> None:
         self._initts = time.monotonic()
@@ -90,8 +93,11 @@ class Logger:
         modnm = fr.f_globals["__name__"].rpartition(".")[2]
         lnum = fr.f_lineno
 
-        _c = TERMSTYLE[lvl]
-        _r = TERMSTYLE[None]
+        if self.termcolor:
+            _c = TERMSTYLE[lvl]
+            _r = TERMSTYLE[None]
+        else:
+            _c = _r = ""
         # ADD? "#{self._counter:03d} ..."
         self.write(
             f"{relts:8.3f}  {_c}{lvl.name[0]}{_r}[{modnm}:{lnum}] {_c}{body}{_r}\n"

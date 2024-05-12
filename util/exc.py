@@ -35,7 +35,7 @@ def exception_handler(
 
 
 @contextmanager
-def custom_excepthook_log() -> (
+def log_excepthook() -> (
     Iterator[Callable[[Type[BaseException], BaseException, TracebackType], Any]]
 ):
     _orig_excepthook = sys.excepthook

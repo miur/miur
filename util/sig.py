@@ -23,7 +23,17 @@ def route_signals_to_fd() -> Iterator[int]:
         _rsigfd, _wsigfd = fd_flags(*os.pipe(), add=os.O_NONBLOCK)
         _orig_fd = signal.set_wakeup_fd(_wsigfd, warn_on_full_buffer=True)
         assert _orig_fd == -1
-        _orig_hdl = signal.signal(signal.SIGWINCH, signal.SIG_DFL)
+
+        ## HACK: initiate forceful refresh() at startup as if we got SIGWINCH
+        os.write(_wsigfd, int.to_bytes(signal.SIGWINCH, 1))
+
+        ## WARN: required, otherwise .set_wakeup_fd() won't be triggered due its SIG_DFL=SIG_IGN
+        ##   BAD: still KEY_RESIZE is not delivered until you press any key due to Epoll
+        signal.signal(signal.SIGWINCH, lambda si,fr: None)
+        # signal.signal(signal.SIGWINCH, lambda si, fr: log.warning(
+        #         f"{signal.Signals(si).name}={si}: {signal.strsignal(si)} during <{fr.f_code.co_filename}:{fr.f_lineno}>"
+        # ))
+
         yield _rsigfd
     finally:
         os.close(_rsigfd)
