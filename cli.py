@@ -1,11 +1,14 @@
+"""
+SUMMARY: Modern [re]Invented Unified navigatoR
+"""
+
+__appname__ = "miur"
+__version__ = "42.1.3"  # INFO: and even more PoCs I did to get here
+
+
 from argparse import Action, ArgumentParser
 from enum import Enum
 from typing import TYPE_CHECKING
-
-# ALT:HACK: import __main__ as M  && use M.__appname__
-#   REF: https://docs.python.org/3/library/__main__.html
-__appname__ = "miur"
-__version__ = "42.1.3"
 
 if TYPE_CHECKING:
     from just.use.iji.main import Context
@@ -29,8 +32,8 @@ class SigAction(Action):
 
 def cli_spec(parser: ArgumentParser) -> ArgumentParser:
     o = parser.add_argument
-    o("cwd", nargs="?", default="/etc")  # FUT:CHG: os.getcwd()
-    o("-v", "--version", action='version', version=__version__)  # '%(prog)s '+__version__
+    o("cwd", nargs="?", default="/etc")  # [_] FUT:CHG: os.getcwd()
+    o("-v", "--version", action="version", version=__version__)
     _sigset = "HUP INT KILL USR1 USR2 TERM CONT STOP WINCH".split()
     o("-s", "--signal", choices=_sigset, type=str.upper, action=SigAction)
     # fmt:off

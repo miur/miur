@@ -15,8 +15,8 @@ from .util.sig import route_signals_to_fd
 if TYPE_CHECKING:
     from argparse import Namespace
 
-# CHG: XDG_RUNTIME_DIR=/run/user/1000 + /miur/pid
-PIDFILE: Final = "/t/miur.pid"
+# OR:(/tmp)=f"/run/user/{os.getlogin()}" os.environ.get('', "/tmp")
+PIDFILE: Final[str] = os.environ.get("XDG_RUNTIME_DIR", "/tmp") + "/miur.pid"
 
 
 def mainloop(stdscr: C.window) -> None:
@@ -51,8 +51,10 @@ def mainloop(stdscr: C.window) -> None:
                         ## HACK:SRC: https://stackoverflow.com/questions/1022957/getting-terminal-width-in-c
                         ##   >> make curses to calc sizes by itself (as it does on each .refresh)
                         ## INFO: actually, "log.*" already does the same, but its IMPL is subject to change
-                        with CE.curses_altscreen(stdscr):
-                            pass
+                        # with CE.curses_altscreen(stdscr):
+                        #     pass
+                        # [_] CHECK: do we even need full .def_prog_mode()/.endwin() here ?
+                        stdscr.refresh()
 
                         ## FAIL: get KEY_RESIZE immediately, don't make Epoll wait until next keypress
                         # ch = stdscr.getch()
@@ -115,6 +117,7 @@ def miur_opts(opts: "Namespace") -> None:
             # SEIZE: trbs/pid: Pidfile featuring stale detection and file-locking ⌇⡦⠿⣢⢔
             #   https://github.com/trbs/pid
             with open(PIDFILE, "r", encoding="utf-8") as f:
+                # [_] TODO: test /proc/pid/exe is the same as /proc/self/exe (OR: sys.argv[0])
                 pid = int(f.read())
         except FileNotFoundError as exc:
             log.error(f"fail {PIDFILE=} | {exc}")

@@ -1,6 +1,9 @@
-#!/usr/bin/env -S python -IB
+#!/usr/bin/python -SIB
+#!/usr/bin/env -S python -SIBO -Ximporttime
+#   -I(-P/s/E) -B | -O -X pycache_prefix=~/.cache/miur
 # PERF:DEBUG: $ PYTHONPATH=/d/just python -PsSB [-X importtime | -X tracemalloc] -m miur
-# -I(-P/s/S/E) -B | -O -X pycache_prefix=~/.cache/miur
+#   OR: $ python -m cProfile -s cumulative -- =miur
+#   [_] TODO: run all of them through flags
 
 import sys
 
@@ -23,9 +26,9 @@ def as_pkg_or_exe(mkrun):  # type:ignore
         return mkrun()
 
     # OR: fs = __import__("os.path", fromlist=[""])
-    from os.path import dirname
+    import os.path as fs
 
-    parent = dirname(dirname(__file__))
+    parent = fs.dirname(fs.dirname(fs.realpath(__file__)))
     sys.path.insert(0, parent)
 
     ## OR:BET? main = __import__("importlib").import_module(".cli", package="miur").main
