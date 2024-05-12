@@ -1,10 +1,15 @@
 ###%USAGE: deferred evaluation
 #  log.warning(lambda: f"{some}")
 
-import sys
+# ALT? from just.ext.logging import logcfg, L
+
 import enum
+import sys
 import time
-from typing import Any, Callable
+from typing import Any, Callable, TypeAlias
+
+_Loggable: TypeAlias = Any
+_LAMBDA = lambda: ""
 
 
 @enum.unique
@@ -38,10 +43,11 @@ TERMSTYLE = {
 
 class Logger:
     minlevel: LogLevel = LogLevel.INFO
-    write: Callable[[str], None] = sys.stdout.write
+    write: Callable[[str], Any] = sys.stdout.write
 
     def __init__(self) -> None:
         self._initts = time.monotonic()
+        self._counter = 0
 
     def config(self, /, **kw: Any) -> None:
         for k, v in kw.items():
@@ -51,35 +57,42 @@ class Logger:
                 raise KeyError(k)
             setattr(self, k, v)
 
-    def warning(self, fmt: str | Callable[[], str]) -> None:
+    def error(self, fmt: _Loggable) -> None:
+        self.at(LogLevel.ERROR, fmt)
+
+    def warning(self, fmt: _Loggable) -> None:
         # ALT: LogLevel[sys._getframe().f_code.co_name.upper()]
         self.at(LogLevel.WARNING, fmt)
 
-    def info(self, fmt: str | Callable[[], str]) -> None:
+    def info(self, fmt: _Loggable) -> None:
         self.at(LogLevel.INFO, fmt)
 
     # @profileit  # BAD: ~1ms/call (mostly due to !curses.*)
-    def at(self, lvl: LogLevel, fmt: str | Callable[[], str]) -> None:
+    def at(self, lvl: LogLevel, fmt: _Loggable) -> None:
         if lvl < self.minlevel:
             return
         if isinstance(fmt, str):
             body = fmt
-        elif callable(fmt):
+        elif type(fmt) is type(_LAMBDA) and fmt.__name__ == _LAMBDA.__name__:
             body = fmt()
         else:
-            raise NotImplementedError
+            body = str(fmt)
         relts = time.monotonic() - self._initts
+        self._counter += 1
 
+        # TODO: use lru_cache (src/mod/fcnnm/lnum) based on parent loci
         fr = sys._getframe(2)  # pylint:disable=protected-access
-        co = fr.f_code
         # fcnnm = co.co_name  # co.co_qualname
-        srcnm = co.co_filename
-        # ALT: sys._getframemodulename(2).rpartition('.')[2]
-        modnm = srcnm.rpartition("/")[2].rpartition(".")[0]
+
+        # ALT: modnm = sys._getframemodulename(2).rpartition('.')[2]
+        # BET? modnm = fr.f_code.co_filename.rpartition("/")[2].rpartition(".")[0]
+        # modnm = sys.modules[fr.f_globals['__name__']].__name__
+        modnm = fr.f_globals["__name__"].rpartition(".")[2]
         lnum = fr.f_lineno
 
         _c = TERMSTYLE[lvl]
         _r = TERMSTYLE[None]
+        # ADD? "#{self._counter:03d} ..."
         self.write(
             f"{relts:8.3f}  {_c}{lvl.name[0]}{_r}[{modnm}:{lnum}] {_c}{body}{_r}\n"
         )

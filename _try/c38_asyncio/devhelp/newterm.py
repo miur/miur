@@ -37,6 +37,10 @@ def newttyconn(ttynm: str | None = None) -> Iterator[tuple[TextIO, TextIO]]:
         print("[nottyconn]")
 
 
+# WARN: despite redirecting STDIN/STDOUT to Jupyter, we can't redir signals (SIGWINCH),
+#   so resize is only possible in manual mode
+# BET:TRY: run !miur directly in newterm, but with Jupyter Kernel as interpreter,
+#   which I can connect from its UI on !ij
 @contextmanager
 def newtermwindow() -> Iterator[tuple[TextIO, TextIO]]:
     # TEMP:HACK: spawn new terminal to prevent crashing/corrupting any existing ones

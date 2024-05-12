@@ -1,77 +1,54 @@
-import sys
-import os
-from subprocess import run
 import curses as C
-from contextlib import contextmanager  # ExitStack,
-from typing import Iterator, Iterable
+import os
+import selectors
+import signal
+import sys
+from contextlib import contextmanager  # closing  ExitStack,
+from typing import Any, Final, Iterator
 
-# from just.ext.logging import logcfg, L
-
+from . import curses_ext as CE
+from .curses_cmds import input_handlers
 from .util.log import log
-
-# @contextmanager
-# def makestdscr() -> Iterator[C.window]:
-#     try:
-#         stdscr = C.initscr()
-#         yield stdscr
-#     finally:
-#         C.endwin()
+from .util.exc import custom_excepthook_log
+# from .util.sig import route_signals_to_fd
 
 
-@contextmanager
-def curses_altscreen(stdscr: C.window) -> Iterator[None]:
-    ## NICE: redirect all logs to primary altscreen
-    C.def_prog_mode()  # save current tty modes
-    C.endwin()  # restore original tty modes
-
-    ## FAIL: clears bkgr, moves cursor, +/- doesn't show old buffer
-    # clear = "\033[H"
-    # mainscr = "\033[?1049l"
-    # altscr = "\033[?1049h"
-    # print(mainscr + "mylogline" + altscr, end="", file=__import__("sys").stderr)
-    try:
-        yield
-    finally:
-        stdscr.refresh()  # restore save modes, repaint screen
-
-
-def shell_out(stdscr: C.window, cmdv: Iterable[str] = (), **envkw: str) -> None:
-    cmd = cmdv or [os.environ.get("SHELL", "sh")]
-    envp = dict(os.environ, **envkw)
-    with curses_altscreen(stdscr):
-        _rc = run(cmd, env=envp, check=True)
-
-
-def print_curses_altscreen(stdscr: C.window, msg: str):
-    with curses_altscreen(stdscr):
-        sys.stdout.write(msg)
-        # ATT: force immediate output before you switch back to curses alt-screen
-        sys.stdout.flush()
-
-
-def drawloop(stdscr: C.window) -> None:
-    log.config(write=lambda text: print_curses_altscreen(stdscr, text))
+def mainloop(stdscr: C.window) -> None:
+    # [_] FIXME: restore in "finally" to prevent logging to curses after it exits
+    log.config(write=lambda text: CE.print_curses_altscreen(stdscr, text))
 
     if not C.has_extended_color_support():
         raise NotImplementedError
-    try:
-        # stdscr.nodelay(True)
-        # self._loop.add_reader(fd=self.STDIN_FILENO, callback=self.process_input)
-        while True:
-            try:
-                wch = stdscr.get_wch()
-            except C.error:
-                break
-            except KeyboardInterrupt:
-                break
-            if wch == "q":
-                break
-            if wch == "s":
-                shell_out(stdscr)
-            log.warning(lambda: f"{wch}")
 
-    finally:
-        stdscr.nodelay(False)
+    # stdscr.refresh()
+
+    # route_signals_to_fd() as sigfd,
+    with selectors.DefaultSelector() as sel:
+        sel.register(sys.stdin.fileno(), selectors.EVENT_READ, data=None)
+        # sel.register(sigfd, selectors.EVENT_READ, data=None)
+        stdscr.nodelay(True)
+        try:
+            while True:
+                for key, events in sel.select():
+                    # if key.fd == sigfd:
+                    #     assert events == selectors.EVENT_READ
+                    #     sig = os.read(sigfd, 1)
+                    #     log.info(sig)
+                    if key.fd == sys.stdin.fileno():
+                        assert events == selectors.EVENT_READ
+                        wch = stdscr.get_wch()
+                        cmd = input_handlers.get(wch, None)
+                        comment = f" ({cmd.__name__})" if cmd else ""
+                        log.warning(repr(wch) + comment)
+                        if cmd:
+                            # WARN: last stmt in loop COS: may raise SystemExit
+                            cmd(stdscr)
+                    else:
+                        log.error((key, events))
+        except KeyboardInterrupt:
+            pass
+        finally:
+            stdscr.nodelay(False)
 
 
 # class Application:
@@ -84,10 +61,48 @@ def drawloop(stdscr: C.window) -> None:
 
 
 # TBD: frontend to various ways to run miur API with different UI
-def miur(cwd: str) -> None:
-    log.info(f"{cwd=}")
-    # with Application() as app:
-    return C.wrapper(drawloop)
+def miur(arg: str) -> None:
+    # CHG: XDG_RUNTIME_DIR=/run/user/1000 + /miur/pid
+    pidfile: Final = "/t/miur.pid"
+
+    if arg.startswith("-SIG"):
+        # MAYBE: check by short LOCK_EX if any LOCK_SH present (i.e. main miur running)
+        try:
+            # SEIZE: trbs/pid: Pidfile featuring stale detection and file-locking ⌇⡦⠿⣢⢔
+            #   https://github.com/trbs/pid
+            with open(pidfile, "r", encoding="utf-8") as f:
+                pid = int(f.read())
+        except FileNotFoundError as exc:
+            log.error(f"fail {pidfile=} | {exc}")
+            sys.exit(1)
+
+        log.warning(f"sending signal={arg} to {pid}")
+        try:
+            os.kill(pid, getattr(signal, arg[1:]))
+        except ProcessLookupError as exc:
+            log.error(f"fail {pid=} | {exc}")
+            sys.exit(1)
+        sys.exit(0)
+
+    lvl = int(os.environ.get("MIUR_LEVEL", "0"))
+    if lvl != 0:
+        log.error(f"avoid nesting {lvl=}")
+        sys.exit(1)
+    os.environ["MIUR_LEVEL"] = str(lvl + 1)
+
+    # IDEA: force-notify epoll as if new data arrived inof actual fd
+    signal.signal(signal.SIGWINCH, lambda si,fr:
+        log.warning(f"{signal.Signals(si).name}={si}: {signal.strsignal(si)} during <{fr.f_code.co_filename}:{fr.f_lineno}>"))
+
+    with open(pidfile, "w", encoding="utf-8") as f:
+        f.write(str(os.getpid()))
+    try:
+        # with Application() as app:
+        log.info(f"cwd={arg}")
+        with custom_excepthook_log():
+            return C.wrapper(mainloop)
+    finally:
+        os.remove(pidfile)
 
 
 def _live() -> None:
