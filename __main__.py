@@ -4,6 +4,9 @@
 # PERF:DEBUG: $ PYTHONPATH=/d/just python -PsSB [-X importtime | -X tracemalloc] -m miur
 #   OR: $ python -m cProfile -s cumulative -- =miur
 #   [_] TODO: run all of them through flags
+#     e.g. set flags=noninteractive (to exit fast) and then exec(cmdline)
+#   [_] ALSO: directly run Jupyther kernel and console by sourcing from inside my code
+#     /d/coastline/fleur/cfg/gdb-jupyter.py
 
 import sys
 

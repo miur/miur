@@ -1,14 +1,8 @@
-"""
-SUMMARY: Modern [re]Invented Unified navigatoR
-"""
-
-__appname__ = "miur"
-__version__ = "42.1.3"  # INFO: and even more PoCs I did to get here
-
-
 from argparse import Action, ArgumentParser
 from enum import Enum
 from typing import TYPE_CHECKING
+
+from . import _app as APP
 
 if TYPE_CHECKING:
     from just.use.iji.main import Context
@@ -33,7 +27,7 @@ class SigAction(Action):
 def cli_spec(parser: ArgumentParser) -> ArgumentParser:
     o = parser.add_argument
     o("cwd", nargs="?", default="/etc")  # [_] FUT:CHG: os.getcwd()
-    o("-v", "--version", action="version", version=__version__)
+    o("-v", "--version", action="version", version=APP.__version__)
     _sigset = "HUP INT KILL USR1 USR2 TERM CONT STOP WINCH".split()
     o("-s", "--signal", choices=_sigset, type=str.upper, action=SigAction)
     # fmt:off
@@ -44,7 +38,7 @@ def cli_spec(parser: ArgumentParser) -> ArgumentParser:
 def miur_args(args: list[str]) -> None:
     from .miur import miur_opts
 
-    _ap = ArgumentParser(prog=__appname__, description=__doc__)
+    _ap = ArgumentParser(prog=APP.__appname__, description=APP.__doc__)
     return miur_opts(cli_spec(_ap).parse_args(args))
 
 
