@@ -4,7 +4,7 @@ from contextlib import contextmanager
 from types import TracebackType
 from typing import Any, Callable, Iterator, Type
 
-from .log import log
+from .logger import log
 
 
 def exception_handler(

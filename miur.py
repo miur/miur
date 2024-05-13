@@ -8,9 +8,9 @@ from typing import TYPE_CHECKING, Any, Final, Iterator
 
 from . import curses_ext as CE
 from .curses_cmds import input_handlers
-from .util.exc import log_excepthook
-from .util.log import log
-from .util.sig import route_signals_to_fd
+from .util.exchook import log_excepthook
+from .util.logger import log
+from .util.sighandler import route_signals_to_fd
 
 if TYPE_CHECKING:
     from argparse import Namespace
