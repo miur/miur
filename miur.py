@@ -3,17 +3,16 @@ import os
 import selectors
 import signal
 import sys
-from contextlib import ExitStack, contextmanager
-from typing import TYPE_CHECKING, Any, Final, Iterator
+from contextlib import ExitStack
+from typing import TYPE_CHECKING, Final
 
 from . import curses_ext as CE
 from .curses_cmds import input_handlers
+from .util.envlevel import increment_envlevel
 from .util.exchook import log_excepthook
 from .util.logger import log
+from .util.pidfile import send_pidfile_signal, temp_pidfile
 from .util.sighandler import route_signals_to_fd
-
-if TYPE_CHECKING:
-    from argparse import Namespace
 
 # OR:(/tmp)=f"/run/user/{os.getlogin()}" os.environ.get('', "/tmp")
 PIDFILE: Final[str] = os.environ.get("XDG_RUNTIME_DIR", "/tmp") + "/miur.pid"
@@ -80,119 +79,24 @@ def mainloop(stdscr: C.window) -> None:
             stdscr.nodelay(False)
 
 
-@contextmanager
-def temp_pidfile(pidfile: str) -> Iterator[None]:
-    with open(pidfile, "w", encoding="utf-8") as f:
-        f.write(str(os.getpid()))
-    try:
-        yield
-    finally:
-        os.remove(pidfile)
-
-
-@contextmanager
-def miur_envlevel(varname: str) -> Iterator[int]:
-    lvl = int(os.environ.get(varname, "0"))
-    if lvl != 0:
-        log.error(f"avoid nesting {lvl=}")
-        sys.exit(1)
-    os.environ[varname] = str(lvl + 1)
-    try:
-        yield lvl
-    finally:
-        os.environ[varname] = str(lvl)
-
-
 def miur_none() -> None:
     # with Application() as app:
     with ExitStack() as stack:
-        stack.enter_context(miur_envlevel("MIUR_LEVEL"))
+        stack.enter_context(increment_envlevel("MIUR_LEVEL"))
+        # MAYBE: only enable PIDFILE when run by miur_opts() to avoid global VAR ?
         stack.enter_context(temp_pidfile(PIDFILE))
         stack.enter_context(log_excepthook())
         return C.wrapper(mainloop)
 
 
+if TYPE_CHECKING:
+    from argparse import Namespace
+
+
 # TBD: frontend to various ways to run miur API with different UI
 def miur_opts(opts: "Namespace") -> None:
     if sig := opts.signal:
-        # MAYBE: check by short LOCK_EX if any LOCK_SH present (i.e. main miur running)
-        try:
-            # SEIZE: trbs/pid: Pidfile featuring stale detection and file-locking ⌇⡦⠿⣢⢔
-            #   https://github.com/trbs/pid
-            with open(PIDFILE, "r", encoding="utf-8") as f:
-                # [_] TODO: test /proc/pid/exe is the same as /proc/self/exe (OR: sys.argv[0])
-                pid = int(f.read())
-        except FileNotFoundError as exc:
-            log.error(f"fail {PIDFILE=} | {exc}")
-            sys.exit(1)
-
-        log.warning(f"sending signal={sig} to {pid=}")
-        try:
-            os.kill(pid, sig)
-        except ProcessLookupError as exc:
-            log.error(f"fail {pid=} | {exc}")
-            sys.exit(1)
-        sys.exit(0)
-
-    if opts.jupyter_kernel:
-        from ipykernel.kernelapp import launch_new_instance
-        from traitlets.config import Config
-
-        c = Config()
-
-        # ipykernel 6.x breaks redirecting stdout · Issue #795 · ipython/ipykernel · GitHub ⌇⡤⢆⡠⡨
-        #   https://github.com/ipython/ipykernel/issues/795
-        # c.IPKernelApp.capture_fd_output = False
-
-        ## FIXED: don't show "how to exit" msg (i.e. connect client and issue "quit") ⌇⡤⢆⡧⣧
-        #   https://ipython.readthedocs.io/en/stable/config/options/kernel.html#configtrait-IPKernelApp.parent_handle
-        # c.IPKernelApp.parent_handle = 1
-
-        ## [_] TODO: integrate my main loop epoll/signals with asyncio from IPython
-        # c.InteractiveShellApp.gui = 'asyncio'
-
-        ## FIXED: single known file -- to avoid manually copying its name each time
-        c.ConnectionFileMixin.connection_file = "miur-kernel.json"
-
-        launch_new_instance(config=c)
-        sys.exit(0)
-
-    if opts.jupyter_console:
-        pass
-
-    if opts.jupyter_client:
-        import json
-
-        # from jupyter_client.asynchronous.client import AsyncKernelClient
-        from jupyter_client.client import KernelClient
-
-        json_file = open("confs/c1.json", "r")
-        data = json.load(json_file)
-        shell_port = data["shell_port"]
-        iopub_port = data["iopub_port"]
-        stdin_port = data["stdin_port"]
-        control_port = data["control_port"]
-        hb_port = data["hb_port"]
-
-        kc = KernelClient(
-            ip="127.0.0.1",
-            transport="tcp",
-            shell_port=shell_port,
-            iopub_port=iopub_port,
-            stdin_port=stdin_port,
-            control_port=control_port,
-            hb_port=hb_port,
-        )
-        code = """import os
-        current_dir = os.getcwd()
-        print("Current working directory:", current_dir)"""
-        msg_id = kc.execute(code)
-        sys.exit(0)
-
-    if opts.jupyter_quit:
-        # OR:BET: jupyter-run = jupyter_client.runapp:RunApp.launch_instance
-        kc.shutdown(code)
-        sys.exit(0)
+        sys.exit(send_pidfile_signal(PIDFILE, sig))
 
     log.info(f"cwd={opts.cwd}")
     return miur_none()

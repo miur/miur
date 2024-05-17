@@ -145,6 +145,7 @@ class CursesDevice:
 
         # WKRND: python - Calling IPython.embed() in asynchronous code (specifying the event loop) - Stack Overflow ⌇⡢⠭⣎⣬
         #   https://stackoverflow.com/questions/56415470/calling-ipython-embed-in-asynchronous-code-specifying-the-event-loop
+        # SEE:ex~: /usr/lib/python3.12/site-packages/ipykernel/eventloops.py:284
         import nest_asyncio
 
         nest_asyncio.apply()
