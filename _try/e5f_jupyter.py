@@ -39,6 +39,7 @@ def main() -> None:
         loop = asyncio.get_running_loop()
         loop.add_signal_handler(SIGINT, lambda: asyncio.get_running_loop().stop())
 
+    # NOTE: this is only possible, because IPython already started IOLoop in bkgr Thread
     ioloop.IOLoop.current().add_callback(setup_handler)
 
     # breakpoint()  # import pdb; pdb.run('kernel.start()')

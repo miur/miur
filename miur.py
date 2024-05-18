@@ -18,6 +18,8 @@ from .util.sighandler import route_signals_to_fd
 # OR:(/tmp)=f"/run/user/{os.getlogin()}" os.environ.get('', "/tmp")
 PIDFILE: Final[str] = os.environ.get("XDG_RUNTIME_DIR", "/tmp") + "/miur.pid"
 
+from ipykernel.kernelapp import IPKernelApp, ioloop
+
 
 def handle_SIGWINCH(
     sel: selectors.DefaultSelector, sigfd: int, stdscr: C.window
@@ -77,6 +79,26 @@ def selectors_loop(stdscr: C.window) -> None:
             stdscr.nodelay(False)
 
 
+async def amain(stdscr: C.window) -> None:
+    loop = asyncio.get_running_loop()
+    curses_stdin_fd = 0
+    # FAIL: RuntimeError: Event loop stopped before Future completed.
+    ev_shutdown = asyncio.Event()
+    loop.add_signal_handler(signal.SIGINT, ev_shutdown.set)
+    loop.add_signal_handler(signal.SIGWINCH, stdscr.refresh)
+    stdscr.nodelay(True)
+    loop.add_reader(fd=curses_stdin_fd, callback=lambda: handle_input(stdscr))
+    try:
+        await ev_shutdown.wait()
+        # while True:
+        #     await asyncio.sleep(1)
+    finally:
+        loop.remove_reader(fd=curses_stdin_fd)
+        stdscr.nodelay(False)
+        loop.remove_signal_handler(signal.SIGWINCH)
+        loop.remove_signal_handler(signal.SIGINT)
+
+
 def mainloop(stdscr: C.window) -> None:
     # [_] FIXME: restore in "finally" to prevent logging to curses after it exits
     log.config(write=lambda text: CE.print_curses_altscreen(stdscr, text))
@@ -84,28 +106,22 @@ def mainloop(stdscr: C.window) -> None:
     if not C.has_extended_color_support():
         raise NotImplementedError
 
-    async def amain() -> None:
-        loop = asyncio.get_running_loop()
-        curses_stdin_fd = 0
-        # FAIL: RuntimeError: Event loop stopped before Future completed.
-        ev_shutdown = asyncio.Event()
-        loop.add_signal_handler(signal.SIGINT, ev_shutdown.set)
-        loop.add_signal_handler(signal.SIGWINCH, stdscr.refresh)
-        stdscr.nodelay(True)
-        loop.add_reader(fd=curses_stdin_fd, callback=lambda: handle_input(stdscr))
-        try:
-            await ev_shutdown.wait()
-            # while True:
-            #     await asyncio.sleep(1)
-        finally:
-            loop.remove_reader(fd=curses_stdin_fd)
-            stdscr.nodelay(False)
-            loop.remove_signal_handler(signal.SIGWINCH)
-            loop.remove_signal_handler(signal.SIGINT)
-
     # MAYBE: if not opts.ipykernel: selectors_loop(stdscr)
-    asyncio.run(amain())
+    # asyncio.run(amain(stdscr))
 
+    kernel = IPKernelApp.instance()
+    kernel.initialize(["python", "--IPKernelApp.parent_handle=1"])
+    kernel.reset_io()
+    # DEBUG: raise RuntimeError()
+
+
+    def setup_handler():
+        loop = asyncio.get_running_loop()
+        # WARN: should "loop.stop" be replaced by some kernel.stop() ?
+        loop.add_signal_handler(signal.SIGINT, loop.stop)
+
+    ioloop.IOLoop.current().add_callback(setup_handler)
+    kernel.start()
 
 
 def miur_none() -> None:
