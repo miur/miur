@@ -80,8 +80,7 @@ def mainloop(stdscr: C.window) -> None:
 
 
 def miur_none() -> None:
-    # with Application() as app:
-    with ExitStack() as stack:
+    with ExitStack() as stack:  # MOVE:> with Application() as app:
         stack.enter_context(increment_envlevel("MIUR_LEVEL"))
         # MAYBE: only enable PIDFILE when run by miur_opts() to avoid global VAR ?
         stack.enter_context(temp_pidfile(PIDFILE))

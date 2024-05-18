@@ -1,20 +1,47 @@
+# DEBUG: $ PYDEVD_DISABLE_FILE_VALIDATION=1 python -m pdb e5f_jupyter.py
 """An in-process terminal example."""
 
-# import asyncio
+import asyncio
+from signal import SIGINT
 
+from ipykernel.kernelapp import IPKernelApp, ioloop
+
+# from IPython.lib.kernel import connect_qtconsole
 # from ipykernel.inprocess.manager import InProcessKernelManager
 ## from ipykernel.inprocess.ipkernel import InProcessInteractiveShell
 # from jupyter_console.ptshell import ZMQTerminalInteractiveShell
 ## ZMQTerminalIPythonApp
 
-# from IPython.lib.kernel import connect_qtconsole
-from ipykernel.kernelapp import IPKernelApp
 
 def main() -> None:
     """The main function."""
 
     kernel = IPKernelApp.instance()
-    kernel.initialize(['python'])
+    kernel.initialize(
+        [
+            "python",
+            "--IPKernelApp.parent_handle=1",
+            # '--debug',
+            # -f ipython-kernel.json
+        ]
+    )
+    ## FIXED: restore redirected stdout/sdterr for !pdb
+    #   print(kernel)  # FAIL: internally redirected IO
+    #   print(kernel, file=__import__("sys").__stderr__)  # WKRND
+    kernel.reset_io()
+
+    ## FIXED: restore ignored SIGINT
+    # BAD: we can't raise exceptions from inside native sig handlers
+    #   signal.signal(signal.SIGINT, lambda si,fr: None)
+    # FAIL: no running event loop
+    #   loop = asyncio.get_running_loop()
+    def setup_handler():
+        loop = asyncio.get_running_loop()
+        loop.add_signal_handler(SIGINT, lambda: asyncio.get_running_loop().stop())
+
+    ioloop.IOLoop.current().add_callback(setup_handler)
+
+    # breakpoint()  # import pdb; pdb.run('kernel.start()')
     kernel.start()
 
     # console = connect_qtconsole(kernel.abs_connection_file, profile=kernel.profile)
@@ -22,7 +49,7 @@ def main() -> None:
 
     # app.quit()
     # console.kill()
-    kernel.io_loop.stop()
+    # kernel.io_loop.stop()
 
     # kernel_manager = InProcessKernelManager()
     # kernel_manager.start_kernel()
