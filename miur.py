@@ -1,3 +1,4 @@
+import asyncio
 import curses as C
 import os
 import selectors
@@ -18,6 +19,64 @@ from .util.sighandler import route_signals_to_fd
 PIDFILE: Final[str] = os.environ.get("XDG_RUNTIME_DIR", "/tmp") + "/miur.pid"
 
 
+def handle_SIGWINCH(
+    sel: selectors.DefaultSelector, sigfd: int, stdscr: C.window
+) -> None:
+    # &next BET:RFC:
+    #   * give up on sigfd -- it's unreliable, as it requires some sigaction() anyway
+    #   * set flag in handler -- COS we need refresh only once for all signals
+    #   * propagate signal from handler to Epoll -- for timely .refresh
+    who = sel.__class__.__name__
+    si = int.from_bytes(os.read(sigfd, 1))
+    snm = signal.Signals(si).name
+    sdesc = signal.strsignal(si)
+    log.warning(f"{who} {snm}={si}: {sdesc}")
+
+    ## HACK:SRC: https://stackoverflow.com/questions/1022957/getting-terminal-width-in-c
+    ##   >> make curses to calc sizes by itself (as it does on each .refresh)
+    ## INFO: actually, "log.*" already does the same, but its IMPL is subject to change
+    # with CE.curses_altscreen(stdscr):
+    #     pass
+    # [_] CHECK: do we even need full .def_prog_mode()/.endwin() here ?
+    stdscr.refresh()
+
+    ## FAIL: get KEY_RESIZE immediately, don't make Epoll wait until next keypress
+    # ch = stdscr.getch()
+    # assert ch == C.KEY_RESIZE, ch
+
+
+def handle_input(stdscr: C.window) -> None:
+    wch = stdscr.get_wch()
+    cmd = input_handlers.get(wch, None)
+    comment = f" ({cmd.__name__})" if cmd else ""
+    log.warning(repr(wch) + comment)
+    if cmd:
+        # WARN: last stmt in loop COS: may raise SystemExit
+        cmd(stdscr)
+
+
+def selectors_loop(stdscr: C.window) -> None:
+    with route_signals_to_fd() as sigfd, selectors.DefaultSelector() as sel:
+        sel.register(sys.stdin.fileno(), selectors.EVENT_READ, data=None)
+        sel.register(sigfd, selectors.EVENT_READ, data=None)
+        stdscr.nodelay(True)
+        try:
+            while True:
+                for key, events in sel.select():
+                    if key.fd == sigfd:
+                        assert events == selectors.EVENT_READ
+                        handle_SIGWINCH(sel, sigfd, stdscr)
+                    elif key.fd == sys.stdin.fileno():
+                        assert events == selectors.EVENT_READ
+                        handle_input(stdscr)
+                    else:
+                        log.error((key, events))
+        except KeyboardInterrupt:
+            pass
+        finally:
+            stdscr.nodelay(False)
+
+
 def mainloop(stdscr: C.window) -> None:
     # [_] FIXME: restore in "finally" to prevent logging to curses after it exits
     log.config(write=lambda text: CE.print_curses_altscreen(stdscr, text))
@@ -25,58 +84,28 @@ def mainloop(stdscr: C.window) -> None:
     if not C.has_extended_color_support():
         raise NotImplementedError
 
-    with route_signals_to_fd() as sigfd, selectors.DefaultSelector() as sel:
-        sel.register(sys.stdin.fileno(), selectors.EVENT_READ, data=None)
-        sel.register(sigfd, selectors.EVENT_READ, data=None)
-
+    async def amain() -> None:
+        loop = asyncio.get_running_loop()
+        curses_stdin_fd = 0
+        # FAIL: RuntimeError: Event loop stopped before Future completed.
+        ev_shutdown = asyncio.Event()
+        loop.add_signal_handler(signal.SIGINT, ev_shutdown.set)
+        loop.add_signal_handler(signal.SIGWINCH, stdscr.refresh)
         stdscr.nodelay(True)
+        loop.add_reader(fd=curses_stdin_fd, callback=lambda: handle_input(stdscr))
         try:
-            while True:
-                for key, events in sel.select():
-
-                    # &next BET:RFC:
-                    #   * give up on sigfd -- it's unreliable, as it requires some sigaction() anyway
-                    #   * set flag in handler -- COS we need refresh only once for all signals
-                    #   * propagate signal from handler to Epoll -- for timely .refresh
-                    if key.fd == sigfd:
-                        assert events == selectors.EVENT_READ
-
-                        who = sel.__class__.__name__
-                        si = int.from_bytes(os.read(sigfd, 1))
-                        snm = signal.Signals(si).name
-                        sdesc = signal.strsignal(si)
-                        log.warning(f"{who} {snm}={si}: {sdesc}")
-
-                        ## HACK:SRC: https://stackoverflow.com/questions/1022957/getting-terminal-width-in-c
-                        ##   >> make curses to calc sizes by itself (as it does on each .refresh)
-                        ## INFO: actually, "log.*" already does the same, but its IMPL is subject to change
-                        # with CE.curses_altscreen(stdscr):
-                        #     pass
-                        # [_] CHECK: do we even need full .def_prog_mode()/.endwin() here ?
-                        stdscr.refresh()
-
-                        ## FAIL: get KEY_RESIZE immediately, don't make Epoll wait until next keypress
-                        # ch = stdscr.getch()
-                        # assert ch == C.KEY_RESIZE, ch
-
-                        continue
-
-                    if key.fd == sys.stdin.fileno():
-                        assert events == selectors.EVENT_READ
-                        wch = stdscr.get_wch()
-                        cmd = input_handlers.get(wch, None)
-                        comment = f" ({cmd.__name__})" if cmd else ""
-                        log.warning(repr(wch) + comment)
-                        if cmd:
-                            # WARN: last stmt in loop COS: may raise SystemExit
-                            cmd(stdscr)
-                        continue
-
-                    log.error((key, events))
-        except KeyboardInterrupt:
-            pass
+            await ev_shutdown.wait()
+            # while True:
+            #     await asyncio.sleep(1)
         finally:
+            loop.remove_reader(fd=curses_stdin_fd)
             stdscr.nodelay(False)
+            loop.remove_signal_handler(signal.SIGWINCH)
+            loop.remove_signal_handler(signal.SIGINT)
+
+    # MAYBE: if not opts.ipykernel: selectors_loop(stdscr)
+    asyncio.run(amain())
+
 
 
 def miur_none() -> None:
@@ -95,7 +124,7 @@ if TYPE_CHECKING:
 # TBD: frontend to various ways to run miur API with different UI
 def miur_opts(opts: "Namespace") -> None:
     if sig := opts.signal:
-        sys.exit(send_pidfile_signal(PIDFILE, sig))
+        sys.exit(send_pidfile_signal(PIDFILE, sig))  # type:ignore
 
     log.info(f"cwd={opts.cwd}")
     return miur_none()

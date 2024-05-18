@@ -8,7 +8,9 @@ from . import curses_ext as CE
 
 
 def exitloop(_: C.window) -> None:
-    raise SystemExit()
+    # BET? properly exit mainloop
+    #   NEED: send kind of "Event/Queue" to rotate loop once
+    raise SystemExit()  # CHECK: same as sys.exit()
 
 
 def resize(scr: C.window) -> None:
