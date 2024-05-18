@@ -3,16 +3,31 @@ import os
 import sys
 from contextlib import contextmanager
 from subprocess import CompletedProcess, run
-from typing import Any, Iterator, Sequence
+from typing import Any, Callable, Iterator, Sequence
+
 
 ## ALT: C.wrapper(drawloop: Callable[[C.window], None])
-# @contextmanager
-# def makestdscr() -> Iterator[C.window]:
-#     try:
-#         stdscr = C.initscr()
-#         yield stdscr
-#     finally:
-#         C.endwin()
+@contextmanager
+def curses_stdscr() -> Iterator[C.window]:
+    if not C.has_extended_color_support():
+        raise NotImplementedError
+    try:
+        stdscr = C.initscr()
+        C.noecho()  # echoing of keys = off
+        C.cbreak()  # buffering on keyboard input = off
+        stdscr.keypad(True)  # sup special escape seq for e.g. curses.KEY_LEFT
+        C.start_color()  # WAIT: which exception does it throw? TRY: TERM=dummy
+        yield stdscr
+    finally:
+        try:
+            stdscr.keypad(False)
+            # del stdscr  # TRY? ALT:BAD: not ported :: delscreen(stdscr)
+            C.echo()
+            # BAD: both nocbreak and endwin may return _curses.error.ERR
+            C.nocbreak()
+            C.endwin()  # CHECK: is it safe to deinit libncurses multiple times in Jupyter?
+        finally:
+            pass
 
 
 ## FAIL: clears bkgr, moves cursor, +/- doesn't show old buffer
@@ -37,20 +52,62 @@ def curses_altscreen(stdscr: C.window) -> Iterator[None]:
         stdscr.refresh()  # restore save modes, repaint screen
 
 
-def print_curses_altscreen(stdscr: C.window, msg: str) -> None:
-    with curses_altscreen(stdscr):
-        sys.stdout.write(msg)
-        # ATT: force immediate output before you switch back to curses alt-screen
-        sys.stdout.flush()
+# def print_curses_altscreen(stdscr: C.window, msg: str) -> None:
+#     with curses_altscreen(stdscr):
+#         sys.stdout.write(msg)
+#         # ATT: force immediate output before you switch back to curses alt-screen
+#         sys.stdout.flush()
+#
+#
+# @contextmanager
+# def log_to_altscreen(stdscr: C.window) -> Iterator[None]:
+#     from .util.logger import log
+#
+#     # TODO: also STDERR -- for conditional based on level
+#     old_stdout = log.write
+#     try:
+#         log.config(write=lambda text: print_curses_altscreen(stdscr, text))
+#         yield
+#     finally:
+#         log.config(write=old_stdout)
+
+
+@contextmanager
+def stdio_to_altscreen(stdscr: C.window) -> Iterator[None]:
+    from .util.logger import log
+
+    def _write(oldw: Callable[[str], int], s: str) -> int:
+        C.def_prog_mode()
+        C.endwin()
+        try:
+            return oldw(s)
+        finally:
+            sys.stdout.flush()
+            stdscr.refresh()
+
+    oldwout = sys.stdout.write
+    oldwerr = sys.stderr.write
+    oldlog = log.write
+    try:
+        sys.stdout.write = lambda s: _write(oldwout, s)
+        sys.stderr.write = lambda s: _write(oldwerr, s)
+        # BAD:WKRND: overriding initial class VAR for logger
+        log.write = sys.stdout.write
+        yield
+    finally:
+        log.write = oldlog
+        sys.stdout.write = oldwout
+        sys.stderr.write = oldwerr
 
 
 def shell_out(
     stdscr: C.window, cmdv: Sequence[str] = (), **envkw: str
 ) -> CompletedProcess[str]:
-    cmd = cmdv or (os.environ.get("SHELL", "sh"),)
+    if not cmdv:
+        cmdv = (os.environ.get("SHELL", "sh"),)
     envp = dict(os.environ, **envkw)
     with curses_altscreen(stdscr):
-        return run(cmd, env=envp, check=True, text=True)
+        return run(cmdv, env=envp, check=True, text=True)
 
 
 def ipython_out(stdscr: C.window, user_ns: dict[str, Any] | None = None) -> None:

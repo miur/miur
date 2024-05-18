@@ -23,6 +23,8 @@ def main() -> None:
             "--IPKernelApp.parent_handle=1",
             # '--debug',
             # -f ipython-kernel.json
+            # "--IPKernelApp.outstream_class=",
+            # "--IPKernelApp.displayhook_class=",
         ]
     )
     ## FIXED: restore redirected stdout/sdterr for !pdb
@@ -45,6 +47,7 @@ def main() -> None:
     # breakpoint()  # import pdb; pdb.run('kernel.start()')
     kernel.start()
 
+    #####
     # console = connect_qtconsole(kernel.abs_connection_file, profile=kernel.profile)
     # kernel.shell.user_ns['kernel'] = kernel
 

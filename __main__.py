@@ -25,7 +25,7 @@ def select_entrypoint():  # type:ignore
 
 
 def as_pkg_or_exe(mkrun):  # type:ignore
-    if globals()["__package__"] is not None:
+    if globals().get("__package__") is not None:
         return mkrun()
 
     # OR: fs = __import__("os.path", fromlist=[""])
