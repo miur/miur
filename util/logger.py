@@ -19,10 +19,11 @@ class LogLevel(enum.IntEnum):
     ERROR = 50
     WARNING = 40
     INFO = 30  # +NOTICE | SUCCESS = 25
-    # DEBUG = 20
-    # OPTIONAL = 15
-    # VERBOSE = 10  # DETAILED = 10
-    # TRACE = TR1..TR9 =
+    # DEBUG = 25
+    # OPTIONAL = 20
+    # VERBOSE = 15  # DETAILED = 10
+    TRACE = 10  # OR? =KPI  // :PERF: latency/cpu/memory
+    # +TR1..TR9 (USE: gradually dimming gray colors, darker than .INFO)
     ANYTHING = 0  # OR: lvl=None
 
 
@@ -36,14 +37,15 @@ TERMSTYLE = {
     # LogLevel.SUCCESS|TRACE: "\033[32m",  # green
     # LogLevel.NOTICE: "\033[34m",  # blue
     # LogLevel.DEBUG: "\033[95m",  # purple
-    # LogLevel.VERBOSE: "\033[37m",  # cyan
+    # LogLevel.VERBOSE: "\033[36m",  # cyan
+    LogLevel.TRACE: "\033[36m",  # cyan
     # LogLevel.DETAILED: "\033[93m",  # grey
     None: "\033[m",  # none
 }
 
 
 class Logger:
-    minlevel: LogLevel = LogLevel.INFO
+    minlevel: LogLevel = LogLevel.ANYTHING
     write: Callable[[str], Any] = sys.stdout.write
     # TODO: make it a part of supplied .write()
     termcolor: bool = True
@@ -69,6 +71,14 @@ class Logger:
 
     def info(self, fmt: _Loggable) -> None:
         self.at(LogLevel.INFO, fmt)
+
+    def trace(self, fmt: _Loggable) -> None:
+        self.at(LogLevel.TRACE, fmt)
+
+    def kpi(self, fmt: _Loggable) -> None:
+        cpu = time.process_time() * 1000
+        ms = (time.monotonic() - self._initts) * 1000
+        self.at(LogLevel.TRACE, f"KPI({ms=:.3f} {cpu=:.3f}) {fmt}")
 
     # @profileit  # BAD: ~1ms/call (mostly due to !curses.*)
     def at(self, lvl: LogLevel, fmt: _Loggable) -> None:

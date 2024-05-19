@@ -107,6 +107,10 @@ def shell_out(
         cmdv = (os.environ.get("SHELL", "sh"),)
     envp = dict(os.environ, **envkw)
     with curses_altscreen(stdscr):
+        ## PERF=57MB
+        # with open(f"/proc/{os.getpid()}/smaps", "r") as f:
+        #     pssmem = sum(int(l.split()[1]) for l in f.readlines() if l.startswith("Pss:"))
+        #     print(pssmem)
         return run(cmdv, env=envp, check=True, text=True)
 
 

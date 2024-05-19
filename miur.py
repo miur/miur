@@ -1,4 +1,3 @@
-import asyncio
 import curses as C
 import os
 import selectors
@@ -6,8 +5,6 @@ import signal
 import sys
 from contextlib import ExitStack
 from typing import TYPE_CHECKING, Final
-
-import ipykernel.kernelapp as IK
 
 from . import curses_ext as CE
 from .curses_cmds import input_handlers
@@ -19,6 +16,9 @@ from .util.sighandler import route_signals_to_fd
 
 # OR:(/tmp)=f"/run/user/{os.getlogin()}" os.environ.get('', "/tmp")
 PIDFILE: Final[str] = os.environ.get("XDG_RUNTIME_DIR", "/tmp") + "/miur.pid"
+
+# USAGE: time mi --backend=asyncio
+PROFILE_STARTUP = True  # =DEBUG
 
 
 def handle_SIGWINCH(
@@ -64,6 +64,9 @@ def mainloop_selectors(stdscr: C.window) -> None:
         stdscr.nodelay(True)
         try:
             while True:
+                if globals().get("PROFILE_STARTUP"):
+                    log.kpi("serving")
+                    break
                 for key, events in sel.select():
                     if key.fd == sigfd:
                         assert events == selectors.EVENT_READ
@@ -81,6 +84,9 @@ def mainloop_selectors(stdscr: C.window) -> None:
 
 async def mainloop_asyncio(stdscr: C.window) -> None:
     stdscr.refresh()  # CHG:> app.refresh
+
+    import asyncio
+
     loop = asyncio.get_running_loop()
     curses_stdin_fd = 0
     # FAIL: RuntimeError: Event loop stopped before Future completed.
@@ -91,6 +97,9 @@ async def mainloop_asyncio(stdscr: C.window) -> None:
     stdscr.nodelay(True)
     loop.add_reader(fd=curses_stdin_fd, callback=lambda: handle_input(stdscr))
     try:
+        if globals().get("PROFILE_STARTUP"):
+            loop.call_soon(ev_shutdown.set)
+            log.kpi("serving")
         await ev_shutdown.wait()
         # while True:
         #     await asyncio.sleep(1)
@@ -102,21 +111,29 @@ async def mainloop_asyncio(stdscr: C.window) -> None:
 
 
 def mainloop_ipython(stdscr: C.window) -> None:
+    import ipykernel.kernelapp as IK
+
+    if not sys.warnoptions:
+        __import__("warnings").simplefilter("default")  # DEBUG: ResourceWarning
+
     os.environ["PYDEVD_DISABLE_FILE_VALIDATION"] = "1"  # =debugpy
     kernel = IK.IPKernelApp.instance()
-    kernel.connection_file = 'miur-ipython.json'
+    kernel.connection_file = "miur-ipython.json"
     kernel.parent_handle = 1  # EXPL: suppress banner with conn details
     kernel.outstream_class = None  # type:ignore
-    kernel.initialize()  # type:ignore  # ["python", "--debug"]
+
+    # ERR: DeprecationWarning: There is no current event loop
+    #   /usr/lib/python3.12/site-packages/tornado/ioloop.py:274:
+    kernel.initialize([])  # type:ignore  # ["python", "--debug"]
 
     # ALT:(outstream_class):FIXED: restore redirected stdout/sdterr for !pdb/etc
     # kernel.reset_io()  # type:ignore
 
     # [_] CHECK
-    ns = kernel.shell.user_ns
+    ns = kernel.shell.user_ns  # type:ignore
     ns["kernel"] = kernel
     ns["stdscr"] = stdscr
-    # ns['_miur'] = __import__("__main__")
+    # ns['_miur'] = __import__("__main__")  # <TODO
 
     # raise RuntimeError()
 
@@ -135,33 +152,39 @@ def mainloop_ipython(stdscr: C.window) -> None:
     #   signal.signal(signal.SIGINT, lambda si,fr: None)
     # FAIL: no running event loop
     #   loop = asyncio.get_running_loop()
-    def setup_mainapp() -> None:
-        loop = asyncio.get_running_loop()
-
-        if not sys.warnoptions:
-            __import__("warnings").simplefilter("default")  # DEBUG: ResourceWarning
-        loop.set_debug(True)  # DEBUG
-
-        # kio = kernel.io_loop
-        # loop.add_signal_handler(signal.SIGINT, lambda: kio.add_callback(kio.stop))
-        tasks.append(loop.create_task(run_mainapp(stdscr), name='main_app'))
+    # def setup_mainapp() -> None:
+    #     loop = asyncio.get_running_loop()
+    #     # kio = kernel.io_loop
+    #     # loop.add_signal_handler(signal.SIGINT, lambda: kio.add_callback(kio.stop))
+    #     tasks.append(loop.create_task(run_mainapp(stdscr), name='main_app'))
 
     kio = IK.ioloop.IOLoop.current()  # type:ignore
-    kio.add_callback(setup_mainapp)
-    try:
-        kernel.start()  # type:ignore
-    finally:
-        kio.close()
+    kio.asyncio_loop.set_debug(True)  # DEBUG
+    # kio.add_callback(setup_mainapp)
+    tasks.append(kio.asyncio_loop.create_task(run_mainapp(stdscr), name="main_app"))
+
+    # HACK: patch to have more control over messy IPython loop
+    #   >> inof "kio.asyncio_loop.run_forever()"
+    kio.asyncio_loop.start = lambda: None
+    kernel.start()  # type:ignore
+    # ALT:BAD: try: kernel.start(); finally: kio.close()
+    __import__("asyncio").run(run_mainapp(stdscr))
 
 
-def mainloop(stdscr: C.window) -> None:
+def miur_none(backend: str | None = None) -> None:
+    if backend is None:
+        backend = "selectors"
+    if backend == "selectors":
+        mainloop = mainloop_selectors
+    elif backend == "asyncio":
+        # NOTE: asyncio.iscoroutinefunction(someFunc)
+        # pylint:disable=unnecessary-lambda-assignment
+        mainloop = lambda stdscr: __import__("asyncio").run(mainloop_asyncio(stdscr))
+    elif backend == "ipython":
+        mainloop = mainloop_ipython
+    else:
+        raise NotImplementedError
 
-    # return mainloop_selectors(stdscr: C.window)
-    # return asyncio.run(mainloop_asyncio(stdscr))
-    return mainloop_ipython(stdscr)
-
-
-def miur_none() -> None:
     with ExitStack() as stack:  # MOVE:> with Application() as app:
         stack.enter_context(increment_envlevel("MIUR_LEVEL"))
         # MAYBE: only enable PIDFILE when run by miur_opts() to avoid global VAR ?
@@ -181,9 +204,15 @@ def miur_opts(opts: "Namespace") -> None:
     if sig := opts.signal:
         sys.exit(send_pidfile_signal(PIDFILE, sig))  # type:ignore
 
+    ## TODO: embedded console/client
+    # $ jupyter console --existing miur-ipython.json
+
     log.info(f"cwd={opts.cwd}")
-    return miur_none()
+    return miur_none(backend=opts.backend)
 
 
 def _live() -> None:
-    pass
+    # pylint:disable=used-before-assignment
+    stdscr: "C.window"
+    stdscr.addstr(1, 1, "hello")
+    stdscr.refresh()
