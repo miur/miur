@@ -79,3 +79,28 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+def _integ_with_asyncio():
+    pass
+    ## FIXED: restore ignored SIGINT
+    # BAD: we can't raise exceptions from inside native sig handlers
+    #   signal.signal(signal.SIGINT, lambda si,fr: None)
+    # FAIL: no running event loop
+    #   loop = asyncio.get_running_loop()
+    # tasks = []
+    # def setup_mainapp() -> None:
+    #     loop = asyncio.get_running_loop()
+    #     # kio = kernel.io_loop
+    #     # loop.add_signal_handler(signal.SIGINT, lambda: kio.add_callback(kio.stop))
+    #     tasks.append(loop.create_task(run_mainapp(stdscr), name='main_app'))
+    # kio.add_callback(setup_mainapp)
+    #
+    # async def run_mainapp(stdscr: C.window) -> None:
+    #     await mainloop_asyncio(stdscr)
+    #     kernel.io_loop.stop()
+    #     ## OR: together
+    #     # async with asyncio.TaskGroup() as tg:
+    #     #     _t1 = tg.create_task(mainloop_asyncio(stdscr))
+    #     #     _t2 = tg.create_task(ipykernel(...))
+    # # tasks.append(ipyloop.create_task(run_mainapp(stdscr), name="main_app"))

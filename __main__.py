@@ -31,6 +31,7 @@ def as_pkg_or_exe(mkrun):  # type:ignore
     # OR: fs = __import__("os.path", fromlist=[""])
     import os.path as fs
 
+    sys.path = [p for p in sys.path if not p.endswith('.zip')]
     parent = fs.dirname(fs.dirname(fs.realpath(__file__)))
     sys.path.insert(0, parent)
 
