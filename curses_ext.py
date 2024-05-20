@@ -111,7 +111,8 @@ def shell_out(
         # with open(f"/proc/{os.getpid()}/smaps", "r") as f:
         #     pssmem = sum(int(l.split()[1]) for l in f.readlines() if l.startswith("Pss:"))
         #     print(pssmem)
-        return run(cmdv, env=envp, check=True, text=True)
+        # NOTE: we shouldn't crash on ZSH (or whatever) returning "exitcode=1"
+        return run(cmdv, env=envp, check=False, text=True)
 
 
 def ipython_out(stdscr: C.window, user_ns: dict[str, Any] | None = None) -> None:

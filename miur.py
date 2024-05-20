@@ -64,8 +64,8 @@ def mainloop_selectors(stdscr: C.window) -> None:
         stdscr.nodelay(True)
         try:
             while True:
+                log.kpi("serving")
                 if globals().get("PROFILE_STARTUP"):
-                    log.kpi("serving")
                     break
                 for key, events in sel.select():
                     if key.fd == sigfd:
@@ -97,9 +97,9 @@ async def mainloop_asyncio(stdscr: C.window) -> None:
     stdscr.nodelay(True)
     loop.add_reader(fd=curses_stdin_fd, callback=lambda: handle_input(stdscr))
     try:
+        log.kpi("serving")
         if globals().get("PROFILE_STARTUP"):
             loop.call_soon(ev_shutdown.set)
-            log.kpi("serving")
         await ev_shutdown.wait()
         # while True:
         #     await asyncio.sleep(1)
@@ -110,12 +110,12 @@ async def mainloop_asyncio(stdscr: C.window) -> None:
         loop.remove_signal_handler(signal.SIGINT)
 
 
-# if TYPE_CHECKING:
-from asyncio import AbstractEventLoop
+if TYPE_CHECKING:
+    from asyncio import AbstractEventLoop
 
 
 @contextmanager
-def my_asyncio_loop(debug: bool = True) -> Iterator[AbstractEventLoop]:
+def my_asyncio_loop(debug: bool = True) -> Iterator["AbstractEventLoop"]:
     import asyncio
 
     # FIXED:ERR: DeprecationWarning: There is no current event loop
@@ -130,11 +130,13 @@ def my_asyncio_loop(debug: bool = True) -> Iterator[AbstractEventLoop]:
 
 
 def inject_ipykernel_into_asyncio(
-    myloop: AbstractEventLoop, myns: dict[str, Any]
+    myloop: "AbstractEventLoop",
+    myns: dict[str, Any],
 ) -> None:
     if sys.flags.isolated:
         __import__("site").main()  # lazy init for "site" in isolated mode
-    os.environ["JUPYTER_PLATFORM_DIRS"] = "1"  # DEPR: can be removed for !jupyter_core>=6
+    # FIXED:DEPR: can be removed for !jupyter_core>=6
+    os.environ["JUPYTER_PLATFORM_DIRS"] = "1"
     import ipykernel.kernelapp as IK
 
     os.environ["PYDEVD_DISABLE_FILE_VALIDATION"] = "1"  # =debugpy
@@ -153,9 +155,6 @@ def inject_ipykernel_into_asyncio(
     ipyloop = IK.ioloop.IOLoop.current()  # type:ignore
     assert myloop == ipyloop.asyncio_loop, "Bug: IPython doesn't use my own global loop"
 
-    # DEBUG:CHECK: correct cleanup of asyncio
-    # raise RuntimeError()
-
     # HACK: monkey-patch to have more control over messy IPython loop
     #   ALT:BAD: try: kernel.start(); finally: kio.close()
     old_start = ipyloop.start
@@ -170,16 +169,41 @@ def inject_ipykernel_into_asyncio(
     ns.update(myns)
 
 
-def miur_none(backend: str | None = None) -> None:
-    # DEBUG: ResourceWarning(asyncio), DeprecationWarning(ipython), etc.
-    if not sys.warnoptions:
-        __import__("warnings").simplefilter("default")
+@contextmanager
+def enable_warnings(error: bool = True) -> Iterator[None]:
+    if sys.warnoptions:
+        return
 
+    import warnings
+
+    # DEBUG: ResourceWarning(asyncio), DeprecationWarning(ipython), etc.
+    if not error:
+        warnings.simplefilter("always")  # OR="default" to print 1st only
+        return
+
+    # SRC: https://stackoverflow.com/questions/22373927/get-traceback-of-warnings
+    # def warn_with_traceback(message, category, filename, lineno, file=None, line=None):
+    #     log = file if hasattr(file,'write') else sys.stderr
+    #     traceback.print_stack(file=log)
+    #     log.write(warnings.formatwarning(message, category, filename, lineno, line))
+    # warnings.showwarning = warn_with_traceback
+
+    warnings.filterwarnings("error")  # Treat warnings as errors
+    try:
+        yield
+    # except Warning:
+    #     log.warning(traceback.format_exc())  # print traceback
+    finally:
+        warnings.resetwarnings()  # Back to default behavior
+
+
+def miur_none(backend: str | None = None) -> None:
     if backend is None:
         backend = "selectors"
 
     with ExitStack() as stack:  # MOVE:> with Application() as app:
         do = stack.enter_context
+        do(enable_warnings())
         do(increment_envlevel("MIUR_LEVEL"))
         # MAYBE: only enable PIDFILE when run by miur_opts() to avoid global VAR ?
         do(temp_pidfile(PIDFILE))
