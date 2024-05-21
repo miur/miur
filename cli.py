@@ -9,13 +9,15 @@ if TYPE_CHECKING:
 
 
 class SwitchEnum(Enum):
-    true = enable = True
-    false = disable = False
-    auto = tty = None
+    y = yes = true = enable = True
+    n = no = false = disable = False
+    a = auto = tty = default = None
 
 
 class SwitchAction(Action):
-    def __call__(self, _ap, ns, s, option_string=None):  # type:ignore
+    def __call__(self, _ap, ns, s:str, option_string=None):  # type:ignore
+        # ALT: create enum as Enum('SwitchEnum', {"0":True, ...}) to allow Literal keys too
+        # if s == "0": s = "no" elif s == "1": s = "yes"
         setattr(ns, self.dest, SwitchEnum[s.lower()])
 
 

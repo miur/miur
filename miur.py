@@ -4,21 +4,16 @@ import selectors
 import signal
 import sys
 from contextlib import ExitStack, contextmanager
-from typing import TYPE_CHECKING, Any, Final, Iterator
+from typing import TYPE_CHECKING, Any, Iterator
 
+from . import _app
 from . import curses_ext as CE
 from .curses_cmds import input_handlers
 from .util.envlevel import increment_envlevel
 from .util.exchook import log_excepthook
 from .util.logger import log
-from .util.pidfile import send_pidfile_signal, temp_pidfile
+from .util.pidfile import pidfile_path, send_pidfile_signal, temp_pidfile
 from .util.sighandler import route_signals_to_fd
-
-# OR:(/tmp)=f"/run/user/{os.getlogin()}" os.environ.get('', "/tmp")
-PIDFILE: Final[str] = os.environ.get("XDG_RUNTIME_DIR", "/tmp") + "/miur.pid"
-
-# USAGE: time mi --backend=asyncio
-PROFILE_STARTUP = True  # =DEBUG
 
 
 def handle_SIGWINCH(
@@ -64,7 +59,7 @@ def mainloop_selectors(stdscr: C.window) -> None:
         stdscr.nodelay(True)
         try:
             log.kpi("serving")
-            if globals().get("PROFILE_STARTUP"):
+            if __debug__ and _app.PROFILE_STARTUP:
                 return
             while True:
                 for key, events in sel.select():
@@ -98,7 +93,7 @@ async def mainloop_asyncio(stdscr: C.window) -> None:
     loop.add_reader(fd=curses_stdin_fd, callback=lambda: handle_input(stdscr))
     try:
         log.kpi("serving")
-        if globals().get("PROFILE_STARTUP"):
+        if __debug__ and _app.PROFILE_STARTUP:
             loop.call_soon(ev_shutdown.set)
         await ev_shutdown.wait()
         # while True:
@@ -198,6 +193,9 @@ def enable_warnings(error: bool = True) -> Iterator[None]:
 
 
 def miur_none(backend: str | None = None) -> None:
+    if _app.PROFILE_STARTUP:
+        log.kpi("main")
+
     if backend is None:
         backend = "selectors"
 
@@ -206,12 +204,16 @@ def miur_none(backend: str | None = None) -> None:
         do(enable_warnings())
         do(increment_envlevel("MIUR_LEVEL"))
         # MAYBE: only enable PIDFILE when run by miur_opts() to avoid global VAR ?
-        do(temp_pidfile(PIDFILE))
+        do(temp_pidfile(pidfile_path()))
         do(log_excepthook())
 
         # TBD: redir fd=0/1 to tty for curses to disentangle from cmdline stdin/stdout
         stdscr = do(CE.curses_stdscr())
-        do(CE.stdio_to_altscreen(stdscr))  # OR: log_to_altscreen()
+
+        if sys.stdout.isatty():
+            # OPT:(logs): tty-altscreen | stdout-pipe-redir | custom fd
+            do(CE.stdio_to_altscreen(stdscr))  # OR: log_to_altscreen()
+
         if backend == "selectors":
             return mainloop_selectors(stdscr)
 
@@ -244,13 +246,19 @@ if TYPE_CHECKING:
 
 # TBD: frontend to various ways to run miur API with different UI
 def miur_opts(opts: "Namespace") -> None:
+    if opts.color is not None:
+        log.config(termcolor=opts.color.value)
+
+    if _app.PROFILE_STARTUP:
+        log.kpi("argparse")
+
     if sig := opts.signal:
-        sys.exit(send_pidfile_signal(PIDFILE, sig))  # type:ignore
+        sys.exit(send_pidfile_signal(pidfile_path(), sig))  # type:ignore
 
     ## TODO: embedded console/client
     # $ jupyter console --existing miur-ipython.json
 
-    log.info(f"cwd={opts.cwd}")
+    # log.info(f"cwd={opts.cwd}")
     return miur_none(backend=opts.backend)
 
 

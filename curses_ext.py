@@ -2,8 +2,11 @@ import curses as C
 import os
 import sys
 from contextlib import contextmanager
+
+# WARN:PERF: somehow doing import here is 2ms faster, than moving into func-local stmt
 from subprocess import CompletedProcess, run
-from typing import Any, Callable, Iterator, Sequence
+from threading import BoundedSemaphore
+from typing import Any, Callable, Iterator, Self, Sequence
 
 
 ## ALT: C.wrapper(drawloop: Callable[[C.window], None])
@@ -40,16 +43,38 @@ def curses_stdscr() -> Iterator[C.window]:
 # tput("rmcup")
 # print(C.LINES)
 # tput("smcup")
-@contextmanager
-def curses_altscreen(stdscr: C.window) -> Iterator[None]:
-    """NICE: redirect all logs to primary altscreen"""
-    C.def_prog_mode()  # save current tty modes
-    C.endwin()  # restore original tty modes
-    try:
-        yield
-    finally:
+# @contextmanager
+# def curses_altscreen(stdscr: C.window) -> Iterator[None]:
+#     """NICE: redirect all logs to primary altscreen"""
+#     C.def_prog_mode()  # save current tty modes
+#     C.endwin()  # restore original tty modes
+#     try:
+#         yield
+#     finally:
+#         stdscr.refresh()  # restore save modes, repaint screen
+class curses_altscreen:
+    _sema1 = BoundedSemaphore(value=1)
+
+    def __init__(self, stdscr: C.window) -> None:
+        self._stdscr = stdscr
+
+    def __enter__(self) -> Self:
+        # HACK: throw BUG if you try to altscreen when you are already altscreen (e.g. shell_out)
+        #  ALT: inof failing (on bug) OR blocking -- simply print to screen as-is
+        self._sema1.acquire()
+        # C.def_prog_mode()  # save current tty modes
+        # C.endwin()  # restore original tty modes
+        return self
+
+    # def __exit__(self,
+    #   exc_type: Optional[Type[BaseException]],
+    #   exc_value: Optional[BaseException],
+    #   traceback: Optional[TracebackType]
+    #   ) -> Optional[bool]:
+    def __exit__(self, t=None, v=None, b=None):  # type:ignore
         # ALT:TRY: C.doupdate()
-        stdscr.refresh()  # restore save modes, repaint screen
+        # self._stdscr.refresh()  # restore save modes, repaint screen
+        self._sema1.release()
 
 
 # def print_curses_altscreen(stdscr: C.window, msg: str) -> None:
@@ -76,14 +101,20 @@ def curses_altscreen(stdscr: C.window) -> Iterator[None]:
 def stdio_to_altscreen(stdscr: C.window) -> Iterator[None]:
     from .util.logger import log
 
+    # WARN:PERF: switching back-n-forth this way takes 0.5ms on each logline
     def _write(oldw: Callable[[str], int], s: str) -> int:
-        C.def_prog_mode()
-        C.endwin()
-        try:
-            return oldw(s)
-        finally:
-            sys.stdout.flush()
-            stdscr.refresh()
+        # C.def_prog_mode()
+        # C.endwin()
+        # try:
+        #     return oldw(s)
+        # finally:
+        #     sys.stdout.flush()
+        #     stdscr.refresh()
+        with curses_altscreen(stdscr):
+            try:
+                return oldw(s)
+            finally:
+                oldw.__self__.flush()
 
     oldwout = sys.stdout.write
     oldwerr = sys.stderr.write
@@ -113,6 +144,23 @@ def shell_out(
         #     print(pssmem)
         # NOTE: we shouldn't crash on ZSH (or whatever) returning "exitcode=1"
         return run(cmdv, env=envp, check=False, text=True)
+
+
+async def shell_async(stdscr: C.window, cmdv: Sequence[str] = (), **envkw: str) -> int:
+    if not cmdv:
+        cmdv = (os.environ.get("SHELL", "sh"),)
+    envp = dict(os.environ, **envkw)
+    # WARN: #miur can run in bkgr, but is not allowed to interact with TTY
+    #   OR:MAYBE: we can allow it -- like create notifications,
+    #    or embed small curses popups directly around cursor
+    with curses_altscreen(stdscr):
+        import asyncio
+
+        # SRC: https://docs.python.org/3/library/asyncio-subprocess.html#examples
+        proc = await asyncio.create_subprocess_exec(*cmdv, env=envp)
+        rc = await proc.wait()
+        assert rc == 0, proc
+        return rc
 
 
 def ipython_out(stdscr: C.window, user_ns: dict[str, Any] | None = None) -> None:

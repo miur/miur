@@ -6,7 +6,8 @@
 import enum
 import sys
 import time
-from typing import Any, Callable, TypeAlias
+from typing import Any, Callable, TypeAlias, Final
+from .. import _app
 
 _Loggable: TypeAlias = Any
 _LAMBDA = lambda: ""  # pylint:disable=unnecessary-lambda-assignment
@@ -28,7 +29,7 @@ class LogLevel(enum.IntEnum):
 
 
 # TODO: make it a part of supplied .write(sys.stdout/stderr)
-TERMSTYLE = {
+TERMSTYLE: Final = {
     # LogLevel.CRITICAL: "\033[1;37m;41m",  # bold-white-on-red
     LogLevel.ERROR: "\033[31m",  # regul-red-on-dfl
     # LogLevel.ALERT: "\033[91m",  # regul-orange-on-dfl
@@ -47,14 +48,14 @@ TERMSTYLE = {
 class Logger:
     minlevel: LogLevel = LogLevel.ANYTHING
     write: Callable[[str], Any] = sys.stdout.write
-    # TODO: make it a part of supplied .write()
-    termcolor: bool = True
 
     def __init__(self) -> None:
         self._initts = time.monotonic()
         self._counter = 0
-        # self._pms = 0
-        # self._pcpu = time.process_time()
+        self._pms = .0
+        self._pcpu = time.process_time()
+        # TODO: make it a part of supplied .write()
+        self.termcolor = self.write.__self__.isatty()
 
     def config(self, /, **kw: Any) -> None:
         for k, v in kw.items():
@@ -78,17 +79,22 @@ class Logger:
         self.at(LogLevel.TRACE, fmt)
 
     def kpi(self, fmt: _Loggable) -> None:
-        cpu = time.process_time() * 1000
-        ms = (time.monotonic() - self._initts) * 1000
-        # dms = ms - self._pms
-        # dcpu = cpu - self._pcpu
-        # fmt = f"KPI[ms={ms*1000:.3f}({dms*1000:+.3f}) cpu={cpu*1000:.3f}({dcpu*1000:+.3f})] {fmt}"
-        # self._pms = ms
-        # self._pcpu = cpu
-
-        # fmt = f"KPI[ms={ms*1000:.3f} cpu={cpu*1000:.3f}] {fmt}"
-        # self.at(LogLevel.TRACE, fmt)
-        self.at(LogLevel.TRACE, f"KPI({ms=:.3f} {cpu=:.3f}) {fmt}")
+        ## PERF: to run startup 100 times and calc average
+        # if __debug__ and _app.PROFILE_STARTUP:
+        #     self.write("%.3f\n" % ((time.monotonic() - self._initts) * 1000))
+        #     return
+        cpu = time.process_time()
+        ms = time.monotonic() - self._initts
+        dms = ms - self._pms
+        dcpu = cpu - self._pcpu
+        line = f"KPI[ms={ms*1000:.3f}({dms*1000:+.3f}) cpu={cpu*1000:.3f}({dcpu*1000:+.3f})] {fmt}"
+        self.at(LogLevel.TRACE, line)
+        self._pms = ms
+        self._pcpu = cpu
+        ## OLD
+        # cpu = time.process_time() * 1000
+        # ms = (time.monotonic() - self._initts) * 1000
+        # self.at(LogLevel.TRACE, f"KPI({ms=:.3f} {cpu=:.3f}) {fmt}")
 
     # @profileit  # BAD: ~1ms/call (mostly due to !curses.*)
     def at(self, lvl: LogLevel, fmt: _Loggable) -> None:
