@@ -18,7 +18,7 @@ from .util.sighandler import route_signals_to_fd
 PIDFILE: Final[str] = os.environ.get("XDG_RUNTIME_DIR", "/tmp") + "/miur.pid"
 
 # USAGE: time mi --backend=asyncio
-# PROFILE_STARTUP = True  # =DEBUG
+PROFILE_STARTUP = True  # =DEBUG
 
 
 def handle_SIGWINCH(
@@ -63,10 +63,10 @@ def mainloop_selectors(stdscr: C.window) -> None:
         sel.register(sigfd, selectors.EVENT_READ, data=None)
         stdscr.nodelay(True)
         try:
+            log.kpi("serving")
+            if globals().get("PROFILE_STARTUP"):
+                return
             while True:
-                log.kpi("serving")
-                if globals().get("PROFILE_STARTUP"):
-                    break
                 for key, events in sel.select():
                     if key.fd == sigfd:
                         assert events == selectors.EVENT_READ

@@ -53,6 +53,8 @@ class Logger:
     def __init__(self) -> None:
         self._initts = time.monotonic()
         self._counter = 0
+        # self._pms = 0
+        # self._pcpu = time.process_time()
 
     def config(self, /, **kw: Any) -> None:
         for k, v in kw.items():
@@ -78,6 +80,14 @@ class Logger:
     def kpi(self, fmt: _Loggable) -> None:
         cpu = time.process_time() * 1000
         ms = (time.monotonic() - self._initts) * 1000
+        # dms = ms - self._pms
+        # dcpu = cpu - self._pcpu
+        # fmt = f"KPI[ms={ms*1000:.3f}({dms*1000:+.3f}) cpu={cpu*1000:.3f}({dcpu*1000:+.3f})] {fmt}"
+        # self._pms = ms
+        # self._pcpu = cpu
+
+        # fmt = f"KPI[ms={ms*1000:.3f} cpu={cpu*1000:.3f}] {fmt}"
+        # self.at(LogLevel.TRACE, fmt)
         self.at(LogLevel.TRACE, f"KPI({ms=:.3f} {cpu=:.3f}) {fmt}")
 
     # @profileit  # BAD: ~1ms/call (mostly due to !curses.*)
