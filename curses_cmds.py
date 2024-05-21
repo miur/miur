@@ -25,8 +25,13 @@ def resize(scr: C.window) -> None:
     scr.refresh()
 
 
+_primary = None
+
 def shell_out(scr: C.window) -> None:
-    CE.shell_out(scr)
+    # CE.shell_out(scr)
+    import asyncio
+    _primary = asyncio.create_task(CE.shell_async(scr))
+    _primary.add_done_callback(lambda *a: None)
 
 
 def ipython_out(scr: C.window) -> None:

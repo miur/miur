@@ -211,7 +211,9 @@ def miur_none(backend: str | None = None) -> None:
         stdscr = do(CE.curses_stdscr())
 
         if sys.stdout.isatty():
-            # OPT:(logs): tty-altscreen | stdout-pipe-redir | custom fd
+            # OPT:(logs): tty-altscreen | stdout-pipe-redir | custom fd | memring
+            #   IDEA:(tty-altscreen): when we shell-out -- accumulate logs in memring,
+            #   and then dump them into altscreen, when you return from shell-out
             do(CE.stdio_to_altscreen(stdscr))  # OR: log_to_altscreen()
 
         if backend == "selectors":

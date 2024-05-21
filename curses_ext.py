@@ -53,6 +53,7 @@ def curses_stdscr() -> Iterator[C.window]:
 #     finally:
 #         stdscr.refresh()  # restore save modes, repaint screen
 class curses_altscreen:
+    # FIXME! we should control not altscreen, but exclusive access to TTY
     _sema1 = BoundedSemaphore(value=1)
 
     def __init__(self, stdscr: C.window) -> None:

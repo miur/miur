@@ -15,7 +15,7 @@ class SwitchEnum(Enum):
 
 
 class SwitchAction(Action):
-    def __call__(self, _ap, ns, s:str, option_string=None):  # type:ignore
+    def __call__(self, _ap, ns, s: str, option_string=None):  # type:ignore
         # ALT: create enum as Enum('SwitchEnum', {"0":True, ...}) to allow Literal keys too
         # if s == "0": s = "no" elif s == "1": s = "yes"
         setattr(ns, self.dest, SwitchEnum[s.lower()])
@@ -33,8 +33,14 @@ def cli_spec(parser: ArgumentParser) -> ArgumentParser:
     _sigset = "HUP INT KILL USR1 USR2 TERM CONT STOP WINCH".split()
     o("-s", "--signal", choices=_sigset, type=str.upper, action=SigAction)
     o("-b", "--backend", choices="selectors asyncio ipython".split())
-    # fmt:off
-    o("-C", "--color", default="true", choices=SwitchEnum.__members__, type=str.lower, action=SwitchAction)
+    o(
+        "-C",
+        "--color",
+        default=SwitchEnum.default,
+        choices=SwitchEnum.__members__,
+        type=str.lower,
+        action=SwitchAction,
+    )
     return parser
 
 
