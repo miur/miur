@@ -222,20 +222,19 @@ def miur_none(backend: str | None = None) -> None:
         if backend in ("asyncio", "ipython"):
             myloop = do(my_asyncio_loop())
 
-        # FIXME:CHG: only if OPT=--ipython
-        #   otherwise: enable ipython on keybind='S-k'
-        if backend == "ipython":
-            # NOTE: make it easier to see ipython loading issues
-            # FAIL: doesn't work together with stdio_to_altscreen()
-            # with CE.curses_altscreen(stdscr):
-            myns = {
-                "stdscr": stdscr,
-                "_miur": __import__("__main__"),
-                "mi": sys.modules[__name__],
-            }
-            inject_ipykernel_into_asyncio(myloop, myns)
+            # FIXME:CHG: only if OPT=--ipython
+            #   otherwise: enable ipython on keybind='S-k'
+            if backend == "ipython":
+                # NOTE: make it easier to see ipython loading issues
+                # FAIL: doesn't work together with stdio_to_altscreen()
+                # with CE.curses_altscreen(stdscr):
+                myns = {
+                    "stdscr": stdscr,
+                    "_miur": __import__("__main__"),
+                    "mi": sys.modules[__name__],
+                }
+                inject_ipykernel_into_asyncio(myloop, myns)
 
-        if backend in ("asyncio", "ipython"):
             import asyncio
 
             return asyncio.run(mainloop_asyncio(stdscr), loop_factory=lambda: myloop)

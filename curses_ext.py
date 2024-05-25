@@ -56,15 +56,16 @@ class curses_altscreen:
     # FIXME! we should control not altscreen, but exclusive access to TTY
     _sema1 = BoundedSemaphore(value=1)
 
-    def __init__(self, stdscr: C.window) -> None:
+    def __init__(self, stdscr: C.window, *, fflush: Callable[[],None] | None = None) -> None:
         self._stdscr = stdscr
+        self._flush = fflush
 
     def __enter__(self) -> Self:
         # HACK: throw BUG if you try to altscreen when you are already altscreen (e.g. shell_out)
         #  ALT: inof failing (on bug) OR blocking -- simply print to screen as-is
         self._sema1.acquire()
-        # C.def_prog_mode()  # save current tty modes
-        # C.endwin()  # restore original tty modes
+        C.def_prog_mode()  # save current tty modes
+        C.endwin()  # restore original tty modes
         return self
 
     # def __exit__(self,
@@ -73,29 +74,12 @@ class curses_altscreen:
     #   traceback: Optional[TracebackType]
     #   ) -> Optional[bool]:
     def __exit__(self, t=None, v=None, b=None):  # type:ignore
+        # ATT: force immediate output before you switch back to curses alt-screen
+        if self._flush:
+            self._flush()
         # ALT:TRY: C.doupdate()
-        # self._stdscr.refresh()  # restore save modes, repaint screen
+        self._stdscr.refresh()  # restore save modes, repaint screen
         self._sema1.release()
-
-
-# def print_curses_altscreen(stdscr: C.window, msg: str) -> None:
-#     with curses_altscreen(stdscr):
-#         sys.stdout.write(msg)
-#         # ATT: force immediate output before you switch back to curses alt-screen
-#         sys.stdout.flush()
-#
-#
-# @contextmanager
-# def log_to_altscreen(stdscr: C.window) -> Iterator[None]:
-#     from .util.logger import log
-#
-#     # TODO: also STDERR -- for conditional based on level
-#     old_stdout = log.write
-#     try:
-#         log.config(write=lambda text: print_curses_altscreen(stdscr, text))
-#         yield
-#     finally:
-#         log.config(write=old_stdout)
 
 
 @contextmanager
@@ -104,18 +88,8 @@ def stdio_to_altscreen(stdscr: C.window) -> Iterator[None]:
 
     # WARN:PERF: switching back-n-forth this way takes 0.5ms on each logline
     def _write(oldw: Callable[[str], int], s: str) -> int:
-        # C.def_prog_mode()
-        # C.endwin()
-        # try:
-        #     return oldw(s)
-        # finally:
-        #     sys.stdout.flush()
-        #     stdscr.refresh()
-        with curses_altscreen(stdscr):
-            try:
-                return oldw(s)
-            finally:
-                oldw.__self__.flush()
+        with curses_altscreen(stdscr, fflush=oldw.__self__.flush):
+            return oldw(s)
 
     oldwout = sys.stdout.write
     oldwerr = sys.stderr.write

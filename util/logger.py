@@ -121,12 +121,13 @@ class Logger:
 
         if self.termcolor:
             _c = TERMSTYLE[lvl]
+            _b = "\033[92m"
             _r = TERMSTYLE[None]
         else:
-            _c = _r = ""
+            _c = _b = _r = ""
         # ADD? "#{self._counter:03d} ..."
         self.write(
-            f"{relts:8.3f}  {_c}{lvl.name[0]}{_r}[{modnm}:{lnum}] {_c}{body}{_r}\n"
+            f"{relts:8.3f}  {_c}{lvl.name[0]}{_b}[{modnm}:{lnum}] {_c}{body}{_r}\n"
         )
 
 
