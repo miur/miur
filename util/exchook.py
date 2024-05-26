@@ -29,8 +29,9 @@ def exception_handler(
         bt = "".join(TR.format_tb(tb)).rstrip().replace(os.linesep, os.linesep + "\\")
         log.info("Traceback (most recent call last):" + os.linesep + "\\" + bt)
         err = "".join(TR.format_exception_only(etype, value)).rstrip()
-        if value.__notes__:
-            err += "".join(os.linesep + "  \\ " + note for note in value.__notes__)
+        ## DISABLED: it seems they are already appended ?
+        # if value.__notes__:
+        #     err += "".join(os.linesep + "  \\ " + note for note in value.__notes__)
         log.error(err)
         # _orig_excepthook(etype, value, tb)  # OR: sys.__excepthook__(...)
     finally:

@@ -1,5 +1,6 @@
-import curses as C
 from typing import Callable
+
+import _curses as C
 
 from . import curses_ext as CE
 from .util.logger import log

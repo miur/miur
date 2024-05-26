@@ -6,7 +6,6 @@
 import enum
 import sys
 import time
-from dataclasses import dataclass
 from typing import Callable, Final, TypeAlias, TypedDict, Unpack
 
 # from .. import _app
@@ -47,13 +46,7 @@ TERMSTYLE: Final = {
 }
 
 
-@dataclass
-class LoggerState:
-    minlevel: LogLevel = LogLevel.ANYTHING
-    write: Callable[[str], None | int] = sys.stdout.write
-    termcolor: bool = sys.stdout.isatty()
-
-
+## HACK: convert @dataclass to TypedDict -- to inherit baseclass from it
 # ERR: TypedDict() expects a dictionary literal as the second argument
 #   OFF: https://github.com/python/mypy/issues/4128
 # _LoggerOpts = TypedDict('_LoggerOpts', {x.name: x.type for x in fields(LoggerState)}, total=False)
@@ -63,22 +56,45 @@ class _LoggerOpts(TypedDict, total=False):
     termcolor: bool
 
 
-class Logger(LoggerState):
+class Logger:  # pylint:disable=too-many-instance-attributes
+    minlevel: LogLevel = LogLevel.ANYTHING
+    write: Callable[[str], None | int]
+    termcolor: bool | None = None
+
     def __init__(self) -> None:
         self._initts = time.monotonic()
         self._counter = 0
         self._pms = 0.0
         self._pcpu = time.process_time()
         super().__init__()
+        self.at = self._lazy_init
+
+    def _lazy_init(self, lvl: LogLevel, fmt: _Loggable) -> None:
+        # NOTE: update to redirected FD
+        if not hasattr(self, 'write'):
+            self.write = sys.stdout.write
         # TODO: make it a part of supplied .write()
-        # self.termcolor = self.write.__self__.isatty()
+        if self.termcolor is None:
+            self.termcolor = sys.stdout.isatty()
+        self.at = self._write
+        self.at(lvl, fmt)
+
+    # @profileit  # BAD: ~1ms/call (mostly due to !curses.*)
+    def _write(self, lvl: LogLevel, fmt: _Loggable) -> None:
+        if lvl < self.minlevel:
+            return
+        self.write(self._format(lvl, fmt))
+        # MAYBE:ALSO: unified logging for lttng
+        # if lvl == LogLevel.TRACE: sys.audit('log.trace', body)
 
     def config(self, /, **kw: Unpack[_LoggerOpts]) -> None:
         for k, v in kw.items():
             # if type(getattr(self, k)) is not type(v):
             #     raise TypeError(type(getattr(self, k)))
-            if not hasattr(self, k):
+            if not hasattr(self, k) and k not in ('write'):
                 raise KeyError(k)
+            # if k == 'termcolor' and v is None:
+            #     v = self.write.__self__.isatty()
             setattr(self, k, v)
 
     def error(self, fmt: _Loggable) -> None:
@@ -112,10 +128,7 @@ class Logger(LoggerState):
         # ms = (time.monotonic() - self._initts) * 1000
         # self.at(LogLevel.TRACE, f"KPI({ms=:.3f} {cpu=:.3f}) {fmt}")
 
-    # @profileit  # BAD: ~1ms/call (mostly due to !curses.*)
-    def at(self, lvl: LogLevel, fmt: _Loggable) -> None:
-        if lvl < self.minlevel:
-            return
+    def _format(self, lvl: LogLevel, fmt: _Loggable) -> str:
         if isinstance(fmt, str):
             body = fmt
         elif type(fmt) is type(_LAMBDA) and fmt.__name__ == _LAMBDA.__name__:
@@ -127,6 +140,11 @@ class Logger(LoggerState):
 
         # TODO: use lru_cache (src/mod/fcnnm/lnum) based on parent loci
         fr = sys._getframe(2)  # pylint:disable=protected-access
+        # NOTE: discover caller frame (outside of this file)
+        while pr := fr.f_back:
+            if fr.f_code.co_filename != __file__:
+                break
+            fr = pr
         # fcnnm = co.co_name  # co.co_qualname
 
         # ALT: modnm = sys._getframemodulename(2).rpartition('.')[2]
@@ -142,9 +160,7 @@ class Logger(LoggerState):
         else:
             _c = _b = _r = ""
         # ADD? "#{self._counter:03d} ..."
-        self.write(
-            f"{relts:8.3f}  {_c}{lvl.name[0]}{_b}[{modnm}:{lnum}] {_c}{body}{_r}\n"
-        )
+        return f"{relts:8.3f}  {_c}{lvl.name[0]}{_b}[{modnm}:{lnum}] {_c}{body}{_r}\n"
 
 
 log = Logger()

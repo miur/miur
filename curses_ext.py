@@ -1,12 +1,90 @@
-import curses as C
 import os
 import sys
 from contextlib import contextmanager
+from io import TextIOWrapper
 
 # WARN:PERF: somehow doing import here is 2ms faster, than moving into func-local stmt
 from subprocess import CompletedProcess, run
 from threading import BoundedSemaphore
-from typing import Any, Callable, Iterator, Self, Sequence
+from typing import IO, Any, Callable, Final, Iterator, Sequence
+
+import _curses as C
+
+# NOTE: hardcoded inside underlying ncurses C-lib
+CURSES_STDIN_FD: Final = 0
+CURSES_STDOUT_FD: Final = 1
+CURSES_STDERR_FD: Final = 2
+
+
+class redir_stdio_nm:
+    _fdini: int
+    _ttyio: IO[Any]
+    _conf: dict[str, Any]
+
+    # CHG:(open): allow passing from outside:
+    #   * path to be opened with same flags (like currently TTY)
+    #   * already opened fd-r/w
+    #   * already opened single fd-rw
+    def __init__(self, nm: str) -> None:  # ALT: Literal["stdin", "stdout", "stderr"]
+        assert nm in ("stdin", "stdout", "stderr"), nm
+        self._stdnm = nm
+        self._conf = {}
+
+    def __enter__(self) -> None:
+        nm = self._stdnm  # OR: nm -> stdio.name[1:-1]
+        stdio = getattr(sys, nm)
+        assert stdio is getattr(sys, "__" + nm + "__"), "IPython limitation"
+        self._fdini = stdio.fileno()
+        assert self._fdini == globals()[f"CURSES_{nm.upper()}_FD"], "Sanity check"
+        for attr in ("line_buffering", "write_through", "encoding"):
+            self._conf[attr] = getattr(stdio, attr)
+        fddup = os.dup(self._fdini)
+        os.set_inheritable(fddup, False)
+        dupio = os.fdopen(fddup, stdio.mode, encoding=stdio.encoding)
+        assert isinstance(dupio, TextIOWrapper)
+        # MAYBE:(TextIOWrapper.write_through=True): to avoid buffering before piping data
+        #   PERF:OPT: allow to change buffering (depending on later measured performance)
+        dupio.reconfigure(line_buffering=True, write_through=True)
+        setattr(sys, nm, dupio)
+        setattr(sys, "__" + nm + "__", dupio)
+        # libc = ctypes.CDLL(None)
+        # c_stdio = ctypes.c_void_p.in_dll(libc, nm)
+        # libc.fflush(c_stdio)
+        # WARN: we can't keep it as "old_stdio" to directly restore on __exit__()
+        #   COS: os.dup2() will close current underlying fd, making stdio disfunctional
+        stdio.close()
+
+        # ATT: we can't reuse "stdio.mode" -- it will be wrong in case of pipe/redir
+        #   ! we can't reuse even ".encoding" if redirection was binary inof text
+        mode = "r" if nm == "stdin" else "w"
+        # OR:DFL: encoding=locale.getencoding() | "utf-8"
+        # pylint:disable=consider-using-with
+        self._ttyio = open("/dev/tty", mode, encoding="locale")
+        # RQ:(inheritable=True): we need FD bound to TTY for shell_out() to work
+        os.dup2(self._ttyio.fileno(), self._fdini, inheritable=True)
+
+    def __exit__(self, et=None, exc=None, tb=None):  # type:ignore
+        nm = self._stdnm
+        dupio = getattr(sys, nm)
+        assert dupio is getattr(sys, "__" + nm + "__"), "IPython limitation"
+        fddup = dupio.fileno()
+        assert fddup != globals()[f"CURSES_{nm.upper()}_FD"], "Sanity check"
+        fdini = self._fdini
+        os.dup2(fddup, fdini, inheritable=True)
+        self._ttyio.close()
+        # FIXED(closefd=False):ERR:(on exit):
+        #   sys:1: ResourceWarning: unclosed file <_io.TextIOWrapper name=0 mode='r' encoding='utf-8'>
+        cf = self._conf
+        stdio = os.fdopen(fdini, dupio.mode, closefd=False)
+        assert isinstance(stdio, TextIOWrapper)
+        stdio.reconfigure(
+            encoding=cf["encoding"],
+            line_buffering=cf["line_buffering"],
+            write_through=cf["write_through"],
+        )
+        setattr(sys, nm, stdio)
+        setattr(sys, "__" + nm + "__", stdio)
+        dupio.close()
 
 
 ## ALT: C.wrapper(drawloop: Callable[[C.window], None])
@@ -15,6 +93,7 @@ def curses_stdscr() -> Iterator[C.window]:
     if not C.has_extended_color_support():
         raise NotImplementedError
     try:
+        C.setupterm(term=os.environ.get("TERM", "unknown"), fd=CURSES_STDOUT_FD)
         stdscr = C.initscr()
         C.noecho()  # echoing of keys = off
         C.cbreak()  # buffering on keyboard input = off
@@ -56,11 +135,13 @@ class curses_altscreen:
     # FIXME! we should control not altscreen, but exclusive access to TTY
     _sema1 = BoundedSemaphore(value=1)
 
-    def __init__(self, stdscr: C.window, *, fflush: Callable[[],None] | None = None) -> None:
+    def __init__(
+        self, stdscr: C.window, *, fflush: Callable[[], None] | None = None
+    ) -> None:
         self._stdscr = stdscr
         self._flush = fflush
 
-    def __enter__(self) -> Self:
+    def __enter__(self) -> None:
         # HACK: throw BUG if you try to altscreen when you are already altscreen (e.g. shell_out)
         #  ALT: inof failing (on bug) OR blocking -- simply print to screen as-is
         if not self._sema1.acquire(blocking=False):
@@ -69,14 +150,13 @@ class curses_altscreen:
             raise RuntimeError("BUG: altscreen is already switched out")
         C.def_prog_mode()  # save current tty modes
         C.endwin()  # restore original tty modes
-        return self
 
     # def __exit__(self,
     #   exc_type: Optional[Type[BaseException]],
     #   exc_value: Optional[BaseException],
     #   traceback: Optional[TracebackType]
     #   ) -> Optional[bool]:
-    def __exit__(self, t=None, v=None, b=None):  # type:ignore
+    def __exit__(self, et=None, exc=None, tb=None):  # type:ignore
         # ATT: force immediate output before you switch back to curses alt-screen
         if self._flush:
             self._flush()

@@ -1,10 +1,12 @@
-import curses as C
 import os
 import selectors
 import signal
+import stat
 import sys
 from contextlib import ExitStack, contextmanager
 from typing import TYPE_CHECKING, Any, Iterator, cast
+
+import _curses as C
 
 from . import _app
 from . import curses_ext as CE
@@ -44,7 +46,7 @@ def handle_SIGWINCH(
 
 def mainloop_selectors(stdscr: C.window) -> None:
     with route_signals_to_fd() as sigfd, selectors.DefaultSelector() as sel:
-        sel.register(sys.stdin.fileno(), selectors.EVENT_READ, data=None)
+        sel.register(CE.CURSES_STDIN_FD, selectors.EVENT_READ, data=None)
         sel.register(sigfd, selectors.EVENT_READ, data=None)
         stdscr.nodelay(True)
         try:
@@ -56,7 +58,7 @@ def mainloop_selectors(stdscr: C.window) -> None:
                     if key.fd == sigfd:
                         assert events == selectors.EVENT_READ
                         handle_SIGWINCH(sel, sigfd, stdscr)
-                    elif key.fd == sys.stdin.fileno():
+                    elif key.fd == CE.CURSES_STDIN_FD:
                         assert events == selectors.EVENT_READ
                         handle_input(stdscr)
                     else:
@@ -73,14 +75,13 @@ async def mainloop_asyncio(stdscr: C.window) -> None:
     import asyncio
 
     loop = asyncio.get_running_loop()
-    curses_stdin_fd = 0
     # FAIL: RuntimeError: Event loop stopped before Future completed.
     ev_shutdown = asyncio.Event()
     loop.add_signal_handler(signal.SIGINT, ev_shutdown.set)
     # FIND:MAYBE: don't process in handler directly, and only schedule callback ?
     loop.add_signal_handler(signal.SIGWINCH, stdscr.refresh)  # CHG:> app.refresh
     stdscr.nodelay(True)
-    loop.add_reader(fd=curses_stdin_fd, callback=lambda: handle_input(stdscr))
+    loop.add_reader(fd=CE.CURSES_STDIN_FD, callback=lambda: handle_input(stdscr))
     try:
         log.kpi("serving")
         if __debug__ and _app.PROFILE_STARTUP:
@@ -89,7 +90,7 @@ async def mainloop_asyncio(stdscr: C.window) -> None:
         # while True:
         #     await asyncio.sleep(1)
     finally:
-        loop.remove_reader(fd=curses_stdin_fd)
+        loop.remove_reader(fd=CE.CURSES_STDIN_FD)
         stdscr.nodelay(False)
         loop.remove_signal_handler(signal.SIGWINCH)
         loop.remove_signal_handler(signal.SIGINT)
@@ -212,10 +213,22 @@ def miur_none(backend: str | None = None) -> None:
         do(temp_pidfile(pidfile_path()))
         do(log_excepthook())
 
-        # TBD: redir fd=0/1 to tty for curses to disentangle from cmdline stdin/stdout
+        # NOTE: this redirection is needed not unconditionally, but only if we use curses
+        for nm in 'stdin stdout stderr'.split():
+            if not getattr(sys, nm).isatty():
+                # TBD: open os.pipe to cvt libc.stderr into py.log inof spitting over TTY
+                do(CE.redir_stdio_nm(nm))
+                if nm == 'stdout':
+                    # NOTE: refresh closed FD
+                    log.write = sys.stdout.write
+
         stdscr = do(CE.curses_stdscr())
 
-        if sys.stdout.isatty():
+        # [_] FIXME: add hooks individually
+        # BAD: { mi | cat } won't enable altscreen, and !cat will spit all over TTY
+        #   ALSO: even if it's not !cat, it still may eventually print something to TTY
+        #   WKRND:PERF: always use altscreen BAD it won't help if other app produces non-synced output
+        if sys.stdout.isatty() or os.fstat(sys.stdout.fileno()).st_mode & stat.S_IFIFO:
             # OPT:(logs): tty-altscreen | stdout-pipe-redir | custom fd | memring
             #   IDEA:(tty-altscreen): when we shell-out -- accumulate logs in memring,
             #   and then dump them into altscreen, when you return from shell-out
