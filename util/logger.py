@@ -6,11 +6,13 @@
 import enum
 import sys
 import time
-from typing import Any, Callable, TypeAlias, Final
-from .. import _app
+from dataclasses import dataclass
+from typing import Callable, Final, TypeAlias, TypedDict, Unpack
 
-_Loggable: TypeAlias = Any
-_LAMBDA = lambda: ""  # pylint:disable=unnecessary-lambda-assignment
+# from .. import _app
+
+_LAMBDA: Final = lambda: ""  # pylint:disable=unnecessary-lambda-assignment
+_Loggable: TypeAlias = str | Callable[[], str]
 
 
 @enum.unique
@@ -45,19 +47,33 @@ TERMSTYLE: Final = {
 }
 
 
-class Logger:
+@dataclass
+class LoggerState:
     minlevel: LogLevel = LogLevel.ANYTHING
-    write: Callable[[str], Any] = sys.stdout.write
+    write: Callable[[str], None | int] = sys.stdout.write
+    termcolor: bool = sys.stdout.isatty()
 
+
+# ERR: TypedDict() expects a dictionary literal as the second argument
+#   OFF: https://github.com/python/mypy/issues/4128
+# _LoggerOpts = TypedDict('_LoggerOpts', {x.name: x.type for x in fields(LoggerState)}, total=False)
+class _LoggerOpts(TypedDict, total=False):
+    minlevel: LogLevel
+    write: Callable[[str], None | int]
+    termcolor: bool
+
+
+class Logger(LoggerState):
     def __init__(self) -> None:
         self._initts = time.monotonic()
         self._counter = 0
-        self._pms = .0
+        self._pms = 0.0
         self._pcpu = time.process_time()
+        super().__init__()
         # TODO: make it a part of supplied .write()
-        self.termcolor = self.write.__self__.isatty()
+        # self.termcolor = self.write.__self__.isatty()
 
-    def config(self, /, **kw: Any) -> None:
+    def config(self, /, **kw: Unpack[_LoggerOpts]) -> None:
         for k, v in kw.items():
             # if type(getattr(self, k)) is not type(v):
             #     raise TypeError(type(getattr(self, k)))

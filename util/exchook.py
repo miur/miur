@@ -28,7 +28,10 @@ def exception_handler(
         # OR: (fr.* for fr in __import__("traceback").extract_tb(tb))
         bt = "".join(TR.format_tb(tb)).rstrip().replace(os.linesep, os.linesep + "\\")
         log.info("Traceback (most recent call last):" + os.linesep + "\\" + bt)
-        log.error("".join(TR.format_exception_only(etype, value)).rstrip())
+        err = "".join(TR.format_exception_only(etype, value)).rstrip()
+        if value.__notes__:
+            err += "".join(os.linesep + "  \\ " + note for note in value.__notes__)
+        log.error(err)
         # _orig_excepthook(etype, value, tb)  # OR: sys.__excepthook__(...)
     finally:
         log.config(write=_orig_write)

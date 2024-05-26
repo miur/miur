@@ -98,6 +98,8 @@ def stdio_to_altscreen(stdscr: C.window) -> Iterator[None]:
     oldwerr = sys.stderr.write
     oldlog = log.write
     try:
+        # FIXME: replace only if STD* is not redirected already to file or pipe
+        #   OR:OPT: especially requesting logs OR output to TTY
         sys.stdout.write = lambda s: _write(oldwout, s)
         sys.stderr.write = lambda s: _write(oldwerr, s)
         # BAD:WKRND: overriding initial class VAR for logger

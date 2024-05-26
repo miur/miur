@@ -8,6 +8,7 @@ if TYPE_CHECKING:
     from just.use.iji.main import Context
 
 
+# FIXME? only allow 3 values to prevent options sprawling ?
 class SwitchEnum(Enum):
     y = yes = true = enable = True
     n = no = false = disable = False

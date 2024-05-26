@@ -10,7 +10,7 @@ from . import _app
 from . import curses_ext as CE
 from .curses_cmds import handle_input
 from .util.envlevel import increment_envlevel
-from .util.exchook import log_excepthook, exception_handler
+from .util.exchook import exception_handler, log_excepthook
 from .util.logger import log
 from .util.pidfile import pidfile_path, send_pidfile_signal, temp_pidfile
 from .util.sighandler import route_signals_to_fd
@@ -109,7 +109,7 @@ def my_asyncio_loop(debug: bool = True) -> Iterator["AbstractEventLoop"]:
     ) -> None:
         loop.default_exception_handler(context)
         exc = cast(Exception, context.get("exception"))
-        exception_handler(type(exc), exc, None)
+        exception_handler(type(exc), exc, exc.__traceback__)
         # print(context)
         for t in asyncio.all_tasks():
             t.cancel()
@@ -252,8 +252,11 @@ if TYPE_CHECKING:
 
 # TBD: frontend to various ways to run miur API with different UI
 def miur_opts(opts: "Namespace") -> None:
-    if opts.color is not None:
-        log.config(termcolor=opts.color.value)
+    c = opts.color.value  # NB: we always have .default set
+    if c is None:
+        # FIXME: check actual fd *after* all redirection OPT
+        c = sys.stdout.isatty()
+    log.config(termcolor=c)
 
     if _app.PROFILE_STARTUP:
         log.kpi("argparse")

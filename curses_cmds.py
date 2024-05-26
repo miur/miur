@@ -42,19 +42,22 @@ def shell_out(scr: C.window) -> None:
 
     def _cb(fut: asyncio.Future[int]) -> None:
         globals()["_primary"] = None
+        sfx = " (shell_out)"
         if fut.cancelled():
-            log.warning("cancelled")
+            log.warning("cancelled" + sfx)
         elif exc := fut.exception():
-            log.error(exc)
+            exc.add_note(sfx)
+            from .util.exchook import exception_handler
+
+            exception_handler(type(exc), exc, exc.__traceback__)
             C.flash()
         else:
-            log.info(fut.result())
+            log.info(f"rc={fut.result()}{sfx}")
 
         C.flushinp()
         loop = asyncio.get_running_loop()
         loop.add_signal_handler(signal.SIGWINCH, scr.refresh)
         loop.add_reader(fd=curses_stdin_fd, callback=lambda: handle_input(scr))
-
 
     _primary = asyncio.create_task(CE.shell_async(scr))
     _primary.add_done_callback(_cb)
@@ -72,6 +75,7 @@ g_input_handlers: dict[str | int, Callable[[C.window], None]] = {
     "S": shell_out,
     "\t": ipython_out,
 }
+
 
 def handle_input(stdscr: C.window) -> None:
     wch = stdscr.get_wch()
