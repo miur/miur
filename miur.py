@@ -4,13 +4,13 @@ import selectors
 import signal
 import sys
 from contextlib import ExitStack, contextmanager
-from typing import TYPE_CHECKING, Any, Iterator
+from typing import TYPE_CHECKING, Any, Iterator, cast
 
 from . import _app
 from . import curses_ext as CE
-from .curses_cmds import input_handlers
+from .curses_cmds import handle_input
 from .util.envlevel import increment_envlevel
-from .util.exchook import log_excepthook
+from .util.exchook import log_excepthook, exception_handler
 from .util.logger import log
 from .util.pidfile import pidfile_path, send_pidfile_signal, temp_pidfile
 from .util.sighandler import route_signals_to_fd
@@ -40,16 +40,6 @@ def handle_SIGWINCH(
     ## FAIL: get KEY_RESIZE immediately, don't make Epoll wait until next keypress
     # ch = stdscr.getch()
     # assert ch == C.KEY_RESIZE, ch
-
-
-def handle_input(stdscr: C.window) -> None:
-    wch = stdscr.get_wch()
-    cmd = input_handlers.get(wch, None)
-    comment = f" ({cmd.__name__})" if cmd else ""
-    log.warning(repr(wch) + comment)
-    if cmd:
-        # WARN: last stmt in loop COS: may raise SystemExit
-        cmd(stdscr)
 
 
 def mainloop_selectors(stdscr: C.window) -> None:
@@ -113,10 +103,25 @@ if TYPE_CHECKING:
 def my_asyncio_loop(debug: bool = True) -> Iterator["AbstractEventLoop"]:
     import asyncio
 
+    def _custom_exception_handler(
+        loop: asyncio.AbstractEventLoop,
+        context: dict[str, Any],
+    ) -> None:
+        loop.default_exception_handler(context)
+        exc = cast(Exception, context.get("exception"))
+        exception_handler(type(exc), exc, None)
+        # print(context)
+        for t in asyncio.all_tasks():
+            t.cancel()
+        # loop.stop()
+
     # FIXED:ERR: DeprecationWarning: There is no current event loop
     #   /usr/lib/python3.12/site-packages/tornado/ioloop.py:274:
     myloop = asyncio.new_event_loop()
     myloop.set_debug(debug)
+    ## BUG: overwrites Jupyter defaults and extends Application GC lifetime
+    ## FAIL: is not triggered if taskref was stored to variable [outside the loop]
+    myloop.set_exception_handler(_custom_exception_handler)
     asyncio.set_event_loop(myloop)
     try:
         yield myloop

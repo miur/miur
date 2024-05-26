@@ -2,6 +2,7 @@ import curses as C
 from typing import Callable
 
 from . import curses_ext as CE
+from .util.logger import log
 
 # def raise_(exc: BaseException) -> None:
 #     raise exc
@@ -27,11 +28,36 @@ def resize(scr: C.window) -> None:
 
 _primary = None
 
+
 def shell_out(scr: C.window) -> None:
     # CE.shell_out(scr)
     import asyncio
+    import signal
+
+    curses_stdin_fd = 0
+    loop = asyncio.get_running_loop()
+    loop.remove_reader(fd=curses_stdin_fd)
+    loop.remove_signal_handler(signal.SIGWINCH)
+    C.flushinp()
+
+    def _cb(fut: asyncio.Future[int]) -> None:
+        globals()["_primary"] = None
+        if fut.cancelled():
+            log.warning("cancelled")
+        elif exc := fut.exception():
+            log.error(exc)
+            C.flash()
+        else:
+            log.info(fut.result())
+
+        C.flushinp()
+        loop = asyncio.get_running_loop()
+        loop.add_signal_handler(signal.SIGWINCH, scr.refresh)
+        loop.add_reader(fd=curses_stdin_fd, callback=lambda: handle_input(scr))
+
+
     _primary = asyncio.create_task(CE.shell_async(scr))
-    _primary.add_done_callback(lambda *a: None)
+    _primary.add_done_callback(_cb)
 
 
 def ipython_out(scr: C.window) -> None:
@@ -39,10 +65,19 @@ def ipython_out(scr: C.window) -> None:
 
 
 # ALT: match to string, and then resolve to appropriate function
-input_handlers: dict[str | int, Callable[[C.window], None]] = {
+g_input_handlers: dict[str | int, Callable[[C.window], None]] = {
     "\033": exitloop,
     "q": exitloop,
     C.KEY_RESIZE: resize,
     "S": shell_out,
     "\t": ipython_out,
 }
+
+def handle_input(stdscr: C.window) -> None:
+    wch = stdscr.get_wch()
+    cmd = g_input_handlers.get(wch, None)
+    comment = f" ({cmd.__name__})" if cmd else ""
+    log.warning(repr(wch) + comment)
+    if cmd:
+        # WARN: last stmt in loop COS: may raise SystemExit
+        cmd(stdscr)

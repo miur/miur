@@ -63,7 +63,10 @@ class curses_altscreen:
     def __enter__(self) -> Self:
         # HACK: throw BUG if you try to altscreen when you are already altscreen (e.g. shell_out)
         #  ALT: inof failing (on bug) OR blocking -- simply print to screen as-is
-        self._sema1.acquire()
+        if not self._sema1.acquire(blocking=False):
+            # sys.exit("BUG")
+            ## FAIL: ignored by asyncio
+            raise RuntimeError("BUG: altscreen is already switched out")
         C.def_prog_mode()  # save current tty modes
         C.endwin()  # restore original tty modes
         return self
