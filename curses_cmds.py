@@ -31,34 +31,34 @@ _primary = None
 
 
 def shell_out(scr: C.window) -> None:
-    # CE.shell_out(scr)
     import asyncio
     import signal
 
-    curses_stdin_fd = 0
     loop = asyncio.get_running_loop()
-    loop.remove_reader(fd=curses_stdin_fd)
+    loop.remove_reader(fd=CE.CURSES_STDIN_FD)
     loop.remove_signal_handler(signal.SIGWINCH)
     C.flushinp()
 
     def _cb(fut: asyncio.Future[int]) -> None:
-        globals()["_primary"] = None
-        sfx = " (shell_out)"
-        if fut.cancelled():
-            log.warning("cancelled" + sfx)
-        elif exc := fut.exception():
-            exc.add_note(sfx)
-            from .util.exchook import exception_handler
+        try:
+            globals()["_primary"] = None
+            sfx = " (shell_out)"
+            if fut.cancelled():
+                log.warning("cancelled" + sfx)
+            elif exc := fut.exception():
+                exc.add_note(sfx)
+                from .util.exchook import exception_handler
 
-            exception_handler(type(exc), exc, exc.__traceback__)
-            C.flash()
-        else:
-            log.info(f"rc={fut.result()}{sfx}")
+                exception_handler(type(exc), exc, exc.__traceback__)
+                C.flash()
+            else:
+                log.info(f"rc={fut.result()}{sfx}")
 
-        C.flushinp()
-        loop = asyncio.get_running_loop()
-        loop.add_signal_handler(signal.SIGWINCH, scr.refresh)
-        loop.add_reader(fd=curses_stdin_fd, callback=lambda: handle_input(scr))
+            C.flushinp()
+        finally:
+            loop = asyncio.get_running_loop()
+            loop.add_signal_handler(signal.SIGWINCH, scr.refresh)
+            loop.add_reader(fd=CE.CURSES_STDIN_FD, callback=lambda: handle_input(scr))
 
     _primary = asyncio.create_task(CE.shell_async(scr))
     _primary.add_done_callback(_cb)
@@ -73,7 +73,7 @@ g_input_handlers: dict[str | int, Callable[[C.window], None]] = {
     "\033": exitloop,
     "q": exitloop,
     C.KEY_RESIZE: resize,
-    "S": shell_out,
+    "S": shell_out,  # CE.shell_out
     "\t": ipython_out,
 }
 

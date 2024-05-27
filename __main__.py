@@ -9,6 +9,7 @@
 #   [_] ALSO: directly run Jupyther kernel and console by sourcing from inside my code
 #     /d/coastline/fleur/cfg/gdb-jupyter.py
 
+
 import sys
 
 
@@ -26,7 +27,7 @@ def select_entrypoint():  # type:ignore
 
 
 def as_pkg_or_exe(mkrun):  # type:ignore
-    sys.path = [p for p in sys.path if not p.endswith('.zip')]
+    sys.path = [p for p in sys.path if not p.endswith(".zip")]
     if globals().get("__package__") is not None:
         return mkrun()
 
@@ -34,13 +35,14 @@ def as_pkg_or_exe(mkrun):  # type:ignore
     ##   BAD: "curses" imports "os" anyways
     ##   BUT: we won't need "os" for cli/headless pure graph processor,
     ##     so this performance hack is still feasible
-    if sys.path and sys.path[0][0] == '/':
+    if sys.path and sys.path[0][0] == "/":
         # FAIL: we use symlink
         # parent = __file__.rsplit('/')[0]
-        parent = '/d/just'
+        parent = "/d/just"
     else:
         # OR: fs = __import__("os.path", fromlist=[""])
         import os.path as fs
+
         parent = fs.dirname(fs.dirname(fs.realpath(__file__)))
 
     sys.path.insert(0, parent)

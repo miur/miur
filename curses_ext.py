@@ -6,7 +6,7 @@ from io import TextIOWrapper
 # WARN:PERF: somehow doing import here is 2ms faster, than moving into func-local stmt
 from subprocess import CompletedProcess, run
 from threading import BoundedSemaphore
-from typing import IO, Any, Callable, Final, Iterator, Sequence
+from typing import IO, Any, AnyStr, Callable, Final, Iterator, Sequence
 
 import _curses as C
 
@@ -92,16 +92,18 @@ class redir_stdio_nm:
 def curses_stdscr() -> Iterator[C.window]:
     if not C.has_extended_color_support():
         raise NotImplementedError
+    C.setupterm(term=os.environ.get("TERM", "unknown"), fd=CURSES_STDOUT_FD)
     try:
-        C.setupterm(term=os.environ.get("TERM", "unknown"), fd=CURSES_STDOUT_FD)
         stdscr = C.initscr()
         C.noecho()  # echoing of keys = off
         C.cbreak()  # buffering on keyboard input = off
         stdscr.keypad(True)  # sup special escape seq for e.g. curses.KEY_LEFT
         C.start_color()  # WAIT: which exception does it throw? TRY: TERM=dummy
+        stdscr.nodelay(True)
         yield stdscr
     finally:
         try:
+            stdscr.nodelay(False)
             stdscr.keypad(False)
             # del stdscr  # TRY? ALT:BAD: not ported :: delscreen(stdscr)
             C.echo()
@@ -166,29 +168,20 @@ class curses_altscreen:
 
 
 @contextmanager
-def stdio_to_altscreen(stdscr: C.window) -> Iterator[None]:
-    from .util.logger import log
+def stdio_to_altscreen(stdscr: C.window, ttyio: IO[Any]) -> Iterator[None]:
+    oldwrite = ttyio.write
 
-    # WARN:PERF: switching back-n-forth this way takes 0.5ms on each logline
-    def _write(oldw: Callable[[str], int], s: str) -> int:
-        with curses_altscreen(stdscr, fflush=oldw.__self__.flush):
-            return oldw(s)
+    # WARN:PERF: switching back-n-forth this way -- takes 0.5ms on each logline
+    # ALT:HACK: fflush=oldw.__self__.flush
+    def _write(s: AnyStr) -> int:
+        with curses_altscreen(stdscr, fflush=ttyio.flush):
+            return oldwrite(s)
 
-    oldwout = sys.stdout.write
-    oldwerr = sys.stderr.write
-    oldlog = log.write
+    ttyio.write = _write  # mypy:disable-error-code=method-assign
     try:
-        # FIXME: replace only if STD* is not redirected already to file or pipe
-        #   OR:OPT: especially requesting logs OR output to TTY
-        sys.stdout.write = lambda s: _write(oldwout, s)
-        sys.stderr.write = lambda s: _write(oldwerr, s)
-        # BAD:WKRND: overriding initial class VAR for logger
-        log.write = sys.stdout.write
         yield
     finally:
-        log.write = oldlog
-        sys.stdout.write = oldwout
-        sys.stderr.write = oldwerr
+        ttyio.write = oldwrite  # mypy:disable-error-code=method-assign
 
 
 def shell_out(

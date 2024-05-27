@@ -62,7 +62,9 @@ class Logger:  # pylint:disable=too-many-instance-attributes
     termcolor: bool | None = None
 
     def __init__(self) -> None:
-        self._initts = time.monotonic()
+        # HACK: approximate ps creation time (w/o IO delays)
+        self._initts = time.monotonic() - time.thread_time()
+        self._pts = self._initts
         self._counter = 0
         self._pms = 0.0
         self._pcpu = time.process_time()
@@ -121,6 +123,8 @@ class Logger:  # pylint:disable=too-many-instance-attributes
         dcpu = cpu - self._pcpu
         line = f"KPI[ms={ms*1000:.3f}({dms*1000:+.3f}) cpu={cpu*1000:.3f}({dcpu*1000:+.3f})] {fmt}"
         self.at(LogLevel.TRACE, line)
+        # HACK: force show last KPI before exit
+        # self.write.__self__.flush()
         self._pms = ms
         self._pcpu = cpu
         ## OLD
@@ -135,8 +139,11 @@ class Logger:  # pylint:disable=too-many-instance-attributes
             body = fmt()
         else:
             body = str(fmt)
-        relts = time.monotonic() - self._initts
-        self._counter += 1
+        ts = time.monotonic()
+        relts = ts - self._initts
+        # dts = ts - self._pts
+        # self._pts = ts
+        # self._counter += 1
 
         # TODO: use lru_cache (src/mod/fcnnm/lnum) based on parent loci
         fr = sys._getframe(2)  # pylint:disable=protected-access
@@ -159,7 +166,7 @@ class Logger:  # pylint:disable=too-many-instance-attributes
             _r = TERMSTYLE[None]
         else:
             _c = _b = _r = ""
-        # ADD? "#{self._counter:03d} ..."
+        # ADD? "#{self._counter:03d} {dts:+6.3f} ..."
         return f"{relts:8.3f}  {_c}{lvl.name[0]}{_b}[{modnm}:{lnum}] {_c}{body}{_r}\n"
 
 
