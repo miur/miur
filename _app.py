@@ -7,4 +7,4 @@ __version__ = "42.1.3"  # INFO: and even more PoCs I did to get here
 
 
 # USAGE: time mi --backend=asyncio
-PROFILE_STARTUP = True  # =DEBUG
+PROFILE_STARTUP = False  # =DEBUG
