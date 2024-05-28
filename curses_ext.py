@@ -177,11 +177,11 @@ def stdio_to_altscreen(stdscr: C.window, ttyio: IO[Any]) -> Iterator[None]:
         with curses_altscreen(stdscr, fflush=ttyio.flush):
             return oldwrite(s)
 
-    ttyio.write = _write  # mypy:disable-error-code=method-assign
+    ttyio.write = _write  # mypy: disable-error-code="method-assign"
     try:
         yield
     finally:
-        ttyio.write = oldwrite  # mypy:disable-error-code=method-assign
+        ttyio.write = oldwrite  # type: ignore[method-assign]
 
 
 def shell_out(

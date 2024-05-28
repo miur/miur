@@ -44,7 +44,7 @@ def handle_SIGWINCH(
     # assert ch == C.KEY_RESIZE, ch
 
 
-def mainloop_selectors(stdscr: C.window) -> None:
+def mainloop_selectors(myns: dict[str, Any]) -> None:
     with route_signals_to_fd() as sigfd, selectors.DefaultSelector() as sel:
         sel.register(CE.CURSES_STDIN_FD, selectors.EVENT_READ, data=None)
         sel.register(sigfd, selectors.EVENT_READ, data=None)
@@ -56,17 +56,18 @@ def mainloop_selectors(stdscr: C.window) -> None:
                 for key, events in sel.select():
                     if key.fd == sigfd:
                         assert events == selectors.EVENT_READ
-                        handle_SIGWINCH(sel, sigfd, stdscr)
+                        handle_SIGWINCH(sel, sigfd, myns["stdscr"])
                     elif key.fd == CE.CURSES_STDIN_FD:
                         assert events == selectors.EVENT_READ
-                        handle_input(stdscr)
+                        handle_input(myns)
                     else:
-                        log.error((key, events))
+                        log.error(str((key, events)))
         except KeyboardInterrupt:
             pass
 
 
-async def mainloop_asyncio(stdscr: C.window) -> None:
+async def mainloop_asyncio(myns: dict[str, Any]) -> None:
+    stdscr: C.window = myns["stdscr"]
     stdscr.refresh()  # CHG:> app.refresh
 
     import asyncio
@@ -77,7 +78,7 @@ async def mainloop_asyncio(stdscr: C.window) -> None:
     loop.add_signal_handler(signal.SIGINT, ev_shutdown.set)
     # FIND:MAYBE: don't process in handler directly, and only schedule callback ?
     loop.add_signal_handler(signal.SIGWINCH, stdscr.refresh)  # CHG:> app.refresh
-    loop.add_reader(fd=CE.CURSES_STDIN_FD, callback=lambda: handle_input(stdscr))
+    loop.add_reader(CE.CURSES_STDIN_FD, handle_input, myns)
     try:
         log.kpi("serving")
         if __debug__ and _app.PROFILE_STARTUP:
@@ -134,46 +135,6 @@ def my_asyncio_loop(debug: bool = True) -> Iterator["AbstractEventLoop"]:
         asyncio.set_event_loop(None)
 
 
-def inject_ipykernel_into_asyncio(
-    myloop: "AbstractEventLoop",
-    myns: dict[str, Any],
-) -> None:
-    if sys.flags.isolated:
-        __import__("site").main()  # lazy init for "site" in isolated mode
-    # FIXED:DEPR: can be removed for !jupyter_core>=6
-    os.environ["JUPYTER_PLATFORM_DIRS"] = "1"
-    import ipykernel.kernelapp as IK
-
-    os.environ["PYDEVD_DISABLE_FILE_VALIDATION"] = "1"  # =debugpy
-    kernel = IK.IPKernelApp.instance()
-    kernel.connection_file = "miur-ipython.json"
-    kernel.parent_handle = 1  # EXPL: suppress banner with conn details
-    # EXPL:(outstream_class): prevent stdout/stderr redirection
-    #   ALT: reset after .initialize() to see !pdb/etc. output
-    #     kernel.reset_io()  # EXPL:FIXED: restore redirected stdout/sdterr
-    kernel.outstream_class = None  # type:ignore
-
-    log.warning(lambda: "bef kinit: %d" % __import__("threading").active_count())
-    kernel.initialize([])  # type:ignore  # OR:([]): ["python", "--debug"]
-    log.warning(lambda: "aft kinit: %d" % __import__("threading").active_count())
-
-    ipyloop = IK.ioloop.IOLoop.current()  # type:ignore
-    assert myloop == ipyloop.asyncio_loop, "Bug: IPython doesn't use my own global loop"
-
-    # HACK: monkey-patch to have more control over messy IPython loop
-    #   ALT:BAD: try: kernel.start(); finally: kio.close()
-    old_start = ipyloop.start
-    ipyloop.start = lambda: None  # EXPL: inof "kio.asyncio_loop.run_forever()"
-    try:
-        kernel.start()  # type:ignore
-    finally:
-        ipyloop.start = old_start
-
-    ns = kernel.shell.user_ns  # type:ignore
-    ns["ipk"] = kernel
-    ns.update(myns)
-
-
 @contextmanager
 def enable_warnings(error: bool = True) -> Iterator[None]:
     if sys.warnoptions:
@@ -225,6 +186,10 @@ def miur_none(bare: bool = True, ipykernel: bool = False) -> None:
                     log.write = sys.stdout.write
 
         stdscr = do(CE.curses_stdscr())
+        myns: dict[str, Any] = {
+            "stdscr": stdscr,
+            "mi": sys.modules[__name__],
+        }
 
         # [_] FIXME: add hooks individually
         # BAD: { mi | cat } won't enable altscreen, and !cat will spit all over TTY
@@ -238,27 +203,22 @@ def miur_none(bare: bool = True, ipykernel: bool = False) -> None:
         if bare:  # NOTE: much faster startup w/o asyncio machinery
             from .curses_cmds import g_input_handlers
 
-            g_input_handlers["S"] = CE.shell_out
-            return mainloop_selectors(stdscr)
+            def _shell_out(myns: dict[str, Any]) -> None:
+                CE.shell_out(myns["stdscr"])
 
-        import asyncio
+            g_input_handlers["S"] = _shell_out
+            return mainloop_selectors(myns)
 
         myloop = do(my_asyncio_loop())
 
-        # FIXME:CHG: only if OPT=--ipython
-        #   otherwise: enable ipython on keybind='S-k'
         if ipykernel:
-            # NOTE: make it easier to see ipython loading issues
-            # FAIL: doesn't work together with stdio_to_altscreen()
-            # with CE.curses_altscreen(stdscr):
-            myns = {
-                "stdscr": stdscr,
-                "_miur": __import__("__main__"),
-                "mi": sys.modules[__name__],
-            }
-            inject_ipykernel_into_asyncio(myloop, myns)
+            from .util.jupyter import inject_ipykernel_into_asyncio
 
-        return asyncio.run(mainloop_asyncio(stdscr), loop_factory=lambda: myloop)
+            inject_ipykernel_into_asyncio(myns)
+
+        import asyncio
+
+        return asyncio.run(mainloop_asyncio(myns), loop_factory=lambda: myloop)
 
 
 if TYPE_CHECKING:
