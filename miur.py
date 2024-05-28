@@ -176,14 +176,16 @@ def miur_none(bare: bool = True, ipykernel: bool = False) -> None:
         do(log_excepthook())
 
         # NOTE: this redirection is needed not unconditionally, but only if we use curses
-        for nm in "stdin stdout stderr".split():
-            if not getattr(sys, nm).isatty():
-                # TBD: open os.pipe to cvt libc.stderr into py.log inof spitting over TTY
-                do(CE.redir_stdio_nm(nm))
-                if nm == "stdout":
-                    # NOTE: refresh closed FD
-                    #   TBD: restore back on scope
-                    log.write = sys.stdout.write
+        ## TEMP:DISABLED: due to kernel.outstream_class "echo"
+        ##   NEED: use separate explicit FD for explicit PIPE -- to prevent their redir by Jupyter
+        # for nm in "stdin stdout stderr".split():
+        #     if not getattr(sys, nm).isatty():
+        #         # TBD: open os.pipe to cvt libc.stderr into py.log inof spitting over TTY
+        #         do(CE.redir_stdio_nm(nm))
+        #         if nm == "stdout":
+        #             # NOTE: refresh closed FD
+        #             #   TBD: restore back on scope
+        #             log.write = sys.stdout.write
 
         stdscr = do(CE.curses_stdscr())
         myns: dict[str, Any] = {
@@ -196,9 +198,11 @@ def miur_none(bare: bool = True, ipykernel: bool = False) -> None:
         #   ALSO: even if it's not !cat, pipeline still may eventually print something to TTY
         #   WKRND: always use altscreen unless redir to file/socket (until PERF measurements)
         #     BAD it won't help if other app produces output at different timings
-        for ttyio in (sys.stdout, sys.stderr):
-            if ttyio.isatty() or os.fstat(ttyio.fileno()).st_mode & stat.S_IFIFO:
-                do(CE.stdio_to_altscreen(stdscr, ttyio))
+        ## TEMP:DISABLED: due to kernel.outstream_class "echo"
+        ##   TRY: wrap only "echo" __std*__.write
+        # for ttyio in (sys.stdout, sys.stderr):
+        #     if ttyio.isatty() or os.fstat(ttyio.fileno()).st_mode & stat.S_IFIFO:
+        #         do(CE.stdio_to_altscreen(stdscr, ttyio))
 
         if bare:  # NOTE: much faster startup w/o asyncio machinery
             from .curses_cmds import g_input_handlers
@@ -214,7 +218,7 @@ def miur_none(bare: bool = True, ipykernel: bool = False) -> None:
         if ipykernel:
             from .util.jupyter import inject_ipykernel_into_asyncio
 
-            inject_ipykernel_into_asyncio(myns)
+            inject_ipykernel_into_asyncio(myloop, myns)
 
         import asyncio
 
@@ -237,10 +241,16 @@ def miur_opts(opts: "Namespace") -> None:
         log.kpi("argparse")
 
     if sig := opts.signal:
-        sys.exit(send_pidfile_signal(pidfile_path(), sig))  # type:ignore
+        ret = send_pidfile_signal(pidfile_path(), sig)
+        sys.exit(ret if ret is None or isinstance(ret, int) else str(ret))
 
-    ## TODO: embedded console/client
-    # $ jupyter console --existing miur-ipython.json
+    if opts.ipyconsole:
+        from .util.jupyter import ipyconsole_out
+
+        # ALT: $ jupyter console --existing miur-ipython.json
+        # > stdscr.addstr(1, 1, "hello")
+        # > stdscr.refresh()
+        sys.exit(ipyconsole_out())
 
     # log.info(f"cwd={opts.cwd}")
     return miur_none(bare=not opts.asyncio, ipykernel=opts.ipykernel)

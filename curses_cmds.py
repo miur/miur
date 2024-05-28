@@ -69,11 +69,12 @@ def shell_out(myns: dict[str, Any]) -> None:
 def ipykernel_start(myns: dict[str, Any]) -> None:
     from .util.jupyter import inject_ipykernel_into_asyncio
 
-    inject_ipykernel_into_asyncio(myns)
+    loop = __import__("asyncio").get_running_loop()
+    inject_ipykernel_into_asyncio(loop, myns)
 
 
 def ipython_out(myns: dict[str, Any]) -> None:
-    CE.ipython_out(myns['stdscr'])
+    CE.ipython_out(myns["stdscr"])
 
 
 # ALT: match to string, and then resolve to appropriate function

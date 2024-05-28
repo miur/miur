@@ -33,17 +33,13 @@ def cli_spec(parser: ArgumentParser) -> ArgumentParser:
     o("-v", "--version", action="version", version=APP.__version__)
     _sigset = "HUP INT KILL USR1 USR2 TERM CONT STOP WINCH".split()
     o("-s", "--signal", choices=_sigset, type=str.upper, action=SigAction)
-    o("-k", "--kill", dest='signal', action='store_const', const='TERM')
-    o("-a", "--asyncio", default=False, action='store_true')
-    o("-K", "--ipykernel", default=False, action='store_true')
-    o(
-        "-C",
-        "--color",
-        default=SwitchEnum.default,
-        choices=SwitchEnum.__members__,
-        type=str.lower,
-        action=SwitchAction,
-    )
+    o("-a", "--asyncio", default=False, action="store_true")
+    o("-K", "--ipykernel", default=False, action="store_true")
+    o("-I", "--ipyconsole", default=False, action="store_true")
+    # pylint:disable=line-too-long
+    # fmt:off
+    o("-k", "--kill", dest="signal", action="store_const", const=__import__("signal").SIGTERM)
+    o("-C", "--color", default=SwitchEnum.default, choices=SwitchEnum.__members__, type=str.lower, action=SwitchAction)
     return parser
 
 
