@@ -13,7 +13,7 @@
 import sys
 
 
-def select_entrypoint():  # type:ignore
+def select_entrypoint():  # type:ignore[no-untyped-def]
     argv = sys.argv
     # PERF: faster startup w/o importing ArgumentParser (128ms vs 115ms)
     if len(argv) == 1 or (len(argv) > 1 and argv[1] == "--"):
@@ -26,7 +26,7 @@ def select_entrypoint():  # type:ignore
     return lambda: miur_args(argv)
 
 
-def as_pkg_or_exe(mkrun):  # type:ignore
+def as_pkg_or_exe(mkrun):  # type:ignore[no-untyped-def]
     sys.path = [p for p in sys.path if not p.endswith(".zip")]
     if globals().get("__package__") is not None:
         return mkrun()
@@ -54,8 +54,8 @@ def as_pkg_or_exe(mkrun):  # type:ignore
     try:
         return mkrun()
     finally:
-        __package__ = None  # type:ignore
+        __package__ = None  # type:ignore[assignment]
         sys.path.remove(parent)
 
 
-sys.exit(as_pkg_or_exe(select_entrypoint)())  # type:ignore
+sys.exit(as_pkg_or_exe(select_entrypoint)())  # type:ignore[no-untyped-call]

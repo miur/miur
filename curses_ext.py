@@ -65,7 +65,7 @@ class redir_stdio_nm:
         os.dup2(self._ttyio.fileno(), fdini, inheritable=True)
         self._fdini = fdini
 
-    def __exit__(self, et=None, exc=None, tb=None):  # type:ignore
+    def __exit__(self, et=None, exc=None, tb=None):  # type:ignore[no-untyped-def]
         nm = self._stdnm
         dupio = getattr(sys, nm)
         assert dupio is getattr(sys, "__" + nm + "__"), "IPython limitation"
@@ -161,7 +161,7 @@ class curses_altscreen:
     #   exc_value: Optional[BaseException],
     #   traceback: Optional[TracebackType]
     #   ) -> Optional[bool]:
-    def __exit__(self, et=None, exc=None, tb=None):  # type:ignore
+    def __exit__(self, et=None, exc=None, tb=None):  # type:ignore[no-untyped-def]
         # ATT: force immediate output before you switch back to curses alt-screen
         if self._flush:
             self._flush()
@@ -180,11 +180,11 @@ def stdio_to_altscreen(stdscr: C.window, ttyio: IO[Any]) -> Iterator[None]:
         with curses_altscreen(stdscr, fflush=ttyio.flush):
             return oldwrite(s)
 
-    ttyio.write = _write  # mypy: disable-error-code="method-assign"
+    ttyio.write = _write  # type:ignore[assignment]
     try:
         yield
     finally:
-        ttyio.write = oldwrite  # type: ignore[method-assign]
+        ttyio.write = oldwrite  # type:ignore[method-assign]
 
 
 def shell_out(

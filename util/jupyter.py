@@ -42,10 +42,11 @@ def inject_ipykernel_into_asyncio(myloop: Any, myns: dict[str, Any]) -> None:
     # kernel.outstream_class = None  # type:ignore[assignment]
 
     log.warning(lambda: "bef kinit: %d" % __import__("threading").active_count())
-    kernel.initialize([])  # type:ignore  # OR:([]): ["python", "--debug"]
+    # OR:([]): ["python", "--debug"]
+    kernel.initialize([])  # type:ignore[no-untyped-call]
     log.warning(lambda: "aft kinit: %d" % __import__("threading").active_count())
 
-    ipyloop = IK.ioloop.IOLoop.current()  # type:ignore
+    ipyloop = IK.ioloop.IOLoop.current()  # type:ignore[attr-defined]
     assert ipyloop.asyncio_loop is myloop, "Bug: IPython doesn't use my own global loop"
 
     # HACK: monkey-patch to have more control over messy IPython loop
@@ -59,7 +60,7 @@ def inject_ipykernel_into_asyncio(myloop: Any, myns: dict[str, Any]) -> None:
         ipyloop.start = old_start
     assert kernel.io_loop
 
-    ns = kernel.shell.user_ns  # type:ignore
+    ns = kernel.shell.user_ns  # type:ignore[union-attr]
     ns["_entry"] = sys.modules["__main__"]
     ns["ipk"] = kernel
     ns.update(myns)

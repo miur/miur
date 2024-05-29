@@ -16,14 +16,14 @@ class SwitchEnum(Enum):
 
 
 class SwitchAction(Action):
-    def __call__(self, _ap, ns, s: str, option_string=None):  # type:ignore
+    def __call__(self, _ap, ns, s: str, option_string=None):  # type:ignore[no-untyped-def]
         # ALT: create enum as Enum('SwitchEnum', {"0":True, ...}) to allow Literal keys too
         # if s == "0": s = "no" elif s == "1": s = "yes"
         setattr(ns, self.dest, SwitchEnum[s.lower()])
 
 
 class SigAction(Action):
-    def __call__(self, _ap, ns, s, option_string=None):  # type:ignore
+    def __call__(self, _ap, ns, s, option_string=None):  # type:ignore[no-untyped-def]
         setattr(ns, self.dest, __import__("signal").Signals["SIG" + s])
 
 
