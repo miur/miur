@@ -245,12 +245,14 @@ def miur_opts(opts: "Namespace") -> None:
         sys.exit(ret if ret is None or isinstance(ret, int) else str(ret))
 
     if opts.ipyconsole:
-        from .util.jupyter import ipyconsole_out
+        import asyncio
+        from .util.jupyter import ipyconsole_async
 
         # ALT: $ jupyter console --existing miur-ipython.json
         # > stdscr.addstr(1, 1, "hello")
         # > stdscr.refresh()
-        sys.exit(ipyconsole_out())
+        asyncio.run(ipyconsole_async())
+        sys.exit()
 
     # log.info(f"cwd={opts.cwd}")
     return miur_none(bare=not opts.asyncio, ipykernel=opts.ipykernel)

@@ -1,10 +1,13 @@
 import os
 import sys
-from typing import Any
+from typing import Any, Final
 
 from .logger import log
 
 g_running_ipykernel: bool = False
+g_running_ipyconsole: bool = False
+
+CONNECTION_FILE: Final = "miur-ipython.json"
 
 
 # WARN: no way to shutdown this kernel easily/cleanly
@@ -27,9 +30,9 @@ def inject_ipykernel_into_asyncio(myloop: Any, myns: dict[str, Any]) -> None:
     import ipykernel.kernelapp as IK
 
     os.environ["PYDEVD_DISABLE_FILE_VALIDATION"] = "1"  # =debugpy
-    kernel = IK.IPKernelApp.instance()
+    kernel: IPKernelApp = IK.IPKernelApp.instance()
     assert not hasattr(kernel, "io_loop")
-    kernel.connection_file = "miur-ipython.json"
+    kernel.connection_file = CONNECTION_FILE
     kernel.parent_handle = 1  # EXPL: suppress banner with conn details
 
     # EXPL:(outstream_class): prevent stdout/stderr redirection
@@ -68,5 +71,21 @@ def inject_ipykernel_into_asyncio(myloop: Any, myns: dict[str, Any]) -> None:
     g_running_ipykernel = True
 
 
-def ipyconsole_out() -> None:
-    pass
+def ipyconsole_async() -> Any:  # type: Coroutine[]
+    global g_running_ipyconsole
+    if g_running_ipyconsole:
+        log.warning("ipyconsole is already running! ignored")
+        return None
+
+    if sys.flags.isolated:
+        __import__("site").main()  # lazy init for "site" in isolated mode
+
+    from jupyter_console.app import ZMQTerminalIPythonApp
+
+    console: ZMQTerminalIPythonApp = ZMQTerminalIPythonApp.instance()
+    console.existing = CONNECTION_FILE
+    console.initialize([])  # CASE: .load_config_file()
+    coro = console.shell._main_task()  # = app.start()
+    g_running_ipyconsole = True
+    return coro
+    # console.shell.shutdown()

@@ -30,7 +30,12 @@ def resize(myns: dict[str, Any]) -> None:
 _primary = None
 
 
-def shell_out(myns: dict[str, Any]) -> None:
+def asyncio_primary_out(myns: dict[str, Any], coro: Any) -> None:
+    global _primary  # pylint:disable=global-statement
+
+    if _primary:
+        raise RuntimeError("BUG: primary TTY app is already set")
+
     stdscr: C.window = myns["stdscr"]
 
     import asyncio
@@ -39,11 +44,9 @@ def shell_out(myns: dict[str, Any]) -> None:
     loop = asyncio.get_running_loop()
     loop.remove_reader(fd=CE.CURSES_STDIN_FD)
     loop.remove_signal_handler(signal.SIGWINCH)
-    C.flushinp()
 
     def _cb(fut: asyncio.Future[int]) -> None:
         try:
-            globals()["_primary"] = None
             sfx = " (shell_out)"
             if fut.cancelled():
                 log.warning("cancelled" + sfx)
@@ -61,9 +64,17 @@ def shell_out(myns: dict[str, Any]) -> None:
             loop = asyncio.get_running_loop()
             loop.add_signal_handler(signal.SIGWINCH, stdscr.refresh)
             loop.add_reader(CE.CURSES_STDIN_FD, handle_input, myns)
+            _primary = None
 
-    _primary = asyncio.create_task(CE.shell_async(stdscr))
+    # MAYBE: do it immediately before launching SHELL itself
+    #   (otherwise #miur may sleep in-between and still leak some input to SHELL)
+    C.flushinp()
+    _primary = asyncio.create_task(coro)
     _primary.add_done_callback(_cb)
+
+
+def shell_out(myns: dict[str, Any]) -> None:
+    asyncio_primary_out(myns, CE.shell_async(myns["stdscr"]))
 
 
 def ipykernel_start(myns: dict[str, Any]) -> None:
@@ -71,6 +82,15 @@ def ipykernel_start(myns: dict[str, Any]) -> None:
 
     loop = __import__("asyncio").get_running_loop()
     inject_ipykernel_into_asyncio(loop, myns)
+
+
+def ipyconsole_out(myns: dict[str, Any]) -> None:
+    async def _ipy_async() -> None:
+        from .util.jupyter import ipyconsole_async
+
+        with CE.curses_altscreen(myns["stdscr"]):
+            await ipyconsole_async()
+    asyncio_primary_out(myns, _ipy_async())
 
 
 def ipython_out(myns: dict[str, Any]) -> None:
@@ -84,6 +104,7 @@ g_input_handlers: dict[str | int, Callable[[dict[str, Any]], None]] = {
     C.KEY_RESIZE: resize,
     "S": shell_out,  # CE.shell_out
     "K": ipykernel_start,
+    "I": ipyconsole_out,
     "\t": ipython_out,
 }
 
