@@ -6,7 +6,7 @@ from io import TextIOWrapper
 # WARN:PERF: somehow doing import here is 2ms faster, than moving into func-local stmt
 from subprocess import CompletedProcess, run
 from threading import BoundedSemaphore
-from typing import IO, Any, AnyStr, Callable, Final, Iterator, Sequence
+from typing import Any, AnyStr, Callable, Final, Iterator, Sequence, TextIO
 
 import _curses as C
 
@@ -18,7 +18,7 @@ CURSES_STDERR_FD: Final = 2
 
 class redir_stdio_nm:
     _fdini: int
-    _ttyio: IO[Any]
+    _ttyio: TextIO
     _conf: dict[str, Any]
 
     # CHG:(open): allow passing from outside:
@@ -30,7 +30,7 @@ class redir_stdio_nm:
         self._stdnm = nm
         self._conf = {}
 
-    def __enter__(self) -> None:
+    def __enter__(self) -> TextIO:
         nm = self._stdnm  # OR: nm -> stdio.name[1:-1]
         stdio = getattr(sys, nm)
         assert stdio is getattr(sys, "__" + nm + "__"), "IPython limitation"
@@ -64,6 +64,7 @@ class redir_stdio_nm:
         # RQ:(inheritable=True): we need FD bound to TTY for shell_out() to work
         os.dup2(self._ttyio.fileno(), fdini, inheritable=True)
         self._fdini = fdini
+        return dupio
 
     def __exit__(self, et=None, exc=None, tb=None):  # type:ignore[no-untyped-def]
         nm = self._stdnm
@@ -171,7 +172,7 @@ class curses_altscreen:
 
 
 @contextmanager
-def stdio_to_altscreen(stdscr: C.window, ttyio: IO[Any]) -> Iterator[None]:
+def stdio_to_altscreen(stdscr: C.window, ttyio: TextIO) -> Iterator[None]:
     oldwrite = ttyio.write
 
     # WARN:PERF: switching back-n-forth this way -- takes 0.5ms on each logline
