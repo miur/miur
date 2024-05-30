@@ -1,6 +1,6 @@
 import os
 import sys
-from typing import Any, Final
+from typing import TYPE_CHECKING, Any, Final
 
 from .logger import log
 
@@ -30,10 +30,11 @@ def inject_ipykernel_into_asyncio(myloop: Any, myns: dict[str, Any]) -> None:
     import ipykernel.kernelapp as IK
 
     os.environ["PYDEVD_DISABLE_FILE_VALIDATION"] = "1"  # =debugpy
-    kernel: IPKernelApp = IK.IPKernelApp.instance()
+    kernel: IK.IPKernelApp = IK.IPKernelApp.instance()
     assert not hasattr(kernel, "io_loop")
     kernel.connection_file = CONNECTION_FILE
     kernel.parent_handle = 1  # EXPL: suppress banner with conn details
+    kernel.quiet = True  # EXPL: don't spam kernel's stdout/stderr with client's output
 
     # EXPL:(outstream_class): prevent stdout/stderr redirection
     #   ALT: reset after .initialize() to see !pdb/etc. output
@@ -71,8 +72,12 @@ def inject_ipykernel_into_asyncio(myloop: Any, myns: dict[str, Any]) -> None:
     g_running_ipykernel = True
 
 
-def ipyconsole_async() -> Any:  # type: Coroutine[]
-    global g_running_ipyconsole
+if TYPE_CHECKING:
+    from collections.abc import Coroutine
+
+
+def ipyconsole_async() -> "Coroutine[] | None":
+    global g_running_ipyconsole  # pylint:disable=global-statement
     if g_running_ipyconsole:
         log.warning("ipyconsole is already running! ignored")
         return None

@@ -178,14 +178,14 @@ def miur_none(bare: bool = True, ipykernel: bool = False) -> None:
         # NOTE: this redirection is needed not unconditionally, but only if we use curses
         ## TEMP:DISABLED: due to kernel.outstream_class "echo"
         ##   NEED: use separate explicit FD for explicit PIPE -- to prevent their redir by Jupyter
-        # for nm in "stdin stdout stderr".split():
-        #     if not getattr(sys, nm).isatty():
-        #         # TBD: open os.pipe to cvt libc.stderr into py.log inof spitting over TTY
-        #         do(CE.redir_stdio_nm(nm))
-        #         if nm == "stdout":
-        #             # NOTE: refresh closed FD
-        #             #   TBD: restore back on scope
-        #             log.write = sys.stdout.write
+        for nm in "stdin stdout stderr".split():
+            if not getattr(sys, nm).isatty():
+                # TBD: open os.pipe to cvt libc.stderr into py.log inof spitting over TTY
+                do(CE.redir_stdio_nm(nm))
+                if nm == "stdout":
+                    # NOTE: refresh closed FD
+                    #   TBD: restore back on scope
+                    log.write = sys.stdout.write
 
         stdscr = do(CE.curses_stdscr())
         myns: dict[str, Any] = {
@@ -200,9 +200,9 @@ def miur_none(bare: bool = True, ipykernel: bool = False) -> None:
         #     BAD it won't help if other app produces output at different timings
         ## TEMP:DISABLED: due to kernel.outstream_class "echo"
         ##   TRY: wrap only "echo" __std*__.write
-        # for ttyio in (sys.stdout, sys.stderr):
-        #     if ttyio.isatty() or os.fstat(ttyio.fileno()).st_mode & stat.S_IFIFO:
-        #         do(CE.stdio_to_altscreen(stdscr, ttyio))
+        for ttyio in (sys.stdout, sys.stderr):
+            if ttyio.isatty() or os.fstat(ttyio.fileno()).st_mode & stat.S_IFIFO:
+                do(CE.stdio_to_altscreen(stdscr, ttyio))
 
         if bare:  # NOTE: much faster startup w/o asyncio machinery
             from .curses_cmds import g_input_handlers
