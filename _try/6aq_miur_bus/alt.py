@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 #
-# SPDX-FileCopyrightText: 2017 Dmytro Kolomoiets <amerlyq@gmail.com> and contributors.
+# SPDX-FileCopyrightText: 2017 Dmytro Kolomoiets <amerlyq+code@gmail.com>
 #
 # SPDX-License-Identifier: GPL-3.0-only
 #

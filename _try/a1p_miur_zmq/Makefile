@@ -1,5 +1,5 @@
 #
-# SPDX-FileCopyrightText: 2016-2020 Dmytro Kolomoiets <amerlyq@gmail.com> and contributors.
+# SPDX-FileCopyrightText: 2016-2020 Dmytro Kolomoiets <amerlyq+code@gmail.com>
 #
 # SPDX-License-Identifier: Apache-2.0
 #
