@@ -17,13 +17,13 @@ def select_entrypoint():  # type:ignore[no-untyped-def]
     argv = sys.argv
     # PERF: faster startup w/o importing ArgumentParser (128ms vs 115ms)
     if len(argv) == 1 or (len(argv) > 1 and argv[1] == "--"):
-        from .miur import miur_none
+        from .miur import miur_main
 
-        return miur_none
+        return miur_main
 
-    from .cli import miur_args
+    from .cli import miur_argparse
 
-    return lambda: miur_args(argv)
+    return lambda: miur_argparse(argv)
 
 
 def as_pkg_or_exe(mkrun):  # type:ignore[no-untyped-def]

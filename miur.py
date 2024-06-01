@@ -8,8 +8,8 @@ from typing import TYPE_CHECKING, Any, Iterator, cast
 
 import _curses as C
 
-from . import _app
 from . import curses_ext as CE
+from .app import AppGlobals
 from .curses_cmds import handle_input
 from .util.envlevel import increment_envlevel
 from .util.exchook import exception_handler, log_excepthook
@@ -44,31 +44,30 @@ def handle_SIGWINCH(
     # assert ch == C.KEY_RESIZE, ch
 
 
-def mainloop_selectors(myns: dict[str, Any]) -> None:
+def mainloop_selectors(g: AppGlobals) -> None:
     with route_signals_to_fd() as sigfd, selectors.DefaultSelector() as sel:
         sel.register(CE.CURSES_STDIN_FD, selectors.EVENT_READ, data=None)
         sel.register(sigfd, selectors.EVENT_READ, data=None)
         try:
             log.kpi("serving")
-            if __debug__ and _app.PROFILE_STARTUP:
+            if __debug__ and g.opts.PROFILE_STARTUP:
                 return
             while True:
                 for key, events in sel.select():
                     if key.fd == sigfd:
                         assert events == selectors.EVENT_READ
-                        handle_SIGWINCH(sel, sigfd, myns["stdscr"])
+                        handle_SIGWINCH(sel, sigfd, g.stdscr)
                     elif key.fd == CE.CURSES_STDIN_FD:
                         assert events == selectors.EVENT_READ
-                        handle_input(myns)
+                        handle_input(g)
                     else:
                         log.error(str((key, events)))
         except KeyboardInterrupt:
             pass
 
 
-async def mainloop_asyncio(myns: dict[str, Any]) -> None:
-    stdscr: C.window = myns["stdscr"]
-    stdscr.refresh()  # CHG:> app.refresh
+async def mainloop_asyncio(g: AppGlobals) -> None:
+    g.stdscr.refresh()  # CHG:> app.refresh
 
     import asyncio
 
@@ -77,11 +76,11 @@ async def mainloop_asyncio(myns: dict[str, Any]) -> None:
     ev_shutdown = asyncio.Event()
     loop.add_signal_handler(signal.SIGINT, ev_shutdown.set)
     # FIND:MAYBE: don't process in handler directly, and only schedule callback ?
-    loop.add_signal_handler(signal.SIGWINCH, stdscr.refresh)  # CHG:> app.refresh
-    loop.add_reader(CE.CURSES_STDIN_FD, handle_input, myns)
+    loop.add_signal_handler(signal.SIGWINCH, g.stdscr.refresh)  # CHG:> app.refresh
+    loop.add_reader(CE.CURSES_STDIN_FD, handle_input, g)
     try:
         log.kpi("serving")
-        if __debug__ and _app.PROFILE_STARTUP:
+        if __debug__ and g.opts.PROFILE_STARTUP:
             loop.call_soon(ev_shutdown.set)
         await ev_shutdown.wait()
         # while True:
@@ -163,15 +162,22 @@ def enable_warnings(error: bool = True) -> Iterator[None]:
         warnings.resetwarnings()  # Back to default behavior
 
 
-def miur_none(bare: bool = True, ipykernel: bool = False) -> None:
-    if _app.PROFILE_STARTUP:
+def miur_main(g: AppGlobals | None = None) -> None:
+    # bare: bool = True, ipykernel: bool = False
+    if g is None:
+        from .app import g_app
+        g = g_app
+
+    g._main = sys.modules[__name__]  # pylint:disable=protected-access
+
+    if g.opts.PROFILE_STARTUP:
         log.kpi("main")
 
     with ExitStack() as stack:  # MOVE:> with Application() as app:
         do = stack.enter_context
         do(enable_warnings())
         do(increment_envlevel("MIUR_LEVEL"))
-        # MAYBE: only enable PIDFILE when run by miur_opts() to avoid global VAR ?
+        # MAYBE: only enable PIDFILE when run by miur_frontend() to avoid global VAR ?
         do(temp_pidfile(pidfile_path()))
         do(log_excepthook())
 
@@ -187,11 +193,7 @@ def miur_none(bare: bool = True, ipykernel: bool = False) -> None:
                     #   TBD: restore back on scope
                     log.write = sys.stdout.write
 
-        stdscr = do(CE.curses_stdscr())
-        myns: dict[str, Any] = {
-            "stdscr": stdscr,
-            "mi": sys.modules[__name__],
-        }
+        g.stdscr = do(CE.curses_stdscr())
 
         # [_] FIXME: add hooks individually
         # BAD: { mi | cat } won't enable altscreen, and !cat will spit all over TTY
@@ -202,50 +204,52 @@ def miur_none(bare: bool = True, ipykernel: bool = False) -> None:
         ##   TRY: wrap only "echo" __std*__.write
         for ttyio in (sys.stdout, sys.stderr):
             if ttyio.isatty() or os.fstat(ttyio.fileno()).st_mode & stat.S_IFIFO:
-                do(CE.stdio_to_altscreen(stdscr, ttyio))
+                do(CE.stdio_to_altscreen(g.stdscr, ttyio))
 
-        if bare:  # NOTE: much faster startup w/o asyncio machinery
+        if g.opts.bare:  # NOTE: much faster startup w/o asyncio machinery
             from .curses_cmds import g_input_handlers
 
-            def _shell_out(myns: dict[str, Any]) -> None:
-                CE.shell_out(myns["stdscr"])
+            def _shell_out(g: AppGlobals) -> None:
+                CE.shell_out(g.stdscr)
 
             g_input_handlers["S"] = _shell_out
-            return mainloop_selectors(myns)
+            return mainloop_selectors(g)
 
         myloop = do(my_asyncio_loop())
 
-        if ipykernel:
+        if g.opts.ipykernel:
             from .util.jupyter import inject_ipykernel_into_asyncio
 
+            # pylint:disable=protected-access
+            myns = {"g": g, "stdscr": g.stdscr, "_main": g._main}
             inject_ipykernel_into_asyncio(myloop, myns)
 
         import asyncio
 
-        return asyncio.run(mainloop_asyncio(myns), loop_factory=lambda: myloop)
-
-
-if TYPE_CHECKING:
-    from argparse import Namespace
+        return asyncio.run(mainloop_asyncio(g), loop_factory=lambda: myloop)
 
 
 # TBD: frontend to various ways to run miur API with different UI
-def miur_opts(opts: "Namespace") -> None:
-    c = opts.color.value  # NB: we always have .default set
+def miur_frontend(g: AppGlobals) -> None:
+    from .app import g
+
+    c = g.opts.color  # NB: we always have .default set
     if c is None:
         # FIXME: check actual fd *after* all redirection OPT
+        # BET: don't reassing cmdline opts -- treat them as Final, and SEP from "state"
         c = sys.stdout.isatty()
     log.config(termcolor=c)
 
-    if _app.PROFILE_STARTUP:
+    if g.opts.PROFILE_STARTUP:
         log.kpi("argparse")
 
-    if sig := opts.signal:
+    if sig := g.opts.signal:
         ret = send_pidfile_signal(pidfile_path(), sig)
         sys.exit(ret if ret is None or isinstance(ret, int) else str(ret))
 
-    if opts.ipyconsole:
+    if g.opts.ipyconsole:
         import asyncio
+
         from .util.jupyter import ipyconsole_async
 
         # ALT: $ jupyter console --existing miur-ipython.json
@@ -255,7 +259,7 @@ def miur_opts(opts: "Namespace") -> None:
         sys.exit()
 
     # log.info(f"cwd={opts.cwd}")
-    return miur_none(bare=not opts.asyncio, ipykernel=opts.ipykernel)
+    return miur_main(g)
 
 
 def _live() -> None:

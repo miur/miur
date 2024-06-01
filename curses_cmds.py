@@ -3,6 +3,7 @@ from typing import Any, Callable
 import _curses as C
 
 from . import curses_ext as CE
+from .app import AppGlobals
 from .util.logger import log
 
 # def raise_(exc: BaseException) -> None:
@@ -15,7 +16,7 @@ def exitloop(_: Any) -> None:
     raise SystemExit()  # CHECK: same as sys.exit()
 
 
-def resize(myns: dict[str, Any]) -> None:
+def resize(g: AppGlobals) -> None:
     ## DEP:configure(--enable-sigwinch)
     # BAD: does not work inside jupyter
     # BAD: should press some key before ev:410 will be reported
@@ -24,19 +25,19 @@ def resize(myns: dict[str, Any]) -> None:
     #   2024-05-11 BUT it works if get_wch() used directly
     # REGR: redraw() during KEY_RESIZE results in ncurses crash
     #   THINK: how to prevent/block redraw in that case?
-    myns["stdscr"].refresh()
+    g.stdscr.refresh()
 
 
 _primary = None
 
 
-def asyncio_primary_out(myns: dict[str, Any], coro: Any) -> None:
+def asyncio_primary_out(g: AppGlobals, coro: Any) -> None:
     global _primary  # pylint:disable=global-statement
 
     if _primary:
         raise RuntimeError("BUG: primary TTY app is already set")
 
-    stdscr: C.window = myns["stdscr"]
+    stdscr: C.window = g.stdscr
 
     import asyncio
     import signal
@@ -63,7 +64,7 @@ def asyncio_primary_out(myns: dict[str, Any], coro: Any) -> None:
         finally:
             loop = asyncio.get_running_loop()
             loop.add_signal_handler(signal.SIGWINCH, stdscr.refresh)
-            loop.add_reader(CE.CURSES_STDIN_FD, handle_input, myns)
+            loop.add_reader(CE.CURSES_STDIN_FD, handle_input, g)
             _primary = None
 
     # MAYBE: do it immediately before launching SHELL itself
@@ -73,32 +74,35 @@ def asyncio_primary_out(myns: dict[str, Any], coro: Any) -> None:
     _primary.add_done_callback(_cb)
 
 
-def shell_out(myns: dict[str, Any]) -> None:
-    asyncio_primary_out(myns, CE.shell_async(myns["stdscr"]))
+def shell_out(g: AppGlobals) -> None:
+    asyncio_primary_out(g, CE.shell_async(g.stdscr))
 
 
-def ipykernel_start(myns: dict[str, Any]) -> None:
+def ipykernel_start(g: AppGlobals) -> None:
     from .util.jupyter import inject_ipykernel_into_asyncio
 
     loop = __import__("asyncio").get_running_loop()
+    # pylint:disable=protected-access
+    myns = {"g": g, "stdscr": g.stdscr, "_main": g._main}
     inject_ipykernel_into_asyncio(loop, myns)
 
 
-def ipyconsole_out(myns: dict[str, Any]) -> None:
+def ipyconsole_out(g: AppGlobals) -> None:
     async def _ipy_async() -> None:
         from .util.jupyter import ipyconsole_async
 
-        with CE.curses_altscreen(myns["stdscr"]):
+        with CE.curses_altscreen(g.stdscr):
             await ipyconsole_async()
-    asyncio_primary_out(myns, _ipy_async())
+
+    asyncio_primary_out(g, _ipy_async())
 
 
-def ipython_out(myns: dict[str, Any]) -> None:
-    CE.ipython_out(myns["stdscr"])
+def ipython_out(g: AppGlobals) -> None:
+    CE.ipython_out(g.stdscr)
 
 
 # ALT: match to string, and then resolve to appropriate function
-g_input_handlers: dict[str | int, Callable[[dict[str, Any]], None]] = {
+g_input_handlers: dict[str | int, Callable[[AppGlobals], None]] = {
     "\033": exitloop,
     "q": exitloop,
     C.KEY_RESIZE: resize,
@@ -109,11 +113,11 @@ g_input_handlers: dict[str | int, Callable[[dict[str, Any]], None]] = {
 }
 
 
-def handle_input(myns: dict[str, Any]) -> None:
-    wch = myns["stdscr"].get_wch()
+def handle_input(g: AppGlobals) -> None:
+    wch = g.stdscr.get_wch()
     cmd = g_input_handlers.get(wch, None)
     comment = f" ({cmd.__name__})" if cmd else ""
     log.warning(repr(wch) + comment)
     if cmd:
         # WARN: last stmt in loop COS: may raise SystemExit
-        cmd(myns)
+        cmd(g)

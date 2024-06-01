@@ -3,13 +3,13 @@ import sys
 from contextlib import contextmanager
 from typing import Iterator
 
-from .. import _app
+from .. import _pkg
 from .logger import log
 
 
 def pidfile_path() -> str:
     # OR:(/tmp)=f"/run/user/{os.getlogin()}" os.environ.get('', "/tmp")
-    return os.environ.get("XDG_RUNTIME_DIR", "/tmp") + "/" + _app.__appname__ + ".pid"
+    return os.environ.get("XDG_RUNTIME_DIR", "/tmp") + "/" + _pkg.__appname__ + ".pid"
 
 
 @contextmanager

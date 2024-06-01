@@ -8,8 +8,6 @@ import sys
 import time
 from typing import Callable, Final, TypeAlias, TypedDict, Unpack
 
-# from .. import _app
-
 _LAMBDA: Final = lambda: ""  # pylint:disable=unnecessary-lambda-assignment
 _Loggable: TypeAlias = str | Callable[[], str]
 
@@ -114,9 +112,8 @@ class Logger:  # pylint:disable=too-many-instance-attributes
 
     def kpi(self, fmt: _Loggable) -> None:
         ## PERF: to run startup 100 times and calc average
-        # if __debug__ and _app.PROFILE_STARTUP:
-        #     self.write("%.3f\n" % ((time.monotonic() - self._initts) * 1000))
-        #     return
+        # self.write("%.3f\n" % ((time.monotonic() - self._initts) * 1000))
+        # return
         cpu = time.process_time()
         ms = time.monotonic() - self._initts
         dms = ms - self._pms
