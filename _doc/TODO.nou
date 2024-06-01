@@ -1,0 +1,72 @@
+⌇⡡⢳⣻⡙
+
+&goals:xlr
+  #graph-navi
+  #graphdb
+  #eventdb
+  #query
+  #workflow
+  #networking
+
+
+&goals:fea
+  dom: use #graphdb as generic #kdb prototype
+    = filelist in dir is an ephemerial timestamped snapshot
+  graph-navi: tree-like navigation but aware of loops/links in graph
+    TRY: preserve spatial memory for user -- keep structure as fixed as possible
+  unify: parse external apps outputs into :dom:
+  integ: directly bridge ext apps to #miur for interactive reflections
+  pipe: continuously feed synthesized data from cli/file into :dom:
+    = to navigate outputs of external apps
+  multi-view: alt views for all nodes metadata #semanticdb instead of only .content
+    OR: "merged" virtual view containing different types of nodes at once
+      NEED: show results of query()
+  query-view: preserve expression and virtual "slice" of results accross whole :dom:
+  reflections: display #miur innards in same dynamic ifc
+  workflow: wf-based ui/keymaps/modes with #workflow as (primary) first class citizen
+  local-options: attach opts (e.g. hidden) to cursor/view, folder, device, tab, etc. with fallback
+    &why avoid long redraw when hide/unhide for whole system
+  multi-ifc: central exchange protocol and dif clients e.g. cli/tui/emacs/gui/opengl/audio
+  history: use #eventdb audit log
+  headless: core-client-server architecture with two hops
+  visual-scripting: embed bash-like ops directly as #semanticdb nodes to reflect all relationships
+    SEE: !xonsh as a base for embedding
+  oneui: same list-navi for everything
+    e.g. filemanager, package manager, git status of repo, volume controls,
+      list of workflows, features of each workflow, user settings of workflow,
+  ? homoiconicity:
+
+
+&goals:pj
+  &exploration (my craving)
+  ...
+
+
+IDEA
+  *Ranger done right*
+  Refactoring and evolution
+  Microkernel relay in fm world
+  ...
+
+
+&goals:cornerstones ⌇⡘⠍⠶⡠
+  "Modern the most widely adopted file manager ever (like vim and emacs)"
+    [_] TODO: make motto and enumerate cornerstones based on Social Architecture
+      [⡤⣳⠴⢦] &mission Manipulate list-based interface to everything [in the IT universe]
+  * cornerstone of structured list manipulation (in contrast to vim/emacs raw text buffer manipulation)
+  * embedded workflows for anybody (as first-rate citizens)
+  * semantic web navigation (generalized concept of filesystem tree hierarchy)
+  * self-reflections (observe and manipulate inner data in same way as other data)
+  * graph of plugins compositions and overrides
+  * self-discovery and personalized suggestion of features (?also machine learning?)
+  * offline/privacy audit log monitoring for user's self-reflections
+  + back-feeding commands outputs
+
+
+&motto ⌇⡦⡋⣑⣳
+  SUMMARY: Modern [re]Invented Unified navigatoR
+  - "Everything is a list"
+  - "Anything can be interpreted as Entity"
+  - "Making choices is a function"  [delegated to you by the program]
+  - "Embrace cognitive constrains"
+  - "All workflows in one library"

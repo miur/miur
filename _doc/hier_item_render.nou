@@ -1,0 +1,41 @@
+⌇⡢⠸⢖⢂ ARCH: manner + trait + arrangement + emphasis
+
+item_layout_class::
+  word   # NICE: we can approx other widgets types if we have graph/tree navi
+  props  # like !tree keyvals
+  line
+  multicell
+  multiline
+  table
+  board
+  image   # tile for e.g. grid gallery preview
+  widget  # interactive item with visual feedback
+
+ifc_distinction_class::
+  regular
+  marginal  # around border
+  vicinity  # to cursor
+  cursor
+  selection
+  tagged
+  hovered
+  filtered  # by regex
+
+spatial_view_class::
+  atom      # dashboard
+  list
+  listprop  # like tree but single level keyvals
+  grid
+  fillcols
+  fillrows
+  tree
+  collage   # =fillgrid -- like image gallery
+
+datatype_class::
+  generic   # list all props as keyvals
+  filelike
+  pkgpacman
+  plaintext
+  audiofile # e.g. draw waveform
+  msgstream # e.g. weechat
+  widget    # show sliders,buttons,switches -- as filesystem list
