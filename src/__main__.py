@@ -8,12 +8,39 @@
 #     e.g. set flags=noninteractive (to exit fast) and then exec(cmdline)
 #   [_] ALSO: directly run Jupyther kernel and console by sourcing from inside my code
 #     /d/coastline/fleur/cfg/gdb-jupyter.py
+# %SUMMARY: frontend
+# %USAGE: $ mi || miur || . =mi
+"""":
+this=$(realpath -e "${BASH_SOURCE[0]:-$0}")
+if (return 0 2>/dev/null); then
+    # alias mi="$this"
+    alias mi.pkg="${this%/*/*}/pkg/PKGBUILD.dev"
+    alias mi.impt="python -SIB -Ximporttime -- '$this'"
+    alias mi.prof="python -SIB -m cProfile -s cumulative -- '$this'"
+
+    alias ml='miur -a'
+    alias mK='miur -K'
+    alias mI='miur -I'
+
+    if [[ ${ZSH_NAME:+x} ]]; then
+        alias -g M='|miur'
+    fi
+    unset this
+    return 0
+fi
+set -o errexit -o errtrace -o noclobber -o noglob -o nounset -o pipefail
+# exec "$@"
+echo "ERR: '$0' is not supposed to be run by $SHELL"
+exit -2
+"""
 
 
 import sys
 
 
 def select_entrypoint():  # type:ignore[no-untyped-def]
+    # argv = sys.argv[1:sys.argv.index('--')] if '--' in sys.argv else sys.argv[1:]
+    # sys.dont_write_bytecode = '-c' in argv or '--clean' in argv
     argv = sys.argv
     # PERF: faster startup w/o importing ArgumentParser (128ms vs 115ms)
     if len(argv) == 1 or (len(argv) > 1 and argv[1] == "--"):
