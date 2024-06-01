@@ -1,9 +1,12 @@
 #
-# SPDX-FileCopyrightText: 2020 Dmytro Kolomoiets <amerlyq@gmail.com> and contributors.
+# SPDX-FileCopyrightText: 2024 Dmytro Kolomoiets <amerlyq+code@gmail.com> and contributors.
 #
 # SPDX-License-Identifier: CC0-1.0
 #
 
 ## Ignore results for grep/ag/etc.
 /.git/
-/OLD/
+/.reuse/
+/_try/
+/LICENSES/
+/pkg/

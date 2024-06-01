@@ -1,0 +1,74 @@
+# vim:ft=dosini:cms=#\ %s
+#%NEW: $ pylint --generate-rcfile > .pylintrc
+# REF: http://pylint.pycqa.org/en/latest/technical_reference/features.html#format-checker-options
+[MASTER]
+
+# extension-pkg-allow-list=curses
+jobs=0
+load-plugins=
+
+# ALSO:
+# python - Ignore by directory using Pylint - Stack Overflow ⌇⡡⡚⣅⡆
+#   https://stackoverflow.com/questions/2503717/ignore-by-directory-using-pylint/52123522#52123522
+ignore=_try
+
+
+[MESSAGES CONTROL]
+# OR= C0103,C0111,W0511
+disable=consider-using-f-string,
+        missing-module-docstring,
+        missing-class-docstring,
+        missing-function-docstring,
+        import-outside-toplevel,
+        too-few-public-methods,
+        invalid-name,
+        # wrong-spelling-in-comment
+
+
+[FORMAT]
+
+expected-line-ending-format=LF
+
+# Regexp for a line that is allowed to be longer than the limit.
+# SEE: https://github.com/PyCQA/pylint/issues/2178
+ignore-long-lines = ^\s*(#.*\s+)?https?://\S+$
+
+# NOTE: "!black" needs 88, but we want to allow long comments
+max-line-length = 112
+
+## USE: inof C0103
+# good-names=i,j,k,ex,Run,_,pk,x,y
+# good-names-rgxs = ^[_a-z][_a-z0-9]?$
+good-names-rgxs = ^[a-z][a-z0-9]?$
+
+
+[MISCELLANEOUS]
+## USE: inof W0511
+# NOTE: enable only during clean-up, LSP being very intrusive and distracting
+# notes=FIX,BAD,TODO
+notes=WTF,BUG,REGR,FAIL,ERR,FIXME,CHECK,&next
+
+
+# [SPELLING]
+# SRC: https://stackoverflow.com/questions/27162315/automated-docstring-and-comments-spell-check
+# DEP: 'python-pyenchant'
+# spelling-dict = en_US
+
+
+[TYPECHECK]
+
+# List of members which are set dynamically and missed by pylint inference
+# system, and so shouldn't trigger E1101 when accessed. Python regular
+# expressions are accepted.
+# FAIL: still does not support '(?:...)' groups
+#   https://github.com/PyCQA/pylint/issues/1167
+# generated-members = fmt\.R[a-z]+
+
+# OLD: generated-members = '(unyt|U)\..+'
+# ignored-modules = unyt
+
+
+[DESIGN]
+
+# Maximum number of arguments for function / method.
+# max-args=6
