@@ -38,7 +38,7 @@ def as_pkg_or_exe(mkrun):  # type:ignore[no-untyped-def]
     if sys.path and sys.path[0][0] == "/":
         # FAIL: we use symlink
         # parent = __file__.rsplit('/')[0]
-        parent = "/d/just"
+        parent = "/d/miur"
     else:
         # OR: fs = __import__("os.path", fromlist=[""])
         import os.path as fs
@@ -50,7 +50,7 @@ def as_pkg_or_exe(mkrun):  # type:ignore[no-untyped-def]
     ## OR:BET? main = __import__("importlib").import_module(".cli", package="miur").main
     # pylint:disable=global-statement,redefined-builtin
     global __package__
-    __package__ = "miur"
+    __package__ = "src"
     try:
         return mkrun()
     finally:

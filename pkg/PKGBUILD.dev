@@ -1,0 +1,62 @@
+#!/usr/bin/env -S makepkg --cleanbuild --syncdeps --noextract --force --install --clean PKGDEST=/t BUILDDIR=/t -p
+# vim:ft=sh
+#
+# SPDX-FileCopyrightText: 2024 Dmytro Kolomoiets <amerlyq+code@gmail.com>
+#
+# SPDX-License-Identifier: MIT
+#
+# Maintainer: Dmytro Kolomoiets <amerlyq+code@gmail.com>
+#
+#%USAGE: $ makepkg --syncdeps --clean --install --force
+#%
+# shellcheck shell=bash disable=SC2034,SC2154
+pkgname=miur-dev
+pkgver=42.1.3
+pkgrel=1
+pkgdesc='Modern reInvented Unified navigatoR'
+url='https://github.com/miur/miur/'
+license=('GPL-3.0-only' 'CC0-1.0' 'CC-BY-SA-4.0')
+arch=('any')
+provides=('miur')
+conflicts=('miur')
+
+depends=(
+  jupyter_console
+  python-black
+  python-isort
+  python-pylint
+  mypy
+  # NEED: sudo pip install autoimport
+  # flake8
+  # python-flake8-black
+  # python-flake8-docstrings
+  # python-flake8-isort
+  # python-flake8-typing-imports
+  # python-pytest-flake8
+)
+
+optdepends=(
+)
+
+package() {
+  local pkgname=${pkgname%-dev}
+  local pkgabbr=${pkgname:0:2}
+  local d_pj=${startdir%/*}
+  local prefix=$pkgdir/usr/local
+  local bindir=$prefix/bin
+  local datadir=$prefix/share
+
+  echo "DEBUG: PWD=$PWD sd=$startdir nm=$pkgname"
+
+  # NOTE: try substitute paths by generalized short name
+  local d_at=/d && [[ $d_pj -ef $d_at/$pkgname ]] && d_pj=$d_at/$pkgname
+  local d_src=$d_pj/src
+
+  install -d "$bindir"
+  ln -svfT "$d_src/__main__.py" "$bindir/$pkgname"
+  ln -svfPT "$pkgname" "$bindir/$pkgabbr"
+
+  site=$pkgdir/$(python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"][1:])')
+  install -d "$site"
+  ln -svfT "$d_src" "$site/$pkgname"
+}

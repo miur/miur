@@ -1,0 +1,47 @@
+# vim:ft=sh
+#
+# SPDX-FileCopyrightText: 2024 Dmytro Kolomoiets <amerlyq+code@gmail.com>
+#
+# SPDX-License-Identifier: MIT
+#
+# Maintainer: Dmytro Kolomoiets <amerlyq+code@gmail.com>
+#
+# shellcheck shell=bash disable=SC2034,SC2154
+# FIXME: reuse info from setuptool
+pkgname=miur
+pkgver=42.1.3
+pkgrel=1
+pkgdesc='Modern reInvented Unified navigatoR'
+url='https://github.com/miur/miur/'
+license=('GPL-3.0-only' 'CC0-1.0' 'CC-BY-SA-4.0')
+arch=('any')
+
+depends=(
+)
+
+optdepends=(
+)
+
+package() {
+  local d_pj=${startdir%/*}
+  local prefix=$pkgdir/usr
+  local bindir=$prefix/bin
+  local datadir=$prefix/share
+
+  local d_src=$d_pj/src
+  install -d "$bindir"
+  # FIXME: proper wrapper
+  ln -svfT "$d_src/__main__.py" "$bindir/$pkgname"
+  # FIXME: print recommended aliases message
+  # ln -svfPT "$pkgname" "$bindir/$pkgabbr"
+
+  site=$pkgdir/$(python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"][1:])')
+  install -d "$site"
+  # FIXME: copy by guidelines
+  ln -svfT "$d_src" "$site/$pkgname"
+
+  for lic in "${license[@]}"; do
+    install -Dm644 -t "$datadir/licenses/$pkgname" -- "$d_pj/LICENSES/${lic}.txt"
+  done
+  install -Dm644 -t "$datadir/doc/$pkgname" -- "$d_pj/README.nou"
+}
