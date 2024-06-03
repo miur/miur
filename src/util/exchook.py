@@ -7,6 +7,34 @@ from typing import Any, Callable, Iterator, Type
 from .logger import log
 
 
+@contextmanager
+def enable_warnings(error: bool = True) -> Iterator[None]:
+    if sys.warnoptions:
+        return
+
+    import warnings
+
+    # DEBUG: ResourceWarning(asyncio), DeprecationWarning(ipython), etc.
+    if not error:
+        warnings.simplefilter("always")  # OR="default" to print 1st only
+        return
+
+    # SRC: https://stackoverflow.com/questions/22373927/get-traceback-of-warnings
+    # def warn_with_traceback(message, category, filename, lineno, file=None, line=None):
+    #     log = file if hasattr(file,'write') else sys.stderr
+    #     traceback.print_stack(file=log)
+    #     log.write(warnings.formatwarning(message, category, filename, lineno, line))
+    # warnings.showwarning = warn_with_traceback
+
+    warnings.filterwarnings("error")  # Treat warnings as errors
+    try:
+        yield
+    # except Warning:
+    #     log.warning(traceback.format_exc())  # print traceback
+    finally:
+        warnings.resetwarnings()  # Back to default behavior
+
+
 def exception_handler(
     etype: Type[BaseException],
     value: BaseException,

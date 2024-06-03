@@ -12,12 +12,16 @@
 # %USAGE: $ mi || miur || . =mi
 """":
 this=$(realpath -e "${BASH_SOURCE[0]:-$0}")
+[[ ${this%/*/*} -ef /d/miur ]] && this=/d/miur/${this#${this%/*/*}/}
 if (return 0 2>/dev/null); then
-    # alias mi="$this"
-    alias mi.pkg="${this%/*/*}/pkg/PKGBUILD.dev"
-    alias mi.impt="python -SIB -Ximporttime -- '$this'"
-    alias mi.prof="python -SIB -m cProfile -s cumulative -- '$this'"
+    _ps4=$PS4 && PS4=' ' && set -x
 
+    alias miur.pkg="${this%/*/*}/pkg/PKGBUILD.dev"
+    alias miur.impt="python -SIB -Ximporttime -- $this"
+    alias miur.prof="python -SIB -m cProfile -s cumulative -- $this"
+
+    # alias mi="$this"
+    alias ma='miur -a'
     alias ml='miur -a'
     alias mK='miur -K'
     alias mI='miur -I'
@@ -25,7 +29,9 @@ if (return 0 2>/dev/null); then
     if [[ ${ZSH_NAME:+x} ]]; then
         alias -g M='|miur'
     fi
-    unset this
+
+    set +x && PS4=$_ps4
+    unset this _ps4
     return 0
 fi
 set -o errexit -o errtrace -o noclobber -o noglob -o nounset -o pipefail

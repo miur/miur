@@ -55,7 +55,7 @@ def miur_argparse(argv: list[str]) -> None:
     #    os re sys tokenize token types functools builtins keyword operator collections
     from inspect import get_annotations
 
-    from .app import g
+    from .app import g_app as g
     from .miur import miur_frontend
 
     # MAYBE:TODO: different actions based on appname=argv[0]

@@ -14,7 +14,7 @@ class AppOptions:
     # USAGE: time mi --backend=asyncio
     PROFILE_STARTUP = False  # =DEBUG
     ####
-    bare: bool = False
+    bare: bool = True
     ipykernel: bool = False
     ipyconsole: bool = False
     color: bool | None
@@ -25,8 +25,8 @@ class AppOptions:
 
 
 class AppIO:
-    redirin: TextIO | None = None
-    redirout: TextIO | None = None
+    pipein: TextIO | None = None
+    pipeout: TextIO | None = None
     ttyin: TextIO | None = None  # !fd=0
     ttyout: TextIO | None = None  # !fd=1
     mixedout: TextIO | None = None  # -> ttyout
@@ -46,4 +46,5 @@ class AppGlobals:
     opts = AppOptions()
 
 
-g = g_app = AppGlobals()
+g_app = AppGlobals()
+# g = g_app

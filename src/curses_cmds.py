@@ -28,52 +28,6 @@ def resize(g: AppGlobals) -> None:
     g.stdscr.refresh()
 
 
-_primary = None
-
-
-def asyncio_primary_out(g: AppGlobals, coro: Any) -> None:
-    global _primary  # pylint:disable=global-statement
-
-    if _primary:
-        raise RuntimeError("BUG: primary TTY app is already set")
-
-    stdscr: C.window = g.stdscr
-
-    import asyncio
-    import signal
-
-    loop = asyncio.get_running_loop()
-    loop.remove_reader(fd=CE.CURSES_STDIN_FD)
-    loop.remove_signal_handler(signal.SIGWINCH)
-
-    def _cb(fut: asyncio.Future[int]) -> None:
-        try:
-            sfx = " (shell_out)"
-            if fut.cancelled():
-                log.warning("cancelled" + sfx)
-            elif exc := fut.exception():
-                exc.add_note(sfx)
-                from .util.exchook import exception_handler
-
-                exception_handler(type(exc), exc, exc.__traceback__)
-                C.flash()
-            else:
-                log.info(f"rc={fut.result()}{sfx}")
-
-            C.flushinp()
-        finally:
-            loop = asyncio.get_running_loop()
-            loop.add_signal_handler(signal.SIGWINCH, stdscr.refresh)
-            loop.add_reader(CE.CURSES_STDIN_FD, handle_input, g)
-            _primary = None
-
-    # MAYBE: do it immediately before launching SHELL itself
-    #   (otherwise #miur may sleep in-between and still leak some input to SHELL)
-    C.flushinp()
-    _primary = asyncio.create_task(coro)
-    _primary.add_done_callback(_cb)
-
-
 def shell_out(g: AppGlobals) -> None:
     asyncio_primary_out(g, CE.shell_async(g.stdscr))
 
