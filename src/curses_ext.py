@@ -5,9 +5,26 @@ from contextlib import contextmanager
 # WARN:PERF: somehow doing import here is 2ms faster, than moving into func-local stmt
 from subprocess import CompletedProcess, run
 from threading import BoundedSemaphore
-from typing import Any, AnyStr, Callable, Iterator, Sequence, TextIO
+from typing import Any, AnyStr, Callable, Iterator, Sequence
 
 import _curses as C
+
+
+# TEMP?HACK: dump logs to altscreen
+def dump_logbuf_to_tty() -> None:
+    from .app import g_app
+
+    assert g_app.io.ttyout, "TEMP: Should always exist"
+
+    if (alt := g_app.io.ttyalt) and (tout := g_app.io.ttyout):
+        # BET? shutil.copyfileobj(alt, tout)
+        #   SRC: https://stackoverflow.com/questions/3253258/what-is-the-best-way-to-write-the-contents-of-a-stringio-to-a-file
+        if buf := alt.getvalue():
+            tout.write(buf)
+            tout.flush()
+            # PERF:BET? creating a new one instead of reusing a blank one is 11% faster
+            #   SRC: https://stackoverflow.com/questions/4330812/how-do-i-clear-a-stringio-object
+            alt.truncate(0)
 
 
 ## ALT: C.wrapper(drawloop: Callable[[C.window], None])
@@ -38,27 +55,11 @@ def curses_stdscr() -> Iterator[C.window]:
             C.endwin()  # CHECK: is it safe to deinit libncurses multiple times in Jupyter?
         finally:
             pass
+        # TEMP:HACK: dump logs on app exit
+        #   BAD? probably doesn't belong here, but whatever
+        dump_logbuf_to_tty()
 
 
-## FAIL: clears bkgr, moves cursor, +/- doesn't show old buffer
-# clear = "\033[H"
-# mainscr = "\033[?1049l"
-# altscr = "\033[?1049h"
-# print(mainscr + "mylogline" + altscr, end="", file=__import__("sys").stderr)
-## ALT:
-# tput = lambda s: tui.otty.write(C.tigetstr(s).decode(tui.otty.encoding))
-# tput("rmcup")
-# print(C.LINES)
-# tput("smcup")
-# @contextmanager
-# def curses_altscreen(stdscr: C.window) -> Iterator[None]:
-#     """NICE: redirect all logs to primary altscreen"""
-#     C.def_prog_mode()  # save current tty modes
-#     C.endwin()  # restore original tty modes
-#     try:
-#         yield
-#     finally:
-#         stdscr.refresh()  # restore save modes, repaint screen
 class curses_altscreen:
     # FIXME! we should control not altscreen, but exclusive access to TTY
     _sema1 = BoundedSemaphore(value=1)
@@ -78,6 +79,7 @@ class curses_altscreen:
             raise RuntimeError("BUG: altscreen is already switched out")
         C.def_prog_mode()  # save current tty modes
         C.endwin()  # restore original tty modes
+        dump_logbuf_to_tty()
 
     # def __exit__(self,
     #   exc_type: Optional[Type[BaseException]],
@@ -93,23 +95,6 @@ class curses_altscreen:
         self._sema1.release()
 
 
-@contextmanager
-def stdio_to_altscreen(stdscr: C.window, ttyio: TextIO) -> Iterator[None]:
-    oldwrite = ttyio.write
-
-    # WARN:PERF: switching back-n-forth this way -- takes 0.5ms on each logline
-    # ALT:HACK: fflush=oldw.__self__.flush
-    def _write(s: AnyStr) -> int:
-        with curses_altscreen(stdscr, fflush=ttyio.flush):
-            return oldwrite(s)
-
-    ttyio.write = _write  # type:ignore[assignment]
-    try:
-        yield
-    finally:
-        ttyio.write = oldwrite  # type:ignore[method-assign]
-
-
 def shell_out(
     stdscr: C.window, cmdv: Sequence[str] = (), **envkw: str
 ) -> CompletedProcess[str]:
@@ -122,6 +107,7 @@ def shell_out(
         #     pssmem = sum(int(l.split()[1]) for l in f.readlines() if l.startswith("Pss:"))
         #     print(pssmem)
         # NOTE: we shouldn't crash on ZSH (or whatever) returning "exitcode=1"
+        # [_] TODO: ..., stdin=g_app.io.ttyin, stdout=g_app.io.ttyout, stderr=(g_app.io.pipeerr or g_app.io.ttyalt))
         return run(cmdv, env=envp, check=False, text=True)
 
 
@@ -136,6 +122,7 @@ async def shell_async(stdscr: C.window, cmdv: Sequence[str] = (), **envkw: str) 
         import asyncio
 
         # SRC: https://docs.python.org/3/library/asyncio-subprocess.html#examples
+        # [_] TODO: ..., stdin=g_app.io.ttyin, stdout=g_app.io.ttyout, stderr=(g_app.io.pipeerr or g_app.io.ttyalt))
         proc = await asyncio.create_subprocess_exec(*cmdv, env=envp)
         rc = await proc.wait()
         assert rc == 0, proc

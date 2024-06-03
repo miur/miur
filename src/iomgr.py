@@ -2,7 +2,6 @@ import os
 import sys
 
 if globals().get("TYPE_CHECKING"):
-    from io import TextIOWrapper
     from typing import Final, TextIO  # , BinaryIO
 
     from .app import AppGlobals
@@ -83,21 +82,41 @@ def init_explicit_io(g: "AppGlobals") -> None:
         if cerr.isatty():
             io.pipeerr = None
             # FIXME? open os.pipe to cvt libc.stderr into py.log inof spitting over TTY
-            io.ttyin = cerr
+            #   FAIL: !deadlock! if underlying native C code fills os.pipe internal buffers
+            io.ttyalt = __import__("io").StringIO()
         else:
             io.pipeerr = dup_and_close_stdio(cerr)
+            io.ttyalt = None
 
     _scope_in(sys.stdin, CURSES_STDIN_FD)
     _scope_out(sys.stdout, CURSES_STDOUT_FD)
     _scope_err(sys.stderr, CURSES_STDERR_FD)
 
-
-    # io.mixedout =
-
     ## WARN: logs in ringbuffer should be kept as-is (as `Events)
     ##   >> they shouldn't be rasterized until you know if DST is plain text, or json, or whatever
-    # io.logsout =
-    #   e.g. log.write = sys.stdout.write  # TBD? restore back on scope ?
+
+    # TBD! only go through ttyalt if using curses (or interactive TTY cli)
+    if o := g.opts.logredir:
+        # TBD? close on exit to avoid `ResourceWarning
+        if isinstance(o, int):
+            io.logsout = os.fdopen(o, "w", encoding="locale")
+        elif isinstance(o, str):
+            # ALSO:DEV: generic support for other redir schemas
+            #   TODO: ... | file:///path/to/log?mode=a+&buffering=1 | (fifo|socket)://...
+            #   DFL=ringbuf
+            #   ALSO: null / disable -- optimize code
+            io.logsout = open(o, "w", encoding="locale")
+        else:
+            raise NotImplementedError
+    else:
+        if io.ttyalt is None:
+            io.ttyalt = __import__("io").StringIO()
+        io.logsout = io.ttyalt  # BAD: possible double-close for same FD
+
+        from .util.logger import log
+
+        # [_] CHECK:WTF:BUG: why logs are printed on TTY even after previous sys.stdout.close()
+        log.write = io.logsout.write  # TBD? restore back on scope ?
 
     # [_] FIXME: add hooks individually
     # BAD: { mi | cat } won't enable altscreen, and !cat will spit all over TTY

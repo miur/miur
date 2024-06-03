@@ -2,13 +2,15 @@
 #   NOTE: native "from io import TextIOWrapper" is much faster
 if globals().get("TYPE_CHECKING"):
     from types import ModuleType
-    from typing import TextIO
+    from typing import Optional, Union, TextIO
+    from io import StringIO
 
     import _curses as C
 
 
 # BET: don't reassing cmdline opts -- treat them as Final, and SEP from active "AppState"
 #   e.g. use typing.NamedTuple -- and assign all options at once BUT:BAD: still need DFL
+# [_] TODO? allow dict['some-opt'] to access non-keyword cmdline-compatible options
 # termcolor = sys.stdout.isatty()
 class AppOptions:
     # USAGE: time mi --backend=asyncio
@@ -17,7 +19,10 @@ class AppOptions:
     bare: bool = True
     ipykernel: bool = False
     ipyconsole: bool = False
+    ####
     color: bool | None
+    # VIZ(logredir): altscreen | fd=3 | ./log | file:///path/to/log:buffering=1 | (fifo|socket)://...
+    logredir: int | str | None = None
     ####
     cwd: str
     ####
@@ -26,13 +31,13 @@ class AppOptions:
 
 # ATT: use these FD explicitly: don't ever use "sys.std{in,out,err}"
 class AppIO:
-    pipein: "TextIO | None" = None
-    pipeout: "TextIO | None" = None
-    pipeerr: "TextIO | None" = None
-    ttyin: "TextIO | None" = None  # !fd=0
-    ttyout: "TextIO | None" = None  # !fd=1
-    mixedout: "TextIO | None" = None  # -> ttyout
-    logsout: "TextIO | None" = None  # -> mixedout
+    pipein: "Optional[TextIO]" = None
+    pipeout: "Optional[TextIO]" = None
+    pipeerr: "Optional[TextIO]" = None
+    ttyin: "Optional[TextIO]" = None  # !fd=0
+    ttyout: "Optional[TextIO]" = None  # !fd=1
+    ttyalt: "Optional[StringIO]" = None  # -> ttyout
+    logsout: "Optional[Union[StringIO,TextIO]]" = None  # -> ttyalt | pipeerr
 
 
 # class AppState:
