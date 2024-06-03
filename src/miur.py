@@ -2,6 +2,7 @@ import sys
 from contextlib import ExitStack
 
 from . import curses_ext as CE
+from . import iomgr
 from .app import AppGlobals
 from .util.envlevel import increment_envlevel
 from .util.exchook import enable_warnings, log_excepthook
@@ -32,40 +33,8 @@ def miur_main(g: AppGlobals | None = None) -> None:
         do(temp_pidfile(pidfile_path()))
         do(log_excepthook())
 
-        # g.io.pipein =
-        # g.io.pipeout =
-        # g.io.ttyin =
-        # g.io.ttyout =
-        # g.io.mixedout =
-        # g.io.logsout =
-
-        # NOTE: this redirection is needed not unconditionally, but only if we use curses
-        ## TEMP:DISABLED: due to kernel.outstream_class "echo"
-        ##   NEED: use separate explicit FD for explicit PIPE -- to prevent their redir by Jupyter
-        for nm in "stdin stdout stderr".split():
-            if not getattr(sys, nm).isatty():
-                # TBD: open os.pipe to cvt libc.stderr into py.log inof spitting over TTY
-                do(CE.redir_stdio_nm(nm))
-                if nm == "stdout":
-                    # NOTE: refresh closed FD
-                    #   TBD: restore back on scope
-                    log.write = sys.stdout.write
-
+        iomgr.init_explicit_io(g)
         g.stdscr = do(CE.curses_stdscr())
-
-        # [_] FIXME: add hooks individually
-        # BAD: { mi | cat } won't enable altscreen, and !cat will spit all over TTY
-        #   ALSO: even if it's not !cat, pipeline still may eventually print something to TTY
-        #   WKRND: always use altscreen unless redir to file/socket (until PERF measurements)
-        #     BAD it won't help if other app produces output at different timings
-        ## TEMP:DISABLED: due to kernel.outstream_class "echo"
-        ##   TRY: wrap only "echo" __std*__.write
-        import os
-        import stat
-
-        for ttyio in (sys.stdout, sys.stderr):
-            if ttyio.isatty() or os.fstat(ttyio.fileno()).st_mode & stat.S_IFIFO:
-                do(CE.stdio_to_altscreen(g.stdscr, ttyio))
 
         if g.opts.bare:  # NOTE: much faster startup w/o asyncio machinery
             from .curses_cmds import g_input_handlers

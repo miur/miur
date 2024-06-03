@@ -1,8 +1,8 @@
-# PERF:(imports): abc collections copyreg contextlib functools operator re sys types warnings _typing
-from typing import TYPE_CHECKING, TextIO
-
-if TYPE_CHECKING:
+# PERF:(typing): abc collections copyreg contextlib functools operator re sys types warnings _typing
+#   NOTE: native "from io import TextIOWrapper" is much faster
+if globals().get("TYPE_CHECKING"):
     from types import ModuleType
+    from typing import TextIO
 
     import _curses as C
 
@@ -24,13 +24,15 @@ class AppOptions:
     signal: int | None
 
 
+# ATT: use these FD explicitly: don't ever use "sys.std{in,out,err}"
 class AppIO:
-    pipein: TextIO | None = None
-    pipeout: TextIO | None = None
-    ttyin: TextIO | None = None  # !fd=0
-    ttyout: TextIO | None = None  # !fd=1
-    mixedout: TextIO | None = None  # -> ttyout
-    logsout: TextIO | None = None  # -> mixedout
+    pipein: "TextIO | None" = None
+    pipeout: "TextIO | None" = None
+    pipeerr: "TextIO | None" = None
+    ttyin: "TextIO | None" = None  # !fd=0
+    ttyout: "TextIO | None" = None  # !fd=1
+    mixedout: "TextIO | None" = None  # -> ttyout
+    logsout: "TextIO | None" = None  # -> mixedout
 
 
 # class AppState:
