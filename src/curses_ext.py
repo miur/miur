@@ -5,7 +5,7 @@ from contextlib import contextmanager
 # WARN:PERF: somehow doing import here is 2ms faster, than moving into func-local stmt
 from subprocess import CompletedProcess, run
 from threading import BoundedSemaphore
-from typing import Any, AnyStr, Callable, Iterator, Sequence
+from typing import Any, Callable, Iterator, Sequence
 
 import _curses as C
 
@@ -54,10 +54,9 @@ def curses_stdscr() -> Iterator[C.window]:
             C.nocbreak()
             C.endwin()  # CHECK: is it safe to deinit libncurses multiple times in Jupyter?
         finally:
-            pass
-        # TEMP:HACK: dump logs on app exit
-        #   BAD? probably doesn't belong here, but whatever
-        dump_logbuf_to_tty()
+            # TEMP:HACK: dump logs on app exit
+            #   BAD? probably doesn't belong here, but whatever
+            dump_logbuf_to_tty()
 
 
 class curses_altscreen:

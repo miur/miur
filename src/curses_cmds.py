@@ -4,6 +4,7 @@ import _curses as C
 
 from . import curses_ext as CE
 from .app import AppGlobals
+from .loop_asyncio import asyncio_primary_out
 from .util.logger import log
 
 # def raise_(exc: BaseException) -> None:

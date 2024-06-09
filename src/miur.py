@@ -3,7 +3,7 @@ from contextlib import ExitStack
 
 from . import curses_ext as CE
 from . import iomgr
-from .app import AppGlobals
+from .app import AppCursesUI, AppGlobals
 from .util.envlevel import increment_envlevel
 from .util.exchook import enable_warnings, log_excepthook
 from .util.logger import log
@@ -35,6 +35,13 @@ def miur_main(g: AppGlobals | None = None) -> None:
 
         iomgr.init_explicit_io(g)
         g.stdscr = do(CE.curses_stdscr())
+
+        from .curses_cmds import handle_input, resize
+
+        ui = AppCursesUI()
+        ui.resize = lambda: resize(g)
+        ui.handle_input = lambda: handle_input(g)
+        g.curses_ui = ui
 
         if g.opts.bare:  # NOTE: much faster startup w/o asyncio machinery
             from .curses_cmds import g_input_handlers

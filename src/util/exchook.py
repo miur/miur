@@ -1,14 +1,15 @@
-import os
 import sys
 from contextlib import contextmanager
-from types import TracebackType
-from typing import Any, Callable, Iterator, Type
 
 from .logger import log
 
+if globals().get("TYPE_CHECKING"):
+    from types import TracebackType
+    from typing import Any, Callable, Iterator, Optional, Type
+
 
 @contextmanager
-def enable_warnings(error: bool = True) -> Iterator[None]:
+def enable_warnings(error: bool = True) -> "Iterator[None]":
     if sys.warnoptions:
         return
 
@@ -36,39 +37,55 @@ def enable_warnings(error: bool = True) -> Iterator[None]:
 
 
 def exception_handler(
-    etype: Type[BaseException],
-    value: BaseException,
-    tb: TracebackType | None,
-) -> Any:
-    ## WTF: I already did that in wrapper().finally, why it has no effect ?
-    # C.endwin()
+    _etype: "Type[BaseException]",
+    value: "BaseException",
+    _tb: "Optional[TracebackType]",
+) -> "Any":
+    # pylint:disable=import-outside-toplevel
+    import traceback as TR
+    from os import linesep as NL
+
+    # TEMP: verify everything we have is actually printed with backtrace
+    log.error("<Exception>")
+    if hasattr(value, "__notes__"):
+        log.error("+__notes__+")
+    if value.__cause__:
+        log.error("+__cause__+")
+
     msg = (str(value.args[0]) if value.args else "") + "".join(
-        f"{os.linesep}  \\ {k} = {v}" for k, v in vars(value).items()
+        f"{NL}  \\ {k} = {v}" for k, v in vars(value).items()
     )
     value.args = (msg, *value.args[1:])
 
-    _orig_write = log.write
-    log.config(write=sys.stderr.write)
+    # MAYBE: write unconditionally to tty/stderr
+    # _orig_write = log.write
+    # log.config(write=g.io.ttyout.write)
     try:
-        # pylint:disable=import-outside-toplevel
-        import traceback as TR
+        log.error("".join(TR.format_exception(value, chain=True)))
+        ## ALT
+        # err = "".join(TR.format_exception_only(_etype, value)).rstrip()
+        # ## DISABLED: it seems they are already appended ?
+        # # if value.__notes__:
+        # #     err += "".join(NL + "  \\ " + note for note in value.__notes__)
+        # log.error(err)
+        # # OR: (fr.* for fr in __import__("traceback").extract_tb(tb))
+        # due = value
+        # while due:
+        #     tb = TR.extract_tb(due.__traceback__)
+        #     bt = "".join(TR.format_tb(tb)).rstrip().replace(NL, NL + "\\")
+        #     log.info("Traceback (most recent call last):" + NL + "\\" + bt)
+        #     due = due.__cause__
 
-        # OR: (fr.* for fr in __import__("traceback").extract_tb(tb))
-        bt = "".join(TR.format_tb(tb)).rstrip().replace(os.linesep, os.linesep + "\\")
-        log.info("Traceback (most recent call last):" + os.linesep + "\\" + bt)
-        err = "".join(TR.format_exception_only(etype, value)).rstrip()
-        ## DISABLED: it seems they are already appended ?
-        # if value.__notes__:
-        #     err += "".join(os.linesep + "  \\ " + note for note in value.__notes__)
-        log.error(err)
+        ## ALSO:MAYBE:
         # _orig_excepthook(etype, value, tb)  # OR: sys.__excepthook__(...)
     finally:
-        log.config(write=_orig_write)
+        # log.config(write=_orig_write)
+        log.error("</Exception>")  # TEMP
 
 
 @contextmanager
 def log_excepthook() -> (
-    Iterator[Callable[[Type[BaseException], BaseException, TracebackType], Any]]
+    "Iterator[Callable[[Type[BaseException], BaseException, TracebackType], Any]]"
 ):
     _orig_excepthook = sys.excepthook
     try:

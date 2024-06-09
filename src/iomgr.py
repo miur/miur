@@ -96,6 +96,7 @@ def init_explicit_io(g: "AppGlobals") -> None:
     ##   >> they shouldn't be rasterized until you know if DST is plain text, or json, or whatever
 
     # TBD! only go through ttyalt if using curses (or interactive TTY cli)
+    #   THINK:MAYBE: write W/E into stderr if it's redirected ? OR: all logs there ?
     if o := g.opts.logredir:
         # TBD? close on exit to avoid `ResourceWarning
         if isinstance(o, int):
@@ -105,6 +106,7 @@ def init_explicit_io(g: "AppGlobals") -> None:
             #   TODO: ... | file:///path/to/log?mode=a+&buffering=1 | (fifo|socket)://...
             #   DFL=ringbuf
             #   ALSO: null / disable -- optimize code
+            # pylint:disable=consider-using-with
             io.logsout = open(o, "w", encoding="locale")
         else:
             raise NotImplementedError

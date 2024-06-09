@@ -5,7 +5,6 @@ from typing import Any, Iterator, cast
 
 from . import iomgr
 from .app import AppGlobals
-from .curses_cmds import handle_input
 from .util.exchook import exception_handler
 from .util.logger import log
 
@@ -21,6 +20,8 @@ def my_asyncio_loop(debug: bool = True) -> Iterator[asyncio.AbstractEventLoop]:
         exc = cast(Exception, context.get("exception"))
         exception_handler(type(exc), exc, exc.__traceback__)
         # print(context)
+        # FIXME: don't cancel "shutdown" task
+        #   BET: gather results of the rest of cancelled tasks, and then set shutdown event
         for t in asyncio.all_tasks():
             t.cancel()
         # loop.stop()
@@ -38,6 +39,7 @@ def my_asyncio_loop(debug: bool = True) -> Iterator[asyncio.AbstractEventLoop]:
     myloop = asyncio.new_event_loop()
 
     myloop.set_debug(debug)
+    # myloop.slow_callback_duration = 0.1
     ## BUG: overwrites Jupyter defaults and extends Application GC lifetime
     ## FAIL: is not triggered if taskref was stored to variable [outside the loop]
     myloop.set_exception_handler(_custom_exception_handler)
@@ -45,19 +47,20 @@ def my_asyncio_loop(debug: bool = True) -> Iterator[asyncio.AbstractEventLoop]:
     try:
         yield myloop
     finally:
+        log.trace("setting... loop=None")
         asyncio.set_event_loop(None)
 
 
 async def mainloop_asyncio(g: AppGlobals) -> None:
-    g.stdscr.refresh()  # CHG:> app.refresh
+    g.curses_ui.resize()
 
     loop = asyncio.get_running_loop()
     # FAIL: RuntimeError: Event loop stopped before Future completed.
     ev_shutdown = asyncio.Event()
     loop.add_signal_handler(signal.SIGINT, ev_shutdown.set)
     # FIND:MAYBE: don't process in handler directly, and only schedule callback ?
-    loop.add_signal_handler(signal.SIGWINCH, g.stdscr.refresh)  # CHG:> app.refresh
-    loop.add_reader(iomgr.CURSES_STDIN_FD, handle_input, g)
+    loop.add_signal_handler(signal.SIGWINCH, g.curses_ui.resize)
+    loop.add_reader(iomgr.CURSES_STDIN_FD, g.curses_ui.handle_input)
     try:
         log.kpi("serving")
         if __debug__ and g.opts.PROFILE_STARTUP:
@@ -65,19 +68,31 @@ async def mainloop_asyncio(g: AppGlobals) -> None:
         await ev_shutdown.wait()
         # while True:
         #     await asyncio.sleep(1)
+    except asyncio.CancelledError:
+        ## TEMP: suppress unnecessary CancelledError Traceback after "_custom_exception_handler"
+        ##   BAD: mistakenly swallows exception even if smb else (mistakenly?) did t.cancel()
+        # print(exc, file=g.io.ttyout)
+        pass
     finally:
+        log.trace("removing... fds/signals")
         loop.remove_reader(fd=iomgr.CURSES_STDIN_FD)
         loop.remove_signal_handler(signal.SIGWINCH)
         loop.remove_signal_handler(signal.SIGINT)
 
 
+# BET: assign app.curses_ui -- when it's created
+#   i.e. treat "None" as our own app doesn't ~need~ TTY
+#     = so it's free to be taked by anybody at any moment
 _primary = None
 
 
 def asyncio_primary_out(g: AppGlobals, coro: Any) -> None:
     global _primary  # pylint:disable=global-statement
 
+    # MAYBE: combine with "curses_altscreen/BoundedSemaphore" -- as they *are* related
+    #   ~~ though app may not need full-screen curses access, it still uses same TTY
     if _primary:
+        del coro  # FIXED:(suppress):ERR: sys:1: RuntimeWarning: coroutine 'shell_async' was never awaited
         raise RuntimeError("BUG: primary TTY app is already set")
 
     import _curses as C
@@ -101,8 +116,9 @@ def asyncio_primary_out(g: AppGlobals, coro: Any) -> None:
             C.flushinp()
         finally:
             loop = asyncio.get_running_loop()
-            loop.add_signal_handler(signal.SIGWINCH, g.stdscr.refresh)
-            loop.add_reader(iomgr.CURSES_STDIN_FD, handle_input, g)
+            loop.add_signal_handler(signal.SIGWINCH, g.curses_ui.resize)
+            loop.add_reader(iomgr.CURSES_STDIN_FD, g.curses_ui.handle_input)
+            global _primary
             _primary = None
 
     # MAYBE: do it immediately before launching SHELL itself

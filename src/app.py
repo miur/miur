@@ -1,9 +1,9 @@
 # PERF:(typing): abc collections copyreg contextlib functools operator re sys types warnings _typing
 #   NOTE: native "from io import TextIOWrapper" is much faster
 if globals().get("TYPE_CHECKING"):
-    from types import ModuleType
-    from typing import Optional, Union, TextIO
     from io import StringIO
+    from types import ModuleType
+    from typing import Callable, Optional, TextIO, Union
 
     import _curses as C
 
@@ -44,6 +44,11 @@ class AppIO:
 #     ttyattached: Task
 
 
+class AppCursesUI:
+    resize: "Callable[[], None]"
+    handle_input: "Callable[[], None]"
+
+
 # FUT:RENAME? c = g_ctx = AppContext() | ns = AppNamespace()
 #   &why: so we won't confuse multiple separate apps contexts (server,clients) with single global state
 class AppGlobals:
@@ -51,6 +56,7 @@ class AppGlobals:
     stdscr: "C.window"
     io = AppIO()
     opts = AppOptions()
+    curses_ui: AppCursesUI
 
 
 g_app = AppGlobals()
