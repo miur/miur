@@ -42,7 +42,8 @@ def cli_spec(parser: ArgumentParser) -> ArgumentParser:
     # BAD: "default" duplicates default value of `AppOptions
     o("-a", "--asyncio", dest="bare", default=True, action="store_false")
     o("-K", "--ipykernel", default=False, action="store_true")
-    o("-I", "--ipyconsole", default=False, action="store_true")
+    o("-I", "--ipyconsole", default=None, action="store_false")
+    o("-X", "--ipyquit", dest="ipyconsole", action="store_true")
     # pylint:disable=line-too-long
     # fmt:off
     o("-k", "--kill", dest="signal", action="store_const", const=__import__("signal").SIGTERM)

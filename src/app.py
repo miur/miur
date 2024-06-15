@@ -18,7 +18,7 @@ class AppOptions:
     ####
     bare: bool = True
     ipykernel: bool = False
-    ipyconsole: bool = False
+    ipyconsole: bool | None = None
     ####
     color: bool | None
     # VIZ(logredir): altscreen | fd=3 | ./log | file:///path/to/log:buffering=1 | (fifo|socket)://...

@@ -48,7 +48,13 @@ def my_asyncio_loop(debug: bool = True) -> Iterator[asyncio.AbstractEventLoop]:
         yield myloop
     finally:
         log.trace("setting... loop=None")
+        ## ALT:BAD~
+        # for t in asyncio.all_tasks(myloop):
+        #     t.cancel()
+        log.info(str(asyncio.all_tasks()))
         asyncio.set_event_loop(None)
+        # with asyncio.Runner(loop_factory=lambda: myloop):
+        #     pass
 
 
 async def mainloop_asyncio(g: AppGlobals) -> None:

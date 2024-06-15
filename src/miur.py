@@ -85,7 +85,8 @@ def miur_frontend(g: AppGlobals) -> None:
         ret = send_pidfile_signal(pidfile_path(), sig)
         sys.exit(ret if ret is None or isinstance(ret, int) else str(ret))
 
-    if g.opts.ipyconsole:
+    if (v := g.opts.ipyconsole) is not None:
+        log.kpi(f"ipyconsole = {v}")
         import asyncio
 
         from .util.jupyter import ipyconsole_async
@@ -93,7 +94,7 @@ def miur_frontend(g: AppGlobals) -> None:
         # ALT: $ jupyter console --existing miur-ipython.json
         # > stdscr.addstr(1, 1, "hello")
         # > stdscr.refresh()
-        asyncio.run(ipyconsole_async())
+        asyncio.run(ipyconsole_async(shutdown=v))
         sys.exit()
 
     # log.info(f"cwd={opts.cwd}")
@@ -101,9 +102,11 @@ def miur_frontend(g: AppGlobals) -> None:
 
 
 def _live() -> None:
-    import _curses as C
+    # import _curses as C
+    from .app import g_app as g
+
+    stdscr = g.stdscr
 
     # pylint:disable=used-before-assignment
-    stdscr: "C.window"
-    stdscr.addstr(1, 1, "hello")
+    stdscr.addstr(4, 1, "hello")
     stdscr.refresh()
