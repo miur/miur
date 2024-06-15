@@ -54,6 +54,7 @@ class AppCursesUI:
 class AppGlobals:
     _main: "ModuleType"
     stdscr: "C.window"
+    doexit: "Callable[[], None]"
     io = AppIO()
     opts = AppOptions()
     curses_ui: AppCursesUI

@@ -23,8 +23,8 @@ if (return 0 2>/dev/null); then
     # alias mi="$this"
     alias ma='miur -a'
     alias ml='miur -a'
-    alias mK='miur -K'
-    alias mI='miur -I'
+    alias mK='miur -aK'
+    alias mI='miur -aI'
 
     if [[ ${ZSH_NAME:+x} ]]; then
         alias -g M='|miur'

@@ -90,7 +90,7 @@ if TYPE_CHECKING:
     from typing import Optional
 
 
-def ipyconsole_async(shutdown: bool = False) -> "Optional[Coroutine[Any]]":
+def ipyconsole_async(shutdown: bool = False) -> "Optional[Coroutine[Any, Any, Any]]":
     global g_running_ipyconsole  # pylint:disable=global-statement
     if g_running_ipyconsole:
         log.warning("ipyconsole is already running! ignored")
@@ -104,6 +104,7 @@ def ipyconsole_async(shutdown: bool = False) -> "Optional[Coroutine[Any]]":
     console: ZMQTerminalIPythonApp = ZMQTerminalIPythonApp.instance()
     console.existing = CONNECTION_FILE
     console.initialize([])  # CASE: .load_config_file()
+    # pylint:disable=protected-access
     coro = console.shell._main_task()  # = app.start()
     if shutdown:
         console.shell.client.shutdown()

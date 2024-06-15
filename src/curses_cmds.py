@@ -1,4 +1,4 @@
-from typing import Any, Callable
+from typing import Callable
 
 import _curses as C
 
@@ -11,10 +11,9 @@ from .util.logger import log
 #     raise exc
 
 
-def exitloop(_: Any) -> None:
-    # BET? properly exit mainloop
-    #   NEED: send kind of "Event/Queue" to rotate loop once
-    raise SystemExit()  # CHECK: same as sys.exit()
+def exitloop(g: AppGlobals) -> None:
+    # raise SystemExit()  # OR:(same): import sys; sys.exit()
+    g.doexit()
 
 
 def resize(g: AppGlobals) -> None:
@@ -73,6 +72,8 @@ def handle_input(g: AppGlobals) -> None:
     cmd = g_input_handlers.get(wch, None)
     comment = f" ({cmd.__name__})" if cmd else ""
     log.warning(repr(wch) + comment)
+    # print(repr(wch))
+    import sys; sys.stdout.write(repr(wch))
     if cmd:
         # WARN: last stmt in loop COS: may raise SystemExit
         cmd(g)

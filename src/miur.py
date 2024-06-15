@@ -91,9 +91,6 @@ def miur_frontend(g: AppGlobals) -> None:
 
         from .util.jupyter import ipyconsole_async
 
-        # ALT: $ jupyter console --existing miur-ipython.json
-        # > stdscr.addstr(1, 1, "hello")
-        # > stdscr.refresh()
         asyncio.run(ipyconsole_async(shutdown=v))
         sys.exit()
 
@@ -107,6 +104,7 @@ def _live() -> None:
 
     stdscr = g.stdscr
 
+    # ALT: $ jupyter console --existing miur-ipython.json
     # pylint:disable=used-before-assignment
     stdscr.addstr(4, 1, "hello")
     stdscr.refresh()

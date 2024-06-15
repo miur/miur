@@ -47,9 +47,9 @@ def curses_stdscr() -> Iterator[C.window]:
         C.start_color()  # WAIT: which exception does it throw? TRY: TERM=dummy
         stdscr.nodelay(True)
         yield stdscr
-    except BaseException as exc:
-        log.error("E1: " + "".join(TR.format_exception(exc, chain=True)))
-        raise
+    # except Exception as exc:
+    #     log.error("E1: " + "".join(TR.format_exception(exc, chain=True)))
+    #     raise
     finally:
         try:
             stdscr.refresh()
@@ -58,15 +58,11 @@ def curses_stdscr() -> Iterator[C.window]:
             # del stdscr  # TRY? ALT:BAD: not ported :: delscreen(stdscr)
             C.echo()
             # BAD: both nocbreak and endwin may return _curses.error/ERR
-            try:
-                C.nocbreak()
-            except C.error as exc:
-                log.error("E2: " + "".join(TR.format_exception(exc, chain=True)))
-                pass
+            C.nocbreak()
             C.endwin()  # CHECK: is it safe to deinit libncurses multiple times in Jupyter?
-        except BaseException as exc:
-            log.error("E3: " + "".join(TR.format_exception(exc, chain=True)))
-            raise
+        # except Exception as exc:
+        #     log.error("E2: " + "".join(TR.format_exception(exc, chain=True)))
+        #     raise
         finally:
             # TEMP:HACK: dump logs on app exit
             #   BAD? probably doesn't belong here, but whatever

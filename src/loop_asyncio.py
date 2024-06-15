@@ -51,7 +51,7 @@ def my_asyncio_loop(debug: bool = True) -> Iterator[asyncio.AbstractEventLoop]:
         ## ALT:BAD~
         # for t in asyncio.all_tasks(myloop):
         #     t.cancel()
-        log.info(str(asyncio.all_tasks()))
+        # log.info(str(asyncio.all_tasks()))
         asyncio.set_event_loop(None)
         # with asyncio.Runner(loop_factory=lambda: myloop):
         #     pass
@@ -63,6 +63,7 @@ async def mainloop_asyncio(g: AppGlobals) -> None:
     loop = asyncio.get_running_loop()
     # FAIL: RuntimeError: Event loop stopped before Future completed.
     ev_shutdown = asyncio.Event()
+    g.doexit = ev_shutdown.set
     loop.add_signal_handler(signal.SIGINT, ev_shutdown.set)
     # FIND:MAYBE: don't process in handler directly, and only schedule callback ?
     loop.add_signal_handler(signal.SIGWINCH, g.curses_ui.resize)
