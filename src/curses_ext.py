@@ -130,9 +130,16 @@ async def shell_async(stdscr: C.window, cmdv: Sequence[str] = (), **envkw: str) 
     with curses_altscreen(stdscr):
         import asyncio
 
+        from .app import g_app as g
+
         # SRC: https://docs.python.org/3/library/asyncio-subprocess.html#examples
-        # [_] TODO: ..., stdin=g_app.io.ttyin, stdout=g_app.io.ttyout, stderr=(g_app.io.pipeerr or g_app.io.ttyalt))
-        proc = await asyncio.create_subprocess_exec(*cmdv, env=envp)
+        proc = await asyncio.create_subprocess_exec(
+            *cmdv,
+            env=envp,
+            stdin=g.io.ttyin,
+            stdout=g.io.ttyout,
+            stderr=(g.io.pipeerr or g.io.ttyout),
+        )
         rc = await proc.wait()
         assert rc == 0, proc
         return rc

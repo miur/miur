@@ -38,6 +38,11 @@ def handle_SIGWINCH(
 
 
 def mainloop_selectors(g: AppGlobals) -> None:
+    def _doexit() -> None:
+        raise SystemExit()
+
+    g.doexit = _doexit
+
     with route_signals_to_fd() as sigfd, selectors.DefaultSelector() as sel:
         sel.register(iomgr.CURSES_STDIN_FD, selectors.EVENT_READ, data=None)
         sel.register(sigfd, selectors.EVENT_READ, data=None)

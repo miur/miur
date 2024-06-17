@@ -73,7 +73,7 @@ def handle_input(g: AppGlobals) -> None:
     comment = f" ({cmd.__name__})" if cmd else ""
     log.warning(repr(wch) + comment)
     # print(repr(wch))
-    import sys; sys.stdout.write(repr(wch))
+    # import sys; sys.stdout.write(repr(wch))
     if cmd:
         # WARN: last stmt in loop COS: may raise SystemExit
         cmd(g)

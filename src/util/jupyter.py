@@ -25,6 +25,9 @@ def inject_ipykernel_into_asyncio(myloop: Any, myns: dict[str, Any]) -> None:
     # with CE.curses_altscreen(stdscr):
     if sys.flags.isolated:
         __import__("site").main()  # lazy init for "site" in isolated mode
+
+    _penv = os.environ.copy()
+
     # FIXED:DEPR: can be removed for !jupyter_core>=6
     os.environ["JUPYTER_PLATFORM_DIRS"] = "1"
     import ipykernel.kernelapp as IK
@@ -81,6 +84,15 @@ def inject_ipykernel_into_asyncio(myloop: Any, myns: dict[str, Any]) -> None:
     ns["_entry"] = sys.modules["__main__"]
     ns["kapp"] = kapp
     ns.update(myns)
+
+    # FIXED: no color in shell_out due to overwritten TERM by IPKernelApp<ZMQInteractiveShell>.init_environment()
+    #   from ..app import g_app
+    #   print(os.environ["TERM"], file=g_app.io.ttyalt)
+    os.environ.update(_penv)
+    for k in os.environ:
+        if k not in _penv:
+            del os.environ[k]
+
     log.trace("ipykernel had started")
     g_running_ipykernel = True
 

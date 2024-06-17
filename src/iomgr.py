@@ -42,7 +42,8 @@ def tty_open_onto_fd(fd: int) -> "TextIO":
     # NOTE: fflush is ignored on STDIN
     #   REF: https://c-faq.com/stdio/stdinflush.html , https://c-faq.com/stdio/stdinflush2.html
     # OR: libc = ctypes.CDLL(None); c_stdio = ctypes.c_void_p.in_dll(libc, nm); libc.fflush(c_stdio)
-    os.fsync(fd)
+    # ATT:DISABLED:COS: fd-owning stdio should be flushed and closed at this point
+    # os.fsync(fd)
     # RQ:(inheritable=True): we need FD bound to TTY for shell_out() to work
     #   BET: do shell_out() with explicit FD
     os.dup2(ttyio.fileno(), fd, inheritable=True)
@@ -63,34 +64,44 @@ def init_explicit_io(g: "AppGlobals") -> None:
         assert cin.fileno() == fd0, "Sanity check"
         if cin.isatty():
             io.pipein = None
-            io.ttyin = cin
+            cin.close()
         else:
             io.pipein = dup_and_close_stdio(cin)
-            io.ttyin = tty_open_onto_fd(fd0)
+        io.ttyin = tty_open_onto_fd(fd0)
 
     def _scope_out(cout: "TextIO", fd1: int) -> None:
         assert cout.fileno() == fd1, "Sanity check"
         if cout.isatty():
             io.pipeout = None
-            io.ttyout = cout
+            ## DISABLED: nice PERF but "sys.stdout" should be disallowed
+            # io.ttyout = cout
+            cout.close()
         else:
             io.pipeout = dup_and_close_stdio(cout)
-            io.ttyout = tty_open_onto_fd(fd1)
+        io.ttyout = tty_open_onto_fd(fd1)
 
     def _scope_err(cerr: "TextIO", fd2: int) -> None:
         assert cerr.fileno() == fd2, "Sanity check"
         if cerr.isatty():
             io.pipeerr = None
+            cerr.close()
             # FIXME? open os.pipe to cvt libc.stderr into py.log inof spitting over TTY
             #   FAIL: !deadlock! if underlying native C code fills os.pipe internal buffers
             io.ttyalt = __import__("io").StringIO()
         else:
             io.pipeerr = dup_and_close_stdio(cerr)
             io.ttyalt = None
+        # TEMP: get backtrace in case of sys.stdout.write() -> ValueError: I/O operation on closed file.
+        sys.stderr = io.ttyalt
+        sys.stdout = io.ttyalt
 
     _scope_in(sys.stdin, CURSES_STDIN_FD)
     _scope_out(sys.stdout, CURSES_STDOUT_FD)
     _scope_err(sys.stderr, CURSES_STDERR_FD)
+
+    # print("aaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+    # print("aaaaaaaaaaaaaaaaaaaaaaaaaaaaa", file=sys.stderr)
+    # sys.stdout.write("aaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n")
 
     ## WARN: logs in ringbuffer should be kept as-is (as `Events)
     ##   >> they shouldn't be rasterized until you know if DST is plain text, or json, or whatever
