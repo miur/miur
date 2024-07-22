@@ -44,6 +44,7 @@ def cli_spec(parser: ArgumentParser) -> ArgumentParser:
     o("-K", "--ipykernel", default=False, action="store_true")
     o("-I", "--ipyconsole", default=None, action="store_false")
     o("-X", "--ipyquit", dest="ipyconsole", action="store_true")
+    o("--logredir", help="redir to fd or path")
     # pylint:disable=line-too-long
     # fmt:off
     o("-k", "--kill", dest="signal", action="store_const", const=__import__("signal").SIGTERM)

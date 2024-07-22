@@ -25,6 +25,7 @@ def resize(g: AppGlobals) -> None:
     #   2024-05-11 BUT it works if get_wch() used directly
     # REGR: redraw() during KEY_RESIZE results in ncurses crash
     #   THINK: how to prevent/block redraw in that case?
+    # g.wdg.redraw()
     g.stdscr.refresh()
 
 
@@ -69,6 +70,8 @@ g_input_handlers: dict[str | int, Callable[[AppGlobals], None]] = {
 
 def handle_input(g: AppGlobals) -> None:
     wch = g.stdscr.get_wch()
+    # IDEA: partially restore TTY to preserve NLs in unexpected exc/backtrace
+    #  C.nocbreak() ... C.cbreak()
     cmd = g_input_handlers.get(wch, None)
     comment = f" ({cmd.__name__})" if cmd else ""
     log.warning(repr(wch) + comment)
@@ -77,3 +80,8 @@ def handle_input(g: AppGlobals) -> None:
     if cmd:
         # WARN: last stmt in loop COS: may raise SystemExit
         cmd(g)
+        # CHG: only do partial redraw e.g. prev/next cursor areas
+        # MAYBE: redraw only if anything had changed (not all cmds to that)
+        #   BUT: uix needs visual feedback on each keypress, so it's better to always redraw
+        # g.wdg.redraw()
+        g.stdscr.refresh()

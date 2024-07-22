@@ -9,22 +9,8 @@ from typing import Any, Callable, Iterator, Sequence
 
 import _curses as C
 
-
-# TEMP?HACK: dump logs to altscreen
-def dump_logbuf_to_tty() -> None:
-    from .app import g_app
-
-    assert g_app.io.ttyout, "TEMP: Should always exist"
-
-    if (alt := g_app.io.ttyalt) and (tout := g_app.io.ttyout):
-        # BET? shutil.copyfileobj(alt, tout)
-        #   SRC: https://stackoverflow.com/questions/3253258/what-is-the-best-way-to-write-the-contents-of-a-stringio-to-a-file
-        if buf := alt.getvalue():
-            tout.write(buf)
-            tout.flush()
-            # PERF:BET? creating a new one instead of reusing a blank one is 11% faster
-            #   SRC: https://stackoverflow.com/questions/4330812/how-do-i-clear-a-stringio-object
-            alt.truncate(0)
+from . import iomgr
+from .app import g_app
 
 
 ## ALT: C.wrapper(drawloop: Callable[[C.window], None])
@@ -33,10 +19,11 @@ def curses_stdscr() -> Iterator[C.window]:
     if not C.has_extended_color_support():
         raise NotImplementedError
 
-    import traceback as TR
+    # import traceback as TR
+    # from .util.logger import log
 
-    from . import iomgr
-    from .util.logger import log
+    # NOTE: only activate stderr=ttyalt when ncurses is active, otherwise print immediately
+    # sys.stderr = g_app.io.ttyalt
 
     C.setupterm(term=os.environ.get("TERM", "unknown"), fd=iomgr.CURSES_STDOUT_FD)
     try:
@@ -66,7 +53,9 @@ def curses_stdscr() -> Iterator[C.window]:
         finally:
             # TEMP:HACK: dump logs on app exit
             #   BAD? probably doesn't belong here, but whatever
-            dump_logbuf_to_tty()
+            # iomgr.dump_logbuf_to_tty()
+            # sys.stderr = g_app.io.ttyout
+            pass
 
 
 class curses_altscreen:
@@ -88,7 +77,8 @@ class curses_altscreen:
             raise RuntimeError("BUG: altscreen is already switched out")
         C.def_prog_mode()  # save current tty modes
         C.endwin()  # restore original tty modes
-        dump_logbuf_to_tty()
+
+        iomgr.dump_logbuf_to_tty(g_app)
 
     # def __exit__(self,
     #   exc_type: Optional[Type[BaseException]],

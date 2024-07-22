@@ -1,3 +1,4 @@
+#!/usr/bin/env -S python -SIB -X faulthandler
 #!/usr/bin/python -SIB
 #!/usr/bin/env -S python -SIB -Ximporttime
 #!/usr/bin/env -S python -SIB -m cProfile -s cumulative --

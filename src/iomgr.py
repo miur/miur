@@ -92,8 +92,9 @@ def init_explicit_io(g: "AppGlobals") -> None:
             io.pipeerr = dup_and_close_stdio(cerr)
             io.ttyalt = None
         # TEMP: get backtrace in case of sys.stdout.write() -> ValueError: I/O operation on closed file.
-        sys.stderr = io.ttyalt
-        sys.stdout = io.ttyalt
+        # TBD: g.opts.redirerr
+        sys.stderr = io.ttyalt  # sys.__stderr__ =
+        sys.stdout = io.ttyalt  # sys.__stdout__ =
 
     _scope_in(sys.stdin, CURSES_STDIN_FD)
     _scope_out(sys.stdout, CURSES_STDOUT_FD)
@@ -144,3 +145,36 @@ def init_explicit_io(g: "AppGlobals") -> None:
     # for ttyio in (sys.stdout, sys.stderr):
     #     if ttyio.isatty() or os.fstat(ttyio.fileno()).st_mode & stat.S_IFIFO:
     #         do(CE.stdio_to_altscreen(g.stdscr, ttyio))
+
+
+# TEMP?HACK: dump logs to altscreen
+def dump_logbuf_to_tty(g: "AppGlobals") -> None:
+    assert g.io.ttyout, "TEMP: Should always exist"
+
+    if (alt := g.io.ttyalt) and (tout := g.io.ttyout):
+        alt.flush()
+        # BET? shutil.copyfileobj(alt, tout)
+        #   SRC: https://stackoverflow.com/questions/3253258/what-is-the-best-way-to-write-the-contents-of-a-stringio-to-a-file
+        if buf := alt.getvalue():
+            tout.write(buf)
+            tout.flush()
+            # PERF:BET? creating a new one instead of reusing a blank one is 11% faster
+            #   SRC: https://stackoverflow.com/questions/4330812/how-do-i-clear-a-stringio-object
+            alt.truncate(0)
+
+
+class stdlog_redir:
+    def __init__(self, g: "AppGlobals") -> None:
+        self._g = g
+
+    def __enter__(self) -> None:
+        init_explicit_io(self._g)
+        import atexit
+
+        # WARN: not called when app is killed by a signal not handled by Python
+        #   ALT:BET?TRY: use try-catchall-finally over main()
+        atexit.register(dump_logbuf_to_tty, self._g)
+
+    def __exit__(self, _et, _exc, _tb):  # type:ignore[no-untyped-def]
+        pass
+        # dump_logbuf_to_tty(self._g)

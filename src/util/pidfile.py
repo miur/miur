@@ -13,11 +13,12 @@ def pidfile_path() -> str:
 
 
 @contextmanager
-def temp_pidfile(pidfile: str) -> Iterator[None]:
+def temp_pidfile(pidfile: str) -> Iterator[int]:
     with open(pidfile, "w", encoding="utf-8") as f:
-        f.write(str(os.getpid()))
+        pid = os.getpid()
+        f.write(str(pid))
     try:
-        yield
+        yield pid
     finally:
         os.remove(pidfile)
 

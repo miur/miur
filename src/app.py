@@ -3,7 +3,7 @@
 if globals().get("TYPE_CHECKING"):
     from io import StringIO
     from types import ModuleType
-    from typing import Callable, Optional, TextIO, Union
+    from typing import Any, Callable, Optional, TextIO, Union
 
     import _curses as C
 
@@ -58,6 +58,7 @@ class AppGlobals:
     io = AppIO()
     opts = AppOptions()
     curses_ui: AppCursesUI
+    wdg: "Any"  # ListWidget
 
 
 g_app = AppGlobals()

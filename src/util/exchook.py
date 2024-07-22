@@ -92,4 +92,6 @@ def log_excepthook() -> (
         sys.excepthook = exception_handler
         yield exception_handler
     finally:
-        sys.excepthook = _orig_excepthook
+        pass
+        ## DISABLED: otherwise top-lvl exceptions won't be logged
+        # sys.excepthook = _orig_excepthook

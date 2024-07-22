@@ -30,18 +30,25 @@ def miur_main(g: AppGlobals | None = None) -> None:
         do(enable_warnings())
         do(increment_envlevel("MIUR_LEVEL"))
         # MAYBE: only enable PIDFILE when run by miur_frontend() to avoid global VAR ?
-        do(temp_pidfile(pidfile_path()))
+        pid = do(temp_pidfile(pidfile_path()))
+        log.kpi(f"{pid}")
         do(log_excepthook())
 
-        iomgr.init_explicit_io(g)
+        do(iomgr.stdlog_redir(g))
         g.stdscr = do(CE.curses_stdscr())
 
+        # raise RuntimeError()
+
         from .curses_cmds import handle_input, resize
+
+        from .widget import FSEntry, ListWidget
 
         ui = AppCursesUI()
         ui.resize = lambda: resize(g)
         ui.handle_input = lambda: handle_input(g)
         g.curses_ui = ui
+        # g.wdg = ListWidget()
+        # g.wdg.set_entity(FSEntry("/etc/udev"))
 
         if g.opts.bare:  # NOTE: much faster startup w/o asyncio machinery
             from .curses_cmds import g_input_handlers
@@ -79,6 +86,7 @@ def miur_frontend(g: AppGlobals) -> None:
     log.config(termcolor=c)
 
     if g.opts.PROFILE_STARTUP:
+        # TODO: disable for integ-tests e.g. "colored output to ttyalt despite stdout redir"
         log.kpi("argparse")
 
     if sig := g.opts.signal:
