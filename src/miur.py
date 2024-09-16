@@ -40,15 +40,14 @@ def miur_main(g: AppGlobals | None = None) -> None:
         # raise RuntimeError()
 
         from .curses_cmds import handle_input, resize
-
-        from .widget import FSEntry, ListWidget
+        from .widget import FSEntry, RootWidget
 
         ui = AppCursesUI()
         ui.resize = lambda: resize(g)
         ui.handle_input = lambda: handle_input(g)
         g.curses_ui = ui
-        # g.wdg = ListWidget()
-        # g.wdg.set_entity(FSEntry("/etc/udev"))
+        g.root_wdg = RootWidget()
+        g.root_wdg.set_entity(FSEntry("/etc/udev"))
 
         if g.opts.bare:  # NOTE: much faster startup w/o asyncio machinery
             from .curses_cmds import g_input_handlers

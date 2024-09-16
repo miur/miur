@@ -58,7 +58,7 @@ class AppGlobals:
     io = AppIO()
     opts = AppOptions()
     curses_ui: AppCursesUI
-    wdg: "Any"  # ListWidget
+    root_wdg: "Any"  # Root/FM/ListWidget
 
 
 g_app = AppGlobals()
