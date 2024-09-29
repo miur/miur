@@ -22,7 +22,7 @@ def draw_list(stdscr: C.window, lst: Sequence[Representable]) -> None:
     for i, x in enumerate(items, start=i):
         idx = 1 + beg + i
         stdscr.addstr(i, 0, f"{i + 1:02d}| {idx:03d}:", C.color_pair(2))
-        log.info(i)
+        log.info(f'{i=}')
         text = " " + x.name
         attr = (C.A_REVERSE | C.A_BOLD) if i == pos else C.color_pair(1)
         stdscr.addstr(text, attr)
@@ -93,3 +93,13 @@ class RootWidget:
     #     s += "\r"
     #     s += str(v) if isinstance((v := self._valpxy.get()), int) else repr(v)
     #     return s
+
+
+def _live() -> None:
+    log.sep()
+    from .app import g_app as g
+
+    g.root_wdg = wdg = RootWidget()
+    wdg.set_entity(FSEntry("/etc/udev"))
+    wdg.redraw(g.stdscr)
+    g.stdscr.refresh()

@@ -122,15 +122,22 @@ def init_explicit_io(g: "AppGlobals") -> None:
             io.logsout = open(o, "w", encoding="locale")
         else:
             raise NotImplementedError
+
+        def _logwrite(s: str):
+            io.logsout.write(s)
+            # NOTE: immediate buffering after each log line
+            io.logsout.flush()
+
     else:
         if io.ttyalt is None:
             io.ttyalt = __import__("io").StringIO()
         io.logsout = io.ttyalt  # BAD: possible double-close for same FD
+        _logwrite = io.logsout.write
 
-        from .util.logger import log
+    from .util.logger import log
 
-        # [_] CHECK:WTF:BUG: why logs are printed on TTY even after previous sys.stdout.close()
-        log.write = io.logsout.write  # TBD? restore back on scope ?
+    # [_] CHECK:WTF:BUG: why logs are printed on TTY even after previous sys.stdout.close()
+    log.write = _logwrite  # TBD? restore back on scope ?
 
     # [_] FIXME: add hooks individually
     # BAD: { mi | cat } won't enable altscreen, and !cat will spit all over TTY

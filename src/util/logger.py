@@ -110,6 +110,13 @@ class Logger:  # pylint:disable=too-many-instance-attributes
     def trace(self, fmt: _Loggable) -> None:
         self.at(LogLevel.TRACE, fmt)
 
+    def sep(self, fmt: _Loggable | None = None) -> None:
+        """Separator with timestamps -- useful as 1st line in _live() Jupyter sessions"""
+        line = "\n----- " + time.strftime("[%Y%m%d_%H%M%S] -----", time.localtime())
+        if fmt:
+            line += " " + str(fmt)
+        self.at(LogLevel.TRACE, line)
+
     def kpi(self, fmt: _Loggable) -> None:
         ## PERF: to run startup 100 times and calc average
         # self.write("%.3f\n" % ((time.monotonic() - self._initts) * 1000))
