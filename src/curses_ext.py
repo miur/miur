@@ -1,3 +1,4 @@
+import enum
 import os
 import sys
 from contextlib import contextmanager
@@ -11,6 +12,32 @@ import _curses as C
 
 from . import iomgr
 from .app import g_app
+
+
+@enum.unique
+class ColorMap(enum.IntEnum):
+    default = 1
+    auxinfo = 2
+    iteminfo = 3
+    cursor = 4
+    footer = 5
+
+
+def init_colorscheme(stdscr: C.window) -> None:
+    # print(C.COLORS)
+    # if C.COLORS < 8:
+    #     C.init_pair(1, 7, 0)
+    #     C.init_pair(2, 4, 6)
+    # else:
+    C.use_default_colors()
+    C.init_pair(ColorMap.default, -1, -1)  # DFL: gray text on transparent bkgr
+    C.init_pair(ColorMap.auxinfo, 10, -1)
+    C.init_pair(ColorMap.iteminfo, 0, -1)
+    C.init_pair(ColorMap.cursor, 8, 4)  # FIXME: use only attrs: C.A_REVERSE | C.A_BOLD
+    C.init_pair(ColorMap.footer, 217, 17)
+
+    # pvis = C.curs_set(visibility=0)
+    stdscr.attron(C.color_pair(ColorMap.default))
 
 
 ## ALT: C.wrapper(drawloop: Callable[[C.window], None])
@@ -33,6 +60,7 @@ def curses_stdscr() -> Iterator[C.window]:
         stdscr.keypad(True)  # sup special escape seq for e.g. curses.KEY_LEFT
         C.start_color()  # WAIT: which exception does it throw? TRY: TERM=dummy
         stdscr.nodelay(True)
+        init_colorscheme(stdscr)
         yield stdscr
     # except Exception as exc:
     #     log.error("E1: " + "".join(TR.format_exception(exc, chain=True)))

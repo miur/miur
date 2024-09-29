@@ -25,6 +25,7 @@ def resize(g: AppGlobals) -> None:
     #   2024-05-11 BUT it works if get_wch() used directly
     # REGR: redraw() during KEY_RESIZE results in ncurses crash
     #   THINK: how to prevent/block redraw in that case?
+    g.stdscr.clear()  # CHECK:NEED:OR:NOT? e.g. to clear bkgr (which earlier wasn't redrawn on resize)
     g.root_wdg.redraw(g.stdscr)
     g.stdscr.refresh()
 
@@ -64,6 +65,8 @@ g_input_handlers: dict[str | int, Callable[[AppGlobals], None]] = {
     "S": shell_out,  # CE.shell_out
     "K": ipykernel_start,
     "I": ipyconsole_out,
+    "j": lambda g: g.root_wdg.cursor_move_rel(1),
+    "k": lambda g: g.root_wdg.cursor_move_rel(-1),
     "\t": ipython_out,
 }
 

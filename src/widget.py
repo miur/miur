@@ -3,6 +3,7 @@ from typing import Callable, Iterable, Protocol, Sequence, TypeVar, override
 
 import _curses as C
 
+from .curses_ext import ColorMap
 from .util.logger import log
 
 
@@ -11,21 +12,51 @@ class Representable(Protocol):
     def name(self) -> str: ...
 
 
-def draw_list(stdscr: C.window, lst: Sequence[Representable]) -> None:
-    i = 0
-    hh, _ww = stdscr.getmaxyx()  # C.LINES
-    items = lst[i : i + hh - 1]
-    beg = 0
-    pos = 1
-    # beg, _end = self._wg._scroll.range(i)
-    # pos = self._wg.currel
-    for i, x in enumerate(items, start=i):
-        idx = 1 + beg + i
-        stdscr.addstr(i, 0, f"{i + 1:02d}| {idx:03d}:", C.color_pair(2))
-        log.info(f'{i=}')
-        text = " " + x.name
-        attr = (C.A_REVERSE | C.A_BOLD) if i == pos else C.color_pair(1)
+# ALSO: my earlier View concept is actually a Presenter
+#   : VisibleContext=ScrollWindow+Cursor+Selections+OverlayHints+Tags+etc.
+class VisibleContext:
+    wdgh: int
+    wdgw: int
+    wndabsoff0: int
+    wndmaxlen: int
+    wndcurpos0: int
+
+
+def draw_list(
+    stdscr: C.window, lst: Sequence[Representable], vctx: VisibleContext
+) -> None:
+    log.info(f"[<={vctx.wndmaxlen}/{len(lst)}]")
+
+    def _pfx(i: int) -> str:
+        idx = 1 + i + vctx.wndabsoff0
+        cur = ">" if i == vctx.wndcurpos0 else ":"
+        return f"{1+i:02d}| {idx:03d}{cur} "
+
+    citem = C.color_pair(ColorMap.default)
+    caux = C.color_pair(ColorMap.auxinfo)
+    ccurs = C.A_REVERSE | C.A_BOLD  # OR: C.color_pair(ColorMap.cursor)
+
+    def _draw_item_at(i: int, attr: int) -> None:
+        idx = i + vctx.wndabsoff0
+        pfx = _pfx(i)
+        stdscr.addstr(i, 0, pfx, caux)
+        text = lst[idx].name
         stdscr.addstr(text, attr)
+        log.info(f"{pfx}{text}")  # :{attr}:
+
+    for i in range(0, min([vctx.wndmaxlen, len(lst)])):
+        _draw_item_at(i, citem)
+
+    ## NOTE: draw cursor AGAIN after footer (i.e. over-draw on top of full list)
+    ##   NICE: no need to hassle with storing cursor prefix length for cx/cy
+    ##   NICE: can redraw only two lines (prev item and cursor) inof whole list
+    # cx = len(_pfx(vctx.wndcurpos0))
+    # _draw_item_at(vctx.wndcurpos0, citem)
+    # stdscr.move(vctx.wndcurpos0, cx)
+    ## OR:BET: only change attributes of already printed line
+    cx = len(_pfx(vctx.wndcurpos0))
+    cn = len(lst[vctx.wndcurpos0 + vctx.wndabsoff0].name)
+    stdscr.chgat(vctx.wndcurpos0, cx, cn, ccurs)
 
 
 # def draw_footer(stdscr: C.window) -> None:
@@ -72,17 +103,39 @@ class RootWidget:
     _lst: Sequence[Representable]
     # _lstpxy: ListCachingProxy[Representable]
     _act: Callable[[], Sequence[Representable]]
+    _vctx: VisibleContext
 
     def set_entity(self, ent: Representable) -> None:
+        c = VisibleContext()
+        c.wndmaxlen = 0  # WKRND:BAD: we don't have stdscr here to getmaxyx()
+        c.wndabsoff0 = 0
+        c.wndcurpos0 = 0  # MAYBE: keep prev cursor position if ent refers to same loci
+        self._vctx = c
         self._ent = ent
         if (sfn := getattr(ent, "explore")) and callable(sfn):
-            self._act = sfn
+            self._act = sfn  # NOTE: keep sfn to be able to refresh() the list (when externally changed)
             self._lst = self._act()
+
+    def cursor_move_rel(self, modifier: int) -> None:
+        c = self._vctx
+        newpos = c.wndcurpos0 + modifier
+        c.wndcurpos0 = max(min(newpos, c.wndmaxlen - 1, len(self._lst) - 1), 0)
 
     def redraw(self, stdscr: C.window) -> None:
         # FUT: dispatch to either curses/cli/Qt
         assert isinstance(stdscr, C.window)
-        draw_list(stdscr, self._lst)
+
+        c = self._vctx
+        c.wdgh, c.wdgw = stdscr.getmaxyx()
+        log.info(f"{c.wdgh}x{c.wdgw}")
+        # FIXME: "-1" should be externally calculated by `Layout, based on "Footer.height"
+        c.wndmaxlen = max(c.wdgh - 1, 0)
+        # wndabsoff0: beg, _end = self._wg._scroll.range(i)
+        # wndcurpos0: pos = self._wg.currel
+
+        # NOTE: actually _lst here stands for a generic _augdbpxy with read.API
+        #   i.e. DB augmented by virtual entries, all generated-and-cleared on demand
+        draw_list(stdscr, self._lst, c)
         # draw_footer(stdscr)
 
     # USE: log.info(str(wdg))
