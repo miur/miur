@@ -21,7 +21,7 @@ class LogLevel(enum.IntEnum):
     INFO = 30  # +NOTICE | SUCCESS = 25
     # DEBUG = 25
     # OPTIONAL = 20
-    # VERBOSE = 15  # DETAILED = 10
+    VERBOSE = 15  # DETAILED = 10
     TRACE = 10  # OR? =KPI  // :PERF: latency/cpu/memory
     # +TR1..TR9 (USE: gradually dimming gray colors, darker than .INFO)
     ANYTHING = 0  # OR: lvl=None
@@ -37,7 +37,7 @@ TERMSTYLE: Final = {
     # LogLevel.SUCCESS|TRACE: "\033[32m",  # green
     # LogLevel.NOTICE: "\033[34m",  # blue
     # LogLevel.DEBUG: "\033[95m",  # purple
-    # LogLevel.VERBOSE: "\033[36m",  # cyan
+    LogLevel.VERBOSE: "\033[36m",  # cyan
     LogLevel.TRACE: "\033[36m",  # cyan
     # LogLevel.DETAILED: "\033[93m",  # grey
     None: "\033[m",  # none
@@ -106,6 +106,9 @@ class Logger:  # pylint:disable=too-many-instance-attributes
 
     def info(self, fmt: _Loggable) -> None:
         self.at(LogLevel.INFO, fmt)
+
+    def verbose(self, fmt: _Loggable) -> None:
+        self.at(LogLevel.VERBOSE, fmt)
 
     def trace(self, fmt: _Loggable) -> None:
         self.at(LogLevel.TRACE, fmt)

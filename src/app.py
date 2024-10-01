@@ -23,6 +23,7 @@ class AppOptions:
     color: bool | None
     # VIZ(logredir): altscreen | fd=3 | ./log | file:///path/to/log:buffering=1 | (fifo|socket)://...
     logredir: int | str | None = None
+    loglevel: int
     ####
     cwd: str
     ####

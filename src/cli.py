@@ -3,6 +3,7 @@ from enum import Enum
 from typing import TYPE_CHECKING
 
 from . import _pkg
+from .util.logger import LogLevel, log
 
 if TYPE_CHECKING:
     from just.use.iji.main import Context
@@ -33,6 +34,20 @@ class SigAction(Action):
         setattr(ns, self.dest, sig)
 
 
+class LogLevelCvt(Action):
+    def __call__(self, _ap, ns, s: str, option_string=None):  # type:ignore
+        s = s.upper()
+        if s.isdigit():
+            m = LogLevel(int(s))
+        elif len(s) == 1:
+            ss = [nm for nm in LogLevel.__members__ if nm[0] == s]
+            assert len(ss) == 1
+            m = LogLevel[ss[0]]
+        else:
+            m = LogLevel[s]
+        setattr(ns, self.dest, m)
+
+
 def cli_spec(parser: ArgumentParser) -> ArgumentParser:
     o = parser.add_argument
     o("cwd", nargs="?", default="/etc")  # [_] FUT:CHG: os.getcwd()
@@ -49,6 +64,10 @@ def cli_spec(parser: ArgumentParser) -> ArgumentParser:
     # fmt:off
     o("-k", "--kill", dest="signal", action="store_const", const=__import__("signal").SIGTERM)
     o("-C", "--color", default=SwitchEnum.default.value, choices=SwitchEnum.__members__, action=SwitchAction)
+    # BET? Find shortest unique prefix for every word in a given list | Set 1 (Using Trie) - GeeksforGeeks ⌇⡦⣻⢯⣷
+    #   https://www.geeksforgeeks.org/find-all-shortest-unique-prefixes-to-represent-each-word-in-a-given-list/
+    loglevellst = (*LogLevel.__members__, *(nm[0] for nm in LogLevel.__members__), *(str(m.value) for m in LogLevel.__members__.values()))
+    o("-L", "--loglevel", default=log.minlevel, choices=loglevellst, action=LogLevelCvt)
     return parser
 
 
@@ -71,6 +90,7 @@ def miur_argparse(argv: list[str]) -> None:
         if not isinstance(v, anno[k]):  # if type(v) is not type(getattr(opts, k)):
             raise ValueError((k, v))
         setattr(g.opts, k, v)
+    log.minlevel = g.opts.loglevel
     return miur_frontend(g)
 
 

@@ -17,6 +17,7 @@ def exitloop(g: AppGlobals) -> None:
 
 
 def resize(g: AppGlobals) -> None:
+    log.info("resize: [{}x{}]".format(*g.stdscr.getmaxyx()))
     ## DEP:configure(--enable-sigwinch)
     # BAD: does not work inside jupyter
     # BAD: should press some key before ev:410 will be reported

@@ -25,7 +25,7 @@ class VisibleContext:
 def draw_list(
     stdscr: C.window, lst: Sequence[Representable], vctx: VisibleContext
 ) -> None:
-    log.info(f"[<={vctx.wndmaxlen}/{len(lst)}]")
+    log.verbose(f"list: [<={vctx.wndmaxlen}/{len(lst)}]")
 
     def _pfx(i: int) -> str:
         idx = 1 + i + vctx.wndabsoff0
@@ -42,7 +42,7 @@ def draw_list(
         stdscr.addstr(i, 0, pfx, caux)
         text = lst[idx].name
         stdscr.addstr(text, attr)
-        log.info(f"{pfx}{text}")  # :{attr}:
+        log.verbose(f"{pfx}{text}")  # :{attr}:
 
     for i in range(0, min([vctx.wndmaxlen, len(lst)])):
         _draw_item_at(i, citem)
@@ -127,7 +127,7 @@ class RootWidget:
 
         c = self._vctx
         c.wdgh, c.wdgw = stdscr.getmaxyx()
-        log.info(f"{c.wdgh}x{c.wdgw}")
+        log.info(f"draw: [{c.wdgh}x{c.wdgw}]")
         # FIXME: "-1" should be externally calculated by `Layout, based on "Footer.height"
         c.wndmaxlen = max(c.wdgh - 1, 0)
         # wndabsoff0: beg, _end = self._wg._scroll.range(i)
@@ -153,6 +153,7 @@ def _live() -> None:
     from .app import g_app as g
 
     g.root_wdg = wdg = RootWidget()
-    wdg.set_entity(FSEntry("/etc/udev"))
+    # wdg.set_entity(FSEntry("/etc/udev"))
+    wdg.set_entity(FSEntry("/d/airy"))
     wdg.redraw(g.stdscr)
     g.stdscr.refresh()
