@@ -65,13 +65,14 @@ class Logger:  # pylint:disable=too-many-instance-attributes
         self._pts = self._initts
         self._counter = 0
         self._pms = 0.0
+        self._fnmlen = 0  # HACK: for gradual loglines indent alignment
         self._pcpu = time.process_time()
         super().__init__()
         self.at = self._lazy_init
 
     def _lazy_init(self, lvl: LogLevel, fmt: _Loggable) -> None:
         # NOTE: update to redirected FD
-        if not hasattr(self, 'write'):
+        if not hasattr(self, "write"):
             self.write = sys.stdout.write
         # TODO: make it a part of supplied .write()
         if self.termcolor is None:
@@ -91,7 +92,7 @@ class Logger:  # pylint:disable=too-many-instance-attributes
         for k, v in kw.items():
             # if type(getattr(self, k)) is not type(v):
             #     raise TypeError(type(getattr(self, k)))
-            if not hasattr(self, k) and k not in ('write'):
+            if not hasattr(self, k) and k not in ("write"):
                 raise KeyError(k)
             # if k == 'termcolor' and v is None:
             #     v = self.write.__self__.isatty()
@@ -166,6 +167,9 @@ class Logger:  # pylint:disable=too-many-instance-attributes
         # modnm = sys.modules[fr.f_globals['__name__']].__name__
         modnm = fr.f_globals["__name__"].rpartition(".")[2]
         lnum = fr.f_lineno
+        loci = f"[{modnm}:{lnum}]"
+        if len(loci) > self._fnmlen:
+            self._fnmlen = len(loci)
 
         if self.termcolor:
             _c = TERMSTYLE[lvl]
@@ -174,7 +178,7 @@ class Logger:  # pylint:disable=too-many-instance-attributes
         else:
             _c = _b = _r = ""
         # ADD? "#{self._counter:03d} {dts:+6.3f} ..."
-        return f"{relts:8.3f}  {_c}{lvl.name[0]}{_b}[{modnm}:{lnum}] {_c}{body}{_r}\n"
+        return f"{relts:8.3f}  {_c}{lvl.name[0]}{_b}{loci:<{self._fnmlen}s} {_c}{body}{_r}\n"
 
 
 log = Logger()
