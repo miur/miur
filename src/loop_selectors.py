@@ -14,6 +14,19 @@ from .util.sighandler import route_signals_to_fd
 def handle_SIGWINCH(
     sel: selectors.DefaultSelector, sigfd: int, stdscr: C.window
 ) -> None:
+
+    # HACK: force size reinit (as ncurses only does it in .iniscr())
+    # SRC:OLD: https://post.bytes.com/forum/topic/python/541442-curses-and-resizing-windows
+    C.def_prog_mode()
+    C.endwin()
+    ## HACK:SRC: https://stackoverflow.com/questions/1022957/getting-terminal-width-in-c
+    ##   >> make curses to calc sizes by itself (as it does on each .refresh)
+    ## INFO: actually, "log.*" already does the same, but its IMPL is subject to change
+    # with CE.curses_altscreen(stdscr):
+    #     pass
+    # [_] CHECK: do we even need full .def_prog_mode()/.endwin() here ?
+    stdscr.refresh()
+
     # &next BET:RFC:
     #   * give up on sigfd -- it's unreliable, as it requires some sigaction() anyway
     #   * set flag in handler -- COS we need refresh only once for all signals
@@ -22,15 +35,9 @@ def handle_SIGWINCH(
     si = int.from_bytes(os.read(sigfd, 1))
     snm = signal.Signals(si).name
     sdesc = signal.strsignal(si)
-    log.warning(f"{who} {snm}={si}: {sdesc}")
+    sz = "{}x{}".format(*stdscr.getmaxyx())
+    log.warning(f"{who} {snm}={si}: {sdesc} [{sz}]")
 
-    ## HACK:SRC: https://stackoverflow.com/questions/1022957/getting-terminal-width-in-c
-    ##   >> make curses to calc sizes by itself (as it does on each .refresh)
-    ## INFO: actually, "log.*" already does the same, but its IMPL is subject to change
-    # with CE.curses_altscreen(stdscr):
-    #     pass
-    # [_] CHECK: do we even need full .def_prog_mode()/.endwin() here ?
-    stdscr.refresh()
 
     ## FAIL: get KEY_RESIZE immediately, don't make Epoll wait until next keypress
     # ch = stdscr.getch()

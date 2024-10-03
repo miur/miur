@@ -151,6 +151,7 @@ class RootWidget:
 def _live() -> None:
     log.sep()
     from .app import g_app as g
+    from .widget import RootWidget
 
     g.root_wdg = wdg = RootWidget()
     # wdg.set_entity(FSEntry("/etc/udev"))

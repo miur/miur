@@ -17,6 +17,15 @@ def exitloop(g: AppGlobals) -> None:
 
 
 def resize(g: AppGlobals) -> None:
+    # HACK: force size reinit (as ncurses only does it in .iniscr())
+    # SRC:OLD: https://post.bytes.com/forum/topic/python/541442-curses-and-resizing-windows
+    C.def_prog_mode()
+    C.endwin()
+    g.stdscr.refresh()
+    # HACK: remove KEY_RESIZE from queue to avoid multi-refresh after several resizes
+    #   ALT:FAIL: _ch = g.stdscr.getch(); assert _ch == C.KEY_RESIZE, _ch
+    C.flushinp()
+
     log.info("resize: [{}x{}]".format(*g.stdscr.getmaxyx()))
     ## DEP:configure(--enable-sigwinch)
     # BAD: does not work inside jupyter
