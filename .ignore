@@ -7,6 +7,6 @@
 ## Ignore results for grep/ag/etc.
 /.git/
 /.reuse/
-/_try/
+# /_try/
 /LICENSES/
 /pkg/
