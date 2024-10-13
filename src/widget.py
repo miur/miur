@@ -1,6 +1,6 @@
 import os
-from typing import Callable, Iterable, Protocol, Sequence, TypeVar, override
 from dataclasses import dataclass
+from typing import Callable, Iterable, Protocol, Sequence, TypeVar, override
 
 import _curses as C
 
@@ -24,7 +24,7 @@ class VisibleContext:
 
 
 @dataclass
-class BiIndex:
+class ABIndex:
     above: int  # .above_cursor (cursor not included)
     below: int  # .below_cursor
 
@@ -42,7 +42,7 @@ class NaviWidget:  # pylint:disable=too-many-instance-attributes
         ## MAYBE:HACK: use viewport_height_above/below like cursor/canvas already do
         ##   NICE: you don't need any separate astrangled VAR,
         ##     like self._canvas_viewport_offset for on-screen-relative position of cursor
-        self._viewport = BiIndex(0, 0)  # RENAME? ._viewport_lines.{above,below}
+        self._viewport = ABIndex(0, 0)  # RENAME? ._viewport_lines.{above,below}
         self._viewport_width: int = 0  # <RQ: for right-justified table items
         # WARN:(margin): should be counted in "lines" inof "items"
         #   !! orse margin over several large multiline items may even push cursor out of the viewport
@@ -51,22 +51,41 @@ class NaviWidget:  # pylint:disable=too-many-instance-attributes
         ##   to support bi-directionally growing lists  # <RQ: for usual scrollbar UI
         # i.e. numbers above/below may change at any moment if dir contents changed,
         #   or if sliding window had loaded more contents by triggering top/bot waterline
-        self._canvas = BiIndex(0, 0)  # RENAME? ._canvas_lines.{above,below}
+        self._canvas = ABIndex(0, 0)  # RENAME? ._canvas_lines.{above,below}
         ## NOTE: we use bi-directionally growing "deque" inof "list index magic",
         ##   so we need to keep a pair of left-right indexes too (like with cached lines).
         ## ARCH: cursor is actually a virtual line between "above" and first item "below",
         ##   with currently picked line being "below[0]", i.e. the first item below
         ##   BUT: what if we are at the last item ? shouldn't "below" be 0 to avoid special cases ?
-        self._items = BiIndex(0, 0)  # RENAME? ._items_cached.{above,below}
-        ## HACK: if item under cursor had disappeared or "order-by" have changed the index,
-        ##   we can temporarily re-insert the item into the list and seek for it to find a new index
-        ## RQ: keep cursor in logical continuity
-        self._focused_item: Representable = None  # OLD=self._focused_item
-        # NOTE:(=const): even in multiline item, we will have 1st line specifically focused
-        self._cursor_height_lines: int = 1
-        # self._cursor_item_index: int = 0  # <REMOVE! should be same as "below[0]"
-        # self._viewport_index: int = 0  # <REMOVE? or keep to be able to jump to first item
-        # self._viewport_offset: int = 0  # <REMOVE: may point into the middle of multiline item
+        self._items = ABIndex(0, 0)  # RENAME? ._items_cached.{above,below}
+
+    ## HACK: if item under cursor had disappeared or "order-by" have changed the index,
+    ##   we can temporarily re-insert the item into the list and seek for it to find a new index
+    ## RQ: keep cursor in logical continuity
+    # self._focused_item: Representable = None  # OLD=self._focused_item
+    # NOTE:(=const): even in multiline item, we will have 1st line specifically focused
+    # self._cursor_height_lines: int = 1
+    # self._cursor_item_index: int = 0  # <REMOVE! should be same as "below[0]"
+    # self._viewport_index: int = 0  # <REMOVE? or keep to be able to jump to first item
+    # self._viewport_offset: int = 0  # <REMOVE: may point into the middle of multiline item
+    @property
+    def focused_item(self) -> Representable:
+        if not self._lst:
+            # BET? return dummy placeholder for empty dirs
+            #   BAD! placeholder is *content*, it shouldn't be *focused* either
+            #   ALT: always include dir itself in listing -- so we could do ops from inside the dir
+            raise IndexError("empty list")
+        idx = self._items.above
+        ## [_] TODO?IDEA: allow cursor to be *after* last item
+        #   NICE: eliminate special case for viewport/canvas
+        #     CASE: for "items" if below=0, then current item is the last one from above=
+        #       ~~ OR: first one from above, if we do "deque"-esque container
+        #   ARCH: treat cursor as a thin line (i.e. having virtual height=0)
+        #     CASE: when last item is very large multiline, placing cursor after it will represent
+        #       that scrolling through whole item had finished -- and bot canvas is snapped to bot viewport.
+        # if self._items.below == 0:
+        #     idx -= 1
+        return self._lst[idx]
 
     ## THINK: does .height=0 even has sense ?
     # def height(self) -> int:
@@ -109,38 +128,70 @@ class NaviWidget:  # pylint:disable=too-many-instance-attributes
         #   WARN: on first assign(), viewport height may still be =0, due to -resize() being called later
         ## TEMP: reset *cursor* position on -assign()
         self._items.above = 0
-        self._items.below = len(self._lst) - 1
-        self._focused_item = self._lst[self._items.above]
+        self._items.below = len(self._lst)
 
     # MAYBE: make ItemWidget to calc() item height and draw it (or only ItemXfm)
     #   WARN: don't store "index" inside ItemWidget << PERF:(slow): rebuild on each order-by
     #     ~~ though, I can pass list index ctx into ItemWidget.render(ctx[index=i])
-    def _itemheight(self, index: int) -> int:
-        return self._lst[index].name.count("\n") + 1
+    @staticmethod
+    def _itemheight(item: Representable) -> int:
+        return item.name.count("\n") + 1
 
     # RENAME? pick_item_from_cursor_below
     def move_cursor_down(self) -> None:
         # FIXME: also scroll canvas/viewport if cursor is on last item, but it's only partially shown
-        if not self._items.below:
+        assert self._items.below > 0
+        if self._items.below <= 1:
             return
-        self._items.above += 1
-        self._items.below -= 1
-        ih = self._focused_item.name.count("\n") + 1  # TEMP: =_itemheight()
-        self._focused_item = self._lst[self._items.above]
+        margin = self._viewport_margin_lines
+        ih = self._itemheight(self.focused_item)
         self._canvas.above += ih
         self._canvas.below -= ih
-        margin = self._viewport_margin_lines
-        if self._viewport.below - ih >= margin:
+        # available_offset = self._viewport.below - margin
+        if self._canvas.below <= margin:
+            offset = min(self._viewport.below - margin, ih)
+            self._viewport.above += offset
+            self._viewport.below -= offset
+        elif self._viewport.below >= ih + margin:
             self._viewport.above += ih
             self._viewport.below -= ih
-        elif self._canvas.below >= margin:
-            adjustment = self._viewport.below - margin
-            self._viewport.above += adjustment
-            self._viewport.below -= adjustment
         else:
-            self._viewport.above += ih
-            self._viewport.below -= ih
+            raise NotImplementedError("unexpected")
+            # self._viewport.above = max
+            # self._viewport.below = 0
 
+        # TODO: make fn accept other values
+        delta = 1
+        # [_] WARN: for large items >4 lines we need "scroll-first" strategy inof "jump-fit-next"
+        self._items.above += delta
+        self._items.below -= delta
+
+    def move_cursor_up(self) -> None:
+        # FIXME: also scroll canvas/viewport if cursor is on first item, but it's only partially shown
+        assert self._items.above >= 0
+        if self._items.above <= 0:
+            return
+        margin = self._viewport_margin_lines
+        ih = self._itemheight(self.focused_item)
+        self._canvas.above -= ih
+        self._canvas.below += ih
+        # available_offset = self._viewport.below - margin
+        if self._canvas.above <= margin:
+            offset = min(self._viewport.above - margin, ih)
+            self._viewport.above -= offset
+            self._viewport.below += offset
+        elif self._viewport.above >= ih + margin:
+            self._viewport.above -= ih
+            self._viewport.below += ih
+        else:
+            raise NotImplementedError("unexpected")
+            # self._viewport.above = 0
+            # self._viewport.below = max
+        # TODO: make fn accept other values
+        delta = 1
+        # [_] WARN: for large items >4 lines we need "scroll-first" strategy inof "jump-fit-next"
+        self._items.above -= delta
+        self._items.below += delta
 
     # RENAME:(shift)? -> "pan"
     # ALT:(merge): shift(self, *, abs=None, rel=None)
@@ -167,25 +218,25 @@ class NaviWidget:  # pylint:disable=too-many-instance-attributes
             last = len(self._lst) - 1
             # ALT: pin last item bot to the vp bot (inof last item top to the vp top)
             #   << much harder, as you need to predict when last item's last line hits vp bot
-            while idx < last and off >= (ih := self._itemheight(idx)):
+            while idx < last and off >= (ih := self._itemheight(self._lst[idx])):
                 idx += 1
                 off -= ih
             # ALT:HACK: allowing {off<0|off>=ih} will allow scrolling viewport past first/last item
             # ALT?NICE? wrap from lst beg if off>=ih (treat list as a ring)
-            if off >= (ih := self._itemheight(idx)):
+            if off >= (ih := self._itemheight(self._lst[idx])):
                 # NOTE: we allow scrolling until [only] last line of last item is left on the screen:
                 #   = to allow displaying large items, which have more lines than fit into screen
                 off = ih - 1
         elif off < 0:
             while idx > 0 and off < 0:  # pylint:disable=chained-comparison
                 idx -= 1
-                off += self._itemheight(idx)
+                off += self._itemheight(self._lst[idx])
             # ALT:HACK: allowing {off<0|off>=ih} will allow scrolling viewport past first/last item
             if off < 0:  # pylint:disable=consider-using-max-builtin
                 off = 0
 
         # assert 0 <= idx <= last
-        # assert 0 <= off <= self._itemheight(idx)
+        # assert 0 <= off <= self._itemheight(self._lst[idx])
         self._viewport_index = idx
         self._viewport_offset = off
 
@@ -308,7 +359,7 @@ class NaviWidget:  # pylint:disable=too-many-instance-attributes
 
         # stdscr.move(self._viewport.above, 0)
         cursor_y = self._viewport.above
-        text = self._focused_item.name
+        text = self.focused_item.name
         stdscr.addstr(cursor_y, 3, text, c_cursor)
 
         ## TODO: draw interlacingly one from below / one from above (based on prev move direction)
@@ -318,7 +369,7 @@ class NaviWidget:  # pylint:disable=too-many-instance-attributes
         while idx > 0:
             idx -= 1
             item = self._lst[idx]
-            ih = item.name.count("\n") + 1  # TEMP: =_itemheight()
+            ih = self._itemheight(item)
             y -= ih
             # TEMP: only draw fully-fitting multiline items
             #   WARN! we assume that: { top of NaviWidget = top of RootWidget = 0,0 }
@@ -329,19 +380,21 @@ class NaviWidget:  # pylint:disable=too-many-instance-attributes
         ## TEMP:WARN: we assume non-empty list
         last = self._items.above + 1 + self._items.below
         idx = self._items.above + 1  # NOTE: skip cursor, start from next item
-        ih = self._focused_item.name.count("\n") + 1  # TEMP: =_itemheight()
-        y = self._viewport.above + ih   # HACK: we need to skip previously drawn cursor too
+        ih = self._itemheight(self.focused_item)
+        # HACK: we need to skip previously drawn cursor too
+        y = self._viewport.above + ih
         while idx < last:
             item = self._lst[idx]
-            ih = item.name.count("\n") + 1  # TEMP: =_itemheight()
+            ih = self._itemheight(item)
             # TEMP: only draw fully-fitting multiline items
             #   WARN! we assume that: { top of NaviWidget = top of RootWidget = 0,0 }
-            if y + ih >= self._viewport.above + self._viewport.below:  # OR? self._canvas.below
+            if (
+                y + ih >= self._viewport.above + self._viewport.below
+            ):  # OR? self._canvas.below
                 break
             stdscr.addstr(y, 3, item.name, c_item)
             y += ih
             idx += 1
-
 
 
 def draw_list(
@@ -448,7 +501,12 @@ class RootWidget:
         # c = self._vctx
         # newpos = c.wndcurpos0 + modifier
         # c.wndcurpos0 = max(min(newpos, c.wndmaxlen - 1, len(self._lst) - 1), 0)
-        self._wdg.move_cursor_down()
+        if modifier < 0:
+            self._wdg.move_cursor_up()
+        elif modifier > 0:
+            self._wdg.move_cursor_down()
+        else:
+            raise NotImplementedError("should refresh")
 
     def resize(self, stdscr: C.window) -> None:
         self._wdg.resize(*stdscr.getmaxyx())
