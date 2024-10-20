@@ -87,77 +87,157 @@ class NaviWidget:  # pylint:disable=too-many-instance-attributes
     # NOTE: elastic scroll, where "step" is anything between 1 line/word or whole multiline item,
     #   depending on what less disrupts the perception flow
     def step_by(self, steps: int) -> None:
-        if steps in (-1, 1):
-            # TODO:ALG: for large items >4 lines we need "scroll-first" strategy inof "jump-fit-next"
-            # focused = self._lst[self._cursor_item_lstindex]
-            # ih = self._itemheight(focused)
-            # if ih > 4:
-            #     TODO_scroll_by(3)_OR_keep_at_margin()
-            #     if total_offset > ih:
-            #         idx += 1
-            # else:
-            #     TODO_scroll_by(ih)_OR_keep_at_margin()
-            #     idx += 1
-            # TODO: scroll canvas/viewport if cursor is on first/last item, but it's only partially shown
-            newidx = (pidx := self._cursor_item_lstindex) + steps
-            self._viewport_followeditem_lstindex = self._cursor_item_lstindex = newidx
-
-            rng = range(min(pidx, newidx), max(pidx, newidx))
-            hlines = sum(self._itemheight(self._lst[i]) for i in rng)
-            # RENAME: delta/advance/shift
-            offset = -hlines if steps < 0 else hlines
-            # TEMP:FAIL: can't scroll, list is limited to the size of viewport
-            # TODO: offset=0 if linesfromtop < margin or linesfromtop > h - margin
-            self._viewport_followeditem_linesfromtop += offset
-        else:
+        if steps not in (-1, 1):
             raise NotImplementedError("TEMP:WiP")
+        # TODO:ALG: for large items >4 lines we need "scroll-first" strategy inof "jump-fit-next"
+        # focused = self._lst[self._cursor_item_lstindex]
+        # ih = self._itemheight(focused)
+        # if ih > 4:
+        #     TODO_scroll_by(3)_OR_keep_at_margin()
+        #     if total_offset > ih:
+        #         idx += 1
+        # else:
+        #     TODO_scroll_by(ih)_OR_keep_at_margin()
+        #     idx += 1
+        # TODO: scroll canvas/viewport if cursor is on first/last item, but it's only partially shown
+        ## TEMP: always step by whole item
+        idx = self._cursor_item_lstindex
+        newidx = idx + steps
+        last = len(self._lst) - 1
 
-    def move_cursor_by(self, delta: int) -> None:
-        xs = self._items
-        if xs.above < 0 or xs.below <= 1 or (xs.above + xs.below) != len(self._lst):
-            # return
-            raise RuntimeError(xs)
-        idx = xs.above = (pidx := xs.above) + delta
-        xs.below -= delta
-        rng = range(min(pidx, idx), max(pidx, idx))
+        self._cursor_item_lstindex = newidx
+        self._viewport_followeditem_lstindex = newidx
+
+        rng = range(min(idx, newidx), max(idx, newidx))
         hlines = sum(self._itemheight(self._lst[i]) for i in rng)
-        self.scroll_by(-hlines if delta < 0 else hlines)
+        # RENAME: delta/advance/shift
+        offset = -hlines if steps < 0 else hlines
+        # TEMP:FAIL: can't scroll, list is limited to the size of viewport
+        # TODO: offset=0 if linesfromtop < margin or linesfromtop > h - margin
+        # self._viewport_followeditem_linesfromtop += offset
 
-    def scroll_by(self, advance: int) -> None:
-        cs, vp = self._canvas, self._viewport
-        # WARN: "vp" can be negative, when cursor is outside of vp
-        #   TODO: assert if viewport is still inside allowed boundaries
-        #     =i.e. max "one screen minus one item" above/below the canvas
-        if cs.above < 0 or cs.below < 0 or (cs.above + cs.below) < len(self._lst):
-            raise RuntimeError(cs)
-
-        # WARN: if vp at bot -- we can modify only vp, keeping cs the same (as cursor is fixed)
-        #   = "true scroll" w/o moving cursor
-        cs.above += advance
-        cs.below -= advance
-
+        h = self._viewport_height_lines
         margin = self._viewport_margin_lines
-        # available_offset = vp.below - margin
-        # FIXME: mind-bogging mess
-        if advance > 0:
-            if cs.below <= margin:
-                # RENAME: residue / alignment
-                offset = min(vp.below - margin, advance)
-            elif vp.below >= advance + margin:
-                offset = advance
-            else:
-                offset = vp.below
-                # raise NotImplementedError("unexpected")
-        else:
-            if cs.above <= margin:
-                offset = -min(vp.above - margin, advance)
-            elif vp.above >= advance + margin:
-                offset = -advance
-            else:
-                offset = -vp.above
-                # raise NotImplementedError("unexpected")
-        vp.above += offset
-        vp.below -= offset
+        pos = self._viewport_followeditem_linesfromtop
+        knock = 0
+        # ALT:IDEA:(step_incr=steps): only allow for "step_by(arg)" to move by one item/index,
+        #   and use "arg" to pick speed of scrolling multiline items instead
+        step_incr = 2  # RENAME? single_step/step_advance
+        advance = int(step_incr * steps)  # OR: math.round(abs())
+
+        # pylint:disable=no-else-raise
+        # FSM:(x4): sign/idx/vp
+
+        if steps > 0:
+
+            # if sum(f_h(0 .. newidx)) < margin:
+            #     raise NotImplementedError()
+            # elif sum(f_h(newidx .. len(self._lst))) < margin:
+            #     raise NotImplementedError()
+
+            if idx < 0 or idx > last:
+                raise IndexError(idx)
+            elif idx < last:
+                raise NotImplementedError("TBD")
+
+                # ~~~
+
+                if pos <= -ih:
+                    raise NotImplementedError("restricted; sync lost: vp had drifted below cursor")
+                elif pos >= h:
+                    raise NotImplementedError("restricted; sync lost: vp had drifted above cursor")
+                elif pos < 0:
+                    raise NotImplementedError("restricted; only *last* large multine item can start above vp")
+
+                elif pos < h - margin - 1:
+                    raise NotImplementedError("TBD: normal ops; move both index and pos")
+
+                    ## FIXME: scroll small items h(item)<4 whole by each step, and large ones by step_incr,
+                    ##   transferring advancement residue onto next item
+                    ## WARN: if steps>1 and will cross margin -- we should apply block from here, and then next block from margin
+                    # newidx = idx + steps
+                    # self._cursor_item_lstindex = newidx
+                    # self._viewport_followeditem_lstindex = newidx
+                    # pos += advance
+                elif pos < h:
+                    raise NotImplementedError("TBD: margin ops; keep pos until we at the end of the list")
+                else:
+                    raise ValueError("unexpected")
+
+            elif idx == last:
+                ih = self._itemheight(self._lst[idx])
+                if pos <= -ih:
+                    # ALT: allow gradual alignment, like in {hidden_part < 0}
+                    raise NotImplementedError(
+                        "last item is far above vp, nothing on the screen"
+                    )
+                elif pos >= h:
+                    # ALT: scroll drifted vp until item becomes visible -> then show item hidden_part as usual
+                    # OR: imm jump vp to the current cursor position *and* move cursor by one step as usual
+                    # OR: jump cursor to current drifted vp top/bot focuseditem based on if <j/k> was pressed
+                    raise NotImplementedError(
+                        "currently restricted; last item first line should be visible"
+                    )
+                elif (
+                    pos < h - ih
+                ):  # NOTE:(ih>h is OK): multiline items can be larger than viewport
+                    # CHECK: already implemented gradual alignment -- will it work or not? CHECK: is it intuitive ?
+                    # [_] BAD:FIXME: should do nothing for short lists {sum(h(i))<h}
+                    raise NotImplementedError(
+                        "currently restricted; last item bot shouldn't be above vp bot"
+                    )
+                else:
+                    # RENAME? visible_{part,below,range,room}/preview_{span,window}
+                    visible_room = h - pos
+                    hidden_part = ih - visible_room
+                    if hidden_part > 0:
+                        # NOTE:(zoom-out): move vp away to make room for the last item to be visible on screen
+                        #   OK: "pos" may become large negative to fit bot part of large multiline item into vp
+                        if advance > hidden_part:
+                            knock = advance - hidden_part
+                            pos -= hidden_part
+                        else:
+                            pos -= advance
+                    elif hidden_part == 0:
+                        # NOTE: detect the attempt to cross the border (bot of last multiline item)
+                        # TODO: visual "knock()" for 100ms when attempting to scroll past top/bot item
+                        knock = advance
+                    elif hidden_part < 0:
+                        # NOTE: gradually align bot of last item with bot of vp
+                        #   ~~ may happen if vp was centered around last item first
+                        # ALT:OPT: allow scrolling till only last line of last item visible
+                        #   i.e. {pos -= advance} until {ih + pos == 1}
+                        empty_space = -hidden_part
+                        if advance > empty_space:
+                            knock = advance - empty_space
+                            pos += empty_space
+                        else:
+                            pos += advance
+
+        elif steps < 0:
+            raise NotImplementedError()
+
+            # elif sum(f_h(0 .. newidx)) < margin:
+            #     raise NotImplementedError()
+            # elif sum(f_h(newidx .. len(self._lst))) < margin:
+            #     raise NotImplementedError()
+
+            if pos < 0:
+                raise NotImplementedError("past last multiline item")
+            elif pos == 0:
+                raise NotImplementedError()
+            elif pos < margin:
+                raise NotImplementedError()
+            elif pos < h - margin - 1:
+                raise NotImplementedError()
+            elif pos < h - 1:
+                raise NotImplementedError()
+            elif pos == h - 1:
+                raise NotImplementedError()
+            elif pos >= h:
+                raise NotImplementedError()
+
+    # def scroll_by(self, advance: int) -> None:
 
     def redraw(self, stdscr: C.window) -> None:
         # draw_list(stdscr, self._lst, c)
