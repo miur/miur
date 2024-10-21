@@ -43,20 +43,22 @@ class NaviWidget:  # pylint:disable=too-many-instance-attributes
             raise IndexError("empty list")
         return self._lst[self._cursor_item_lstindex]
 
-    def resize(self, h: int, w: int) -> None:
-        ph = self._viewport_height_lines
-        self._viewport_height_lines = h
-        self._viewport_width_columns = w
-        self._viewport_margin_lines = h // 6  # OR: fixed=2
+    def resize(self, vh: int, vw: int) -> None:
+        pvh = self._viewport_height_lines
+        self._viewport_height_lines = vh
+        self._viewport_width_columns = vw
+        self._viewport_margin_lines = vh // 6  # OR: fixed=2
         # KEEP: self._viewport_followeditem_lstindex
         # TODO: adjust resulting offset to align onto margin
-        if ph > 0 and (ratio := self._viewport_followeditem_linesfromtop / ph) > 0:
-            self._viewport_followeditem_linesfromtop = int(h * ratio)
+        # if pvh > 0 and (ratio := self._viewport_followeditem_linesfromtop / pvh) > 0:
+        #     self._viewport_followeditem_linesfromtop = int(vh * ratio)
+        self._viewport_followeditem_linesfromtop = 0
+
 
     # CASE:(lightweight): to be able to re-assign ~same list after external xfm, e.g. after "order-by"
     def assign(self, lst: Sequence[Representable]) -> None:
         pidx = self._cursor_item_lstindex
-        focused = self._lst[pidx]
+        focused = self._lst[pidx] if getattr(self, "_lst", None) else None
         # WARN: whole function should be atomic
         #   i.e. "cursor,canvas" should always be in boundaries of "lst"
         # TODO: pre-load only visible part fitting into viewport
@@ -66,7 +68,7 @@ class NaviWidget:  # pylint:disable=too-many-instance-attributes
         #   and seek for it to find a new index, then pick item before or after expected position
         # NOTE: search for the item if "order-by" have changed its index
         ## TEMP: reset *cursor* position on -assign()
-        if focused is not lst[pidx]:
+        if focused is not None and focused is not lst[pidx]:
             try:
                 newidx = lst.index(focused)
             except ValueError:
@@ -87,6 +89,7 @@ class NaviWidget:  # pylint:disable=too-many-instance-attributes
     # NOTE: elastic scroll, where "step" is anything between 1 line/word or whole multiline item,
     #   depending on what less disrupts the perception flow
     def step_by(self, steps: int) -> None:
+        return  # TEMP
         if steps not in (-1, 1):
             raise NotImplementedError("TEMP:WiP")
         # TODO:ALG: for large items >4 lines we need "scroll-first" strategy inof "jump-fit-next"
@@ -143,14 +146,22 @@ class NaviWidget:  # pylint:disable=too-many-instance-attributes
                 # ~~~
 
                 if pos <= -ih:
-                    raise NotImplementedError("restricted; sync lost: vp had drifted below cursor")
+                    raise NotImplementedError(
+                        "restricted; sync lost: vp had drifted below cursor"
+                    )
                 elif pos >= h:
-                    raise NotImplementedError("restricted; sync lost: vp had drifted above cursor")
+                    raise NotImplementedError(
+                        "restricted; sync lost: vp had drifted above cursor"
+                    )
                 elif pos < 0:
-                    raise NotImplementedError("restricted; only *last* large multine item can start above vp")
+                    raise NotImplementedError(
+                        "restricted; only *last* large multine item can start above vp"
+                    )
 
                 elif pos < h - margin - 1:
-                    raise NotImplementedError("TBD: normal ops; move both index and pos")
+                    raise NotImplementedError(
+                        "TBD: normal ops; move both index and pos"
+                    )
 
                     ## FIXME: scroll small items h(item)<4 whole by each step, and large ones by step_incr,
                     ##   transferring advancement residue onto next item
@@ -160,7 +171,9 @@ class NaviWidget:  # pylint:disable=too-many-instance-attributes
                     # self._viewport_followeditem_lstindex = newidx
                     # pos += advance
                 elif pos < h:
-                    raise NotImplementedError("TBD: margin ops; keep pos until we at the end of the list")
+                    raise NotImplementedError(
+                        "TBD: margin ops; keep pos until we at the end of the list"
+                    )
                 else:
                     raise ValueError("unexpected")
 
@@ -240,95 +253,69 @@ class NaviWidget:  # pylint:disable=too-many-instance-attributes
     # def scroll_by(self, advance: int) -> None:
 
     def redraw(self, stdscr: C.window) -> None:
-        # draw_list(stdscr, self._lst, c)
         # draw_footer(stdscr)
         # ARCH:WARN: we actually need to render whatever is *shown in viewport* (even if cursor is far outside)
         #   COS: when cursor is outside -- most "write" actions will be disabled
         #   => you always need to know the span of items present in viewport to be rendered in O(1)
         c_item = C.color_pair(ColorMap.default)
         c_auxinfo = C.color_pair(ColorMap.auxinfo)
+        c_iteminfo = C.color_pair(ColorMap.iteminfo)
+        c_pfxrel = c_auxinfo
+        c_pfxidx = c_iteminfo
         c_cursor = C.A_REVERSE | C.A_BOLD  # OR: C.color_pair(ColorMap.cursor)
 
-        idx = self._items.above
-        y = self._viewport.above
-        while idx > 0:
-            idx -= 1
-            item = self._lst[idx]
-            ih = self._itemheight(item)
-            y -= ih
-            # TEMP: only draw fully-fitting multiline items
-            #   WARN! we assume that: { top of NaviWidget = top of RootWidget = 0,0 }
-            if y < 0:  # OR? self._canvas.above
-                break
-            nm, _, aux = item.name.partition("\n")
-            stdscr.addstr(y, 3, nm, c_item)
-            for i, x in enumerate(aux.split("\n")):
-                stdscr.addstr(y + 1 + i, 5, x, c_auxinfo)
+        # log.verbose(f"list: [<={vp.h}/{len(lst)}]")
 
-        cursor_y = self._viewport.above
-        nm, _, aux = self.focused_item.name.partition("\n")
-        stdscr.addstr(cursor_y, 3, nm, c_cursor)
-        for i, x in enumerate(aux.split("\n")):
-            stdscr.addstr(cursor_y + 1 + i, 5, x, c_cursor)
+        # self._viewport_margin_lines
+        ci = self._cursor_item_lstindex
+        vh = self._viewport_height_lines
+        vw = self._viewport_width_columns
+        top_idx = self._viewport_followeditem_lstindex
+        # WARN! we assume that: { top of NaviWidget = top of RootWidget = 0,0 }
+        top_y = self._viewport_followeditem_linesfromtop
+        while top_idx > 0 and top_y > 0:
+            top_idx -= 1
+            top_y -= self._itemheight(self._lst[top_idx])
+        # log.trace(f"{top_y} {top_idx=}")
 
-        ## TEMP:WARN: we assume non-empty list
-        last = self._items.above + 1 + self._items.below
-        idx = self._items.above + 1  # NOTE: skip cursor, start from next item
-        ih = self._itemheight(self.focused_item)
-        # HACK: we need to skip previously drawn cursor too
-        y = self._viewport.above + ih
-        while idx < last:
-            item = self._lst[idx]
-            ih = self._itemheight(item)
-            # TEMP: only draw fully-fitting multiline items
-            #   WARN! we assume that: { top of NaviWidget = top of RootWidget = 0,0 }
-            if (
-                y + ih >= self._viewport.above + self._viewport.below
-            ):  # OR? self._canvas.below
-                break
-            nm, _, aux = item.name.partition("\n")
-            stdscr.addstr(y, 3, nm, c_item)
-            for i, x in enumerate(aux.split("\n")):
-                stdscr.addstr(y + 1 + i, 5, x, c_auxinfo)
-            y += ih
-            idx += 1
+        last = len(self._lst) - 1
+        i, y = top_idx, top_y
+        while i <= last and y < vh:
+            item = self._lst[i]
+            rel = i - top_idx
+            pfxrel = f"{1+rel:02d}| "
+            pfxidx = f"{1+i:03d}{">" if i == ci else ":"} "
+            indent = len(pfxrel)+len(pfxidx)
+            nm, *lines = item.name.split("\n")
+            py = y
+            if 0 <= y < vh:
+                stdscr.addstr(y, 0, pfxrel, c_auxinfo)
+                stdscr.addstr(y, len(pfxrel), pfxidx, c_cursor if i == ci else c_iteminfo)
+                stdscr.addstr(y, indent, nm[:vw-indent], c_cursor if i == ci else c_item)
+            y += 1
+            for l in lines:
+                if 0 <= y < vh:
+                    # stdscr.addstr(y, 2, "|", c_auxinfo)
+                    stdscr.addstr(y, indent + 2, l[:vw-indent-2], c_cursor if i == ci else c_iteminfo)
+                y += 1
+            if y - py != self._itemheight(item):
+                log.error(f"{y - py} != {self._itemheight(item)}")
+                raise RuntimeError("WTF: this exception is silently ignored")
+            i += 1
+
+        ## NOTE: draw cursor AGAIN after footer (i.e. over-draw on top of full list)
+        ##   NICE: no need to hassle with storing cursor prefix length for cx/cy
+        ##   NICE: can redraw only two lines (prev item and cursor) inof whole list
+        # cx = len(_pfx(vctx.wndcurpos0))
+        # _draw_item_at(vctx.wndcurpos0, citem)
+        # stdscr.move(vctx.wndcurpos0, cx)
+        ## OR:BET: only change attributes of already printed line
+        # cx = len(_pfx(vctx.wndcurpos0))
+        # cn = len(lst[vctx.wndcurpos0 + vctx.wndabsoff0].name)
+        # stdscr.chgat(vctx.wndcurpos0, cx, cn, ccurs)
 
 
-def draw_list(
-    stdscr: C.window, lst: Sequence[Representable], vctx: VisibleContext
-) -> None:
-    log.verbose(f"list: [<={vctx.wndmaxlen}/{len(lst)}]")
 
-    def _pfx(i: int) -> str:
-        idx = 1 + i + vctx.wndabsoff0
-        cur = ">" if i == vctx.wndcurpos0 else ":"
-        return f"{1+i:02d}| {idx:03d}{cur} "
-
-    citem = C.color_pair(ColorMap.default)
-    caux = C.color_pair(ColorMap.auxinfo)
-    ccurs = C.A_REVERSE | C.A_BOLD  # OR: C.color_pair(ColorMap.cursor)
-
-    def _draw_item_at(i: int, attr: int) -> None:
-        idx = i + vctx.wndabsoff0
-        pfx = _pfx(i)
-        stdscr.addstr(i, 0, pfx, caux)
-        text = lst[idx].name
-        stdscr.addstr(text, attr)
-        # log.verbose(f"{pfx}{text}")  # :{attr}:
-
-    for i in range(0, min([vctx.wndmaxlen, len(lst)])):
-        _draw_item_at(i, citem)
-
-    ## NOTE: draw cursor AGAIN after footer (i.e. over-draw on top of full list)
-    ##   NICE: no need to hassle with storing cursor prefix length for cx/cy
-    ##   NICE: can redraw only two lines (prev item and cursor) inof whole list
-    # cx = len(_pfx(vctx.wndcurpos0))
-    # _draw_item_at(vctx.wndcurpos0, citem)
-    # stdscr.move(vctx.wndcurpos0, cx)
-    ## OR:BET: only change attributes of already printed line
-    cx = len(_pfx(vctx.wndcurpos0))
-    cn = len(lst[vctx.wndcurpos0 + vctx.wndabsoff0].name)
-    stdscr.chgat(vctx.wndcurpos0, cx, cn, ccurs)
 
 
 # def draw_footer(stdscr: C.window) -> None:
