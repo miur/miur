@@ -25,6 +25,7 @@ class NaviWidget:  # pylint:disable=too-many-instance-attributes
         self._viewport_followeditem_lstindex = 0
         # NOTE: will become negative *only* when scrolling past first line of last multiline item
         self._viewport_followeditem_linesfromtop = 0
+        self._viewport_origin_yx = (0, 0)
         self._viewport_height_lines = 0
         self._viewport_width_columns = 0  # <RQ: for right-justified table items
         # WARN:(margin): should be counted in "lines" inof "items"
@@ -43,8 +44,9 @@ class NaviWidget:  # pylint:disable=too-many-instance-attributes
             raise IndexError("empty list")
         return self._lst[self._cursor_item_lstindex]
 
-    def resize(self, vh: int, vw: int) -> None:
-        pvh = self._viewport_height_lines
+    def resize(self, vh: int, vw: int, origin: tuple[int, int] = (0, 0)) -> None:
+        # pvh = self._viewport_height_lines
+        self._viewport_origin_yx = origin
         self._viewport_height_lines = vh
         self._viewport_width_columns = vw
         self._viewport_margin_lines = vh // 6  # OR: fixed=2
@@ -53,7 +55,6 @@ class NaviWidget:  # pylint:disable=too-many-instance-attributes
         # if pvh > 0 and (ratio := self._viewport_followeditem_linesfromtop / pvh) > 0:
         #     self._viewport_followeditem_linesfromtop = int(vh * ratio)
         self._viewport_followeditem_linesfromtop = 0
-
 
     # CASE:(lightweight): to be able to re-assign ~same list after external xfm, e.g. after "order-by"
     def assign(self, lst: Sequence[Representable]) -> None:
@@ -88,38 +89,25 @@ class NaviWidget:  # pylint:disable=too-many-instance-attributes
 
     # NOTE: elastic scroll, where "step" is anything between 1 line/word or whole multiline item,
     #   depending on what less disrupts the perception flow
+    # TODO:OPT: always step by whole item ~~ should be the same as "step_by(+/-inf)"
     def step_by(self, steps: int) -> None:
-        return  # TEMP
         if steps not in (-1, 1):
-            raise NotImplementedError("TEMP:WiP")
-        # TODO:ALG: for large items >4 lines we need "scroll-first" strategy inof "jump-fit-next"
-        # focused = self._lst[self._cursor_item_lstindex]
-        # ih = self._itemheight(focused)
-        # if ih > 4:
-        #     TODO_scroll_by(3)_OR_keep_at_margin()
-        #     if total_offset > ih:
-        #         idx += 1
-        # else:
-        #     TODO_scroll_by(ih)_OR_keep_at_margin()
-        #     idx += 1
-        # TODO: scroll canvas/viewport if cursor is on first/last item, but it's only partially shown
-        ## TEMP: always step by whole item
+            raise NotImplementedError("DECI:WiP")
+
         idx = self._cursor_item_lstindex
-        newidx = idx + steps
-        last = len(self._lst) - 1
+        # newidx = idx + steps
+        # self._cursor_item_lstindex = newidx
+        # self._viewport_followeditem_lstindex = newidx
 
-        self._cursor_item_lstindex = newidx
-        self._viewport_followeditem_lstindex = newidx
-
-        rng = range(min(idx, newidx), max(idx, newidx))
-        hlines = sum(self._itemheight(self._lst[i]) for i in rng)
+        # rng = range(min(idx, newidx), max(idx, newidx))
+        # hlines = sum(self._itemheight(self._lst[i]) for i in rng)
         # RENAME: delta/advance/shift
-        offset = -hlines if steps < 0 else hlines
+        # offset = -hlines if steps < 0 else hlines
         # TEMP:FAIL: can't scroll, list is limited to the size of viewport
-        # TODO: offset=0 if linesfromtop < margin or linesfromtop > h - margin
+        # TODO: offset=0 if linesfromtop < margin or linesfromtop > vh - margin
         # self._viewport_followeditem_linesfromtop += offset
 
-        h = self._viewport_height_lines
+        vh = self._viewport_height_lines
         margin = self._viewport_margin_lines
         pos = self._viewport_followeditem_linesfromtop
         knock = 0
@@ -129,48 +117,53 @@ class NaviWidget:  # pylint:disable=too-many-instance-attributes
         advance = int(step_incr * steps)  # OR: math.round(abs())
 
         # pylint:disable=no-else-raise
-        # FSM:(x4): sign/idx/vp
-
+        # ARCH:FSM:(x4): sign/idx/vp/size
         if steps > 0:
 
-            # if sum(f_h(0 .. newidx)) < margin:
-            #     raise NotImplementedError()
-            # elif sum(f_h(newidx .. len(self._lst))) < margin:
-            #     raise NotImplementedError()
+            last = len(self._lst) - 1
 
             if idx < 0 or idx > last:
                 raise IndexError(idx)
             elif idx < last:
-                raise NotImplementedError("TBD")
 
-                # ~~~
-
-                if pos <= -ih:
+                if pos >= vh:
                     raise NotImplementedError(
-                        "restricted; sync lost: vp had drifted below cursor"
-                    )
-                elif pos >= h:
-                    raise NotImplementedError(
-                        "restricted; sync lost: vp had drifted above cursor"
+                        "TEMP: restricted; sync lost: vp had drifted above cursor"
                     )
                 elif pos < 0:
-                    raise NotImplementedError(
-                        "restricted; only *last* large multine item can start above vp"
-                    )
-
-                elif pos < h - margin - 1:
+                    if pos <= -ih:
+                        raise NotImplementedError(
+                            "TEMP: restricted; sync lost: vp had drifted below cursor"
+                        )
+                    else:
+                        raise NotImplementedError(
+                            "TEMP: restricted; only *last* large multine item can start above vp"
+                        )
+                elif pos < vh - margin - 1:
                     raise NotImplementedError(
                         "TBD: normal ops; move both index and pos"
                     )
 
-                    ## FIXME: scroll small items h(item)<4 whole by each step, and large ones by step_incr,
+                    ## FIXME: scroll small items vh(item)<4 whole by each step, and large ones by step_incr,
                     ##   transferring advancement residue onto next item
-                    ## WARN: if steps>1 and will cross margin -- we should apply block from here, and then next block from margin
+                    # TODO:ALG: for large items >4 lines we need "scroll-first" strategy inof "jump-fit-next"
+                    # focused = self._lst[self._cursor_item_lstindex]
+                    # ih = self._itemheight(focused)
+                    # if ih > 4:
+                    #     TODO_scroll_by(3)_OR_keep_at_margin()
+                    #     if total_offset > ih:
+                    #         idx += 1
+                    # else:
+                    #     TODO_scroll_by(ih)_OR_keep_at_margin()
+                    #     idx += 1
+
+                    ## WARN: if steps>1 and will cross margin -- we should apply block from here,
+                    ##   and then next block from margin
                     # newidx = idx + steps
                     # self._cursor_item_lstindex = newidx
                     # self._viewport_followeditem_lstindex = newidx
                     # pos += advance
-                elif pos < h:
+                elif pos < vh:
                     raise NotImplementedError(
                         "TBD: margin ops; keep pos until we at the end of the list"
                     )
@@ -184,7 +177,7 @@ class NaviWidget:  # pylint:disable=too-many-instance-attributes
                     raise NotImplementedError(
                         "last item is far above vp, nothing on the screen"
                     )
-                elif pos >= h:
+                elif pos >= vh:
                     # ALT: scroll drifted vp until item becomes visible -> then show item hidden_part as usual
                     # OR: imm jump vp to the current cursor position *and* move cursor by one step as usual
                     # OR: jump cursor to current drifted vp top/bot focuseditem based on if <j/k> was pressed
@@ -192,16 +185,17 @@ class NaviWidget:  # pylint:disable=too-many-instance-attributes
                         "currently restricted; last item first line should be visible"
                     )
                 elif (
-                    pos < h - ih
-                ):  # NOTE:(ih>h is OK): multiline items can be larger than viewport
+                    pos < vh - ih
+                ):  # NOTE:(ih>vh is OK): multiline items can be larger than viewport
                     # CHECK: already implemented gradual alignment -- will it work or not? CHECK: is it intuitive ?
-                    # [_] BAD:FIXME: should do nothing for short lists {sum(h(i))<h}
+                    # [_] BAD:FIXME: should do nothing for short lists {sum(vh(i))<vh}
                     raise NotImplementedError(
                         "currently restricted; last item bot shouldn't be above vp bot"
                     )
                 else:
+                    ## NOTE: scroll canvas/viewport if cursor is on first/last item, but it's only partially shown
                     # RENAME? visible_{part,below,range,room}/preview_{span,window}
-                    visible_room = h - pos
+                    visible_room = vh - pos
                     hidden_part = ih - visible_room
                     if hidden_part > 0:
                         # NOTE:(zoom-out): move vp away to make room for the last item to be visible on screen
@@ -241,13 +235,13 @@ class NaviWidget:  # pylint:disable=too-many-instance-attributes
                 raise NotImplementedError()
             elif pos < margin:
                 raise NotImplementedError()
-            elif pos < h - margin - 1:
+            elif pos < vh - margin - 1:
                 raise NotImplementedError()
-            elif pos < h - 1:
+            elif pos < vh - 1:
                 raise NotImplementedError()
-            elif pos == h - 1:
+            elif pos == vh - 1:
                 raise NotImplementedError()
-            elif pos >= h:
+            elif pos >= vh:
                 raise NotImplementedError()
 
     # def scroll_by(self, advance: int) -> None:
@@ -280,30 +274,43 @@ class NaviWidget:  # pylint:disable=too-many-instance-attributes
 
         last = len(self._lst) - 1
         i, y = top_idx, top_y
+        vy, vx = self._viewport_origin_yx
         while i <= last and y < vh:
             item = self._lst[i]
             rel = i - top_idx
             pfxrel = f"{1+rel:02d}| "
             pfxidx = f"{1+i:03d}{">" if i == ci else ":"} "
-            indent = len(pfxrel)+len(pfxidx)
+            indent = len(pfxrel) + len(pfxidx)
             nm, *lines = item.name.split("\n")
             py = y
             if 0 <= y < vh:
-                stdscr.addstr(y, 0, pfxrel, c_auxinfo)
-                stdscr.addstr(y, len(pfxrel), pfxidx, c_cursor if i == ci else c_iteminfo)
-                stdscr.addstr(y, indent, nm[:vw-indent], c_cursor if i == ci else c_item)
+                stdscr.addstr(vy + y, vx + 0, pfxrel, c_pfxrel)
+                stdscr.addstr(
+                    vy + y, vx + len(pfxrel), pfxidx, c_cursor if i == ci else c_pfxidx
+                )
+                stdscr.addstr(
+                    vy + y,
+                    vx + indent,
+                    nm[: vw - indent],
+                    c_cursor if i == ci else c_item,
+                )
             y += 1
             for l in lines:
                 if 0 <= y < vh:
-                    # stdscr.addstr(y, 2, "|", c_auxinfo)
-                    stdscr.addstr(y, indent + 2, l[:vw-indent-2], c_cursor if i == ci else c_iteminfo)
+                    # stdscr.addstr(vy+y, 2, "|", c_pfxrel)
+                    stdscr.addstr(
+                        vy + y,
+                        vx + indent + 2,
+                        l[: vw - indent - 2],
+                        c_cursor if i == ci else c_iteminfo,
+                    )
                 y += 1
             if y - py != self._itemheight(item):
                 log.error(f"{y - py} != {self._itemheight(item)}")
                 raise RuntimeError("WTF: this exception is silently ignored")
             i += 1
 
-        ## NOTE: draw cursor AGAIN after footer (i.e. over-draw on top of full list)
+        ## ALT:NOTE: draw cursor AGAIN after footer (i.e. over-draw on top of full list)
         ##   NICE: no need to hassle with storing cursor prefix length for cx/cy
         ##   NICE: can redraw only two lines (prev item and cursor) inof whole list
         # cx = len(_pfx(vctx.wndcurpos0))
@@ -313,28 +320,6 @@ class NaviWidget:  # pylint:disable=too-many-instance-attributes
         # cx = len(_pfx(vctx.wndcurpos0))
         # cn = len(lst[vctx.wndcurpos0 + vctx.wndabsoff0].name)
         # stdscr.chgat(vctx.wndcurpos0, cx, cn, ccurs)
-
-
-
-
-
-# def draw_footer(stdscr: C.window) -> None:
-#     pair = 30
-#     C.init_pair(pair, 217, 17)
-#     attr = C.color_pair(pair)
-#     # info = C.color_content(fg)
-#     # info = C.COLOR_PAIRS
-#     #
-#     # # pylint:disable=protected-access
-#     # pv = self._wg._scroll._provider
-#     # idx = 1 + self._wg.curabs
-#     # sortby = pv._sortby
-#     # sortrev = "￬" if pv._sortrev else "￪"
-#     # info = f"{idx}/{len(pv)} | {sortby=}{sortrev}"
-#     info = 100
-#
-#     hh, _ww = stdscr.getmaxyx()  # C.LINES
-#     stdscr.addstr(hh - 1, 0, f"--- {info}", attr)
 
 
 class FSEntry(Representable):
@@ -365,6 +350,8 @@ class RootWidget:
     # _lstpxy: ListCachingProxy[Representable]
     _act: Callable[[], Sequence[Representable]]
     _wdg: NaviWidget
+    _wh: int
+    _ww: int
 
     def set_entity(self, ent: Representable) -> None:
         self._ent = ent
@@ -379,7 +366,8 @@ class RootWidget:
         self._wdg.step_by(modifier)
 
     def resize(self, stdscr: C.window) -> None:
-        self._wdg.resize(*stdscr.getmaxyx())
+        self._wh, self._ww = stdscr.getmaxyx()
+        self._wdg.resize(self._wh - 2, self._ww, origin=(1, 0))
         self.redraw(stdscr)
 
     def redraw(self, stdscr: C.window) -> None:
@@ -390,6 +378,29 @@ class RootWidget:
         # NOTE: actually _lst here stands for a generic _augdbpxy with read.API
         #   i.e. DB augmented by virtual entries, all generated-and-cleared on demand
         self._wdg.redraw(stdscr)
+
+        # pylint:disable=protected-access
+        c_footer = C.color_pair(ColorMap.footer)
+        ci = 1 + self._wdg._cursor_item_lstindex
+        sz = len(self._wdg._lst)
+        sortby = "name"
+        sortrev = False
+        footer = f"--- {ci}/{sz} | by={sortby}{"￪" if sortrev else "￬"}"
+        stdscr.addstr(self._wh - 1, 0, footer, c_footer)
+
+        if isinstance(self._ent, FSEntry):
+            header = str(self._ent._x)
+        else:
+            header = repr(self._ent)
+        stdscr.addstr(0, 0, header, c_footer | C.A_BOLD)
+
+        # NOTE: place real cursor to where list-cursor is, to make tmux overlay selection more intuitive
+        cy = self._wdg._viewport_origin_yx[0]
+        cx = self._wdg._viewport_origin_yx[1] + 4  # = len(pfx)
+        pos = self._wdg._viewport_followeditem_linesfromtop
+        if 0 <= pos < self._wdg._viewport_height_lines:
+            cy += pos
+        stdscr.move(cy, cx)
 
     # USE: log.info(str(wdg))
     # def __str__(self) -> str:

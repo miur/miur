@@ -1,4 +1,5 @@
 from typing import Callable
+import inspect
 
 import _curses as C
 
@@ -86,7 +87,13 @@ def handle_input(g: AppGlobals) -> None:
     # IDEA: partially restore TTY to preserve NLs in unexpected exc/backtrace
     #  C.nocbreak() ... C.cbreak()
     cmd = g_input_handlers.get(wch, None)
-    comment = f" ({cmd.__name__})" if cmd else ""
+    if cmd:
+        if (nm := cmd.__name__) == '<lambda>':
+            comment = " : " + inspect.getsource(cmd).partition('lambda')[2].partition(':')[2].strip(' ,\n')
+        else:
+            comment = f" ({nm})"
+    else:
+        comment = ""
     log.warning(repr(wch) + comment)
     # print(repr(wch))
     # import sys; sys.stdout.write(repr(wch))
