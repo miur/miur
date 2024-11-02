@@ -36,11 +36,7 @@ def enable_warnings(error: bool = True) -> "Iterator[None]":
         warnings.resetwarnings()  # Back to default behavior
 
 
-def exception_handler(
-    _etype: "Type[BaseException]",
-    value: "BaseException",
-    _tb: "Optional[TracebackType]",
-) -> "Any":
+def log_exc(value: "BaseException") -> "Any":
     # pylint:disable=import-outside-toplevel
     import traceback as TR
     from os import linesep as NL
@@ -81,6 +77,14 @@ def exception_handler(
     finally:
         # log.config(write=_orig_write)
         log.error("</Exception>")  # TEMP
+
+
+def exception_handler(
+    _etype: "Type[BaseException]",
+    value: "BaseException",
+    _tb: "Optional[TracebackType]",
+) -> "Any":
+    log_exc(value)
 
 
 @contextmanager

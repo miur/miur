@@ -3,7 +3,10 @@ from typing import Callable, Iterable, Protocol, Sequence, override
 
 import _curses as C
 
+from . import widget as this  # pylint:disable=import-self
+from .app import g_app
 from .curses_ext import ColorMap
+from .util.exchook import log_exc
 from .util.logger import log
 
 
@@ -12,6 +15,7 @@ class Representable(Protocol):
     def name(self) -> str: ...
 
 
+# RENAME? my algo is "SatelliteViewport"
 class NaviWidget:  # pylint:disable=too-many-instance-attributes
     def __init__(self) -> None:
         self._lst: Sequence[Representable]
@@ -49,7 +53,7 @@ class NaviWidget:  # pylint:disable=too-many-instance-attributes
         self._viewport_origin_yx = origin
         self._viewport_height_lines = vh
         self._viewport_width_columns = vw
-        self._viewport_margin_lines = vh // 6  # OR: fixed=2
+        self._viewport_margin_lines = vh // 8  # OR: fixed=2
         # KEEP: self._viewport_followeditem_lstindex
         # TODO: adjust resulting offset to align onto margin
         # if pvh > 0 and (ratio := self._viewport_followeditem_linesfromtop / pvh) > 0:
@@ -57,26 +61,33 @@ class NaviWidget:  # pylint:disable=too-many-instance-attributes
         self._viewport_followeditem_linesfromtop = 0
 
     # CASE:(lightweight): to be able to re-assign ~same list after external xfm, e.g. after "order-by"
-    def assign(self, lst: Sequence[Representable]) -> None:
-        pidx = self._cursor_item_lstindex
+    def assign(self, lst: Sequence[Representable], hint_idx: int | None = None) -> None:
+        pidx = self._cursor_item_lstindex if hint_idx is None else hint_idx
         focused = self._lst[pidx] if getattr(self, "_lst", None) else None
         # WARN: whole function should be atomic
         #   i.e. "cursor,canvas" should always be in boundaries of "lst"
         # TODO: pre-load only visible part fitting into viewport
         #   WARN: on first assign(), viewport height may still be =0, due to -resize() being called later
         self._lst = lst
-        # TODO: if item under cursor had disappeared we can temp-reinsert the _focused_item into the list
-        #   and seek for it to find a new index, then pick item before or after expected position
-        # NOTE: search for the item if "order-by" have changed its index
-        ## TEMP: reset *cursor* position on -assign()
-        if focused is not None and focused is not lst[pidx]:
-            try:
-                newidx = lst.index(focused)
-            except ValueError:
-                newidx = 0
-            self._cursor_item_lstindex = newidx
-            self._viewport_followeditem_lstindex = newidx
-            # KEEP: self._viewport_followeditem_linesfromtop
+        newidx = self._reindex(pidx, focused) if focused else 0
+        self._viewport_followeditem_lstindex = self._cursor_item_lstindex = newidx
+        # KEEP: self._viewport_followeditem_linesfromtop
+
+    def _reindex(self, pidx: int, focused: Representable) -> int:
+        # NOTE: keep cursor on same item::
+        #   * if any items were inserted/deleted before idx
+        #   * if "order-by" have changed its item's idx in _lst
+        if focused is None:
+            return 0
+        if focused is self._lst[pidx]:
+            return pidx
+        try:
+            return self._lst.index(focused)
+        except ValueError:
+            ## TEMP: reset *cursor* position on .assign(newlst)
+            # TODO: if item under cursor had disappeared we can temp-reinsert the _focused_item into the list
+            #   and seek for it to find a new index, then pick item before or after expected position
+            return 0
 
     # MAYBE: make ItemWidget to calc() item height and draw it (or only ItemXfm)
     #   WARN: don't store "index" inside ItemWidget << PERF:(slow): rebuild on each order-by
@@ -95,6 +106,9 @@ class NaviWidget:  # pylint:disable=too-many-instance-attributes
             raise NotImplementedError("DECI:WiP")
 
         idx = self._cursor_item_lstindex
+        last = len(self._lst) - 1
+        if idx < 0 or idx > last:
+            raise IndexError(idx)
         ih = self._itemheight(self._lst[idx])
 
         # rng = range(min(idx, newidx), max(idx, newidx))
@@ -108,6 +122,7 @@ class NaviWidget:  # pylint:disable=too-many-instance-attributes
         vh = self._viewport_height_lines
         margin = self._viewport_margin_lines
         pos = self._viewport_followeditem_linesfromtop
+
         knock = 0
         # ALT:IDEA:(step_incr=steps): only allow for "step_by(arg)" to move by one item/index,
         #   and use "arg" to pick speed of scrolling multiline items instead
@@ -118,12 +133,9 @@ class NaviWidget:  # pylint:disable=too-many-instance-attributes
         # ARCH:FSM:(x4): sign/idx/vp/size
         if steps > 0:
 
-            last = len(self._lst) - 1
+            if idx < last:
 
-            if idx < 0 or idx > last:
-                raise IndexError(idx)
-            elif idx < last:
-
+                # ARCH:FUT: it's a FSM -- should we make it explicit?
                 if pos >= vh:
                     raise NotImplementedError(
                         "TEMP: restricted; sync lost: vp had drifted above cursor"
@@ -134,22 +146,39 @@ class NaviWidget:  # pylint:disable=too-many-instance-attributes
                             "TEMP: restricted; sync lost: vp had drifted below cursor"
                         )
                     else:
+                        # THINK: actually *any* current item can be larger than vp
                         raise NotImplementedError(
                             "TEMP: restricted; only *last* large multine item can start above vp"
                         )
+                elif pos < vh - margin - 1 - ih:
+                    ## NOTE: always jump to next item (whatever item size)
+                    # TODO: scroll by "steps" if item is larger than half-viewport
+                    # CHG? gravitate to margin/bot if sum(h(idx..last)) < margin
+                    #   ~~ for i in range(last, max(0,last-margin)); do if ... break; bot_edge_idx = i;
+                    idx += 1
+                    pos += ih
                 elif pos < vh - margin - 1:
                     ## NOTE: jump to next item {if current one is small} and discarding residue,
                     ##   or scroll large item by "steps"-proportional advancement
-                    if advance >= ih:
-                        raise NotImplementedError("TBD: normal ops; move index/pos")
+                    if True or advance >= ih:
+                        # raise NotImplementedError("TBD: normal ops; move index/pos")
                         idx += 1
                         # MAYBE?WF:(irritating?): transfer advancement residue onto next item scroll
-                        #   TRY: can be either more intuitive OR more discrupting
+                        #   TRY: can be either more intuitive OR more disrupting
                         ## [_] FIXME: if we get {pos>vh-margin-1} -- we should also apply next block from margin
                         ##   i.e. keep at margin or step it further
-                        pos += ih
-                    else:
-                        raise NotImplementedError("TBD: normal ops; move index/pos")
+                        # pos += ih
+
+                        # TEMP:FIXME: does not account for variable-length itemheight
+                        if last - idx < margin:
+                            raise NotImplementedError(
+                                "TBD: end of the list; advance over margin"
+                            )
+                        pos = vh - margin - 1
+                    elif advance < ih:
+                        raise NotImplementedError(
+                            "TBD: scroll large item by steps\n" + str(locals())
+                        )
                         # FAIL: there is no way to detect when to switch to next item,
                         #   as "virtual offset inside item" is derived from dynamic "offset from top"
                         # MAYBE: we still need a "vp-virtual cursor" to point to "subparts" of the items
@@ -337,7 +366,7 @@ class FSEntry(Representable):
     def name(self) -> str:
         # return repr(self._x)
         # TEMP:TEST: multiline entries
-        return str(self._x).replace("n", "n⬎\n")
+        return str(self._x).replace("o", "o⬎\n")
 
     # i.e. =InterpretUnchangedDirListingPropertyAsFSEntriesInUsualWay
     def explore(self) -> Iterable["FSEntry"]:
@@ -359,17 +388,24 @@ class RootWidget:
     _wh: int
     _ww: int
 
-    def set_entity(self, ent: Representable) -> None:
+    def set_entity(self, ent: Representable, hint_idx: int | None = None) -> None:
         self._ent = ent
         if (sfn := getattr(ent, "explore")) and callable(sfn):
             self._act = sfn  # NOTE: keep sfn to be able to refresh() the list (when externally changed)
             self._lst = self._act()
             # TEMP:TRY:
             self._wdg = NaviWidget()
-            self._wdg.assign(self._lst)
+            self._wdg.assign(self._lst, hint_idx)
 
     def cursor_move_rel(self, modifier: int) -> None:
-        self._wdg.step_by(modifier)
+        # TEMP: don't exit !miur when developing in REPL
+        if g_app.opts.ipykernel:
+            try:
+                self._wdg.step_by(modifier)
+            except Exception as exc:  # pylint:disable=broad-exception-caught
+                log_exc(exc)
+        else:
+            self._wdg.step_by(modifier)
 
     def resize(self, stdscr: C.window) -> None:
         self._wh, self._ww = stdscr.getmaxyx()
@@ -394,7 +430,8 @@ class RootWidget:
         footer = f"--- {ci}/{sz} | by={sortby}{"￪" if sortrev else "￬"}"
         stdscr.addstr(self._wh - 1, 0, footer, c_footer)
 
-        if isinstance(self._ent, FSEntry):
+        # HACK:(this): force cmp with new instance after reload()
+        if isinstance(self._ent, this.FSEntry):
             header = str(self._ent._x)
         else:
             header = repr(self._ent)
@@ -423,9 +460,13 @@ def _live() -> None:
     from .app import g_app as g
     from .widget import RootWidget  # pylint:disable=import-self,redefined-outer-name
 
+    hidx = None
+    if pwdg := getattr(g.root_wdg, "_wdg", None):
+        hidx = pwdg._cursor_item_lstindex  # pylint:disable=protected-access
+
     g.root_wdg = wdg = RootWidget()
     # wdg.set_entity(FSEntry("/etc/udev"))
-    wdg.set_entity(FSEntry("/d/airy"))
+    wdg.set_entity(this.FSEntry("/d/airy"), hint_idx=hidx)
     g.curses_ui.resize()
     # wdg.redraw(g.stdscr)
     # g.stdscr.refresh()

@@ -28,6 +28,8 @@ def miur_main(g: AppGlobals | None = None) -> None:
     with ExitStack() as stack:  # MOVE:> with Application() as app:
         do = stack.enter_context
         do(enable_warnings())
+        # BET:CHG: inof preventing nesting -- simply connect nested miur to the same outer session of the server
+        #   NICE: propagate all the changes back to the top-level miur session in miur-vim-miur sandwich
         do(increment_envlevel("MIUR_LEVEL"))
         # MAYBE: only enable PIDFILE when run by miur_frontend() to avoid global VAR ?
         pid = do(temp_pidfile(pidfile_path()))
