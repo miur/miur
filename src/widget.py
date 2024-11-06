@@ -67,7 +67,7 @@ class NaviWidget:  # pylint:disable=too-many-instance-attributes
         # TODO: pre-load only visible part fitting into viewport
         #   WARN: on first assign(), viewport height may still be =0, due to -resize() being called later
         self._lst = lst
-        newidx = self._reindex(pidx, focused) if focused else 0
+        newidx = self._reindex(pidx, focused)
         self._viewport_followeditem_lstindex = self._cursor_item_lstindex = newidx
         # KEEP: self._viewport_followeditem_linesfromtop
 
@@ -77,7 +77,7 @@ class NaviWidget:  # pylint:disable=too-many-instance-attributes
         #   * if "order-by" have changed its item's idx in _lst
         if focused is None:
             return 0
-        if focused is self._lst[pidx]:
+        if pidx < len(self._lst) and focused is self._lst[pidx]:
             return pidx
         try:
             return self._lst.index(focused)
@@ -103,13 +103,14 @@ class NaviWidget:  # pylint:disable=too-many-instance-attributes
         if steps not in (-1, 1):
             raise NotImplementedError("DECI:WiP")
 
+        def _fih(i: int) -> int:
+            return self._itemheight(self._lst[i])
+
         idx = self._cursor_item_lstindex
         last = len(self._lst) - 1
         if idx < 0 or idx > last:
             raise IndexError(idx)
-        ih = self._itemheight(self._lst[idx])
-        if ih != 1:
-            raise NotImplementedError("TEMP:(restricted): single-line items only")
+        ih = _fih(idx)
 
         # rng = range(min(idx, newidx), max(idx, newidx))
         # hlines = sum(self._itemheight(self._lst[i]) for i in rng)
@@ -121,10 +122,11 @@ class NaviWidget:  # pylint:disable=too-many-instance-attributes
 
         vh = self._viewport_height_lines
         bot = vh - 1
-        # margin = self._viewport_margin_lines
-        margin = 0  # <TEMP
-        if vh < 2*margin + 1:
-            raise NotImplementedError("TEMP:(restricted): viewport with enough space inside")
+        margin = self._viewport_margin_lines
+        if vh < 2 * margin + 1:
+            raise NotImplementedError(
+                "TEMP:(restricted): viewport with enough space inside"
+            )
         pos = self._viewport_followeditem_linesfromtop
 
         knock = 0
@@ -133,8 +135,14 @@ class NaviWidget:  # pylint:disable=too-many-instance-attributes
         step_incr = 2  # <TEMP|RENAME? single_step/step_advance
         advance = int(step_incr * steps)  # OR: math.round(abs())
 
+        # IDEA: visualize all these "margin" and sumheight/etc. to get a visual feedback
+        #   from all boundary conditions -- and prevent errors like "off by 1"
+        #   ~~ only visualize upp/bot "margin" based on last "steps" direction (i.e. dynamically)
 
-        # pylint:disable=chained-comparison
+        # IDEA: visualize scroll-animation when scrolling long items at once
+        #   << orse they "jump into the face" when you are scrolling around margin
+
+        # pylint:disable=chained-comparison,no-else-raise
         if pos < 0 or pos > bot:
             raise NotImplementedError("TEMP:(restricted): cursor should be visible")
         elif pos == 0 and steps < 0:
@@ -142,14 +150,66 @@ class NaviWidget:  # pylint:disable=too-many-instance-attributes
             if idx < 0:
                 knock = idx
                 idx = 0
+        elif pos <= margin and steps < 0:
+            idx += steps
+            if idx < 0:
+                knock = idx
+                idx = 0
+            if pos > idx:
+                # NOTE: if some item ih=0, then enclosing perf hack will leave gaps till first item
+                assert all(_fih(i) >= 1 for i in range(0, idx))
+                lines_top = sum(_fih(i) for i in range(0, idx))
+                if lines_top < margin:
+                    pos = lines_top
+        elif pos >= bot - margin and steps > 0:
+            idx += steps
+            if idx > last:
+                knock = idx - last
+                idx = last
+            if bot - pos > last - idx:
+                assert all(_fih(i) >= 1 for i in range(idx, last + 1))
+                lines_bot = sum(_fih(i) for i in range(idx, last + 1)) - 1
+                if lines_bot < margin:
+                    pos = bot - lines_bot
         elif pos == bot and steps > 0:
             idx += steps
             if idx > last:
                 knock = idx - last
                 idx = last
-        else:
+        elif steps < 0:
+            pidx = idx
             idx += steps
-            pos += steps
+            if idx < 0:
+                knock = idx
+                idx = 0
+            lines_step_up = sum(_fih(i) for i in range(idx, pidx))
+            pos -= lines_step_up
+            # NOTE: keep at margin, or step over it, or adhere to the end
+            if pos <= margin:
+                pos = margin
+                if idx <= margin:
+                    assert all(_fih(i) >= 1 for i in range(0, idx))
+                    lines_top = sum(_fih(i) for i in range(0, idx))
+                    if lines_top <= margin:
+                        pos = lines_top
+        elif steps > 0:
+            pidx = idx
+            idx += steps
+            if idx > last:
+                knock = idx - last
+                idx = last
+            # FUT: allow advancing by partial items
+            lines_step_down = sum(_fih(i) for i in range(pidx, idx))
+            pos += lines_step_down
+            if pos >= bot - margin:
+                pos = bot - margin
+                if bot - pos >= last - idx:
+                    assert all(_fih(i) >= 1 for i in range(idx, last + 1))
+                    lines_bot = sum(_fih(i) for i in range(idx, last + 1)) - 1
+                    if lines_bot <= margin:
+                        pos = bot - lines_bot
+        else:
+            raise ValueError("unexpected")
 
         self._cursor_item_lstindex = idx
         self._viewport_followeditem_lstindex = idx
@@ -391,9 +451,9 @@ class FSEntry(Representable):
     @override
     @property
     def name(self) -> str:
-        return str(self._x)
+        # return str(self._x)
         # TEMP:TEST: multiline entries
-        # return str(self._x).replace("o", "o⬎\n")
+        return str(self._x).replace("o", "o⬎\n")
 
     # i.e. =InterpretUnchangedDirListingPropertyAsFSEntriesInUsualWay
     def explore(self) -> Iterable["FSEntry"]:
@@ -480,28 +540,30 @@ class RootWidget:
 def _live() -> None:
     log.sep()
     from .app import g_app as g
-    from .widget import RootWidget  # pylint:disable=import-self,redefined-outer-name
     from .util.exchook import log_exc
+    from .widget import RootWidget  # pylint:disable=import-self,redefined-outer-name
 
     hidx = None
     if pwdg := getattr(g.root_wdg, "_wdg", None):
         hidx = pwdg._cursor_item_lstindex  # pylint:disable=protected-access
 
+    i: int
     try:
         g.root_wdg = wdg = RootWidget()
-        # wdg.set_entity(FSEntry("/etc/udev"))
+        # wdg.set_entity(this.FSEntry("/etc/udev"), hint_idx=hidx)
         wdg.set_entity(this.FSEntry("/d/airy"), hint_idx=hidx)
         g.curses_ui.resize()
 
         # ALT: fuzzy-test, by random direction of up/down 50 times
-        ndown = 50
-        for _ in range(ndown):
+        ndown = 30
+        for i in range(ndown):
             wdg.cursor_move_rel(1)
         wdg.redraw(g.stdscr)
         g.stdscr.refresh()
-        for _ in range(ndown):
+        for i in range(ndown):
             wdg.cursor_move_rel(-1)
         wdg.redraw(g.stdscr)
         g.stdscr.refresh()
     except Exception as exc:  # pylint:disable=broad-exception-caught
+        exc.add_note(f"{i=}")
         log_exc(exc)
