@@ -7,6 +7,7 @@ from . import curses_ext as CE
 from .app import AppGlobals
 from .loop_asyncio import asyncio_primary_out
 from .util.logger import log
+from .util.exchook import log_exc
 
 # def raise_(exc: BaseException) -> None:
 #     raise exc
@@ -98,8 +99,15 @@ def handle_input(g: AppGlobals) -> None:
     # print(repr(wch))
     # import sys; sys.stdout.write(repr(wch))
     if cmd:
-        # WARN: last stmt in loop COS: may raise SystemExit
-        cmd(g)
+        # TEMP: don't exit !miur when developing in REPL
+        if g.opts.ipykernel:
+            try:
+                cmd(g)
+            except Exception as exc:  # pylint:disable=broad-exception-caught
+                log_exc(exc)
+        else:
+            # WARN: last stmt in loop COS: may raise SystemExit
+            cmd(g)
         # CHG: only do partial redraw e.g. prev/next cursor areas
         # MAYBE: redraw only if anything had changed (not all cmds to that)
         #   BUT: uix needs visual feedback on each keypress, so it's better to always redraw

@@ -4,9 +4,7 @@ from typing import Callable, Iterable, Protocol, Sequence, override
 import _curses as C
 
 from . import widget as this  # pylint:disable=import-self
-from .app import g_app
 from .curses_ext import ColorMap
-from .util.exchook import log_exc
 from .util.logger import log
 
 
@@ -110,6 +108,8 @@ class NaviWidget:  # pylint:disable=too-many-instance-attributes
         if idx < 0 or idx > last:
             raise IndexError(idx)
         ih = self._itemheight(self._lst[idx])
+        if ih != 1:
+            raise NotImplementedError("TEMP:(restricted): single-line items only")
 
         # rng = range(min(idx, newidx), max(idx, newidx))
         # hlines = sum(self._itemheight(self._lst[i]) for i in rng)
@@ -120,14 +120,41 @@ class NaviWidget:  # pylint:disable=too-many-instance-attributes
         # self._viewport_followeditem_linesfromtop += offset
 
         vh = self._viewport_height_lines
-        margin = self._viewport_margin_lines
+        bot = vh - 1
+        # margin = self._viewport_margin_lines
+        margin = 0  # <TEMP
+        if vh < 2*margin + 1:
+            raise NotImplementedError("TEMP:(restricted): viewport with enough space inside")
         pos = self._viewport_followeditem_linesfromtop
 
         knock = 0
         # ALT:IDEA:(step_incr=steps): only allow for "step_by(arg)" to move by one item/index,
         #   and use "arg" to pick speed of scrolling multiline items instead
-        step_incr = 2  # RENAME? single_step/step_advance
+        step_incr = 2  # <TEMP|RENAME? single_step/step_advance
         advance = int(step_incr * steps)  # OR: math.round(abs())
+
+
+        # pylint:disable=chained-comparison
+        if pos < 0 or pos > bot:
+            raise NotImplementedError("TEMP:(restricted): cursor should be visible")
+        elif pos == 0 and steps < 0:
+            idx += steps
+            if idx < 0:
+                knock = idx
+                idx = 0
+        elif pos == bot and steps > 0:
+            idx += steps
+            if idx > last:
+                knock = idx - last
+                idx = last
+        else:
+            idx += steps
+            pos += steps
+
+        self._cursor_item_lstindex = idx
+        self._viewport_followeditem_lstindex = idx
+        self._viewport_followeditem_linesfromtop = pos
+        return  # <TEMP
 
         # pylint:disable=no-else-raise
         # ARCH:FSM:(x4): sign/idx/vp/size
@@ -364,9 +391,9 @@ class FSEntry(Representable):
     @override
     @property
     def name(self) -> str:
-        # return repr(self._x)
+        return str(self._x)
         # TEMP:TEST: multiline entries
-        return str(self._x).replace("o", "o⬎\n")
+        # return str(self._x).replace("o", "o⬎\n")
 
     # i.e. =InterpretUnchangedDirListingPropertyAsFSEntriesInUsualWay
     def explore(self) -> Iterable["FSEntry"]:
@@ -398,14 +425,7 @@ class RootWidget:
             self._wdg.assign(self._lst, hint_idx)
 
     def cursor_move_rel(self, modifier: int) -> None:
-        # TEMP: don't exit !miur when developing in REPL
-        if g_app.opts.ipykernel:
-            try:
-                self._wdg.step_by(modifier)
-            except Exception as exc:  # pylint:disable=broad-exception-caught
-                log_exc(exc)
-        else:
-            self._wdg.step_by(modifier)
+        self._wdg.step_by(modifier)
 
     def resize(self, stdscr: C.window) -> None:
         self._wh, self._ww = stdscr.getmaxyx()
@@ -415,6 +435,8 @@ class RootWidget:
     def redraw(self, stdscr: C.window) -> None:
         # FUT: dispatch to either curses/cli/Qt
         assert isinstance(stdscr, C.window)
+        # FUT: only clear "rest of each line" -- and only if prev line there was longer
+        stdscr.clear()
         # FIXED: prevent crash when window shrinks past the cursor
         # self.cursor_move_rel(0)
         # NOTE: actually _lst here stands for a generic _augdbpxy with read.API
@@ -459,14 +481,27 @@ def _live() -> None:
     log.sep()
     from .app import g_app as g
     from .widget import RootWidget  # pylint:disable=import-self,redefined-outer-name
+    from .util.exchook import log_exc
 
     hidx = None
     if pwdg := getattr(g.root_wdg, "_wdg", None):
         hidx = pwdg._cursor_item_lstindex  # pylint:disable=protected-access
 
-    g.root_wdg = wdg = RootWidget()
-    # wdg.set_entity(FSEntry("/etc/udev"))
-    wdg.set_entity(this.FSEntry("/d/airy"), hint_idx=hidx)
-    g.curses_ui.resize()
-    # wdg.redraw(g.stdscr)
-    # g.stdscr.refresh()
+    try:
+        g.root_wdg = wdg = RootWidget()
+        # wdg.set_entity(FSEntry("/etc/udev"))
+        wdg.set_entity(this.FSEntry("/d/airy"), hint_idx=hidx)
+        g.curses_ui.resize()
+
+        # ALT: fuzzy-test, by random direction of up/down 50 times
+        ndown = 50
+        for _ in range(ndown):
+            wdg.cursor_move_rel(1)
+        wdg.redraw(g.stdscr)
+        g.stdscr.refresh()
+        for _ in range(ndown):
+            wdg.cursor_move_rel(-1)
+        wdg.redraw(g.stdscr)
+        g.stdscr.refresh()
+    except Exception as exc:  # pylint:disable=broad-exception-caught
+        log_exc(exc)
