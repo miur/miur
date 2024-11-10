@@ -1,13 +1,13 @@
-from typing import Callable
 import inspect
+from typing import Callable
 
 import _curses as C
 
 from . import curses_ext as CE
 from .app import AppGlobals
 from .loop_asyncio import asyncio_primary_out
-from .util.logger import log
 from .util.exchook import log_exc
+from .util.logger import log
 
 # def raise_(exc: BaseException) -> None:
 #     raise exc
@@ -77,8 +77,11 @@ g_input_handlers: dict[str | int, Callable[[AppGlobals], None]] = {
     "S": shell_out,  # CE.shell_out
     "K": ipykernel_start,
     "I": ipyconsole_out,
+    "\014": resize,  # manually trigger redraw on <C-l>
     "j": lambda g: g.root_wdg.cursor_move_rel(1),
     "k": lambda g: g.root_wdg.cursor_move_rel(-1),
+    "h": lambda g: g.root_wdg.go_to_parent(),
+    "l": lambda g: g.root_wdg.go_into_cursor(),
     "\t": ipython_out,
 }
 
@@ -89,8 +92,9 @@ def handle_input(g: AppGlobals) -> None:
     #  C.nocbreak() ... C.cbreak()
     cmd = g_input_handlers.get(wch, None)
     if cmd:
-        if (nm := cmd.__name__) == '<lambda>':
-            comment = " : " + inspect.getsource(cmd).partition('lambda')[2].partition(':')[2].strip(' ,\n')
+        if (nm := cmd.__name__) == "<lambda>":
+            srcbody = inspect.getsource(cmd).partition("lambda")[2]
+            comment = " : " + srcbody.partition(":")[2].strip(" ,\n")
         else:
             comment = f" ({nm})"
     else:

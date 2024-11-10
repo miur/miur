@@ -1,4 +1,5 @@
 import os
+import os.path as fs
 from typing import Callable, Iterable, Protocol, Sequence, override
 
 import _curses as C
@@ -69,9 +70,10 @@ class NaviWidget:  # pylint:disable=too-many-instance-attributes
         self._lst = lst
         newidx = self._reindex(pidx, focused)
         self._viewport_followeditem_lstindex = self._cursor_item_lstindex = newidx
-        # KEEP: self._viewport_followeditem_linesfromtop
+        ## DISABLED: we always keep the previous position of cursor on the screen
+        #   self._viewport_followeditem_linesfromtop = 0
 
-    def _reindex(self, pidx: int, focused: Representable) -> int:
+    def _reindex(self, pidx: int, focused: Representable | None) -> int:
         # NOTE: keep cursor on same item::
         #   * if any items were inserted/deleted before idx
         #   * if "order-by" have changed its item's idx in _lst
@@ -290,6 +292,7 @@ class NaviWidget:  # pylint:disable=too-many-instance-attributes
                     raise RuntimeWarning("RND:(invariant): cursor should be on margin")
             elif pos != bot - margin:
                 # ALT:MAYBE? gravitate cursor back to margin
+                # [_] WTF:ERR:CASE: open "/" and scroll down -- it gravitates :(
                 raise RuntimeWarning("RND:(invariant): cursor should be on margin")
 
         elif steps < 0:
@@ -376,20 +379,22 @@ class NaviWidget:  # pylint:disable=too-many-instance-attributes
                 stdscr.addstr(
                     vy + y, vx + len(pfxrel), pfxidx, c_cursor if i == ci else c_pfxidx
                 )
+                xoff = vx + indent
                 stdscr.addstr(
                     vy + y,
-                    vx + indent,
-                    nm[: vw - indent],
+                    xoff,
+                    nm[: vw - xoff],
                     c_cursor if i == ci else c_item,
                 )
             y += 1
             for l in lines:
                 if 0 <= y < vh:
                     # stdscr.addstr(vy+y, 2, "|", c_pfxrel)
+                    xoff = vx + indent + 2
                     stdscr.addstr(
                         vy + y,
-                        vx + indent + 2,
-                        l[: vw - indent - 2],
+                        xoff,
+                        l[: vw - xoff],
                         c_cursor if i == ci else c_iteminfo,
                     )
                 y += 1
@@ -410,9 +415,45 @@ class NaviWidget:  # pylint:disable=too-many-instance-attributes
         # stdscr.chgat(vctx.wndcurpos0, cx, cn, ccurs)
 
 
-class FSEntry(Representable):
+class Explorable(Protocol):
+    def explore(self) -> Iterable["Representable"]: ...
+
+
+# RENAME? ErrorEntry -- BUT: such entry should also be explorable...
+class HaltEntry(Representable):
+    def __init__(self, kind: str) -> None:
+        self._x = kind
+
+    @override
+    @property
+    def name(self) -> str:
+        return self._x
+
+
+class TextEntry(Representable, Explorable):
+    def __init__(self, text: str) -> None:
+        self._x = text
+
+    @override
+    @property
+    def name(self) -> str:
+        return self._x
+
+    @override
+    def explore(self) -> Iterable["Representable"]:
+        words = self._x.split()
+        if len(words) <= 1:
+            return [HaltEntry("NOT EXPLORABLE (YET)")]
+        cls = type(self)
+        return [cls(w) for w in words]
+
+
+class FSEntry(Representable, Explorable):
     def __init__(self, path: str) -> None:
         self._x = path
+
+    def __lt__(self, other: "FSEntry") -> bool:
+        return self._x < other._x
 
     @override
     @property
@@ -422,9 +463,38 @@ class FSEntry(Representable):
         return str(self._x).replace("o", "o⬎\n")
 
     # i.e. =InterpretUnchangedDirListingPropertyAsFSEntriesInUsualWay
-    def explore(self) -> Iterable["FSEntry"]:
-        with os.scandir(self._x) as it:
-            return [FSEntry(e.path) for e in it]
+    @override
+    def explore(self) -> Iterable["Representable"]:
+        p = self._x
+        if not fs.lexists(p):
+            return [HaltEntry("FILE NOT FOUND")]
+        cls = type(self)
+        # FIXME: skip .islink if .originator==self
+        #   ALT: produce virtual FSEntryLike entry, as it's a collection of paths inof real folder
+        #     NICE: preserves original order inof being sorted by default as all other FSEntry
+        #   ALT: print this info on 2nd/3rd line below the link, as auxinfo
+        #     BAD: we are losing unified access to copy/edit/navi the interpreted symlink values as regular items
+        #       ALT:NICE: with subcursor we could navi/copy even those 2nd/3rd lines of info
+        if fs.islink(p):
+            return [self, cls(os.readlink(p)), cls(fs.realpath(p))]
+        if fs.isdir(p):
+            with os.scandir(p) as it:
+                return [cls(e.path) for e in it]
+        if fs.isfile(p):
+            try:
+                textlines: list[TextEntry] = []
+                with open(p, "r", encoding="utf-8") as f:
+                    # ALT:(python>=3.13): lines = f.readlines(sizehint=1024, keepends=False)
+                    while (line := f.readline()) and f.tell() < 1024:
+                        textlines.append(this.TextEntry(line.removesuffix("\n")))
+                return textlines
+            except UnicodeDecodeError:
+                hexlines: list[TextEntry] = []
+                with open(p, "rb") as f:
+                    while (data := f.read(16)) and f.tell() < 1024:
+                        hexlines.append(this.TextEntry(data.hex(" ")))
+                return hexlines
+        raise NotImplementedError(p)
 
 
 # T = TypeVar("T")
@@ -441,17 +511,50 @@ class RootWidget:
     _wh: int
     _ww: int
 
+    def __init__(self) -> None:
+        self._wdg = NaviWidget()
+        self._history: list[Representable] = []  # RENAME? _cursor_chain
+
     def set_entity(self, ent: Representable, hint_idx: int | None = None) -> None:
         self._ent = ent
         if (sfn := getattr(ent, "explore")) and callable(sfn):
             self._act = sfn  # NOTE: keep sfn to be able to refresh() the list (when externally changed)
             self._lst = self._act()
-            # TEMP:TRY:
-            self._wdg = NaviWidget()
+            # BAD:PERF:
+            if all(isinstance(x, this.FSEntry) for x in self._lst):
+                self._lst.sort()
             self._wdg.assign(self._lst, hint_idx)
 
     def cursor_move_rel(self, modifier: int) -> None:
         self._wdg.step_by(modifier)
+
+    # RENAME? expand_under_cursor
+    def go_into_cursor(self) -> None:
+        # ALT:BAD?PERF: store in each TextEntity a backref to "originator"
+        #   == to be able to return to its "parent"
+        #   NICE: only "navigated-to" items will store this backref
+        # TODO: wrap each stored entity into EntityContext(ent, idx=..., pos=...)
+        #   &why to be able to restore vp/navi as you left it
+        #   ALT:BET? create a separate NaviWidget() per each Entity assigned
+        #     NICE: preserve "pos,vh,margin" as-is, and then reinterpret/resize only when going back
+        self._history.append(self._ent)
+        self.set_entity(self._wdg.focused_item, hint_idx=0)
+        if isinstance(self._ent, this.FSEntry):
+            os.chdir(self._ent._x)
+
+    def go_to_parent(self) -> None:
+        # pylint:disable=protected-access
+        if len(self._history) > 0:
+            # FIXME: we shouldn't "pop" -- it should be still in the list,
+            #   to be able to navigate forward
+            parent = self._history.pop()
+        elif isinstance(self._ent, this.FSEntry):
+            parent = this.FSEntry(fs.dirname(self._ent._x))
+        else:
+            raise NotImplementedError()
+        if isinstance(parent, this.FSEntry):
+            os.chdir(parent._x)
+        self.set_entity(parent, hint_idx=0)
 
     def resize(self, stdscr: C.window) -> None:
         self._wh, self._ww = stdscr.getmaxyx()
