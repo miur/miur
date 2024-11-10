@@ -11,6 +11,7 @@ Modern Interface for Uniform Reconnaissance.
 .. note::
    It is much **more** than a simple file manager.
 
+**Mission:** interpret everything as graphs and navigate them like you do in filesystem.
 
 &motto ⌇⡦⡋⣑⣳
 

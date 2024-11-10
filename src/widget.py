@@ -96,6 +96,8 @@ class NaviWidget:  # pylint:disable=too-many-instance-attributes
     def _itemheight(item: Representable) -> int:
         return item.name.count("\n") + 1
 
+    # TBD: def scroll_by(self, advance: int) -> None:
+
     # NOTE: elastic scroll, where "step" is anything between 1 line/word or whole multiline item,
     #   depending on what less disrupts the perception flow
     # TODO:OPT: always step by whole item ~~ should be the same as "step_by(+/-inf)"
@@ -127,9 +129,10 @@ class NaviWidget:  # pylint:disable=too-many-instance-attributes
             raise NotImplementedError(
                 "TEMP:(restricted): viewport with enough space inside"
             )
+        # NOTE:(pos<0|ih>vh is OK): multiline items can be larger than viewport
         pos = self._viewport_followeditem_linesfromtop
 
-        knock = 0
+        knock = 0  # <EXPL: amount of unused "steps" (for either switching or scrolling)
         # ALT:IDEA:(step_incr=steps): only allow for "step_by(arg)" to move by one item/index,
         #   and use "arg" to pick speed of scrolling multiline items instead
         step_incr = 2  # <TEMP|RENAME? single_step/step_advance
@@ -142,40 +145,153 @@ class NaviWidget:  # pylint:disable=too-many-instance-attributes
         # IDEA: visualize scroll-animation when scrolling long items at once
         #   << orse they "jump into the face" when you are scrolling around margin
 
+        # RQ: last item can be above bot only if list is shorter than vp
+        #   ALT:CHECK:(gravitate): "gradually align of last item to bot" -- will it be *intuitive* ?
+        if (
+            idx == last
+            and pos + ih < bot
+            and (last >= bot or sum(_fih(i) for i in range(0, last + 1)) >= bot)
+        ):
+            raise NotImplementedError(
+                "RQ: last item can be above bot only if list is shorter than vp"
+            )
+
+        # ARCH:FUT: it's a FSM(sign/idx/vp/size) -- should we make it explicit?
         # pylint:disable=chained-comparison,no-else-raise
         if pos < 0 or pos > bot:
             raise NotImplementedError("TEMP:(restricted): cursor should be visible")
+            # raise NotImplementedError("past last multiline item")
+            # if steps > 0 and idx < last:
+            #     if pos > bot:
+            #         raise NotImplementedError("TEMP: restricted; sync lost: vp had drifted above cursor")
+            #     elif pos < 0:
+            #         if pos <= -ih:
+            #             raise NotImplementedError("TEMP: restricted; sync lost: vp had drifted below cursor")
+            #         else:
+            #             # THINK: actually *any* current item can be larger than vp
+            #             raise NotImplementedError("TEMP: restricted; only *last* large multine item can start above vp")
+            # elif idx == last:
+            #     if pos <= -ih:
+            #         # ALT: allow gradual alignment, like in {hidden_part < 0}
+            #         raise NotImplementedError(
+            #             "TEMP: restricted; last item is far above vp, nothing on the screen"
+            #         )
+            #     elif pos > bot:
+            #         # ALT: scroll drifted vp until item becomes visible -> then show item hidden_part as usual
+            #         # OR: imm jump vp to the current cursor position *and* move cursor by one step as usual
+            #         # OR: jump cursor to current drifted vp top/bot focuseditem based on if <j/k> was pressed
+            #         raise NotImplementedError(
+            #             "TEMP: restricted; last item first line should be visible"
+            #         )
         elif pos == 0 and steps < 0:
             idx += steps
             if idx < 0:
                 knock = idx
                 idx = 0
+        elif pos == bot and steps > 0:
+            # NOTE: preserve pos until the last item in list
+            #   OR? auto-jump (or gravitate) to either margin or bot, based on how much lst is left
+            idx += steps
+            if idx > last:
+                knock = idx - last
+                idx = last
         elif pos <= margin and steps < 0:
             idx += steps
             if idx < 0:
                 knock = idx
                 idx = 0
-            if pos > idx:
+            if pos > idx:  # <PERF:HACK
                 # NOTE: if some item ih=0, then enclosing perf hack will leave gaps till first item
                 assert all(_fih(i) >= 1 for i in range(0, idx))
                 lines_top = sum(_fih(i) for i in range(0, idx))
                 if lines_top < margin:
                     pos = lines_top
         elif pos >= bot - margin and steps > 0:
+            ## FAIL: there is no way to detect when to switch to next item,
+            #   as "virtual offset inside item" is derived from dynamic "offset from top"
+            # MAYBE: we still need a "vp-virtual cursor" to point to "subparts" of the items
+            #   ARCH: virt.cursor coincides with user's attention focus and limited by vp boundaries
+            #     >> so "lst-cursor" is simply one of possible projections of virt.cursor onto lst
+            #       i.e. multiple virt positions match single lst item
+            #       HACK:(vice-versa): in zoom-out preview of the list one virt.cursor
+            #         may match multiple lst items, which you can expand or zoom-in
+            #   NICE? we can make {pos>=0} always positive, and control top item offset by subcursor
+            #   IDEA: use 2D(y,x) subcursor to impl a wf-like "row of buttons" under each item
+            #     (or to navigate individual words of multiline item/text)
+
+            ## FIXME: {advance<ih} -> {virt.cursor-cursor+advance > ih}
+            # if advance < ih:
+            #     raise NotImplementedError(
+            #         "TBD: scroll large item by steps, keeping virt.pos the same\n" + str(locals())
+            #     )
+
+            ## NOTE: jump to next item {if current one is small} and discard residue,
+            # [_] OR:TODO: scroll large item by "steps"-proportional advancement
+            # [_] ALSO:WF:TRY?(irritating?): transfer advancement residue onto next item scroll
+            #   ~~ can be either more intuitive OR more disrupting
             idx += steps
             if idx > last:
-                knock = idx - last
+                remainder = idx - last
+                advance = int(remainder * step_incr)
                 idx = last
-            if bot - pos > last - idx:
+
+            if idx == last:
+                ## NOTE: scroll partially shown last item
+                # BAD! should also apply to above branch {pos==bot}
+                #   ~~ BUT: may occur only if "RND:(invariant): cursor should be on margin" was broken
+                # RENAME? visible_{part,below,range,room}/preview_{span,window}
+                visible_room = vh - pos
+                hidden_part = ih - visible_room
+                if hidden_part > 0:
+                    # NOTE:(zoom-out): move vp away to make room for the last item to be visible on screen
+                    if advance > hidden_part:
+                        knock, residue = divmod(advance - hidden_part, step_incr)
+                        if residue > 0:
+                            knock += 1
+                        pos -= hidden_part
+                    else:
+                        # OK: "pos" may become large negative to fit bot part of large multiline item into vp
+                        pos -= advance
+                elif hidden_part == 0:
+                    # NOTE: detect the attempt to cross the border (bot of last multiline item)
+                    # TODO:(animation): visual "knock()" for 100ms when attempting to scroll past top/bot item
+                    knock, residue = divmod(advance - hidden_part, step_incr)
+                    if residue > 0:
+                        knock += 1
+                elif hidden_part < 0:
+                    # NOTE:(gravitate): gradually align bot of last item with bot of vp
+                    #   ~~ may happen if vp was centered around last item first
+                    # ALT:OPT: allow scrolling till only last line of last item visible
+                    #   i.e. {pos -= advance} until {ih + pos == 1}
+                    empty_space = -hidden_part
+                    if advance > empty_space:
+                        knock, residue = divmod(advance - empty_space, step_incr)
+                        if residue > 0:
+                            knock += 1
+                        pos += empty_space
+                    else:
+                        pos += advance
+                        assert pos + ih <= bot
+                else:
+                    raise ValueError("unexpected")
+
+            if bot - pos > last - idx:  # <PERF:HACK
                 assert all(_fih(i) >= 1 for i in range(idx, last + 1))
+                ## NOTE: gravitate to bot
+                # ALT:NOT? calc from bot-up until found how much items fit under margin
+                #   ~~ for i in range(last, max(0,last-margin)); do if ... break; bot_edge_idx = i;
                 lines_bot = sum(_fih(i) for i in range(idx, last + 1)) - 1
                 if lines_bot < margin:
+                    # NOTE: immediately show last {small} items fully
                     pos = bot - lines_bot
-        elif pos == bot and steps > 0:
-            idx += steps
-            if idx > last:
-                knock = idx - last
-                idx = last
+                    assert 0 <= pos <= bot
+                elif pos != bot - margin:
+                    # ALT:MAYBE? gravitate cursor back to margin
+                    raise RuntimeWarning("RND:(invariant): cursor should be on margin")
+            elif pos != bot - margin:
+                # ALT:MAYBE? gravitate cursor back to margin
+                raise RuntimeWarning("RND:(invariant): cursor should be on margin")
+
         elif steps < 0:
             pidx = idx
             idx += steps
@@ -193,6 +309,8 @@ class NaviWidget:  # pylint:disable=too-many-instance-attributes
                     if lines_top <= margin:
                         pos = lines_top
         elif steps > 0:
+            ## NOTE: always jump to next item (whatever item size)
+            # TODO: scroll by "steps" if item is larger than e.g. half-viewport
             pidx = idx
             idx += steps
             if idx > last:
@@ -211,162 +329,10 @@ class NaviWidget:  # pylint:disable=too-many-instance-attributes
         else:
             raise ValueError("unexpected")
 
-        self._cursor_item_lstindex = idx
-        self._viewport_followeditem_lstindex = idx
-        self._viewport_followeditem_linesfromtop = pos
-        return  # <TEMP
-
-        # pylint:disable=no-else-raise
-        # ARCH:FSM:(x4): sign/idx/vp/size
-        if steps > 0:
-
-            if idx < last:
-
-                # ARCH:FUT: it's a FSM -- should we make it explicit?
-                if pos >= vh:
-                    raise NotImplementedError(
-                        "TEMP: restricted; sync lost: vp had drifted above cursor"
-                    )
-                elif pos < 0:
-                    if pos <= -ih:
-                        raise NotImplementedError(
-                            "TEMP: restricted; sync lost: vp had drifted below cursor"
-                        )
-                    else:
-                        # THINK: actually *any* current item can be larger than vp
-                        raise NotImplementedError(
-                            "TEMP: restricted; only *last* large multine item can start above vp"
-                        )
-                elif pos < vh - margin - 1 - ih:
-                    ## NOTE: always jump to next item (whatever item size)
-                    # TODO: scroll by "steps" if item is larger than half-viewport
-                    # CHG? gravitate to margin/bot if sum(h(idx..last)) < margin
-                    #   ~~ for i in range(last, max(0,last-margin)); do if ... break; bot_edge_idx = i;
-                    idx += 1
-                    pos += ih
-                elif pos < vh - margin - 1:
-                    ## NOTE: jump to next item {if current one is small} and discarding residue,
-                    ##   or scroll large item by "steps"-proportional advancement
-                    if True or advance >= ih:
-                        # raise NotImplementedError("TBD: normal ops; move index/pos")
-                        idx += 1
-                        # MAYBE?WF:(irritating?): transfer advancement residue onto next item scroll
-                        #   TRY: can be either more intuitive OR more disrupting
-                        ## [_] FIXME: if we get {pos>vh-margin-1} -- we should also apply next block from margin
-                        ##   i.e. keep at margin or step it further
-                        # pos += ih
-
-                        # TEMP:FIXME: does not account for variable-length itemheight
-                        if last - idx < margin:
-                            raise NotImplementedError(
-                                "TBD: end of the list; advance over margin"
-                            )
-                        pos = vh - margin - 1
-                    elif advance < ih:
-                        raise NotImplementedError(
-                            "TBD: scroll large item by steps\n" + str(locals())
-                        )
-                        # FAIL: there is no way to detect when to switch to next item,
-                        #   as "virtual offset inside item" is derived from dynamic "offset from top"
-                        # MAYBE: we still need a "vp-virtual cursor" to point to "subparts" of the items
-                        #   ARCH: virt.cursor coincides with user's attention focus and limited by vp boundaries
-                        #     >> so "lst-cursor" is simply one of possible projections of virt.cursor onto lst
-                        #       i.e. multiple virt positions match single lst item
-                        #       HACK:(vice-versa): in zoom-out preview of the list one virt.cursor
-                        #         may match multiple lst items, which you can expand or zoom-in
-                        #   NICE? we can make {pos>=0} always positive, and control top item offset by subcursor
-                        #   IDEA: use 2D(y,x) subcursor to impl a wf-like "row of buttons" under each item
-                        #     (or to navigate individual words of multiline item/text)
-                        pos -= advance
-                elif pos < vh:
-                    raise NotImplementedError(
-                        "TBD: margin ops; keep (and align?) pos until we at the end of the list"
-                    )
-                else:
-                    raise ValueError("unexpected")
-
-            elif idx == last:
-                if pos <= -ih:
-                    # ALT: allow gradual alignment, like in {hidden_part < 0}
-                    raise NotImplementedError(
-                        "TEMP: restricted; last item is far above vp, nothing on the screen"
-                    )
-                elif pos >= vh:
-                    # ALT: scroll drifted vp until item becomes visible -> then show item hidden_part as usual
-                    # OR: imm jump vp to the current cursor position *and* move cursor by one step as usual
-                    # OR: jump cursor to current drifted vp top/bot focuseditem based on if <j/k> was pressed
-                    raise NotImplementedError(
-                        "TEMP: restricted; last item first line should be visible"
-                    )
-                elif pos < vh - ih:
-                    # NOTE:(pos<0|ih>vh is OK): multiline items can be larger than viewport
-                    # CHECK: already implemented gradual alignment -- will it work or not? CHECK: is it intuitive ?
-                    # [_] BAD:FIXME: should do nothing for short lists {sum(vh(i))<vh}
-                    raise NotImplementedError(
-                        "TEMP: restricted; last item bot shouldn't be above vp bot"
-                    )
-                elif pos < vh:
-                    ## NOTE: scroll canvas/viewport if cursor is on first/last item, but it's only partially shown
-                    # RENAME? visible_{part,below,range,room}/preview_{span,window}
-                    visible_room = vh - pos
-                    hidden_part = ih - visible_room
-                    if hidden_part > 0:
-                        # NOTE:(zoom-out): move vp away to make room for the last item to be visible on screen
-                        #   OK: "pos" may become large negative to fit bot part of large multiline item into vp
-                        if advance > hidden_part:
-                            knock = advance - hidden_part
-                            pos -= hidden_part
-                        else:
-                            pos -= advance
-                    elif hidden_part == 0:
-                        # NOTE: detect the attempt to cross the border (bot of last multiline item)
-                        # TODO: visual "knock()" for 100ms when attempting to scroll past top/bot item
-                        knock = advance
-                    elif hidden_part < 0:
-                        # NOTE: gradually align bot of last item with bot of vp
-                        #   ~~ may happen if vp was centered around last item first
-                        # ALT:OPT: allow scrolling till only last line of last item visible
-                        #   i.e. {pos -= advance} until {ih + pos == 1}
-                        empty_space = -hidden_part
-                        if advance > empty_space:
-                            knock = advance - empty_space
-                            pos += empty_space
-                        else:
-                            pos += advance
-                    else:
-                        raise ValueError("unexpected")
-                else:
-                    raise ValueError("unexpected")
-
-        elif steps < 0:
-            raise NotImplementedError()
-
-            # elif sum(f_h(0 .. newidx)) < margin:
-            #     raise NotImplementedError()
-            # elif sum(f_h(newidx .. len(self._lst))) < margin:
-            #     raise NotImplementedError()
-
-            if pos < 0:
-                raise NotImplementedError("past last multiline item")
-            elif pos == 0:
-                raise NotImplementedError()
-            elif pos < margin:
-                raise NotImplementedError()
-            elif pos < vh - margin - 1:
-                raise NotImplementedError()
-            elif pos < vh - 1:
-                raise NotImplementedError()
-            elif pos == vh - 1:
-                raise NotImplementedError()
-            elif pos >= vh:
-                raise NotImplementedError()
-
         # FUT: don't assign if the same
         self._cursor_item_lstindex = idx
         self._viewport_followeditem_lstindex = idx
         self._viewport_followeditem_linesfromtop = pos
-
-    # def scroll_by(self, advance: int) -> None:
 
     def redraw(self, stdscr: C.window) -> None:
         # draw_footer(stdscr)
