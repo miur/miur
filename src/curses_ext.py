@@ -1,7 +1,7 @@
-import enum
 import os
 import sys
 from contextlib import contextmanager
+from enum import IntEnum, auto
 
 # WARN:PERF: somehow doing import here is 2ms faster, than moving into func-local stmt
 from subprocess import CompletedProcess, run
@@ -14,13 +14,15 @@ from . import iomgr
 from .app import g_app
 
 
-@enum.unique
-class ColorMap(enum.IntEnum):
-    default = 1
-    auxinfo = 2
-    iteminfo = 3
-    cursor = 4
-    footer = 5
+class ColorMap(IntEnum):
+    default = auto()
+    auxinfo = auto()
+    iteminfo = auto()
+    cursor = auto()
+    footer = auto()
+    error = auto()
+    fsdir = auto()
+    fslink = auto()
 
 
 def init_colorscheme(stdscr: C.window) -> None:
@@ -35,6 +37,9 @@ def init_colorscheme(stdscr: C.window) -> None:
     C.init_pair(ColorMap.iteminfo, 0, -1)
     C.init_pair(ColorMap.cursor, 8, 4)  # FIXME: use only attrs: C.A_REVERSE | C.A_BOLD
     C.init_pair(ColorMap.footer, 217, 17)
+    C.init_pair(ColorMap.error, 1, -1)
+    C.init_pair(ColorMap.fsdir, 4, -1)
+    C.init_pair(ColorMap.fslink, 6, -1)
 
     # pvis = C.curs_set(visibility=0)
     stdscr.attron(C.color_pair(ColorMap.default))

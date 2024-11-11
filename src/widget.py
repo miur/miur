@@ -129,6 +129,10 @@ class SatelliteViewport:  # pylint:disable=too-many-instance-attributes
         if steps not in (-1, 1):
             raise NotImplementedError("DECI:WiP")
 
+        if not self._lst:
+            log.trace("EMPTY")
+            return
+
         def _fih(i: int) -> int:
             return self._itemheight(self._lst[i])
 
@@ -370,11 +374,13 @@ class SatelliteViewport:  # pylint:disable=too-many-instance-attributes
         c_pfxrel = c_auxinfo
         c_pfxidx = c_iteminfo
         c_cursor = C.A_REVERSE | C.A_BOLD  # OR: C.color_pair(ColorMap.cursor)
+        c_error = C.color_pair(ColorMap.error)
+        c_fsdir = C.color_pair(ColorMap.fsdir)
+        c_fslink = C.color_pair(ColorMap.fslink)
 
         vy, vx = self._viewport_origin_yx
         if not self._lst:
-            c_error = C.A_REVERSE | C.A_BOLD | C.COLOR_RED
-            stdscr.addstr(vy, vx, "EMPTY LIST", c_error)
+            stdscr.addstr(vy, vx, "[ EMPTY ]", c_error | c_cursor)
             return
 
         # log.verbose(f"list: [<={vp.h}/{len(lst)}]")
@@ -395,6 +401,11 @@ class SatelliteViewport:  # pylint:disable=too-many-instance-attributes
         i, y = top_idx, top_y
         while i <= last and y < vh:
             item = self._lst[i]
+            if isinstance(item, HaltEntry):
+                stdscr.addstr(vy + y, vx + 0, f"[ {item.name} ]", c_error | c_cursor)
+                i += 1
+                return
+
             rel = i - top_idx
             pfxrel = f"{1+rel:02d}| "
             # TODO: for binary/hex show "file offset in hex" inof "item idx in _xfm_list"
@@ -408,11 +419,21 @@ class SatelliteViewport:  # pylint:disable=too-many-instance-attributes
                     vy + y, vx + len(pfxrel), pfxidx, c_cursor if i == ci else c_pfxidx
                 )
                 xoff = vx + indent
+                if not isinstance(item, FSEntry):
+                    c_schema = c_item
+                elif fs.islink(item.loci):
+                    c_schema = c_fslink
+                    if fs.isdir(item.loci):
+                        c_schema |= C.A_BOLD
+                elif fs.isdir(item.loci):
+                    c_schema = c_fsdir
+                else:
+                    c_schema = c_item
                 stdscr.addstr(
                     vy + y,
                     xoff,
                     nm[: vw - xoff],
-                    c_cursor if i == ci else c_item,
+                    c_schema | c_cursor if i == ci else c_schema,
                 )
             y += 1
             for l in lines:
@@ -509,9 +530,10 @@ class TextEntry(Golden):
 class FSEntry(Golden):
     __slots__ = ()  # "name", "loci", "explore")
 
-    def __init__(self, path: str) -> None:
+    def __init__(self, path: str, nm:bool|str = True, alt: bool = False) -> None:
         self._x = path
-        self._nm = fs.basename(path)
+        self._nm = fs.basename(path) if nm is True else path if nm is False else nm
+        self._alt = alt
 
     # NICE: as we have a separate .name field, we can augment regular filenames
     # ex~:
@@ -535,18 +557,19 @@ class FSEntry(Golden):
     def explore(self) -> Iterable[Representable]:
         p = self._x
         if not fs.lexists(p):
-            return [HaltEntry("FILE NOT FOUND", loci=(self._x))]
+            return [HaltEntry("FILE NOT FOUND", loci=(self._x,))]
         if not fs.exists(p):
-            return [HaltEntry("DANGLING SYMLINK", loci=(fs.realpath(self._x)))]
+            return [HaltEntry("DANGLING SYMLINK", loci=(fs.realpath(self._x),))]
         cls = type(self)
-        # FIXME: skip .islink if .originator==self
+        # [_] TRY: print this info on 2nd/3rd line below the link, as auxinfo
+        #   BAD: we are losing unified access to copy/edit/navi the interpreted symlink values as regular items
+        #     ALT:NICE: with subcursor we could navi/copy even those 2nd/3rd lines of info
+        # [?] ALT:FIXME: skip .islink if .originator==self
+        #   NICE: we can walk up through .originator chain and construct full "loci" for pieces
         #   ALT: produce virtual FSEntryLike entry, as it's a collection of paths inof real folder
         #     NICE: preserves original order inof being sorted by default as all other FSEntry
-        #   ALT: print this info on 2nd/3rd line below the link, as auxinfo
-        #     BAD: we are losing unified access to copy/edit/navi the interpreted symlink values as regular items
-        #       ALT:NICE: with subcursor we could navi/copy even those 2nd/3rd lines of info
-        if fs.islink(p):
-            return [self, cls(os.readlink(p)), cls(fs.realpath(p))]
+        if not self._alt and fs.islink(p):
+            return [cls(p, nm=False, alt=True), cls(os.readlink(p), nm=False), cls(fs.realpath(p), nm=False), cls(fs.relpath(fs.realpath(p), p), nm=False)]
         if fs.isdir(p):
             with os.scandir(p) as it:
                 return [cls(e.path) for e in it]
@@ -623,7 +646,8 @@ class EntityView:
         # HACK:(this): force cmp with new instance after reload()
         if isinstance(self._ent, this.FSEntry) and fs.isdir(self._ent._x):
             os.chdir(self._ent._x)
-            self._xfm_lst.sort()
+            if not fs.islink(self._ent.loci) or self._ent._alt is True:
+                self._xfm_lst.sort()
 
 
 # ENH:ADD: triplet preview (Miller)
@@ -650,13 +674,20 @@ class NaviWidget:
         self._view._wdg.resize(vh, vw, origin=origin)
 
     def cursor_step_by(self, steps: int) -> None:
-        raise RuntimeError("try")
         # pylint:disable=protected-access
         self._view._wdg.step_by(steps)
 
     def view_go_into(self) -> None:
         # pylint:disable=protected-access
         pwdg = self._view._wdg
+
+        # ALT:BET? temporarily insert HaltEntry into all empty lists
+        #   BAD: such entry will get superfluous index "01 | 001> "
+        #     ~~ it's better to disable indexes for *all* HaltEntry()
+        if not pwdg._lst:
+            log.trace("EMPTY")
+            return
+
         nent = pwdg.focused_item
 
         if isinstance(nent, HaltEntry):
@@ -748,7 +779,7 @@ class RootWidget:
 
     def cursor_step_by(self, steps: int) -> None:
         # pylint:disable=protected-access
-        self._navi._view._wdg.step_by(steps)
+        self._navi.cursor_step_by(steps)
 
     def view_go_into(self) -> None:
         self._navi.view_go_into()
@@ -773,12 +804,13 @@ class RootWidget:
         c_iteminfo = C.color_pair(ColorMap.iteminfo)
         c_auxinfo = C.color_pair(ColorMap.auxinfo)
         c_footer = C.color_pair(ColorMap.footer)
+        wdg = self._navi._view._wdg
 
         # pylint:disable=protected-access
         # ALT:([]): use ⸤⸣ OR ⸢⸥
         header = f"[{self._navi._history_idx+1}⁄{len(self._navi._history_stack)}] "
         stdscr.addstr(0, 0, header, c_auxinfo)
-        xpath = self._navi._view._wdg.focused_item.loci
+        xpath = wdg.focused_item.loci if wdg._lst else self._navi._view._ent.loci + "/"
         try:
             iname = xpath.rindex("/")
             stdscr.addstr(0, len(header), xpath[:iname], c_footer | C.A_BOLD)
@@ -793,7 +825,6 @@ class RootWidget:
 
         self._navi.redraw(stdscr)
 
-        wdg = self._navi._view._wdg
         ci = 1 + wdg._cursor_item_lstindex
         sz = len(wdg._lst)
         sortby = "name"
@@ -805,7 +836,10 @@ class RootWidget:
 
         # NOTE: place real cursor to where list-cursor is, to make tmux overlay selection more intuitive
         cy = wdg._viewport_origin_yx[0]
-        cx = wdg._viewport_origin_yx[1] + 4  # = len(pfx)
+        if not wdg._lst or isinstance(wdg.focused_item, HaltEntry):
+            cx = 0
+        else:
+            cx = wdg._viewport_origin_yx[1] + 3  # = len(pfx)
         pos = wdg._viewport_followeditem_linesfromtop
         if 0 <= pos < wdg._viewport_height_lines:
             cy += pos
