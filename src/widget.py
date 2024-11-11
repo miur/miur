@@ -1,6 +1,6 @@
 import os
 import os.path as fs
-from typing import Callable, Iterable, Protocol, Sequence, override
+from typing import Callable, Iterable, Protocol, Self, Sequence, override
 
 import _curses as C
 
@@ -13,9 +13,12 @@ class Representable(Protocol):
     @property
     def name(self) -> str: ...
 
+    # MOVE? "Sortable" ?
+    def __lt__(self, other: Self) -> bool:
+        return self.name < other.name
 
-# RENAME? my algo is "SatelliteViewport"
-class NaviWidget:  # pylint:disable=too-many-instance-attributes
+
+class SatelliteViewport:  # pylint:disable=too-many-instance-attributes
     def __init__(self) -> None:
         self._lst: Sequence[Representable]
         # ARCH:
@@ -40,6 +43,9 @@ class NaviWidget:  # pylint:disable=too-many-instance-attributes
     #    MAYBE:THINK: use .subfocus(canvas_line/word) to apply actions to specific auxinfo of focused item
     @property
     def focused_item(self) -> Representable:
+        # MAYBE:XLR: point cursor to folder/_ent itself
+        #   + makes cursor always deterministic
+        #   + allows you the subset of operations, like adding new files to the folder
         if not self._lst:
             # BET? return dummy placeholder for empty dirs
             #   BAD! placeholder is *content*, it shouldn't be *focused* either
@@ -48,16 +54,16 @@ class NaviWidget:  # pylint:disable=too-many-instance-attributes
         return self._lst[self._cursor_item_lstindex]
 
     def resize(self, vh: int, vw: int, origin: tuple[int, int] = (0, 0)) -> None:
-        # pvh = self._viewport_height_lines
+        pvh = self._viewport_height_lines
         self._viewport_origin_yx = origin
         self._viewport_height_lines = vh
         self._viewport_width_columns = vw
         self._viewport_margin_lines = vh // 8  # OR: fixed=2
         # KEEP: self._viewport_followeditem_lstindex
-        # TODO: adjust resulting offset to align onto margin
-        # if pvh > 0 and (ratio := self._viewport_followeditem_linesfromtop / pvh) > 0:
-        #     self._viewport_followeditem_linesfromtop = int(vh * ratio)
-        self._viewport_followeditem_linesfromtop = 0
+        # RND: adjust resulting offset to align onto margin
+        #   ALT:BAD: self._viewport_followeditem_linesfromtop = 0
+        if pvh > 0 and (ratio := self._viewport_followeditem_linesfromtop / pvh) > 0:
+            self._viewport_followeditem_linesfromtop = int(vh * ratio)
 
     # CASE:(lightweight): to be able to re-assign ~same list after external xfm, e.g. after "order-by"
     def assign(self, lst: Sequence[Representable], hint_idx: int | None = None) -> None:
@@ -349,6 +355,12 @@ class NaviWidget:  # pylint:disable=too-many-instance-attributes
         c_pfxidx = c_iteminfo
         c_cursor = C.A_REVERSE | C.A_BOLD  # OR: C.color_pair(ColorMap.cursor)
 
+        vy, vx = self._viewport_origin_yx
+        if not self._lst:
+            c_error = C.A_REVERSE | C.A_BOLD | C.COLOR_RED
+            stdscr.addstr(vy, vx, "EMPTY LIST", c_error)
+            return
+
         # log.verbose(f"list: [<={vp.h}/{len(lst)}]")
 
         # self._viewport_margin_lines
@@ -365,11 +377,11 @@ class NaviWidget:  # pylint:disable=too-many-instance-attributes
 
         last = len(self._lst) - 1
         i, y = top_idx, top_y
-        vy, vx = self._viewport_origin_yx
         while i <= last and y < vh:
             item = self._lst[i]
             rel = i - top_idx
             pfxrel = f"{1+rel:02d}| "
+            # TODO: for binary/hex show "file offset in hex" inof "item idx in _xfm_list"
             pfxidx = f"{1+i:03d}{">" if i == ci else ":"} "
             indent = len(pfxrel) + len(pfxidx)
             nm, *lines = item.name.split("\n")
@@ -416,7 +428,10 @@ class NaviWidget:  # pylint:disable=too-many-instance-attributes
 
 
 class Explorable(Protocol):
-    def explore(self) -> Iterable["Representable"]: ...
+    # BET? def explore(self) -> Iterable[Representable] | HaltEntry/None: ...
+    #   ALT: allow .explore to raise NotImplementedError() as regular *frequent* behavior
+    #     BAD: we need a way to query "if Explorable" to indicate it in `Viewport before opening
+    def explore(self) -> Iterable[Representable]: ...
 
 
 # RENAME? ErrorEntry -- BUT: such entry should also be explorable...
@@ -440,7 +455,7 @@ class TextEntry(Representable, Explorable):
         return self._x
 
     @override
-    def explore(self) -> Iterable["Representable"]:
+    def explore(self) -> Iterable[Representable]:
         words = self._x.split()
         if len(words) <= 1:
             return [HaltEntry("NOT EXPLORABLE (YET)")]
@@ -452,9 +467,6 @@ class FSEntry(Representable, Explorable):
     def __init__(self, path: str) -> None:
         self._x = path
 
-    def __lt__(self, other: "FSEntry") -> bool:
-        return self._x < other._x
-
     @override
     @property
     def name(self) -> str:
@@ -464,7 +476,7 @@ class FSEntry(Representable, Explorable):
 
     # i.e. =InterpretUnchangedDirListingPropertyAsFSEntriesInUsualWay
     @override
-    def explore(self) -> Iterable["Representable"]:
+    def explore(self) -> Iterable[Representable]:
         p = self._x
         if not fs.lexists(p):
             return [HaltEntry("FILE NOT FOUND")]
@@ -489,6 +501,7 @@ class FSEntry(Representable, Explorable):
                         textlines.append(this.TextEntry(line.removesuffix("\n")))
                 return textlines
             except UnicodeDecodeError:
+                # TODO: on redraw() show "file offset in hex" inof "item idx in _xfm_list"
                 hexlines: list[TextEntry] = []
                 with open(p, "rb") as f:
                     while (data := f.read(16)) and f.tell() < 1024:
@@ -502,99 +515,139 @@ class FSEntry(Representable, Explorable):
 #     pass
 
 
-class RootWidget:
+# ALT:SPLIT: make an `EntityContext for serialization/restoration on restart
+class EntityView:
     _ent: Representable
-    _lst: Sequence[Representable]
-    # _lstpxy: ListCachingProxy[Representable]
+    _originator: Self | None
+    _wdg: SatelliteViewport
     _act: Callable[[], Sequence[Representable]]
-    _wdg: NaviWidget
-    _wh: int
-    _ww: int
+    # _lstpxy: ListCachingProxy[Representable]
+    _orig_lst: Sequence[Representable]
+    _xfm_lst: list[Representable]
 
-    def __init__(self) -> None:
-        self._wdg = NaviWidget()
-        self._history: list[Representable] = []  # RENAME? _cursor_chain
-
-    def set_entity(self, ent: Representable, hint_idx: int | None = None) -> None:
+    # ALT:BAD?PERF: store in each TextEntity a backref to "originator"
+    #   == to be able to return to its "parent"
+    #   NICE: only "navigated-to" items will store this backref
+    def __init__(self, ent: Representable, originator: Self | None = None) -> None:
+        assert not isinstance(ent, HaltEntry)
         self._ent = ent
-        if (sfn := getattr(ent, "explore")) and callable(sfn):
+        # NOTE: remember which `View have created this one -- tba to return back
+        self._originator = originator
+        # ALT:PERF(slow): @runtime_checkable : isinstance(ent, Explorable)
+        #   https://mypy.readthedocs.io/en/latest/protocols.html#using-isinstance-with-protocols
+        if (sfn := getattr(ent, "explore", None)) and callable(sfn):
             self._act = sfn  # NOTE: keep sfn to be able to refresh() the list (when externally changed)
-            self._lst = self._act()
-            # BAD:PERF:
-            if all(isinstance(x, this.FSEntry) for x in self._lst):
-                self._lst.sort()
-            self._wdg.assign(self._lst, hint_idx)
-
-    def cursor_move_rel(self, modifier: int) -> None:
-        self._wdg.step_by(modifier)
-
-    # RENAME? expand_under_cursor
-    def go_into_cursor(self) -> None:
-        # ALT:BAD?PERF: store in each TextEntity a backref to "originator"
-        #   == to be able to return to its "parent"
-        #   NICE: only "navigated-to" items will store this backref
-        # TODO: wrap each stored entity into EntityContext(ent, idx=..., pos=...)
-        #   &why to be able to restore vp/navi as you left it
-        #   ALT:BET? create a separate NaviWidget() per each Entity assigned
-        #     NICE: preserve "pos,vh,margin" as-is, and then reinterpret/resize only when going back
-        self._history.append(self._ent)
-        self.set_entity(self._wdg.focused_item, hint_idx=0)
-        if isinstance(self._ent, this.FSEntry):
-            os.chdir(self._ent._x)
-
-    def go_to_parent(self) -> None:
-        # pylint:disable=protected-access
-        if len(self._history) > 0:
-            # FIXME: we shouldn't "pop" -- it should be still in the list,
-            #   to be able to navigate forward
-            parent = self._history.pop()
-        elif isinstance(self._ent, this.FSEntry):
-            parent = this.FSEntry(fs.dirname(self._ent._x))
+            self._orig_lst = self._act()
+            self._transform()
+            assert getattr(self, "_xfm_lst", None) is not None
+            self._wdg = SatelliteViewport()
+            self._wdg.assign(self._xfm_lst)
         else:
             raise NotImplementedError()
-        if isinstance(parent, this.FSEntry):
-            os.chdir(parent._x)
-        self.set_entity(parent, hint_idx=0)
 
-    def resize(self, stdscr: C.window) -> None:
-        self._wh, self._ww = stdscr.getmaxyx()
-        self._wdg.resize(self._wh - 2, self._ww, origin=(1, 1))
-        self.redraw(stdscr)
+    # VIZ: sort, reverse, filter, groupby, aug/highlight/mark/tag
+    def _transform(self) -> None:
+        self._xfm_lst = list(self._orig_lst)
+        self._apply_default_policy()
+
+    def _apply_default_policy(self) -> None:
+        # pylint:disable=protected-access
+        if isinstance(self._ent, this.FSEntry) and fs.isdir(self._ent._x):
+            os.chdir(self._ent._x)
+            self._xfm_lst.sort()
+
+
+# ENH:ADD: triplet preview (Miller)
+class NaviWidget:
+    _view: EntityView
+
+    def __init__(self, ent: Representable) -> None:
+        # NOTE: we create a separate `SatelliteViewport per each `Entity assigned
+        #   NICE: preserve "pos,vh,margin" as-is, and then reinterpret/resize only when going back
+        #   ++ NICE: preserve the *generated* items as-is in the "_wdg._lst"
+        #   +++ NICE: can use totally different *widgets* based on the type(_ent)
+        #     e.g. Dashboard or Editor
+        self._view = EntityView(ent)
+        # MAYBE:CHG: directly store "ent" in _stack to represent "xpath",
+        #   as now we can use "_pool" -- to map it to temporarily cached "_view"
+        #   RENAME? _cursor_chain/navi_stack | _pool_cached_view/_view_pool
+        self._history_stack = [self._view]
+        self._history_idx = len(self._history_stack) - 1
+        # NOTE: tba to restore view when opening previously visited nodes
+        self._history_pool = {ent: self._view}
+
+    def resize(self, vh: int, vw: int, origin: tuple[int, int] = (0, 0)) -> None:
+        # pylint:disable=protected-access
+        self._view._wdg.resize(vh, vw, origin=origin)
+
+    def cursor_step_by(self, steps: int) -> None:
+        # pylint:disable=protected-access
+        self._view._wdg.step_by(steps)
+
+    def view_go_into(self) -> None:
+        # pylint:disable=protected-access
+        pwdg = self._view._wdg
+        nent = pwdg.focused_item
+
+        if isinstance(nent, HaltEntry):
+            log.trace(nent.name)
+            return
+
+        def _histappend() -> None:
+            if v := self._history_pool.get(nent):
+                self._view = v
+            else:
+                self._view = EntityView(nent)
+                self._history_pool[nent] = self._view
+            self._history_stack.append(self._view)
+            self._history_idx = len(self._history_stack) - 1
+
+        # NOTE: keep previous navi stack to be able to return to same EntityView
+        #   but discard the rest of navi stack if we go into different route
+        if (nidx := self._history_idx + 1) < len(self._history_stack):
+            if self._history_stack[nidx]._ent == nent:
+                self._history_idx = nidx
+                self._view = self._history_stack[nidx]
+            else:
+                del self._history_stack[nidx:]
+                _histappend()
+        else:
+            _histappend()
+        # NOTE: resize() newly created wdg to same dimensions
+        self._view._wdg.resize(
+            pwdg._viewport_height_lines,
+            pwdg._viewport_width_columns,
+            origin=pwdg._viewport_origin_yx,
+        )
+
+    def view_go_back(self) -> None:
+        # pylint:disable=protected-access
+        pwdg = self._view._wdg
+        if self._history_idx > 0:
+            self._history_idx -= 1
+            self._view = self._history_stack[self._history_idx]
+        elif isinstance(self._view._ent, this.FSEntry):
+            # RND:(controversial): as we basically navigate to *new* nodes to the left,
+            #   so we should keep the history of this navigation, but we discard that
+            parent_ent = this.FSEntry(fs.dirname(self._view._ent._x))
+            self._view = EntityView(parent_ent)  # , hint_idx=0)
+            self._history_stack = [self._view]
+            self._history_idx = len(self._history_stack) - 1
+        else:
+            raise NotImplementedError()
+        # NOTE: resize() old/cached wdg, as window may had resized from then.
+        self._view._wdg.resize(
+            pwdg._viewport_height_lines,
+            pwdg._viewport_width_columns,
+            origin=pwdg._viewport_origin_yx,
+        )
 
     def redraw(self, stdscr: C.window) -> None:
-        # FUT: dispatch to either curses/cli/Qt
-        assert isinstance(stdscr, C.window)
-        # FUT: only clear "rest of each line" -- and only if prev line there was longer
-        stdscr.clear()
         # FIXED: prevent crash when window shrinks past the cursor
-        # self.cursor_move_rel(0)
+        # self.cursor_step_by(0)
         # NOTE: actually _lst here stands for a generic _augdbpxy with read.API
         #   i.e. DB augmented by virtual entries, all generated-and-cleared on demand
-        self._wdg.redraw(stdscr)
-
-        # pylint:disable=protected-access
-        c_footer = C.color_pair(ColorMap.footer)
-        ci = 1 + self._wdg._cursor_item_lstindex
-        sz = len(self._wdg._lst)
-        sortby = "name"
-        sortrev = False
-        footer = f"--- {ci}/{sz} | by={sortby}{"￪" if sortrev else "￬"}"
-        stdscr.addstr(self._wh - 1, 0, footer, c_footer)
-
-        # HACK:(this): force cmp with new instance after reload()
-        if isinstance(self._ent, this.FSEntry):
-            header = str(self._ent._x)
-        else:
-            header = repr(self._ent)
-        stdscr.addstr(0, 0, header, c_footer | C.A_BOLD)
-
-        # NOTE: place real cursor to where list-cursor is, to make tmux overlay selection more intuitive
-        cy = self._wdg._viewport_origin_yx[0]
-        cx = self._wdg._viewport_origin_yx[1] + 4  # = len(pfx)
-        pos = self._wdg._viewport_followeditem_linesfromtop
-        if 0 <= pos < self._wdg._viewport_height_lines:
-            cy += pos
-        stdscr.move(cy, cx)
+        self._view._wdg.redraw(stdscr)
 
     # USE: log.info(str(wdg))
     # def __str__(self) -> str:
@@ -606,33 +659,109 @@ class RootWidget:
     #     return s
 
 
+class RootWidget:
+    _wh: int
+    _ww: int
+
+    # USE: {RootWidget(HaltEntry("NOTHING"))} for a "default" ctor
+    def __init__(self, ent: Representable) -> None:
+        self.set_entity(ent)
+
+    def set_entity(self, ent: Representable) -> None:
+        # FUT: may create different widgets based on `Entity and `Policy
+        self._navi = NaviWidget(ent)
+
+    ## DISABLED: we need explicit methods for type-checking
+    ##   and to appropriately update header/footer on action
+    # def action[**P](self, name: str, *args: P.args, **kwargs: P.kwargs) -> None:
+    #     getattr(self, name)(*args, **kwargs)
+
+    def cursor_step_by(self, steps: int) -> None:
+        # pylint:disable=protected-access
+        self._navi._view._wdg.step_by(steps)
+
+    def view_go_into(self) -> None:
+        self._navi.view_go_into()
+        # self._invalidate_header_footer()
+
+    def view_go_back(self) -> None:
+        self._navi.view_go_back()
+        # self._invalidate_header_footer()
+
+    def resize(self, stdscr: C.window) -> None:
+        self._wh, self._ww = stdscr.getmaxyx()
+        orig_yx = (1, 1)
+        size_yx = (self._wh - orig_yx[0] - 1, self._ww - orig_yx[1])
+        self._navi.resize(*size_yx, origin=orig_yx)
+
+    def redraw(self, stdscr: C.window) -> None:
+        # FUT: dispatch to either curses/cli/Qt
+        assert isinstance(stdscr, C.window)
+        # FUT: only clear "rest of each line" -- and only if prev line there was longer
+        stdscr.clear()
+
+        self._navi.redraw(stdscr)
+
+        # pylint:disable=protected-access
+        wdg = self._navi._view._wdg
+        c_footer = C.color_pair(ColorMap.footer)
+        ci = 1 + wdg._cursor_item_lstindex
+        sz = len(wdg._lst)
+        sortby = "name"
+        sortrev = False
+        footer = f"--- {ci}/{sz} | by={sortby}{"￪" if sortrev else "￬"}"
+        ## DEBUG:NEED:(__main__.py): -X tracemalloc
+        # footer += f"  --- {{RAM={__import__("tracemalloc").get_traced_memory()[0]//1024:,}kB}}"
+        stdscr.addstr(self._wh - 1, 0, footer, c_footer)
+
+        header = f"[{self._navi._history_idx+1}/{len(self._navi._history_stack)}] "
+        ent = self._navi._view._ent
+        # HACK:(this): force cmp with new instance after reload()
+        if isinstance(ent, this.FSEntry):
+            header += str(ent._x)
+        else:
+            header += repr(ent)
+        stdscr.addstr(0, 0, header, c_footer | C.A_BOLD)
+
+        # NOTE: place real cursor to where list-cursor is, to make tmux overlay selection more intuitive
+        cy = wdg._viewport_origin_yx[0]
+        cx = wdg._viewport_origin_yx[1] + 4  # = len(pfx)
+        pos = wdg._viewport_followeditem_linesfromtop
+        if 0 <= pos < wdg._viewport_height_lines:
+            cy += pos
+        stdscr.move(cy, cx)
+
+
 def _live() -> None:
     log.sep()
     from .app import g_app as g
     from .util.exchook import log_exc
     from .widget import RootWidget  # pylint:disable=import-self,redefined-outer-name
 
+    # pylint:disable=protected-access
+    # HACK: we should restore all "EntryView" contexts, as we recreate ALL objects
+    #   ENH:TODO: serialize/deserialize whole `Views inof only current view pos/idx ?
     hidx = None
-    if pwdg := getattr(g.root_wdg, "_wdg", None):
-        hidx = pwdg._cursor_item_lstindex  # pylint:disable=protected-access
+    if pnavi := getattr(g.root_wdg, "_navi", None):
+        hidx = pnavi._view._wdg._cursor_item_lstindex
 
-    i: int
+    # i: int
     try:
-        g.root_wdg = wdg = RootWidget()
-        # wdg.set_entity(this.FSEntry("/etc/udev"), hint_idx=hidx)
-        wdg.set_entity(this.FSEntry("/d/airy"), hint_idx=hidx)
+        g.root_wdg = RootWidget(HaltEntry("NOTHING"))
+        # g.root_wdg.set_entity(this.FSEntry("/etc/udev"), hint_idx=hidx)
+        g.root_wdg.set_entity(this.FSEntry("/d/airy"))  # , hint_idx=hidx)
         g.curses_ui.resize()
 
         # ALT: fuzzy-test, by random direction of up/down 50 times
-        ndown = 30
-        for i in range(ndown):
-            wdg.cursor_move_rel(1)
-        wdg.redraw(g.stdscr)
-        g.stdscr.refresh()
-        for i in range(ndown):
-            wdg.cursor_move_rel(-1)
-        wdg.redraw(g.stdscr)
-        g.stdscr.refresh()
+        # ndown = 30
+        # for i in range(ndown):
+        #     wdg.cursor_step_by(1)
+        # wdg.redraw(g.stdscr)
+        # g.stdscr.refresh()
+        # for i in range(ndown):
+        #     wdg.cursor_step_by(-1)
+        # wdg.redraw(g.stdscr)
+        # g.stdscr.refresh()
     except Exception as exc:  # pylint:disable=broad-exception-caught
-        exc.add_note(f"{i=}")
+        # exc.add_note(f"{i=}")
         log_exc(exc)

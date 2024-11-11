@@ -39,6 +39,7 @@ def resize(g: AppGlobals) -> None:
     #   THINK: how to prevent/block redraw in that case?
     g.stdscr.clear()  # CHECK:NEED:OR:NOT? e.g. to clear bkgr (which earlier wasn't redrawn on resize)
     g.root_wdg.resize(g.stdscr)
+    g.root_wdg.redraw(g.stdscr)
     g.stdscr.refresh()
 
 
@@ -78,10 +79,10 @@ g_input_handlers: dict[str | int, Callable[[AppGlobals], None]] = {
     "K": ipykernel_start,
     "I": ipyconsole_out,
     "\014": resize,  # manually trigger redraw on <C-l>
-    "j": lambda g: g.root_wdg.cursor_move_rel(1),
-    "k": lambda g: g.root_wdg.cursor_move_rel(-1),
-    "h": lambda g: g.root_wdg.go_to_parent(),
-    "l": lambda g: g.root_wdg.go_into_cursor(),
+    "j": lambda g: g.root_wdg.cursor_step_by(1),
+    "k": lambda g: g.root_wdg.cursor_step_by(-1),
+    "h": lambda g: g.root_wdg.view_go_back(),
+    "l": lambda g: g.root_wdg.view_go_into(),
     "\t": ipython_out,
 }
 
