@@ -18,6 +18,22 @@ class Representable(Protocol):
         return self.name < other.name
 
 
+class Addressable(Protocol):
+    @property
+    def loci(self) -> str: ...
+
+
+class Explorable(Protocol):
+    # BET? def explore(self) -> Iterable[Representable] | HaltEntry/None: ...
+    #   ALT: allow .explore to raise NotImplementedError() as regular *frequent* behavior
+    #     BAD: we need a way to query "if Explorable" to indicate it in `Viewport before opening
+    def explore(self) -> Iterable[Representable]: ...
+
+
+class Golden(Representable, Addressable, Explorable, Protocol):
+    __slots__ = ()
+
+
 class SatelliteViewport:  # pylint:disable=too-many-instance-attributes
     def __init__(self) -> None:
         self._lst: Sequence[Representable]
@@ -427,59 +443,101 @@ class SatelliteViewport:  # pylint:disable=too-many-instance-attributes
         # stdscr.chgat(vctx.wndcurpos0, cx, cn, ccurs)
 
 
-class Explorable(Protocol):
-    # BET? def explore(self) -> Iterable[Representable] | HaltEntry/None: ...
-    #   ALT: allow .explore to raise NotImplementedError() as regular *frequent* behavior
-    #     BAD: we need a way to query "if Explorable" to indicate it in `Viewport before opening
-    def explore(self) -> Iterable[Representable]: ...
-
-
 # RENAME? ErrorEntry -- BUT: such entry should also be explorable...
-class HaltEntry(Representable):
-    def __init__(self, kind: str) -> None:
-        self._x = kind
+class HaltEntry(Golden):
+    def __init__(self, kind: str, loci: tuple[str, ...] | None = None) -> None:
+        self._msg = kind
+        self._orig = loci
 
     @override
     @property
     def name(self) -> str:
-        return self._x
-
-
-class TextEntry(Representable, Explorable):
-    def __init__(self, text: str) -> None:
-        self._x = text
+        return self._msg
 
     @override
     @property
-    def name(self) -> str:
-        return self._x
+    def loci(self) -> str:
+        return "".join(self._orig) if self._orig else "∅ " + repr(self)
 
     @override
     def explore(self) -> Iterable[Representable]:
-        words = self._x.split()
-        if len(words) <= 1:
-            return [HaltEntry("NOT EXPLORABLE (YET)")]
+        raise TypeError(self._msg)
+
+
+class TextEntry(Golden):
+    __slots__ = ()  # "name", "loci", "explore")
+
+    def __init__(self, text: str, loci: tuple[str, ...] | None = None) -> None:
+        self._x = text
+        self._at = loci  # = (path,lnum,[col,[boff,...]])
+
+    @override
+    @property
+    def name(self) -> str:
+        return self._x
+
+    @override
+    @property
+    def loci(self) -> str:
+        return "".join(self._at) if self._at else "∅ " + repr(self)
+
+    @override
+    def explore(self) -> Iterable[Representable]:
+        from re import finditer
+
         cls = type(self)
-        return [cls(w) for w in words]
+        words = [
+            cls(
+                m.group(0),
+                loci=(
+                    (
+                        self._at[0],
+                        f":{m.start()}+{m.end() - m.start()}",
+                        self._at[-1],
+                    )
+                    if self._at
+                    else ("∅", f":{m.start()}+{m.end() - m.start()}")
+                ),
+            )
+            for m in finditer(r"\S+", self._x)
+        ]
+        if len(words) <= 1:
+            return [HaltEntry("ATOMIC", loci=self._at)]  # ALT: "NOT EXPLORABLE (YET)"
+        return words
 
 
-class FSEntry(Representable, Explorable):
+class FSEntry(Golden):
+    __slots__ = ()  # "name", "loci", "explore")
+
     def __init__(self, path: str) -> None:
         self._x = path
+        self._nm = fs.basename(path)
 
+    # NICE: as we have a separate .name field, we can augment regular filenames
+    # ex~:
+    #   ~ skip date-prefix (to sort by body)
+    #   ~ substitute my xts3 to isodate
+    #   ~ insert full path into name -- for flattened folders
     @override
     @property
     def name(self) -> str:
         # return str(self._x)
         # TEMP:TEST: multiline entries
-        return str(self._x).replace("o", "o⬎\n")
+        return self._nm.replace("o", "o⬎\n")
+
+    @override
+    @property
+    def loci(self) -> str:
+        return self._x
 
     # i.e. =InterpretUnchangedDirListingPropertyAsFSEntriesInUsualWay
     @override
     def explore(self) -> Iterable[Representable]:
         p = self._x
         if not fs.lexists(p):
-            return [HaltEntry("FILE NOT FOUND")]
+            return [HaltEntry("FILE NOT FOUND", loci=(self._x))]
+        if not fs.exists(p):
+            return [HaltEntry("DANGLING SYMLINK", loci=(fs.realpath(self._x)))]
         cls = type(self)
         # FIXME: skip .islink if .originator==self
         #   ALT: produce virtual FSEntryLike entry, as it's a collection of paths inof real folder
@@ -497,15 +555,25 @@ class FSEntry(Representable, Explorable):
                 textlines: list[TextEntry] = []
                 with open(p, "r", encoding="utf-8") as f:
                     # ALT:(python>=3.13): lines = f.readlines(sizehint=1024, keepends=False)
-                    while (line := f.readline()) and f.tell() < 1024:
-                        textlines.append(this.TextEntry(line.removesuffix("\n")))
+                    i = 1
+                    while (boff := f.tell()) < 1024 and (line := f.readline(1024)):
+                        ent = this.TextEntry(
+                            line.removesuffix("\n"), loci=(p, f":{i}", f"  `{boff}")
+                        )
+                        textlines.append(ent)
+                        i += 1
                 return textlines
             except UnicodeDecodeError:
                 # TODO: on redraw() show "file offset in hex" inof "item idx in _xfm_list"
                 hexlines: list[TextEntry] = []
                 with open(p, "rb") as f:
-                    while (data := f.read(16)) and f.tell() < 1024:
-                        hexlines.append(this.TextEntry(data.hex(" ")))
+                    i = 1
+                    while (boff := f.tell()) < 1024 and (data := f.read(16)):
+                        ent = this.TextEntry(
+                            data.hex(" "), loci=(p, f" `0x{boff:x}  #{i}")
+                        )
+                        hexlines.append(ent)
+                        i += 1
                 return hexlines
         raise NotImplementedError(p)
 
@@ -552,6 +620,7 @@ class EntityView:
 
     def _apply_default_policy(self) -> None:
         # pylint:disable=protected-access
+        # HACK:(this): force cmp with new instance after reload()
         if isinstance(self._ent, this.FSEntry) and fs.isdir(self._ent._x):
             os.chdir(self._ent._x)
             self._xfm_lst.sort()
@@ -581,6 +650,7 @@ class NaviWidget:
         self._view._wdg.resize(vh, vw, origin=origin)
 
     def cursor_step_by(self, steps: int) -> None:
+        raise RuntimeError("try")
         # pylint:disable=protected-access
         self._view._wdg.step_by(steps)
 
@@ -663,7 +733,7 @@ class RootWidget:
     _wh: int
     _ww: int
 
-    # USE: {RootWidget(HaltEntry("NOTHING"))} for a "default" ctor
+    # USE? {RootWidget(HaltEntry("NOTHING"))} for a "default" ctor
     def __init__(self, ent: Representable) -> None:
         self.set_entity(ent)
 
@@ -699,12 +769,31 @@ class RootWidget:
         assert isinstance(stdscr, C.window)
         # FUT: only clear "rest of each line" -- and only if prev line there was longer
         stdscr.clear()
+        c_item = C.color_pair(ColorMap.default)
+        c_iteminfo = C.color_pair(ColorMap.iteminfo)
+        c_auxinfo = C.color_pair(ColorMap.auxinfo)
+        c_footer = C.color_pair(ColorMap.footer)
+
+        # pylint:disable=protected-access
+        # ALT:([]): use ⸤⸣ OR ⸢⸥
+        header = f"[{self._navi._history_idx+1}⁄{len(self._navi._history_stack)}] "
+        stdscr.addstr(0, 0, header, c_auxinfo)
+        xpath = self._navi._view._wdg.focused_item.loci
+        try:
+            iname = xpath.rindex("/")
+            stdscr.addstr(0, len(header), xpath[:iname], c_footer | C.A_BOLD)
+            try:
+                ilnum = xpath.index(":", iname)
+                stdscr.addstr(0, len(header) + iname, xpath[iname:ilnum], c_item)
+                stdscr.addstr(0, len(header) + ilnum, xpath[ilnum:], c_iteminfo)
+            except ValueError:
+                stdscr.addstr(0, len(header) + iname, xpath[iname:], c_item)
+        except ValueError:
+            stdscr.addstr(0, len(header), xpath, c_footer | C.A_BOLD)
 
         self._navi.redraw(stdscr)
 
-        # pylint:disable=protected-access
         wdg = self._navi._view._wdg
-        c_footer = C.color_pair(ColorMap.footer)
         ci = 1 + wdg._cursor_item_lstindex
         sz = len(wdg._lst)
         sortby = "name"
@@ -713,15 +802,6 @@ class RootWidget:
         ## DEBUG:NEED:(__main__.py): -X tracemalloc
         # footer += f"  --- {{RAM={__import__("tracemalloc").get_traced_memory()[0]//1024:,}kB}}"
         stdscr.addstr(self._wh - 1, 0, footer, c_footer)
-
-        header = f"[{self._navi._history_idx+1}/{len(self._navi._history_stack)}] "
-        ent = self._navi._view._ent
-        # HACK:(this): force cmp with new instance after reload()
-        if isinstance(ent, this.FSEntry):
-            header += str(ent._x)
-        else:
-            header += repr(ent)
-        stdscr.addstr(0, 0, header, c_footer | C.A_BOLD)
 
         # NOTE: place real cursor to where list-cursor is, to make tmux overlay selection more intuitive
         cy = wdg._viewport_origin_yx[0]
@@ -747,9 +827,8 @@ def _live() -> None:
 
     # i: int
     try:
-        g.root_wdg = RootWidget(HaltEntry("NOTHING"))
+        g.root_wdg = RootWidget(this.FSEntry("/d/airy"))
         # g.root_wdg.set_entity(this.FSEntry("/etc/udev"), hint_idx=hidx)
-        g.root_wdg.set_entity(this.FSEntry("/d/airy"))  # , hint_idx=hidx)
         g.curses_ui.resize()
 
         # ALT: fuzzy-test, by random direction of up/down 50 times
