@@ -24,9 +24,6 @@ class Addressable(Protocol):
 
 
 class Explorable(Protocol):
-    # BET? def explore(self) -> Iterable[Representable] | HaltEntry/None: ...
-    #   ALT: allow .explore to raise NotImplementedError() as regular *frequent* behavior
-    #     BAD: we need a way to query "if Explorable" to indicate it in `Viewport before opening
     def explore(self) -> Iterable[Representable]: ...
 
 
@@ -121,6 +118,23 @@ class SatelliteViewport:  # pylint:disable=too-many-instance-attributes
         return item.name.count("\n") + 1
 
     # TBD: def scroll_by(self, advance: int) -> None:
+
+    def jump_to(self, idx: int) -> None:
+        if not self._lst or idx not in (-1, 0):
+            raise NotImplementedError("DECI:WiP")
+
+        if idx == 0:
+            pos = 0
+        elif idx in (-1, len(self._lst) - 1):
+            idx = len(self._lst) + idx if idx < 0 else idx
+            pos = self._viewport_height_lines - self._itemheight(self._lst[idx])
+        else:
+            # FAIL: it steps by "steps" inof "items"
+            # self.step_by((len(self._lst) + idx if idx < 0 else idx) - self._cursor_item_lstindex)
+            raise NotImplementedError(idx)
+
+        self._viewport_followeditem_lstindex = self._cursor_item_lstindex = idx
+        self._viewport_followeditem_linesfromtop = pos
 
     # NOTE: elastic scroll, where "step" is anything between 1 line/word or whole multiline item,
     #   depending on what less disrupts the perception flow
@@ -303,13 +317,15 @@ class SatelliteViewport:  # pylint:disable=too-many-instance-attributes
                 else:
                     raise ValueError("unexpected")
 
-            if bot - pos > last - idx:  # <PERF:HACK
+            # DEBUG: log.trace("".join(f"\n\t{k}={v}" for k,v in locals().items()))
+
+            if bot - pos >= last - idx:  # <PERF:HACK
                 assert all(_fih(i) >= 1 for i in range(idx, last + 1))
                 ## NOTE: gravitate to bot
                 # ALT:NOT? calc from bot-up until found how much items fit under margin
                 #   ~~ for i in range(last, max(0,last-margin)); do if ... break; bot_edge_idx = i;
                 lines_bot = sum(_fih(i) for i in range(idx, last + 1)) - 1
-                if lines_bot < margin:
+                if lines_bot <= margin:
                     # NOTE: immediately show last {small} items fully
                     pos = bot - lines_bot
                     assert 0 <= pos <= bot
@@ -355,6 +371,7 @@ class SatelliteViewport:  # pylint:disable=too-many-instance-attributes
                     lines_bot = sum(_fih(i) for i in range(idx, last + 1)) - 1
                     if lines_bot <= margin:
                         pos = bot - lines_bot
+                        assert 0 <= pos <= bot
         else:
             raise ValueError("unexpected")
 
@@ -380,7 +397,7 @@ class SatelliteViewport:  # pylint:disable=too-many-instance-attributes
 
         vy, vx = self._viewport_origin_yx
         if not self._lst:
-            stdscr.addstr(vy, vx, "[ EMPTY ]", c_error | c_cursor)
+            stdscr.addstr(vy, vx, "<<EMPTY>> BUT:(should be HaltEntry(EMPTY)", c_error | c_cursor)
             return
 
         # log.verbose(f"list: [<={vp.h}/{len(lst)}]")
@@ -522,15 +539,18 @@ class TextEntry(Golden):
             )
             for m in finditer(r"\S+", self._x)
         ]
+        if not words:
+            return [HaltEntry("EMPTY TEXT", loci=self._at)]
         if len(words) <= 1:
-            return [HaltEntry("ATOMIC", loci=self._at)]  # ALT: "NOT EXPLORABLE (YET)"
+            # ALT: "NOT EXPLORABLE (YET)" | "INTERPRETATION NOT ASSIGNED"
+            return [HaltEntry("ATOMIC", loci=self._at)]
         return words
 
 
 class FSEntry(Golden):
     __slots__ = ()  # "name", "loci", "explore")
 
-    def __init__(self, path: str, nm:bool|str = True, alt: bool = False) -> None:
+    def __init__(self, path: str, nm: bool | str = True, alt: bool = False) -> None:
         self._x = path
         self._nm = fs.basename(path) if nm is True else path if nm is False else nm
         self._alt = alt
@@ -569,13 +589,21 @@ class FSEntry(Golden):
         #   ALT: produce virtual FSEntryLike entry, as it's a collection of paths inof real folder
         #     NICE: preserves original order inof being sorted by default as all other FSEntry
         if not self._alt and fs.islink(p):
-            return [cls(p, nm=False, alt=True), cls(os.readlink(p), nm=False), cls(fs.realpath(p), nm=False), cls(fs.relpath(fs.realpath(p), p), nm=False)]
+            return [
+                cls(p, nm=False, alt=True),
+                cls(os.readlink(p), nm=False),
+                cls(fs.realpath(p), nm=False),
+                cls(fs.relpath(fs.realpath(p), p), nm=False),
+            ]
         if fs.isdir(p):
             with os.scandir(p) as it:
-                return [cls(e.path) for e in it]
+                fslst: list[FSEntry | HaltEntry] = []
+                fslst = [cls(e.path) for e in it]
+                return fslst if fslst else [HaltEntry("EMPTY DIR")]
+
         if fs.isfile(p):
             try:
-                textlines: list[TextEntry] = []
+                linelst: list[TextEntry | HaltEntry] = []
                 with open(p, "r", encoding="utf-8") as f:
                     # ALT:(python>=3.13): lines = f.readlines(sizehint=1024, keepends=False)
                     i = 1
@@ -583,21 +611,21 @@ class FSEntry(Golden):
                         ent = this.TextEntry(
                             line.removesuffix("\n"), loci=(p, f":{i}", f"  `{boff}")
                         )
-                        textlines.append(ent)
+                        linelst.append(ent)
                         i += 1
-                return textlines
+                return linelst if linelst else [HaltEntry("EMPTY FILE")]
             except UnicodeDecodeError:
                 # TODO: on redraw() show "file offset in hex" inof "item idx in _xfm_list"
-                hexlines: list[TextEntry] = []
+                hexlst: list[TextEntry | HaltEntry] = []
                 with open(p, "rb") as f:
                     i = 1
                     while (boff := f.tell()) < 1024 and (data := f.read(16)):
                         ent = this.TextEntry(
                             data.hex(" "), loci=(p, f" `0x{boff:x}  #{i}")
                         )
-                        hexlines.append(ent)
+                        hexlst.append(ent)
                         i += 1
-                return hexlines
+                return hexlst if hexlst else [HaltEntry("UnicodeDecodeError / NoAccess")]
         raise NotImplementedError(p)
 
 
@@ -673,6 +701,10 @@ class NaviWidget:
         # pylint:disable=protected-access
         self._view._wdg.resize(vh, vw, origin=origin)
 
+    def cursor_jump_to(self, idx: int) -> None:
+        # pylint:disable=protected-access
+        self._view._wdg.jump_to(idx)
+
     def cursor_step_by(self, steps: int) -> None:
         # pylint:disable=protected-access
         self._view._wdg.step_by(steps)
@@ -680,13 +712,6 @@ class NaviWidget:
     def view_go_into(self) -> None:
         # pylint:disable=protected-access
         pwdg = self._view._wdg
-
-        # ALT:BET? temporarily insert HaltEntry into all empty lists
-        #   BAD: such entry will get superfluous index "01 | 001> "
-        #     ~~ it's better to disable indexes for *all* HaltEntry()
-        if not pwdg._lst:
-            log.trace("EMPTY")
-            return
 
         nent = pwdg.focused_item
 
@@ -777,6 +802,15 @@ class RootWidget:
     # def action[**P](self, name: str, *args: P.args, **kwargs: P.kwargs) -> None:
     #     getattr(self, name)(*args, **kwargs)
 
+    # ALT:BET: allow direct access to contained objects methods ?
+    #   i.e. remove "_" private prefix
+    #   &why to easily control substructures by global/modal keymaps
+    #   [_] TRY:FIND: better way to achieve that, e.g. type-checked function
+    #     OR `<Some>Command dispatched by top-class deeper into bus of listening nested objects
+    def cursor_jump_to(self, idx: int) -> None:
+        # pylint:disable=protected-access
+        self._navi.cursor_jump_to(idx)
+
     def cursor_step_by(self, steps: int) -> None:
         # pylint:disable=protected-access
         self._navi.cursor_step_by(steps)
@@ -855,15 +889,21 @@ def _live() -> None:
     # pylint:disable=protected-access
     # HACK: we should restore all "EntryView" contexts, as we recreate ALL objects
     #   ENH:TODO: serialize/deserialize whole `Views inof only current view pos/idx ?
-    hidx = None
+    pent = this.FSEntry("/d/airy")
+    hint_idx = None
     if pnavi := getattr(g.root_wdg, "_navi", None):
-        hidx = pnavi._view._wdg._cursor_item_lstindex
+        pent = pnavi._view._ent
+        hint_idx = pnavi._view._wdg._cursor_item_lstindex
 
     # i: int
     try:
-        g.root_wdg = RootWidget(this.FSEntry("/d/airy"))
+        g.root_wdg = RootWidget(pent)
         # g.root_wdg.set_entity(this.FSEntry("/etc/udev"), hint_idx=hidx)
         g.curses_ui.resize()
+
+        if hint_idx is not None:
+            pnavi._view._wdg._cursor_item_lstindex = hint_idx
+            pnavi._view._wdg._viewport_followeditem_lstindex = hint_idx
 
         # ALT: fuzzy-test, by random direction of up/down 50 times
         # ndown = 30

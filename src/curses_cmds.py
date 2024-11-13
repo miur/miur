@@ -81,6 +81,8 @@ g_input_handlers: dict[str | int, Callable[[AppGlobals], None]] = {
     "\014": resize,  # manually trigger redraw on <C-l>
     "j": lambda g: g.root_wdg.cursor_step_by(1),
     "k": lambda g: g.root_wdg.cursor_step_by(-1),
+    "g": lambda g: g.root_wdg.cursor_jump_to(0),
+    "G": lambda g: g.root_wdg.cursor_jump_to(-1),
     "h": lambda g: g.root_wdg.view_go_back(),
     "l": lambda g: g.root_wdg.view_go_into(),
     "\t": ipython_out,
