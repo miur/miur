@@ -4,7 +4,7 @@ import _curses as C
 
 from ..curses_ext import ColorMap
 from ..util.logger import log
-from .entries import FSEntry, HaltEntry
+from .entries import ErrorEntry, FSEntry
 from .vlst_base import SatelliteViewport_DataProtocol
 
 
@@ -27,9 +27,12 @@ class SatelliteViewport_RedrawMixin:
 
         vy, vx = self._viewport_origin_yx
         if not self._lst:
-            stdscr.addstr(
-                vy, vx, "<<EMPTY>> BUT:(should be HaltEntry(EMPTY)", c_error | c_cursor
-            )
+            ## [_] DECI!. insert proper "EMPTY" nodes
+            ##   OR pass whole _view into SatVP to access _ent ?
+            ##   ALT:BET? prevent whole redraw() inside root_wdg()
+            # if fs.isdir(emptylist._originator):
+            #   msg = "EMPTY DIR"
+            stdscr.addstr(vy, vx, "<<EMPTY>>", c_error | c_cursor)
             return
 
         # log.verbose(f"list: [<={vp.h}/{len(lst)}]")
@@ -50,7 +53,7 @@ class SatelliteViewport_RedrawMixin:
         i, y = top_idx, top_y
         while i <= last and y < vh:
             item = self._lst[i]
-            if isinstance(item, HaltEntry):
+            if isinstance(item, ErrorEntry):
                 stdscr.addstr(vy + y, vx + 0, f"[ {item.name} ]", c_error | c_cursor)
                 i += 1
                 return

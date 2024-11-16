@@ -2,7 +2,7 @@ import _curses as C
 
 from ..curses_ext import ColorMap
 from .entity_base import Representable
-from .entries import HaltEntry
+from .entries import ErrorEntry
 from .navi import NaviWidget
 
 
@@ -91,7 +91,7 @@ class RootWidget:
 
         # NOTE: place real cursor to where list-cursor is, to make tmux overlay selection more intuitive
         cy = wdg._viewport_origin_yx[0]
-        if not wdg._lst or isinstance(wdg.focused_item, HaltEntry):
+        if not wdg._lst or isinstance(wdg.focused_item, ErrorEntry):
             cx = 0
         else:
             cx = wdg._viewport_origin_yx[1] + 3  # = len(pfx)

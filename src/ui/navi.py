@@ -4,7 +4,7 @@ import _curses as C
 
 from ..util.logger import log
 from .entity_base import Representable
-from .entries import FSEntry, HaltEntry
+from .entries import ErrorEntry, FSEntry
 from .view import EntityView
 
 
@@ -43,9 +43,13 @@ class NaviWidget:
         # pylint:disable=protected-access
         pwdg = self._view._wdg
 
+        if not pwdg._lst:
+            log.trace("<<EMPTY>>")
+            return
+
         nent = pwdg.focused_item
 
-        if isinstance(nent, HaltEntry):
+        if isinstance(nent, ErrorEntry):
             log.trace(nent.name)
             return
 
@@ -53,7 +57,10 @@ class NaviWidget:
             if v := self._history_pool.get(nent):
                 self._view = v
             else:
-                self._view = EntityView(nent)
+                try:
+                    self._view = EntityView(nent)
+                except Exception as exc:
+                    raise NotImplementedError() from exc
                 self._history_pool[nent] = self._view
             self._history_stack.append(self._view)
             self._history_idx = len(self._history_stack) - 1

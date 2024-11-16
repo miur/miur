@@ -5,10 +5,10 @@ from typing import Iterable, override
 from .entity_base import Golden, Representable
 
 
-# RENAME? ErrorEntry -- BUT: such entry should also be explorable...
-class HaltEntry(Golden):
-    def __init__(self, kind: str, loci: tuple[str, ...] | None = None) -> None:
-        self._msg = kind
+# class ErrorEntry(HaltEntry(Atomic))
+class ErrorEntry(Golden):
+    def __init__(self, msg: str, loci: tuple[str, ...] | None = None) -> None:
+        self._msg = msg
         self._orig = loci
 
     @override
@@ -23,7 +23,7 @@ class HaltEntry(Golden):
 
     @override
     def explore(self) -> Iterable[Representable]:
-        raise TypeError(self._msg)
+        raise NotImplementedError(self._msg)
 
 
 class TextEntry(Golden):
@@ -63,11 +63,8 @@ class TextEntry(Golden):
             )
             for m in finditer(r"\S+", self._x)
         ]
-        if not words:
-            return [HaltEntry("EMPTY TEXT", loci=self._at)]
-        if len(words) <= 1:
-            # ALT: "NOT EXPLORABLE (YET)" | "INTERPRETATION NOT ASSIGNED"
-            return [HaltEntry("ATOMIC", loci=self._at)]
+        if len(words) == 1:
+            return [ErrorEntry("INDIVISIBLE WORD", loci=self._at)]
         return words
 
 
@@ -101,9 +98,9 @@ class FSEntry(Golden):
     def explore(self) -> Iterable[Representable]:
         p = self._x
         if not fs.lexists(p):
-            return [HaltEntry("FILE NOT FOUND", loci=(self._x,))]
+            return [ErrorEntry("FILE NOT FOUND", loci=(self._x,))]
         if not fs.exists(p):
-            return [HaltEntry("DANGLING SYMLINK", loci=(fs.realpath(self._x),))]
+            return [ErrorEntry("DANGLING SYMLINK", loci=(fs.realpath(self._x),))]
         cls = type(self)
         # [_] TRY: print this info on 2nd/3rd line below the link, as auxinfo
         #   BAD: we are losing unified access to copy/edit/navi the interpreted symlink values as regular items
@@ -121,13 +118,11 @@ class FSEntry(Golden):
             ]
         if fs.isdir(p):
             with os.scandir(p) as it:
-                fslst: list[FSEntry | HaltEntry] = []
-                fslst = [cls(e.path) for e in it]
-                return fslst if fslst else [HaltEntry("EMPTY DIR")]
+                return [cls(e.path) for e in it]
 
         if fs.isfile(p):
             try:
-                linelst: list[TextEntry | HaltEntry] = []
+                linelst: list[TextEntry] = []
                 with open(p, "r", encoding="utf-8") as f:
                     # ALT:(python>=3.13): lines = f.readlines(sizehint=1024, keepends=False)
                     i = 1
@@ -137,10 +132,10 @@ class FSEntry(Golden):
                         )
                         linelst.append(ent)
                         i += 1
-                return linelst if linelst else [HaltEntry("EMPTY FILE")]
+                return linelst
             except UnicodeDecodeError:
                 # TODO: on redraw() show "file offset in hex" inof "item idx in _xfm_list"
-                hexlst: list[TextEntry | HaltEntry] = []
+                hexlst: list[TextEntry | ErrorEntry] = []
                 with open(p, "rb") as f:
                     i = 1
                     while (boff := f.tell()) < 1024 and (data := f.read(16)):
@@ -148,6 +143,6 @@ class FSEntry(Golden):
                         hexlst.append(ent)
                         i += 1
                 return (
-                    hexlst if hexlst else [HaltEntry("UnicodeDecodeError / NoAccess")]
+                    hexlst if hexlst else [ErrorEntry("UnicodeDecodeError / NoAccess")]
                 )
         raise NotImplementedError(p)

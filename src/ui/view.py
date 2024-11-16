@@ -3,7 +3,7 @@ import os.path as fs
 from typing import Callable, Self, Sequence
 
 from .entity_base import Representable
-from .entries import FSEntry, HaltEntry
+from .entries import FSEntry
 from .vlst import SatelliteViewport
 
 # T = TypeVar("T")
@@ -28,13 +28,12 @@ class EntityView:
     #   == to be able to return to its "parent"
     #   NICE: only "navigated-to" items will store this backref
     def __init__(self, ent: Representable, originator: Self | None = None) -> None:
-        assert not isinstance(ent, HaltEntry)
         self._ent = ent
         # NOTE: remember which `View have created this one -- tba to return back
         self._originator = originator
         # ALT:PERF(slow): @runtime_checkable : isinstance(ent, Explorable)
         #   https://mypy.readthedocs.io/en/latest/protocols.html#using-isinstance-with-protocols
-        if (sfn := getattr(ent, "explore", None)) and callable(sfn):
+        if sfn := getattr(ent, "explore", None):  # and callable(sfn):
             self._act = sfn  # NOTE: keep sfn to be able to refresh() the list (when externally changed)
             self._orig_lst = self._act()
             self._transform()
