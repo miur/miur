@@ -42,7 +42,8 @@ def miur_main(g: AppGlobals | None = None) -> None:
         # raise RuntimeError()
 
         from .curses_cmds import handle_input, resize
-        from .widget import FSEntry, RootWidget
+        from .ui.entries import FSEntry
+        from .ui.root import RootWidget
 
         ui = AppCursesUI()
         ui.resize = lambda: resize(g)
