@@ -124,21 +124,44 @@ class FSEntry(Golden):
             try:
                 linelst: list[TextEntry] = []
                 with open(p, "r", encoding="utf-8") as f:
-                    # ALT:(python>=3.13): lines = f.readlines(sizehint=1024, keepends=False)
-                    i = 1
-                    while (boff := f.tell()) < 1024 and (line := f.readline(1024)):
-                        ent = TextEntry(
-                            line.removesuffix("\n"), loci=(p, f":{i}", f"  `{boff}")
-                        )
-                        linelst.append(ent)
-                        i += 1
+                    # TEMP:XLR: syntax-hi for files
+                    if p.endswith(".py"):
+                        if __import__("sys").flags.isolated:
+                            # lazy init for "site" in isolated mode
+                            __import__("site").main()
+                        from pygments import highlight
+                        from pygments.formatters.terminal256 import Terminal256Formatter
+                        from pygments.lexers.python import PythonLexer
+
+                        # from pygments.style import Style
+                        # from pygments.token import Token
+                        # class MyStyle(Style):
+                        #     styles = {
+                        #         Token.String: "ansibrightblue bg:ansibrightred",
+                        #     }
+                        # fmtr = Terminal256Formatter(style=MyStyle)
+
+                        code = f.read(1024)
+                        # code = 'print("Hello World")'
+                        result = highlight(code, PythonLexer(), Terminal256Formatter())
+                        # print(result.encode())
+                        linelst = [TextEntry(x) for x in result.split("\n")]
+                    else:
+                        i = 1
+                        # ALT:(python>=3.13): lines = f.readlines(sizehint=1024, keepends=False)
+                        while (boff := f.tell()) < 1024 and (line := f.readline(1024)):
+                            ent = TextEntry(
+                                line.removesuffix("\n"), loci=(p, f":{i}", f"  `{boff}")
+                            )
+                            linelst.append(ent)
+                            i += 1
                 return linelst
             except UnicodeDecodeError:
                 # TODO: on redraw() show "file offset in hex" inof "item idx in _xfm_list"
                 hexlst: list[TextEntry | ErrorEntry] = []
-                with open(p, "rb") as f:
+                with open(p, "rb") as blob:
                     i = 1
-                    while (boff := f.tell()) < 1024 and (data := f.read(16)):
+                    while (boff := blob.tell()) < 1024 and (data := blob.read(16)):
                         ent = TextEntry(data.hex(" "), loci=(p, f" `0x{boff:x}  #{i}"))
                         hexlst.append(ent)
                         i += 1

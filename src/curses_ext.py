@@ -66,6 +66,14 @@ def curses_stdscr() -> Iterator[C.window]:
         C.start_color()  # WAIT: which exception does it throw? TRY: TERM=dummy
         stdscr.nodelay(True)
         init_colorscheme(stdscr)
+
+        ## HACK: allow ANSI colors in curses.addstr()
+        # SRC: https://github.com/getcuia/cusser
+        # FAIL: doesn't work on !python>=3.11
+        # from cusser import Cusser
+        # if not isinstance(stdscr, Cusser):
+        #     stdscr = Cusser(stdscr)
+
         yield stdscr
     # except Exception as exc:
     #     log.error("E1: " + "".join(TR.format_exception(exc, chain=True)))

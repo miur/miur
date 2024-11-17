@@ -102,11 +102,12 @@ if TYPE_CHECKING:
     from typing import Optional
 
 
-def ipyconsole_async(shutdown: bool = False) -> "Optional[Coroutine[Any, Any, Any]]":
+def ipyconsole_async(shutdown: bool = False) -> "Coroutine[Any, Any, Any]":
     global g_running_ipyconsole  # pylint:disable=global-statement
     if g_running_ipyconsole:
-        log.warning("ipyconsole is already running! ignored")
-        return None
+        # log.warning("ipyconsole is already running! ignored")
+        # return None
+        raise RuntimeError("ipyconsole is already running")
 
     if sys.flags.isolated:
         __import__("site").main()  # lazy init for "site" in isolated mode
@@ -121,7 +122,7 @@ def ipyconsole_async(shutdown: bool = False) -> "Optional[Coroutine[Any, Any, An
     if shutdown:
         console.shell.client.shutdown()
     g_running_ipyconsole = console
-    return coro
+    return cast(coro, "Coroutine[Any, Any, Any]")
 
 
 def jupyter_client() -> None:
