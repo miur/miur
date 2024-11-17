@@ -2,10 +2,14 @@ import os.path as fs
 
 import _curses as C
 
-from ..curses_ext import ColorMap
+from ..curses_ext import g_style as S
 from ..util.logger import log
 from .entries import ErrorEntry, FSEntry
 from .vlst_base import SatelliteViewport_DataProtocol
+
+# TRY: split into single-dispatch generic functions to draw elements
+#   i.e. rev-dep for isolated curses:draw(XXX) inof distributed XXX.draw_curses()
+# NEED: singleton for colors
 
 
 class SatelliteViewport_RedrawMixin:
@@ -15,15 +19,6 @@ class SatelliteViewport_RedrawMixin:
         # ARCH:WARN: we actually need to render whatever is *shown in viewport* (even if cursor is far outside)
         #   COS: when cursor is outside -- most "write" actions will be disabled
         #   => you always need to know the span of items present in viewport to be rendered in O(1)
-        c_item = C.color_pair(ColorMap.default)
-        c_auxinfo = C.color_pair(ColorMap.auxinfo)
-        c_iteminfo = C.color_pair(ColorMap.iteminfo)
-        c_pfxrel = c_auxinfo
-        c_pfxidx = c_iteminfo
-        c_cursor = C.A_REVERSE | C.A_BOLD  # OR: C.color_pair(ColorMap.cursor)
-        c_error = C.color_pair(ColorMap.error)
-        c_fsdir = C.color_pair(ColorMap.fsdir)
-        c_fslink = C.color_pair(ColorMap.fslink)
 
         vy, vx = self._viewport_origin_yx
         if not self._lst:
@@ -32,9 +27,10 @@ class SatelliteViewport_RedrawMixin:
             ##   ALT:BET? prevent whole redraw() inside root_wdg()
             # if fs.isdir(emptylist._originator):
             #   msg = "EMPTY DIR"
-            stdscr.addstr(vy, vx, "<<EMPTY>>", c_error | c_cursor)
+            stdscr.addstr(vy, vx, "<<EMPTY>>", S.error | S.cursor)
             return
 
+        ## CHECK: if more than one redraw per one keypress
         # log.verbose(f"list: [<={vp.h}/{len(lst)}]")
 
         # self._viewport_margin_lines
@@ -54,7 +50,7 @@ class SatelliteViewport_RedrawMixin:
         while i <= last and y < vh:
             item = self._lst[i]
             if isinstance(item, ErrorEntry):
-                stdscr.addstr(vy + y, vx + 0, f"[ {item.name} ]", c_error | c_cursor)
+                stdscr.addstr(vy + y, vx + 0, f"[ {item.name} ]", S.error | S.cursor)
                 i += 1
                 return
 
@@ -66,37 +62,37 @@ class SatelliteViewport_RedrawMixin:
             nm, *lines = item.name.split("\n")
             py = y
             if 0 <= y < vh:
-                stdscr.addstr(vy + y, vx + 0, pfxrel, c_pfxrel)
+                stdscr.addstr(vy + y, vx + 0, pfxrel, S.pfxrel)
                 stdscr.addstr(
-                    vy + y, vx + len(pfxrel), pfxidx, c_cursor if i == ci else c_pfxidx
+                    vy + y, vx + len(pfxrel), pfxidx, S.cursor if i == ci else S.pfxidx
                 )
                 xoff = vx + indent
                 if not isinstance(item, FSEntry):
-                    c_schema = c_item
+                    S.schema = S.item
                 elif fs.islink(item.loci):
-                    c_schema = c_fslink
+                    S.schema = S.fslink
                     if fs.isdir(item.loci):
-                        c_schema |= C.A_BOLD
+                        S.schema |= C.A_BOLD
                 elif fs.isdir(item.loci):
-                    c_schema = c_fsdir
+                    S.schema = S.fsdir
                 else:
-                    c_schema = c_item
+                    S.schema = S.item
                 stdscr.addstr(
                     vy + y,
                     xoff,
                     nm[: vw - xoff],
-                    c_schema | c_cursor if i == ci else c_schema,
+                    S.schema | S.cursor if i == ci else S.schema,
                 )
             y += 1
             for l in lines:
                 if 0 <= y < vh:
-                    # stdscr.addstr(vy+y, 2, "|", c_pfxrel)
+                    # stdscr.addstr(vy+y, 2, "|", S.pfxrel)
                     xoff = vx + indent + 2
                     stdscr.addstr(
                         vy + y,
                         xoff,
                         l[: vw - xoff],
-                        c_cursor if i == ci else c_iteminfo,
+                        S.cursor if i == ci else S.iteminfo,
                     )
                 y += 1
             if y - py != self._itemheight(item):

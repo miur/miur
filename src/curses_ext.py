@@ -1,11 +1,11 @@
 import os
 import sys
 from contextlib import contextmanager
-from enum import IntEnum, auto
 
 # WARN:PERF: somehow doing import here is 2ms faster, than moving into func-local stmt
 from subprocess import CompletedProcess, run
 from threading import BoundedSemaphore
+from types import SimpleNamespace
 from typing import Any, Callable, Iterator, Sequence
 
 import _curses as C
@@ -13,16 +13,14 @@ import _curses as C
 from . import iomgr
 from .app import g_app
 
+# SEE: https://bugs.python.org/issue40284
+g_style = SimpleNamespace()
 
-class ColorMap(IntEnum):
-    default = auto()
-    auxinfo = auto()
-    iteminfo = auto()
-    cursor = auto()
-    footer = auto()
-    error = auto()
-    fsdir = auto()
-    fslink = auto()
+
+def termcolor2(fg: int, bg: int) -> int:
+    i = len(vars(g_style))  # <BAD:PERF
+    C.init_pair(i, fg, bg)
+    return C.color_pair(i)
 
 
 def init_colorscheme(stdscr: C.window) -> None:
@@ -32,17 +30,24 @@ def init_colorscheme(stdscr: C.window) -> None:
     #     C.init_pair(2, 4, 6)
     # else:
     C.use_default_colors()
-    C.init_pair(ColorMap.default, -1, -1)  # DFL: gray text on transparent bkgr
-    C.init_pair(ColorMap.auxinfo, 10, -1)
-    C.init_pair(ColorMap.iteminfo, 0, -1)
-    C.init_pair(ColorMap.cursor, 8, 4)  # FIXME: use only attrs: C.A_REVERSE | C.A_BOLD
-    C.init_pair(ColorMap.footer, 217, 17)
-    C.init_pair(ColorMap.error, 1, -1)
-    C.init_pair(ColorMap.fsdir, 4, -1)
-    C.init_pair(ColorMap.fslink, 6, -1)
+
+    S = g_style
+    S.hardcoded = C.color_pair(0)  # = (C.COLOR_WHITE, C.COLOR_BLACK)
+
+    S.default = termcolor2(-1, -1)  # DFL: gray text on transparent bkgr
+    S.item = S.default
+    S.auxinfo = termcolor2(10, -1)
+    S.iteminfo = termcolor2(0, -1)
+    S.pfxrel = S.auxinfo
+    S.pfxidx = S.iteminfo
+    S.cursor = C.A_REVERSE | C.A_BOLD  # OR: termcolor2(8, 4)
+    S.footer = termcolor2(217, 17)
+    S.error = termcolor2(1, -1)
+    S.fsdir = termcolor2(4, -1)
+    S.fslink = termcolor2(6, -1)
 
     # pvis = C.curs_set(visibility=0)
-    stdscr.attron(C.color_pair(ColorMap.default))
+    stdscr.attron(S.default)
 
 
 ## ALT: C.wrapper(drawloop: Callable[[C.window], None])

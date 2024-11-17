@@ -1,6 +1,6 @@
 import _curses as C
 
-from ..curses_ext import ColorMap
+from ..curses_ext import g_style as S
 from .entity_base import Representable
 from .entries import ErrorEntry
 from .navi import NaviWidget
@@ -55,28 +55,24 @@ class RootWidget:
         assert isinstance(stdscr, C.window)
         # FUT: only clear "rest of each line" -- and only if prev line there was longer
         stdscr.clear()
-        c_item = C.color_pair(ColorMap.default)
-        c_iteminfo = C.color_pair(ColorMap.iteminfo)
-        c_auxinfo = C.color_pair(ColorMap.auxinfo)
-        c_footer = C.color_pair(ColorMap.footer)
         wdg = self._navi._view._wdg
 
         # pylint:disable=protected-access
         # ALT:([]): use ⸤⸣ OR ⸢⸥
         header = f"[{self._navi._history_idx+1}⁄{len(self._navi._history_stack)}] "
-        stdscr.addstr(0, 0, header, c_auxinfo)
+        stdscr.addstr(0, 0, header, S.auxinfo)
         xpath = wdg.focused_item.loci if wdg._lst else self._navi._view._ent.loci + "/"
         try:
             iname = xpath.rindex("/")
-            stdscr.addstr(0, len(header), xpath[:iname], c_footer | C.A_BOLD)
+            stdscr.addstr(0, len(header), xpath[:iname], S.footer | C.A_BOLD)
             try:
                 ilnum = xpath.index(":", iname)
-                stdscr.addstr(0, len(header) + iname, xpath[iname:ilnum], c_item)
-                stdscr.addstr(0, len(header) + ilnum, xpath[ilnum:], c_iteminfo)
+                stdscr.addstr(0, len(header) + iname, xpath[iname:ilnum], S.item)
+                stdscr.addstr(0, len(header) + ilnum, xpath[ilnum:], S.iteminfo)
             except ValueError:
-                stdscr.addstr(0, len(header) + iname, xpath[iname:], c_item)
+                stdscr.addstr(0, len(header) + iname, xpath[iname:], S.item)
         except ValueError:
-            stdscr.addstr(0, len(header), xpath, c_footer | C.A_BOLD)
+            stdscr.addstr(0, len(header), xpath, S.footer | C.A_BOLD)
 
         self._navi.redraw(stdscr)
 
@@ -87,7 +83,7 @@ class RootWidget:
         footer = f"--- {ci}/{sz} | by={sortby}{"￪" if sortrev else "￬"}"
         ## DEBUG:NEED:(__main__.py): -X tracemalloc
         # footer += f"  --- {{RAM={__import__("tracemalloc").get_traced_memory()[0]//1024:,}kB}}"
-        stdscr.addstr(self._wh - 1, 0, footer, c_footer)
+        stdscr.addstr(self._wh - 1, 0, footer, S.footer)
 
         # NOTE: place real cursor to where list-cursor is, to make tmux overlay selection more intuitive
         cy = wdg._viewport_origin_yx[0]

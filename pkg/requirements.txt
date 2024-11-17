@@ -1,2 +1,2 @@
 pygments
-cusser
+ranger-fm

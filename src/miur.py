@@ -33,9 +33,11 @@ def miur_main(g: AppGlobals | None = None) -> None:
         do(increment_envlevel("MIUR_LEVEL"))
         # MAYBE: only enable PIDFILE when run by miur_frontend() to avoid global VAR ?
         pid = do(temp_pidfile(pidfile_path()))
+        # BAD: log is too early to be redirected by stdlog_redir()
         log.kpi(f"{pid}")
         do(log_excepthook())
 
+        # MOVE? as early as possible
         do(iomgr.stdlog_redir(g))
         g.stdscr = do(CE.curses_stdscr())
 
@@ -88,6 +90,7 @@ def miur_frontend(g: AppGlobals) -> None:
     log.config(termcolor=c)
 
     if sys.prefix != sys.base_prefix:
+        # BAD: log is too early to be redirected by stdlog_redir()
         log.info(f"VENV: {sys.prefix}")
 
     if g.opts.devinstall:
