@@ -2,7 +2,8 @@
 #!/usr/bin/python -SIB
 #!/usr/bin/env -S python -SIB -Ximporttime
 #!/usr/bin/env -S python -SIB -m cProfile -s cumulative --
-#   -I(-P/s/E) -B | -O -X pycache_prefix=~/.cache/miur
+# ALT(-B): -O -X pycache_prefix=~/.cache/miur
+#   -I(-P/s/E)
 # PERF:DEBUG: $ PYTHONPATH=/d/just python -PsSB [-X importtime | -X tracemalloc] -m miur
 #   OR: $ python -m cProfile -s cumulative -- =miur
 #   [_] TODO: run all of them through flags
@@ -45,7 +46,7 @@ exit -2
 import sys
 
 
-def select_entrypoint():  # type:ignore[no-untyped-def]
+def select_entrypoint(devroot: str):  # type:ignore[no-untyped-def]
     # argv = sys.argv[1:sys.argv.index('--')] if '--' in sys.argv else sys.argv[1:]
     # sys.dont_write_bytecode = '-c' in argv or '--clean' in argv
     argv = sys.argv
@@ -55,9 +56,16 @@ def select_entrypoint():  # type:ignore[no-untyped-def]
 
         return miur_main
 
+    from .util.devenv import ensure_venv
+
+    # MAYBE: make a frontend to miur (like "fleur/ctl" did)
+    #   >> move all dev-helpers there and access miur only through it
+    #   &why keep only essential features in primary codebase
+    ensure_venv(devroot)
+
     from .cli import miur_argparse
 
-    return lambda: miur_argparse(argv)
+    return lambda: miur_argparse(argv, devroot)
 
 
 def as_pkg_or_exe(mkrun):  # type:ignore[no-untyped-def]
@@ -86,7 +94,7 @@ def as_pkg_or_exe(mkrun):  # type:ignore[no-untyped-def]
     global __package__
     __package__ = "src"
     try:
-        return mkrun()
+        return mkrun(parent)
     finally:
         __package__ = None  # type:ignore[assignment]
         sys.path.remove(parent)

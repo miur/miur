@@ -1,0 +1,4 @@
+## Python project
+/.mypy_cache/
+/.venv/
+__pycache__/

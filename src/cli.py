@@ -56,6 +56,7 @@ def cli_spec(parser: ArgumentParser) -> ArgumentParser:
     o("-s", "--signal", choices=_sigset, action=SigAction)
     # BAD: "default" duplicates default value of `AppOptions
     o("-a", "--asyncio", dest="bare", default=True, action="store_false")
+    o("-D", "--devinstall", action="store_true")
     o("-K", "--ipykernel", default=False, action="store_true")
     o("-I", "--ipyconsole", default=None, action="store_false")
     o("-X", "--ipyquit", dest="ipyconsole", action="store_true")
@@ -71,13 +72,15 @@ def cli_spec(parser: ArgumentParser) -> ArgumentParser:
     return parser
 
 
-def miur_argparse(argv: list[str]) -> None:
+def miur_argparse(argv: list[str], devroot: str | None = None) -> None:
     # PERF:(imports): abc ast dis collections.abc enum importlib.machinery itertools linecache
     #    os re sys tokenize token types functools builtins keyword operator collections
     from inspect import get_annotations
 
     from .app import g_app as g
     from .miur import miur_frontend
+
+    g.opts.devroot = devroot
 
     # MAYBE:TODO: different actions based on appname=argv[0]
 

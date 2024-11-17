@@ -15,8 +15,10 @@ if globals().get("TYPE_CHECKING"):
 class AppOptions:
     # USAGE: time mi --backend=asyncio
     PROFILE_STARTUP = False  # =DEBUG
+    devroot: str | None = None
     ####
     bare: bool = True
+    devinstall: bool = False
     ipykernel: bool = False
     ipyconsole: bool | None = None
     ####

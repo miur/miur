@@ -87,6 +87,17 @@ def miur_frontend(g: AppGlobals) -> None:
         c = sys.stdout.isatty()
     log.config(termcolor=c)
 
+    if sys.prefix != sys.base_prefix:
+        log.info(f"VENV: {sys.prefix}")
+
+    if g.opts.devinstall:
+        from .util import devenv
+
+        devenv.install_venv_deps(devroot=g.opts.devroot, dev=True)
+        # MAYBE: allow "continue running" after installing deps
+        #   ~~ somewhat annoying in practice, probably only useful for daemon server
+        sys.exit()
+
     if g.opts.PROFILE_STARTUP:
         # TODO: disable for integ-tests e.g. "colored output to ttyalt despite stdout redir"
         log.kpi("argparse")
@@ -101,8 +112,7 @@ def miur_frontend(g: AppGlobals) -> None:
 
         from .util.jupyter import ipyconsole_async
 
-        asyncio.run(ipyconsole_async(shutdown=v))
-        sys.exit()
+        sys.exit(asyncio.run(ipyconsole_async(shutdown=v)))
 
     # log.info(f"cwd={opts.cwd}")
     return miur_main(g)
