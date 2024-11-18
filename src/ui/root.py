@@ -23,18 +23,13 @@ class RootWidget:
     # def action[**P](self, name: str, *args: P.args, **kwargs: P.kwargs) -> None:
     #     getattr(self, name)(*args, **kwargs)
 
-    # ALT:BET: allow direct access to contained objects methods ?
-    #   i.e. remove "_" private prefix
-    #   &why to easily control substructures by global/modal keymaps
-    #   [_] TRY:FIND: better way to achieve that, e.g. type-checked function
-    #     OR `<Some>Command dispatched by top-class deeper into bus of listening nested objects
-    def cursor_jump_to(self, idx: int) -> None:
-        # pylint:disable=protected-access
-        self._navi.cursor_jump_to(idx)
-
-    def cursor_step_by(self, steps: int) -> None:
-        # pylint:disable=protected-access
-        self._navi.cursor_step_by(steps)
+    # def cursor_jump_to(self, idx: int) -> None:
+    #     # pylint:disable=protected-access
+    #     self._navi.cursor_jump_to(idx)
+    #
+    # def cursor_step_by(self, steps: int) -> None:
+    #     # pylint:disable=protected-access
+    #     self._navi.cursor_step_by(steps)
 
     def view_go_into(self) -> None:
         self._navi.view_go_into()

@@ -2,6 +2,7 @@ import os
 import os.path as fs
 from typing import Iterable, override
 
+from ..util.logger import log
 from .entity_base import Golden, Representable
 
 
@@ -142,9 +143,10 @@ class FSEntry(Golden):
                         # fmtr = Terminal256Formatter(style=MyStyle)
 
                         code = f.read(1024)
-                        # code = 'print("Hello World")'
+                        # ALT? render into HTML -> load as tree -> walk it and translate to curses
                         result = highlight(code, PythonLexer(), Terminal256Formatter())
-                        # print(result.encode())
+                        # DEBUG: log.trace(result)
+                        # os.environ["CODE"] = result
                         linelst = [TextEntry(x) for x in result.split("\n")]
                     else:
                         i = 1

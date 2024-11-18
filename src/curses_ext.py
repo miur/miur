@@ -15,12 +15,20 @@ from .app import g_app
 
 # SEE: https://bugs.python.org/issue40284
 g_style = SimpleNamespace()
+_registered_color_pairs: dict[tuple[int, int], int] = {}
 
 
 def termcolor2(fg: int, bg: int) -> int:
-    i = len(vars(g_style))  # <BAD:PERF
-    C.init_pair(i, fg, bg)
-    return C.color_pair(i)
+    fgbg = (fg, bg)
+    p = _registered_color_pairs.get(fgbg, None)
+    if p is None:
+        i = len(_registered_color_pairs)
+        # CHECK: if newer curses supports more than 256 color pairs
+        # REF: https://stackoverflow.com/questions/476878/256-colors-foreground-and-background
+        assert i < 256
+        C.init_pair(i, fg, bg)
+        p = _registered_color_pairs[fgbg] = C.color_pair(i)
+    return p
 
 
 def init_colorscheme(stdscr: C.window) -> None:
@@ -32,7 +40,7 @@ def init_colorscheme(stdscr: C.window) -> None:
     C.use_default_colors()
 
     S = g_style
-    S.hardcoded = C.color_pair(0)  # = (C.COLOR_WHITE, C.COLOR_BLACK)
+    S.hardcoded = termcolor2(C.COLOR_WHITE, C.COLOR_BLACK)  # C.color_pair(0)
 
     S.default = termcolor2(-1, -1)  # DFL: gray text on transparent bkgr
     S.item = S.default

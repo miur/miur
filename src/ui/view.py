@@ -31,14 +31,18 @@ class EntityView:
         self._ent = ent
         # NOTE: remember which `View have created this one -- tba to return back
         self._originator = originator
+        self.fetch()
+
+    def fetch(self) -> None:
         # ALT:PERF(slow): @runtime_checkable : isinstance(ent, Explorable)
         #   https://mypy.readthedocs.io/en/latest/protocols.html#using-isinstance-with-protocols
-        if sfn := getattr(ent, "explore", None):  # and callable(sfn):
+        if sfn := getattr(self._ent, "explore", None):  # and callable(sfn):
             self._act = sfn  # NOTE: keep sfn to be able to refresh() the list (when externally changed)
             self._orig_lst = self._act()
             self._transform()
             assert getattr(self, "_xfm_lst", None) is not None
-            self._wdg = SatelliteViewport()
+            if not getattr(self, "_wdg", None):
+                self._wdg = SatelliteViewport()
             self._wdg.assign(self._xfm_lst)
         else:
             raise NotImplementedError()

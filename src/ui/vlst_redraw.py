@@ -1,8 +1,10 @@
 import os.path as fs
 
 import _curses as C
+from ranger.gui import ansi
 
 from ..curses_ext import g_style as S
+from ..curses_ext import termcolor2
 from ..util.logger import log
 from .entries import ErrorEntry, FSEntry
 from .vlst_base import SatelliteViewport_DataProtocol
@@ -77,12 +79,37 @@ class SatelliteViewport_RedrawMixin:
                     S.schema = S.fsdir
                 else:
                     S.schema = S.item
-                stdscr.addstr(
-                    vy + y,
-                    xoff,
-                    nm[: vw - xoff],
-                    S.schema | S.cursor if i == ci else S.schema,
-                )
+
+                chunks = ansi.split_ansi_from_text(nm)
+                assert chunks
+                if len(chunks) <= 1:
+                    stdscr.addnstr(
+                        vy + y,
+                        xoff,
+                        nm,
+                        vw - xoff,
+                        S.schema | S.cursor if i == ci else S.schema,
+                    )
+                else:
+                    ## ALT:(messy decoding): simply use non-curses libs
+                    #  * https://github.com/peterbrittain/asciimatics
+                    #  * https://github.com/urwid/urwid
+                    #  * ...
+                    nm_visible = ansi.char_slice(nm, 0, vw - xoff)
+                    # RND: we allow curses to calc() offset by itself
+                    stdscr.move(vy + y, xoff)
+                    pattr = 0
+                    for chunk in ansi.text_with_fg_bg_attr(nm_visible):
+                        # log.trace(chunk)
+                        if isinstance(chunk, tuple):
+                            fg, bg, attr = chunk
+                            if i == ci:
+                                attr |= S.cursor
+                            pattr = termcolor2(fg, bg) | attr
+                            # log.info(pattr)
+                        else:
+                            stdscr.addstr(chunk, pattr)
+
             y += 1
             for l in lines:
                 if 0 <= y < vh:

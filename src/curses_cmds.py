@@ -70,19 +70,29 @@ def ipython_out(g: AppGlobals) -> None:
     CE.ipython_out(g.stdscr)
 
 
+# ALT:BET: allow direct access to contained _objects methods ?
+#   i.e. remove "_" private prefix from *._navi._view.*
+#   &why to easily control substructures by global/modal keymaps
+#   [_] TRY:FIND: better way to achieve that, e.g. type-checked function
+#     OR `<Some>Command dispatched by top-class deeper into bus of listening nested objects
+#       IDEA: declare `Protocol interfaces for internal classes
+#         and combine them as a type for root_wdg dispatch function
+#         NICE: we can type-check all dispatched "messages" with their args as actual fn calls
 # ALT: match to string, and then resolve to appropriate function
 g_input_handlers: dict[str | int, Callable[[AppGlobals], None]] = {
+    # pylint:disable=protected-access
     "\033": exitloop,
     "q": exitloop,
     C.KEY_RESIZE: resize,
-    "S": shell_out,  # CE.shell_out
+    "s": shell_out,  # CE.shell_out
     "K": ipykernel_start,
     "I": ipyconsole_out,
-    "\014": resize,  # manually trigger redraw on <C-l>
-    "j": lambda g: g.root_wdg.cursor_step_by(1),
-    "k": lambda g: g.root_wdg.cursor_step_by(-1),
-    "g": lambda g: g.root_wdg.cursor_jump_to(0),
-    "G": lambda g: g.root_wdg.cursor_jump_to(-1),
+    "\x0c": resize,  # <C-l> manually trigger redraw
+    "\x12": lambda g: g.root_wdg._navi._view.fetch(),  # <C-r> refresh cached list
+    "j": lambda g: g.root_wdg._navi.cursor_step_by(1),
+    "k": lambda g: g.root_wdg._navi.cursor_step_by(-1),
+    "g": lambda g: g.root_wdg._navi.cursor_jump_to(0),
+    "G": lambda g: g.root_wdg._navi.cursor_jump_to(-1),
     "h": lambda g: g.root_wdg.view_go_back(),
     "l": lambda g: g.root_wdg.view_go_into(),
     "\t": ipython_out,
