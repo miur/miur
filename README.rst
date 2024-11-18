@@ -6,21 +6,48 @@
 miur
 ####
 
-Modern Interface for Uniform Reconnaissance.
+Modern/Modal Interface for Uniform Reconnaissance.
 
-.. note::
-   It is much **more** than a simple file manager.
+**Mission:** interpret everything as graphs and navigate them like a filesystem.
 
-**Mission:** interpret everything as graphs and navigate them like you do in filesystem.
-
-&motto ⌇⡦⡋⣑⣳
+**Motto:** ⌇⡦⡋⣑⣳
 
 - "Everything is a list"
-- "Anything can be interpreted as Entity"
+- "Anything can be interpreted as list"
+- "Multiple ways to interpret -- is a list too"
 - "Making choices is a function"  [delegated to *YOU* by the program]
-- "Embrace cognitive constrains"
-- "All workflows in one catalogue"
+- "Workflow as a plugin"  -- upload yours and explore others
+- "Consistency first, usability second"  [-- everything else is not on the chart]
+- "Be frontend to anything out there"  [bridge what you can; reimplement what you must]
+- "Tools in the loop"  (interpret output as structures and actions)
+- "Explore even itself"  (events, logs, ui, config, workflows, keybindings, runtime, RAM, etc.)
+- "Embrace cognitive constrains"  (suggest workflows and give feedback)
+- "Bind all events to current contexts"  == that's simply how attention-memory works
+- "File Manager is a lie. What you manage -- is your attention."
 
+.. tip::
+   It's hilarious, but you can treat any folder of files as a *Lisp* program.
+   If you name folders/files after some AST -- you can execute the dir as an app! (homoiconicity)
+   By using scripts as function names and symlinks to other files as args,
+     you should be able to compose an adhoc application -- something worthy to explore.
+   Writing code solely by moving files around -- who would even dare to call it programming? :)
+
+
+CHANGELOG
+=========
+
+2024-12-01
+----------
+
+DONE
+
+- list widget (SatelliteViewport)
+- class hierarchy for ui
+- automatic venv
+- PoC file system navigation
+- PoC highlighting file by type
+- PoC pygmentized in curses
+- FIXED: no curses resize on SIGWINCH
 
 2024-06-01
 ----------
