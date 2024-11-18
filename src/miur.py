@@ -4,6 +4,7 @@ from contextlib import ExitStack
 from . import curses_ext as CE
 from . import iomgr
 from .app import AppCursesUI, AppGlobals
+from .util.devenv import get_py_args
 from .util.envlevel import increment_envlevel
 from .util.exchook import enable_warnings, log_excepthook
 from .util.logger import log
@@ -91,7 +92,9 @@ def miur_frontend(g: AppGlobals) -> None:
 
     if sys.prefix != sys.base_prefix:
         # BAD: log is too early to be redirected by stdlog_redir()
-        log.info(f"VENV: {sys.prefix}")
+        log.info(f"VENV: {sys.prefix} ; {sys.base_prefix}")
+
+    log.info(f"ARGS: {' '.join(repr(a) if ' ' in a else a for a in get_py_args())}")
 
     if g.opts.devinstall:
         from .util import devenv

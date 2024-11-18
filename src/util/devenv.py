@@ -58,6 +58,17 @@ def install_venv_deps(devroot: str | None = None, dev: bool = False) -> None:
     touch(venvstamp)
 
 
+# FIND: is there any standard way in latest python>=3.12 ?
+def get_py_args(appargs: bool = True) -> list[str]:
+    import ctypes
+
+    argc = ctypes.c_int()
+    argv = ctypes.POINTER(ctypes.c_wchar_p)()
+    ctypes.pythonapi.Py_GetArgcArgv(ctypes.byref(argc), ctypes.byref(argv))
+    num = argc.value if appargs else argc.value - len(sys.argv) + 1
+    return [argv[i] for i in range(num)]
+
+
 def ensure_venv(devroot: str) -> None:
     if sys.prefix == sys.base_prefix:
         import venv
@@ -69,7 +80,23 @@ def ensure_venv(devroot: str) -> None:
             venv.create(vpath, with_pip=True)
         os.environ["VIRTUAL_ENV"] = vpath
         os.environ["PATH"] = vpath + ":" + os.environ["PATH"]
-        exe = fs.join(vpath, "bin/python")
-        os.execv(exe, [exe] + sys.argv)
+        vexe = fs.join(vpath, "bin/python")
+
+        cmd = get_py_args()
+        if vexe == cmd[0]:
+            exc = RuntimeError(f"ERR: endless loop in exec(.venv)")
+            exc.add_note(" * manually REMOVE '-S' from python interp args")
+            exc.add_note(f" * {cmd}")
+            raise exc
+        cmd[0] = vexe
+
+        # HACK: start miur in isolated mode, but then drop it to be able to use .venv
+        #   CHECK: is it a bug, that "-S" affects .venv ?
+        if cmd[1] == "-S":
+            del cmd[1]
+        elif cmd[1].startswith("-"):
+            cmd[1] = cmd[1].replace("S", "")
+
+        os.execv(cmd[0], cmd)
     else:
         install_venv_deps(devroot, dev=False)
