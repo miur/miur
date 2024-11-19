@@ -36,6 +36,7 @@ def enable_warnings(error: bool = True) -> "Iterator[None]":
         warnings.resetwarnings()  # Back to default behavior
 
 
+# FIXME: forward parent's callsite loci into log.* to know where exception was caught
 def log_exc(value: "BaseException") -> "Any":
     # pylint:disable=import-outside-toplevel
     import traceback as TR

@@ -19,6 +19,8 @@ def exitloop(g: AppGlobals) -> None:
 
 
 def resize(g: AppGlobals) -> None:
+    ## HACK:SRC: https://stackoverflow.com/questions/1022957/getting-terminal-width-in-c
+    ##   >> make curses to calc sizes by itself (as it does on each .refresh)
     # HACK: force size reinit (as ncurses only does it in .iniscr())
     # SRC:OLD: https://post.bytes.com/forum/topic/python/541442-curses-and-resizing-windows
     C.def_prog_mode()

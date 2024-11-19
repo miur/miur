@@ -1,6 +1,6 @@
 from argparse import Action, ArgumentParser
 from enum import Enum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
 from . import _pkg
 from .util.logger import LogLevel, log
@@ -17,13 +17,15 @@ class SwitchEnum(Enum):
 
 
 class SwitchAction(Action):
-    def __call__(self, _ap, ns, s: str, option_string=None):  # type:ignore
+    @override
+    def __call__(self, _ap, ns, s, option_string=None):  # type:ignore[no-untyped-def]
         # ALT: create enum as Enum('SwitchEnum', {"0":True, ...}) to allow Literal keys too
         # if s == "0": s = "no" elif s == "1": s = "yes"
         setattr(ns, self.dest, SwitchEnum[s.lower()].value)
 
 
 class SigAction(Action):
+    @override
     def __call__(self, _ap, ns, s, option_string=None):  # type:ignore[no-untyped-def]
         if not isinstance(s, str) or not s.isascii():
             raise NotADirectoryError
@@ -50,12 +52,12 @@ class LogLevelCvt(Action):
 
 def cli_spec(parser: ArgumentParser) -> ArgumentParser:
     o = parser.add_argument
-    o("cwd", nargs="?", default="/etc")  # [_] FUT:CHG: os.getcwd()
+    o("xpath", nargs="?")
     o("-v", "--version", action="version", version=_pkg.__version__)
     _sigset = "HUP INT KILL USR1 USR2 TERM CONT STOP WINCH".split()
     o("-s", "--signal", choices=_sigset, action=SigAction)
-    # BAD: "default" duplicates default value of `AppOptions
-    o("-a", "--asyncio", dest="bare", default=True, action="store_false")
+    o("-a", "--asyncio", dest="bare", action="store_false")
+    o("-b", "--bare", action="store_true")
     o("-D", "--devinstall", action="store_true")
     o("-K", "--ipykernel", default=False, action="store_true")
     o("-I", "--ipyconsole", default=None, action="store_false")
@@ -72,29 +74,35 @@ def cli_spec(parser: ArgumentParser) -> ArgumentParser:
     return parser
 
 
-def miur_argparse(argv: list[str], devroot: str | None = None) -> None:
+def miur_argparse(argv: list[str]) -> None:
     # PERF:(imports): abc ast dis collections.abc enum importlib.machinery itertools linecache
     #    os re sys tokenize token types functools builtins keyword operator collections
     from inspect import get_annotations
 
-    from .app import g_app as g
-    from .miur import miur_frontend
-
-    g.opts.devroot = devroot
+    from .app import g_app
 
     # MAYBE:TODO: different actions based on appname=argv[0]
 
     _ap = ArgumentParser(prog=_pkg.__appname__, description=_pkg.__doc__)
     _ns = cli_spec(_ap).parse_args(argv[1:])
-    anno = get_annotations(type(g.opts))
+    o = g_app.opts
+    anno = get_annotations(type(o))
+    loci = o.__class__.__qualname__
     for k, v in _ns.__dict__.items():
         if k not in anno:  # if not hasattr(opts, k):
-            raise KeyError((k, v))
+            raise KeyError(f".{k}.={v} key not found in {loci}")
         if not isinstance(v, anno[k]):  # if type(v) is not type(getattr(opts, k)):
-            raise ValueError((k, v))
-        setattr(g.opts, k, v)
-    log.minlevel = g.opts.loglevel
-    return miur_frontend(g)
+            raise ValueError(f"{v}!=.{anno[k]}. wrong type_anno for value in {loci}")
+        setattr(o, k, v)
+    log.minlevel = LogLevel(o.loglevel)
+
+    if o.PROFILE_STARTUP:
+        # TODO: disable for integ-tests e.g. "colored output to ttyalt despite stdout redir"
+        log.kpi("argparse")
+
+    from .miur import miur_frontend
+
+    return miur_frontend(g_app)
 
 
 def miur_ctx(ctx: "Context") -> None:

@@ -55,6 +55,8 @@ package() {
   install -d "$bindir"
   ln -svfT "$d_src/__main__.py" "$bindir/$pkgname"
   ln -svfPT "$pkgname" "$bindir/$pkgabbr"
+  # HACK:(--bare): use alt-name "mi-" to run faster (but limited) raw EPOLL backend
+  ln -svfPT "$pkgname-" "$bindir/$pkgabbr"
 
   site=$pkgdir/$(python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"][1:])')
   install -d "$site"

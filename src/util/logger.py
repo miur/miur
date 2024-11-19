@@ -74,8 +74,16 @@ class Logger:  # pylint:disable=too-many-instance-attributes
         # NOTE: update to redirected FD
         if not hasattr(self, "write"):
             self.write = sys.stdout.write
+
+        from ..app import g_app
+
+        # ATT: don't reassing cmdline opts -- treat them as Final, and SEP from "state"
+        self.termcolor = getattr(g_app.opts, "color", None)
         # TODO: make it a part of supplied .write()
         if self.termcolor is None:
+            # FIXME: check actual fd *after* all redirection OPT
+            #   ~~ it means we should avoid using logger until all redirs were applied
+            #   IDEA: accumulate early logs in the buffer, and then dump all of them at once
             self.termcolor = sys.stdout.isatty()
         self.at = self._write
         self.at(lvl, fmt)

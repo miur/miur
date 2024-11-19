@@ -1,10 +1,11 @@
 import os
 import os.path as fs
 import sys
-from subprocess import run
 
 
 def vpip(*args: str, output: bool = False) -> str:
+    from subprocess import run
+
     # OFF:API: https://pip.pypa.io/en/latest/user_guide/#using-pip-from-your-program
     # TUT: https://realpython.com/what-is-pip/
     pipa = (sys.executable, "-m", "pip", "--require-virtualenv", "--isolated")

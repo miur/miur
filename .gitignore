@@ -2,3 +2,6 @@
 /.mypy_cache/
 /.venv/
 __pycache__/
+
+# cached ZSH scripts
+*.zwc

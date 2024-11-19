@@ -27,7 +27,7 @@ class AppOptions:
     logredir: int | str | None = None
     loglevel: int
     ####
-    cwd: str
+    xpath: str | None
     ####
     signal: int | None
 

@@ -1,17 +1,31 @@
 import os.path as fs
+from functools import cache
+from types import ModuleType
 
 import _curses as C
-from ranger.gui import ansi
 
 from ..curses_ext import g_style as S
 from ..curses_ext import termcolor2
+from ..util.exchook import log_exc
 from ..util.logger import log
 from .entries import ErrorEntry, FSEntry
 from .vlst_base import SatelliteViewport_DataProtocol
 
 # TRY: split into single-dispatch generic functions to draw elements
 #   i.e. rev-dep for isolated curses:draw(XXX) inof distributed XXX.draw_curses()
-# NEED: singleton for colors
+
+
+@cache
+def ranger_ansi() -> ModuleType | None:
+    if __import__("sys").flags.isolated:
+        __import__("site").main()  # lazy init for "site" in isolated mode
+    try:
+        from ranger.gui import ansi
+    except Exception as exc:
+        log.error("You need to monkey-patch 'curses.setupterm()' in .venv")
+        log_exc(exc)
+        return None
+    return ansi  # type:ignore
 
 
 class SatelliteViewport_RedrawMixin:
@@ -80,9 +94,8 @@ class SatelliteViewport_RedrawMixin:
                 else:
                     S.schema = S.item
 
-                chunks = ansi.split_ansi_from_text(nm)
-                assert chunks
-                if len(chunks) <= 1:
+                ansi = ranger_ansi()
+                if not ansi or len(ansi.split_ansi_from_text(nm)) <= 1:
                     stdscr.addnstr(
                         vy + y,
                         xoff,

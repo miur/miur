@@ -4,22 +4,13 @@ from contextlib import ExitStack
 from . import curses_ext as CE
 from . import iomgr
 from .app import AppCursesUI, AppGlobals
-from .util.devenv import get_py_args
 from .util.envlevel import increment_envlevel
 from .util.exchook import enable_warnings, log_excepthook
 from .util.logger import log
 from .util.pidfile import pidfile_path, send_pidfile_signal, temp_pidfile
 
 
-def miur_main(g: AppGlobals | None = None) -> None:
-    # bare: bool = True, ipykernel: bool = False
-    if g is None:
-        from .app import g_app
-
-        g = g_app  # FIXED: !mypy idiosyncrasies
-
-    g._main = sys.modules[__name__]  # pylint:disable=protected-access
-
+def miur_main(g: AppGlobals) -> None:
     if g.opts.PROFILE_STARTUP:
         # FIXME: accumulate early logs into buffer, and emit them at once only after FD redir
         # OPT: print early logs immediately to STDERR -- to troubleshoot early startup
@@ -35,7 +26,7 @@ def miur_main(g: AppGlobals | None = None) -> None:
         # MAYBE: only enable PIDFILE when run by miur_frontend() to avoid global VAR ?
         pid = do(temp_pidfile(pidfile_path()))
         # BAD: log is too early to be redirected by stdlog_redir()
-        log.kpi(f"{pid}")
+        log.verbose(f"{pid=}")
         do(log_excepthook())
 
         # MOVE? as early as possible
@@ -52,7 +43,8 @@ def miur_main(g: AppGlobals | None = None) -> None:
         ui.resize = lambda: resize(g)
         ui.handle_input = lambda: handle_input(g)
         g.curses_ui = ui
-        g.root_wdg = RootWidget(FSEntry("/d/airy"))
+        xpath = getattr(g.opts, "xpath", None) or "/d/airy"
+        g.root_wdg = RootWidget(FSEntry(xpath))
         # g.root_wdg.set_entity(FSEntry("/etc/udev"))
 
         if g.opts.bare:  # NOTE: much faster startup w/o asyncio machinery
@@ -83,19 +75,6 @@ def miur_main(g: AppGlobals | None = None) -> None:
 
 # TBD: frontend to various ways to run miur API with different UI
 def miur_frontend(g: AppGlobals) -> None:
-    c = g.opts.color  # NB: we always have .default set
-    if c is None:
-        # FIXME: check actual fd *after* all redirection OPT
-        # BET: don't reassing cmdline opts -- treat them as Final, and SEP from "state"
-        c = sys.stdout.isatty()
-    log.config(termcolor=c)
-
-    if sys.prefix != sys.base_prefix:
-        # BAD: log is too early to be redirected by stdlog_redir()
-        log.info(f"VENV: {sys.prefix} ; {sys.base_prefix}")
-
-    log.info(f"ARGS: {' '.join(repr(a) if ' ' in a else a for a in get_py_args())}")
-
     if g.opts.devinstall:
         from .util import devenv
 
@@ -104,14 +83,11 @@ def miur_frontend(g: AppGlobals) -> None:
         #   ~~ somewhat annoying in practice, probably only useful for daemon server
         sys.exit()
 
-    if g.opts.PROFILE_STARTUP:
-        # TODO: disable for integ-tests e.g. "colored output to ttyalt despite stdout redir"
-        log.kpi("argparse")
-
     if sig := g.opts.signal:
         ret = send_pidfile_signal(pidfile_path(), sig)
         sys.exit(ret if ret is None or isinstance(ret, int) else str(ret))
 
+    # CASE: launch console on "True", quit remotely on "False"
     if (v := g.opts.ipyconsole) is not None:
         log.kpi(f"ipyconsole = {v}")
         import asyncio

@@ -69,7 +69,7 @@ async def mainloop_asyncio(g: AppGlobals) -> None:
     loop.add_signal_handler(signal.SIGWINCH, g.curses_ui.resize)
     loop.add_reader(iomgr.CURSES_STDIN_FD, g.curses_ui.handle_input)
     try:
-        log.kpi("serving")
+        log.kpi("serving asyncio")
         if __debug__ and g.opts.PROFILE_STARTUP:
             loop.call_soon(ev_shutdown.set)
         await ev_shutdown.wait()

@@ -13,32 +13,14 @@
 # %SUMMARY: frontend
 # %USAGE: $ mi || miur || . =mi
 """":
-this=$(realpath -e "${BASH_SOURCE[0]:-$0}")
-[[ ${this%/*/*} -ef /d/miur ]] && this=/d/miur/${this#${this%/*/*}/}
 if (return 0 2>/dev/null); then
-    _ps4=$PS4 && PS4=' ' && set -x
-
-    alias miur.pkg="${this%/*/*}/pkg/PKGBUILD.dev"
-    alias miur.impt="python -SIB -Ximporttime -- $this"
-    alias miur.prof="python -SIB -m cProfile -s cumulative -- $this"
-
-    # alias mi="$this"
-    alias ma='miur -a'
-    alias ml='miur -a'
-    alias mK='miur -aK'
-    alias mI='miur -aI'
-
-    if [[ ${ZSH_NAME:+x} ]]; then
-        alias -g M='|miur'
-    fi
-
-    set +x && PS4=$_ps4
-    unset this _ps4
+    app=$(realpath -e "${BASH_SOURCE[0]:-$0}")
+    source "${app%/*/*}/pkg/aliases.sh" "$app" "$@"
+    unset app
     return 0
 fi
-set -o errexit -o errtrace -o noclobber -o noglob -o nounset -o pipefail
-# exec "$@"
 echo "ERR: '$0' is not supposed to be run by $SHELL"
+# exec "$0" "$@"
 exit -2
 """
 
@@ -50,22 +32,45 @@ def select_entrypoint(devroot: str):  # type:ignore[no-untyped-def]
     # argv = sys.argv[1:sys.argv.index('--')] if '--' in sys.argv else sys.argv[1:]
     # sys.dont_write_bytecode = '-c' in argv or '--clean' in argv
     argv = sys.argv
+
+    # HACK:(--bare): use alt-name "mi-" to run faster (but limited) raw EPOLL backend
+    bare = argv[0].rpartition("/")[2] in ("mi-", "miur-")
+
+    from .app import g_app
+    from .util.devenv import get_py_args
+    from .util.logger import log
+
+    # ALT?(sys.modules[__main__]): will it work in !jupyter ?
+    g_app._main = sys.modules[__name__]  # pylint:disable=protected-access
+    o = g_app.opts
+    o.bare = bare
+    o.devroot = devroot
+
+    # BAD: log is too early to be redirected by stdlog_redir()
+    venv_path = f"{p} ; {b}" if (p := sys.prefix) != (b := sys.base_prefix) else "---"
+    log.verbose(f"(.venv): {venv_path}")
+    log.verbose(f"<$ {' '.join(repr(a) if ' ' in a else a for a in get_py_args())}")
+    if o.PROFILE_STARTUP:
+        log.kpi("entrypoint")
+
+    # PERF: run --bare w/o .venv; NEED: install all deps by system pkg manager
+    if not bare:
+        from .util.devenv import ensure_venv
+
+        # MAYBE: make a frontend to miur (like "fleur/ctl" did)
+        #   >> move all dev-helpers there and access miur only through it
+        #   &why keep only essential features in primary codebase
+        ensure_venv(devroot)
+
     # PERF: faster startup w/o importing ArgumentParser (128ms vs 115ms)
     if len(argv) == 1 or (len(argv) > 1 and argv[1] == "--"):
         from .miur import miur_main
 
-        return miur_main
-
-    from .util.devenv import ensure_venv
-
-    # MAYBE: make a frontend to miur (like "fleur/ctl" did)
-    #   >> move all dev-helpers there and access miur only through it
-    #   &why keep only essential features in primary codebase
-    ensure_venv(devroot)
+        return lambda: miur_main(g_app)
 
     from .cli import miur_argparse
 
-    return lambda: miur_argparse(argv, devroot)
+    return lambda: miur_argparse(argv)
 
 
 def as_pkg_or_exe(mkrun):  # type:ignore[no-untyped-def]
