@@ -1,3 +1,4 @@
+import os
 import os.path as fs
 from functools import cache
 from types import ModuleType
@@ -83,16 +84,25 @@ class SatelliteViewport_RedrawMixin:
                     vy + y, vx + len(pfxrel), pfxidx, S.cursor if i == ci else S.pfxidx
                 )
                 xoff = vx + indent
-                if not isinstance(item, FSEntry):
-                    S.schema = S.item
-                elif fs.islink(item.loci):
-                    S.schema = S.fslink
-                    if fs.isdir(item.loci):
-                        S.schema |= C.A_BOLD
-                elif fs.isdir(item.loci):
-                    S.schema = S.fsdir
-                else:
-                    S.schema = S.item
+                c_schema = S.item
+                if isinstance(item, FSEntry):
+                    path = item.loci
+                    if not fs.exists(path):
+                        c_schema = S.error
+                        if fs.lexists(path):
+                            c_schema |= C.A_ITALIC | C.A_BOLD
+                    elif fs.isdir(path):
+                        c_schema = S.fsdir
+                        if fs.islink(path):
+                            # ALT:TRY: use color "in the middle" bw dir and filesymlink
+                            #   i.e. introduce S.fsdirlink color
+                            c_schema = S.fslink | C.A_BOLD
+                    elif fs.isfile(path):
+                        c_schema = S.item
+                        if fs.islink(path):
+                            c_schema = S.fslink | C.A_ITALIC | C.A_BOLD
+                        elif os.access(path, os.X_OK):
+                            c_schema = S.fsexe | C.A_BOLD
 
                 ansi = ranger_ansi()
                 if not ansi or len(ansi.split_ansi_from_text(nm)) <= 1:
@@ -101,7 +111,7 @@ class SatelliteViewport_RedrawMixin:
                         xoff,
                         nm,
                         vw - xoff,
-                        S.schema | S.cursor if i == ci else S.schema,
+                        c_schema | S.cursor if i == ci else c_schema,
                     )
                 else:
                     ## ALT:(messy decoding): simply use non-curses libs

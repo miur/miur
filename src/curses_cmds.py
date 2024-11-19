@@ -1,12 +1,11 @@
-import inspect
-from typing import Callable
+import os
+from typing import Callable, Sequence
 
 import _curses as C
 
 from . import curses_ext as CE
 from .app import AppGlobals
 from .loop_asyncio import asyncio_primary_out
-from .util.exchook import log_exc
 from .util.logger import log
 
 # def raise_(exc: BaseException) -> None:
@@ -45,8 +44,83 @@ def resize(g: AppGlobals) -> None:
     g.stdscr.refresh()
 
 
-def shell_out(g: AppGlobals) -> None:
-    asyncio_primary_out(g, CE.shell_async(g.stdscr))
+def shell_out(g: AppGlobals, loci: str) -> None:
+    asyncio_primary_out(g, CE.shell_async(g.stdscr, f=loci))
+
+
+def shell_out_prompt(g: AppGlobals, loci: str) -> None:
+    # HACK※⡢⣯⢁⢏ pre-fill prompt (inof running) by specified cmdline on ZSH startup
+    # RQ:(~/.zshrc): if [[ -n ${ZSH_BUFFER-} ]]; then print -z "$ZSH_BUFFER" && unset ZSH_BUFFER; fi
+    #   [_] BET: print help notice  above shell-out to use $F,$D,$X,$S vars in cmdline
+    #   ALSO: use $f2 to refer to 2nd tab, and $F to refer to previously opened tab
+    asyncio_primary_out(g, CE.shell_async(g.stdscr, ZSH_BUFFER=loci, f=loci))
+
+
+def run_editor(g: AppGlobals, *args: str | Sequence[str]) -> None:
+    cmdv = [os.getenv("EDITOR", "nvim")]
+    for a in args:
+        if isinstance(a, str):
+            cmdv.append(a)
+        else:
+            cmdv.extend(a)
+    # TODO: when open dir -- focus netrw on same file, as dir's cached view (if present)
+    asyncio_primary_out(g, CE.shell_async(g.stdscr, cmdv))
+
+
+# TBD: feed non-FSEntry or mixed/virtual Entities into vim (+pre-filter pre-sorted lists)
+#   i.e. when current Entity isn't .isdir() -- you need to pass the list through stdin
+def run_quickfix(g: AppGlobals, *args: str) -> None:
+    # TODO: focus/position cursor in both buffer and in quickfix on same item
+    #   * CASE: list of filenames -- buffer on file, no quickfix
+    #   * CASE: list of search results -- quickfix on result, hide/delete original buffer
+    return run_editor(
+        g,
+        "-",
+        ("-c", "setl noro ma bt=nofile nowrap"),
+        ("-c", "au User LazyPluginsLoaded cgetb|copen"),
+        args,
+    )
+
+
+# [_] #visual FIXME: don't dump logs into shell on altscreen, when jumping into fullscreen app
+#   &why it creates significant delay and glimpses text behind the screen unnecessarily
+#   ALT: force somehow TERM to not refresh screen contents when doing altscreen with app
+#   ALSO: same when you quit ranger -- it should exit "less cleanly" to not repaint the TERM
+def run_ranger(g: AppGlobals, path: str) -> None:
+    if int(v := os.getenv("RANGER_LEVEL", "0")) > 0:
+        log.warning("skipping cmd due to RANGER_LEVEL=" + v)
+        return  # NOTE: exit ranger-nested shell
+
+    import os.path as fs
+
+    # MAYBE: strip loci to be an actual path (even for text file lines)
+    if not fs.exists(path):
+        raise ValueError(path)
+
+    # TRY: replace XDG file by some e.g. fd=3 redir
+    tmp = os.getenv("XDG_RUNTIME_DIR", "/tmp") + "/ranger/cwd"
+    # INFO:(--selectfile): it's obsoleted by pos-args, according to "man ranger"
+    #   BUT! if you pass a dir in pos-args -- it will be *opened*, inof *selected*
+    cmdv = ["ranger", "--choosedir=" + tmp, "--selectfile=" + path]
+
+    def _cb() -> None:
+        try:
+            # TRY:BET? inof per-app filecache do 'readlink /proc/<child>/cwd' on child process
+            #   XLR: can we handle SIGCHLD by background asyncio and read cwd from dying child ?
+            with open(tmp, encoding="utf-8") as f:
+                cwd = f.read(1024)
+            from .ui.entries import FSEntry
+
+            # pylint:disable=protected-access
+            if cwd != fs.dirname(path):  # OR: g.root_wdg._navi._view._ent.loci
+                g.root_wdg._navi.view_jump_to(FSEntry(cwd))
+                resize(g)  # <COS: term could have been resized when using nested app
+            # ALT: if os.exists(cwd) and cwd != os.getcwd():
+            #     os.chdir(cwd)
+        except Exception:
+            pass
+
+    asyncio_primary_out(g, CE.shell_async(g.stdscr, cmdv), cb=_cb)
 
 
 def ipykernel_start(g: AppGlobals) -> None:
@@ -83,32 +157,44 @@ def ipython_out(g: AppGlobals) -> None:
 # ALT: match to string, and then resolve to appropriate function
 g_input_handlers: dict[str | int, Callable[[AppGlobals], None]] = {
     # pylint:disable=protected-access
-    "\033": exitloop,
+    # C.KEY_RESIZE: resize,
+    "^[": exitloop,  # <Esc>
     "q": exitloop,
-    C.KEY_RESIZE: resize,
-    "s": shell_out,  # CE.shell_out
+    # "s": shell_out,  # CE.shell_out
+    "s": lambda g: shell_out(g, g.root_wdg._navi._view._wdg.focused_item.loci),
+    # "a": shell_out_prompt,
+    "S": lambda g: shell_out_prompt(g, g.root_wdg._navi._view._wdg.focused_item.loci),
+    # "o": run_quickfix,
+    "E": run_quickfix,
+    "e": lambda g: run_editor(g, g.root_wdg._navi._view._wdg.focused_item.loci),
+    "r": lambda g: run_ranger(g, g.root_wdg._navi._view._wdg.focused_item.loci),
+    # "R": lambda g: run_ranger(g, g.root_wdg._navi._view._ent.loci),
     "K": ipykernel_start,
     "I": ipyconsole_out,
-    "\x0c": resize,  # <C-l> manually trigger redraw
-    "\x12": lambda g: g.root_wdg._navi._view.fetch(),  # <C-r> refresh cached list
+    "^I": ipython_out,  # <Tab>
+    "^J": run_editor,  # <CR>
+    "^L": resize,  # <C-l> manually trigger redraw
+    "^R": lambda g: g.root_wdg._navi._view.fetch(),  # <C-r> refresh cached list
     "j": lambda g: g.root_wdg._navi.cursor_step_by(1),
     "k": lambda g: g.root_wdg._navi.cursor_step_by(-1),
     "g": lambda g: g.root_wdg._navi.cursor_jump_to(0),
     "G": lambda g: g.root_wdg._navi.cursor_jump_to(-1),
     "h": lambda g: g.root_wdg.view_go_back(),
     "l": lambda g: g.root_wdg.view_go_into(),
-    "\t": ipython_out,
 }
 
 
 def handle_input(g: AppGlobals) -> None:
     wch = g.stdscr.get_wch()
+    if isinstance(wch, str) and ord(wch) < 20:
+        wch = C.unctrl(wch).decode("utf-8")
+
     # IDEA: partially restore TTY to preserve NLs in unexpected exc/backtrace
     #  C.nocbreak() ... C.cbreak()
     cmd = g_input_handlers.get(wch, None)
     if cmd:
         if (nm := cmd.__name__) == "<lambda>":
-            srcbody = inspect.getsource(cmd).partition("lambda")[2]
+            srcbody = __import__("inspect").getsource(cmd).partition("lambda")[2]
             comment = " : " + srcbody.partition(":")[2].strip(" ,\n")
         else:
             comment = f" ({nm})"
@@ -123,6 +209,8 @@ def handle_input(g: AppGlobals) -> None:
             try:
                 cmd(g)
             except Exception as exc:  # pylint:disable=broad-exception-caught
+                from .util.exchook import log_exc
+
                 log_exc(exc)
         else:
             # WARN: last stmt in loop COS: may raise SystemExit

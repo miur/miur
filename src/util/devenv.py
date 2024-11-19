@@ -79,8 +79,11 @@ def ensure_venv(devroot: str) -> None:
         if not fs.exists(vpath):
             # OFF: https://docs.python.org/3/library/venv.html
             venv.create(vpath, with_pip=True)
-        os.environ["VIRTUAL_ENV"] = vpath
-        os.environ["PATH"] = vpath + ":" + os.environ["PATH"]
+
+        ## DISABLED:BAD: interferes with .py apps launched from nested shell
+        # os.environ["VIRTUAL_ENV"] = vpath
+        # os.environ["PATH"] = vpath + ":" + os.environ["PATH"]
+
         vexe = fs.join(vpath, "bin/python")
 
         cmd = get_py_args()

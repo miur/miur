@@ -54,7 +54,7 @@ def miur_main(g: AppGlobals) -> None:
             def _shell_out(g: AppGlobals) -> None:
                 CE.shell_out(g.stdscr)
 
-            g_input_handlers["S"] = _shell_out
+            g_input_handlers["s"] = _shell_out
             return mainloop_selectors(g)
 
         from .loop_asyncio import mainloop_asyncio, my_asyncio_loop

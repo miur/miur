@@ -42,16 +42,17 @@ class NaviWidget:
     def view_go_into(self) -> None:
         # pylint:disable=protected-access
         pwdg = self._view._wdg
-
         if not pwdg._lst:
             log.trace("<<EMPTY>>")
             return
+        self.view_jump_to(pwdg.focused_item)
 
-        nent = pwdg.focused_item
-
+    def view_jump_to(self, nent: Representable) -> None:
         if isinstance(nent, ErrorEntry):
             log.trace(nent.name)
             return
+
+        pwdg = self._view._wdg
 
         def _histappend() -> None:
             if v := self._history_pool.get(nent):
@@ -65,8 +66,11 @@ class NaviWidget:
             self._history_stack.append(self._view)
             self._history_idx = len(self._history_stack) - 1
 
+        # pylint:disable=protected-access
         # NOTE: keep previous navi stack to be able to return to same EntityView
         #   but discard the rest of navi stack if we go into different route
+        #   BAD: if we "jump" to unrelated path (e.g. after !ranger),
+        #     then going back-n-forth will discard that jumped path from history :(
         if (nidx := self._history_idx + 1) < len(self._history_stack):
             if self._history_stack[nidx]._ent == nent:
                 self._history_idx = nidx
@@ -76,7 +80,7 @@ class NaviWidget:
                 _histappend()
         else:
             _histappend()
-        # NOTE: resize() newly created wdg to same dimensions
+        # NOTE: resize() *new* wdg to same dimensions as *pwdg*
         self._view._wdg.resize(
             pwdg._viewport_height_lines,
             pwdg._viewport_width_columns,

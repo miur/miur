@@ -57,6 +57,8 @@ def select_entrypoint(devroot: str):  # type:ignore[no-untyped-def]
     if not bare:
         from .util.devenv import ensure_venv
 
+        # BAD: shell_out() will be inside that .venv too
+        #   >> ATT: you shouldn't run *any* python programs in that nested shell
         # MAYBE: make a frontend to miur (like "fleur/ctl" did)
         #   >> move all dev-helpers there and access miur only through it
         #   &why keep only essential features in primary codebase

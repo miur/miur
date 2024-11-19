@@ -1,7 +1,7 @@
 import asyncio
 import signal
 from contextlib import contextmanager
-from typing import Any, Iterator, cast
+from typing import Any, Callable, Iterator, cast
 
 from . import iomgr
 from .app import AppGlobals
@@ -93,7 +93,11 @@ async def mainloop_asyncio(g: AppGlobals) -> None:
 _primary = None
 
 
-def asyncio_primary_out(g: AppGlobals, coro: Any) -> None:
+def asyncio_primary_out(
+    g: AppGlobals,
+    coro: Any,
+    cb: Callable[[], None] | None = None,
+) -> None:
     global _primary  # pylint:disable=global-statement
 
     # MAYBE: combine with "curses_altscreen/BoundedSemaphore" -- as they *are* related
@@ -109,6 +113,7 @@ def asyncio_primary_out(g: AppGlobals, coro: Any) -> None:
     loop.remove_signal_handler(signal.SIGWINCH)
 
     def _cb(fut: asyncio.Future[int]) -> None:
+        success = False
         try:
             sfx = " (shell_out)"
             if fut.cancelled():
@@ -119,6 +124,7 @@ def asyncio_primary_out(g: AppGlobals, coro: Any) -> None:
                 C.flash()
             else:
                 log.info(f"rc={fut.result()}{sfx}")
+                success = True
 
             C.flushinp()
         finally:
@@ -127,6 +133,9 @@ def asyncio_primary_out(g: AppGlobals, coro: Any) -> None:
             loop.add_reader(iomgr.CURSES_STDIN_FD, g.curses_ui.handle_input)
             global _primary
             _primary = None
+        # HACK: chain callback() hook/stmt after successfully executed task
+        if success and cb:
+            cb()
 
     # MAYBE: do it immediately before launching SHELL itself
     #   (otherwise #miur may sleep in-between and still leak some input to SHELL)

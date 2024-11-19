@@ -14,6 +14,7 @@ from . import iomgr
 from .app import g_app
 
 # SEE: https://bugs.python.org/issue40284
+# CHECK: it seems "S.<Tab>" completion doesn't work
 g_style = SimpleNamespace()
 _registered_color_pairs: dict[tuple[int, int], int] = {}
 
@@ -50,9 +51,10 @@ def init_colorscheme(stdscr: C.window) -> None:
     S.pfxidx = S.iteminfo
     S.cursor = C.A_REVERSE | C.A_BOLD  # OR: termcolor2(8, 4)
     S.footer = termcolor2(217, 17)
-    S.error = termcolor2(1, -1)
-    S.fsdir = termcolor2(4, -1)
-    S.fslink = termcolor2(6, -1)
+    S.error = termcolor2(160, -1)  # 1
+    S.fsdir = termcolor2(33, -1)  # 4
+    S.fslink = termcolor2(37, -1)  # 6
+    S.fsexe = termcolor2(64, -1)  # 2
 
     # pvis = C.curs_set(visibility=0)
     stdscr.attron(S.default)
@@ -165,8 +167,10 @@ def shell_out(
 
 
 async def shell_async(stdscr: C.window, cmdv: Sequence[str] = (), **envkw: str) -> int:
+    interactive = False
     if not cmdv:
         cmdv = (os.environ.get("SHELL", "sh"),)
+        interactive = True
     envp = dict(os.environ, **envkw)
     # WARN: #miur can run in bkgr, but is not allowed to interact with TTY
     #   OR:MAYBE: we can allow it -- like create notifications,
@@ -185,7 +189,13 @@ async def shell_async(stdscr: C.window, cmdv: Sequence[str] = (), **envkw: str) 
             stderr=(g.io.pipeerr or g.io.ttyout),
         )
         rc = await proc.wait()
-        assert rc == 0, proc
+        if rc:
+            from .util.logger import log
+
+            msg = f"{rc=} <- {cmdv} {proc}"
+            log.error(msg)
+            if not interactive:
+                raise RuntimeError(msg)
         return rc
 
 
