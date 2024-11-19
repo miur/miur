@@ -51,6 +51,7 @@ class AppIO:
 class AppCursesUI:
     resize: "Callable[[], None]"
     handle_input: "Callable[[], None]"
+    modal: str
 
 
 # FUT:RENAME? c = g_ctx = AppContext() | ns = AppNamespace()

@@ -1,5 +1,5 @@
 import os
-from typing import Callable, Sequence
+from typing import Callable, Sequence, TypeAlias
 
 import _curses as C
 
@@ -147,10 +147,12 @@ def ipython_out(g: AppGlobals) -> None:
 
 
 def _loci(g: AppGlobals) -> str:
-    g.root_wdg._navi._view._wdg.focused_item.loci
+    # pylint:disable=protected-access
+    return g.root_wdg._navi._view._wdg.focused_item.loci
 
 
-_KeyMap = dict[str | int, Callable[[AppGlobals], None]]
+_KeyMap: TypeAlias = dict[str | int, Callable[[AppGlobals], None]]
+g_input_handlers: _KeyMap
 
 # ALT:BET: allow direct access to contained _objects methods ?
 #   i.e. remove "_" private prefix from *._navi._view.*
@@ -162,7 +164,6 @@ _KeyMap = dict[str | int, Callable[[AppGlobals], None]]
 #         NICE: we can type-check all dispatched "messages" with their args as actual fn calls
 # ALT: match to string, and then resolve to appropriate function
 _modal_default: _KeyMap = {
-    # pylint:disable=protected-access
     # C.KEY_RESIZE: resize,
     "^[": exitloop,  # <Esc>
     "q": exitloop,
@@ -180,6 +181,7 @@ _modal_default: _KeyMap = {
     "^I": ipython_out,  # <Tab>
     "^J": run_editor,  # <CR>
     "^L": resize,  # <C-l> manually trigger redraw
+    # pylint:disable=protected-access
     "^R": lambda g: g.root_wdg._navi._view.fetch(),  # <C-r> refresh cached list
     "j": lambda g: g.root_wdg._navi.cursor_step_by(1),
     "k": lambda g: g.root_wdg._navi.cursor_step_by(-1),
@@ -187,7 +189,7 @@ _modal_default: _KeyMap = {
     "G": lambda g: g.root_wdg._navi.cursor_jump_to(-1),
     "h": lambda g: g.root_wdg.view_go_back(),
     "l": lambda g: g.root_wdg.view_go_into(),
-    ",": lambda g: modal_switch_to(_modal_comma),
+    ",": lambda g: modal_switch_to(_modal_comma, nm=","),
 }
 
 _modal_comma: _KeyMap = {
@@ -195,12 +197,16 @@ _modal_comma: _KeyMap = {
     "m": lambda g: shell_out(g, _loci(g)),
 }
 
-g_input_handlers = _modal_default
 
-
-def modal_switch_to(m: _KeyMap) -> None:
+def modal_switch_to(m: _KeyMap | None, nm: str = "") -> None:
+    if m is None:
+        m = _modal_default
+        nm = nm or "Default"
     global g_input_handlers
     g_input_handlers = m
+    from .app import g_app
+
+    g_app.curses_ui.modal = nm
 
 
 def handle_input(g: AppGlobals) -> None:
@@ -240,4 +246,6 @@ def handle_input(g: AppGlobals) -> None:
         g.root_wdg.redraw(g.stdscr)
         g.stdscr.refresh()
     elif g_input_handlers is not _modal_default:
-        modal_switch_to(_modal_default)
+        modal_switch_to(None)
+        g.root_wdg.redraw(g.stdscr)
+        g.stdscr.refresh()

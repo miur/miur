@@ -37,7 +37,7 @@ def miur_main(g: AppGlobals) -> None:
 
         # raise RuntimeError()
 
-        from .curses_cmds import handle_input, resize
+        from .curses_cmds import handle_input, modal_switch_to, resize
         from .ui.entries import FSEntry
         from .ui.root import RootWidget
 
@@ -45,6 +45,7 @@ def miur_main(g: AppGlobals) -> None:
         ui.resize = lambda: resize(g)
         ui.handle_input = lambda: handle_input(g)
         g.curses_ui = ui
+        modal_switch_to(None)
         xpath = getattr(g.opts, "xpath", None)
         if xpath is None:
             xpath = __import__("os").getcwd()

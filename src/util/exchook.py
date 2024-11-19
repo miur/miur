@@ -1,8 +1,6 @@
 import sys
 from contextlib import contextmanager
 
-from .logger import log
-
 if globals().get("TYPE_CHECKING"):
     from types import TracebackType
     from typing import Any, Callable, Iterator, Optional, Type
@@ -39,8 +37,17 @@ def enable_warnings(error: bool = True) -> "Iterator[None]":
 # FIXME: forward parent's callsite loci into log.* to know where exception was caught
 def log_exc(value: "BaseException") -> "Any":
     # pylint:disable=import-outside-toplevel
+    import os
     import traceback as TR
     from os import linesep as NL
+
+    from .logger import TERMSTYLE, LogLevel, log
+
+    try:
+        termsz = os.get_terminal_size()
+    except OSError:
+        termsz = os.terminal_size((0, 0))
+        log.warning("Can't reflow on narrow terminal")
 
     # TEMP: verify everything we have is actually printed with backtrace
     log.error("<Exception>")
@@ -58,20 +65,67 @@ def log_exc(value: "BaseException") -> "Any":
     # _orig_write = log.write
     # log.config(write=g.io.ttyout.write)
     try:
-        log.error("".join(TR.format_exception(value, chain=True)))
-        ## ALT
-        # err = "".join(TR.format_exception_only(_etype, value)).rstrip()
-        # ## DISABLED: it seems they are already appended ?
-        # # if value.__notes__:
-        # #     err += "".join(NL + "  \\ " + note for note in value.__notes__)
-        # log.error(err)
-        # # OR: (fr.* for fr in __import__("traceback").extract_tb(tb))
-        # due = value
-        # while due:
-        #     tb = TR.extract_tb(due.__traceback__)
-        #     bt = "".join(TR.format_tb(tb)).rstrip().replace(NL, NL + "\\")
-        #     log.info("Traceback (most recent call last):" + NL + "\\" + bt)
-        #     due = due.__cause__
+        # ALT:DFL: log.error("".join(TR.format_exception(value, chain=True)))
+
+        due: BaseException | None = value
+        _cc = TERMSTYLE[LogLevel.COMMENT]
+        _ct = TERMSTYLE[LogLevel.TRACE]
+        _ce = TERMSTYLE[LogLevel.ERROR]
+        _r = TERMSTYLE[None]
+        tabl = 60
+        while due:
+            # tb = TR.extract_tb(due.__traceback__)
+
+            ## FUT:ENH: print with tidbits for __context__, etc.  from OFF:SRC:
+            ##   /usr/lib/python3.12/traceback.py:944:def format(self, *, chain=True, _ctx=None):
+            te = TR.TracebackException.from_exception(due, capture_locals=True)
+            tb = te.stack
+
+            # bt = "".join(TR.format_tb(tb)).rstrip().replace(NL, NL + "\\")
+            # log.info("Traceback (most recent call last):" + NL + "\\" + bt)
+            last = len(tb) - 1
+            for i, t in enumerate(tb):
+                modnm = t.filename.rpartition("/")[2]
+                lnum = str(t.lineno)
+                if t.lineno != t.end_lineno:
+                    lnum += f"-{t.end_lineno}"
+                lvl = LogLevel.TRACE
+                _cs = _ct + "\033[3m"
+                sep = "|"
+                sfx = ""
+                if i == last:
+                    lvl = LogLevel.ERROR
+                    _cs = _ce + "\033[1;3m"  # BAD(;4): makes underscores hard to see
+                    # sep = ">"  # "\n"
+                    if ctx := t.locals:
+                        sfx = "".join(
+                            f"\n\t{k} = {_ct}{v}{_r}" for k, v in sorted(ctx.items())
+                        )
+                l = t._line.rstrip()  # pylint:disable=protected-access
+                indent = l[: len(l) - len(l.lstrip())]
+                code = (
+                    f"{indent}{_cc}{l[len(indent):t.colno]}"
+                    + f"{_cs}{l[t.colno:t.end_colno]}{_r}"
+                    + f"{_cc}{l[t.end_colno:]}{_r}"
+                )
+                if termsz.columns > 80:
+                    fmt = f"{_r}{sep}{code}{" "*max(2,tabl-len(l))}{_cc}{f'// {t.name}'}{_r}{sfx}"
+                else:
+                    fmt = f"{_r}{_cc}{f'// {t.name}'}{_r}\n{sep}{code}{sfx}"
+                log.at(
+                    lvl,
+                    fmt,
+                    loci=f" {modnm}:{lnum}",
+                )
+
+            # err = "".join(TR.format_exception_only(type(due), due)).rstrip()
+            err = "".join(te.format_exception_only()).rstrip()
+            ## CHECK: it seems they are already appended ?
+            if hasattr(due, "__notes__"):
+                err += "".join(NL + "  \\ " + note for note in due.__notes__)
+            log.error(err)
+
+            due = due.__cause__
 
         ## ALSO:MAYBE:
         # _orig_excepthook(etype, value, tb)  # OR: sys.__excepthook__(...)

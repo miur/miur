@@ -1,5 +1,6 @@
 import _curses as C
 
+from ..app import g_app
 from ..curses_ext import g_style as S
 from ..util.logger import log
 from .entity_base import Representable
@@ -86,10 +87,13 @@ class RootWidget:
         sz = len(wdg._lst)
         sortby = "name"
         sortrev = False
-        footer = f"--- {ci}/{sz} | by={sortby}{"￪" if sortrev else "￬"}"
+        footer = f"--- {ci:2d}/{sz} | by={sortby}{"￪" if sortrev else "￬"}"
         ## DEBUG:NEED:(__main__.py): -X tracemalloc
         # footer += f"  --- {{RAM={__import__("tracemalloc").get_traced_memory()[0]//1024:,}kB}}"
-        stdscr.addstr(self._wh - 1, 0, footer, S.footer)
+        modal = "[" + g_app.curses_ui.modal.upper() + "]"
+        if (spacerlen := self._ww - len(footer) - len(modal) - 1) > 0:
+            footer += " " * spacerlen + modal
+        stdscr.addnstr(self._wh - 1, 0, footer, self._ww, S.footer)
 
         # NOTE: place real cursor to where list-cursor is, to make tmux overlay selection more intuitive
         cy = wdg._viewport_origin_yx[0]
