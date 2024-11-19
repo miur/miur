@@ -146,6 +146,12 @@ def ipython_out(g: AppGlobals) -> None:
     CE.ipython_out(g.stdscr)
 
 
+def _loci(g: AppGlobals) -> str:
+    g.root_wdg._navi._view._wdg.focused_item.loci
+
+
+_KeyMap = dict[str | int, Callable[[AppGlobals], None]]
+
 # ALT:BET: allow direct access to contained _objects methods ?
 #   i.e. remove "_" private prefix from *._navi._view.*
 #   &why to easily control substructures by global/modal keymaps
@@ -155,19 +161,19 @@ def ipython_out(g: AppGlobals) -> None:
 #         and combine them as a type for root_wdg dispatch function
 #         NICE: we can type-check all dispatched "messages" with their args as actual fn calls
 # ALT: match to string, and then resolve to appropriate function
-g_input_handlers: dict[str | int, Callable[[AppGlobals], None]] = {
+_modal_default: _KeyMap = {
     # pylint:disable=protected-access
     # C.KEY_RESIZE: resize,
     "^[": exitloop,  # <Esc>
     "q": exitloop,
     # "s": shell_out,  # CE.shell_out
-    "s": lambda g: shell_out(g, g.root_wdg._navi._view._wdg.focused_item.loci),
+    "s": lambda g: shell_out(g, _loci(g)),
     # "a": shell_out_prompt,
-    "S": lambda g: shell_out_prompt(g, g.root_wdg._navi._view._wdg.focused_item.loci),
+    "S": lambda g: shell_out_prompt(g, _loci(g)),
     # "o": run_quickfix,
     "E": run_quickfix,
-    "e": lambda g: run_editor(g, g.root_wdg._navi._view._wdg.focused_item.loci),
-    "r": lambda g: run_ranger(g, g.root_wdg._navi._view._wdg.focused_item.loci),
+    "e": lambda g: run_editor(g, _loci(g)),
+    "r": lambda g: run_ranger(g, _loci(g)),
     # "R": lambda g: run_ranger(g, g.root_wdg._navi._view._ent.loci),
     "K": ipykernel_start,
     "I": ipyconsole_out,
@@ -181,7 +187,20 @@ g_input_handlers: dict[str | int, Callable[[AppGlobals], None]] = {
     "G": lambda g: g.root_wdg._navi.cursor_jump_to(-1),
     "h": lambda g: g.root_wdg.view_go_back(),
     "l": lambda g: g.root_wdg.view_go_into(),
+    ",": lambda g: modal_switch_to(_modal_comma),
 }
+
+_modal_comma: _KeyMap = {
+    "s": lambda g: shell_out(g, _loci(g)),
+    "m": lambda g: shell_out(g, _loci(g)),
+}
+
+g_input_handlers = _modal_default
+
+
+def modal_switch_to(m: _KeyMap) -> None:
+    global g_input_handlers
+    g_input_handlers = m
 
 
 def handle_input(g: AppGlobals) -> None:
@@ -220,3 +239,5 @@ def handle_input(g: AppGlobals) -> None:
         #   BUT: uix needs visual feedback on each keypress, so it's better to always redraw
         g.root_wdg.redraw(g.stdscr)
         g.stdscr.refresh()
+    elif g_input_handlers is not _modal_default:
+        modal_switch_to(_modal_default)

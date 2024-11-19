@@ -17,3 +17,15 @@ def increment_envlevel(varname: str) -> Iterator[int]:
         yield lvl
     finally:
         os.environ[varname] = str(lvl)
+
+
+@contextmanager
+def save_choosedir(path: str) -> Iterator[None]:
+    try:
+        yield
+    finally:
+        from ..app import g_app
+
+        loci = g_app.root_wdg._navi._view._ent.loci
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(loci)

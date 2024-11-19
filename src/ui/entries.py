@@ -99,9 +99,11 @@ class FSEntry(Golden):
     def explore(self) -> Iterable[Representable]:
         p = self._x
         if not fs.lexists(p):
-            return [ErrorEntry("FILE NOT FOUND", loci=(self._x,))]
+            return [ErrorEntry("FILE NOT FOUND", loci=(p,))]
+        if not os.access(p, os.R_OK):
+            return [ErrorEntry("PERMISSION DENIED", loci=(p,))]
         if not fs.exists(p):
-            return [ErrorEntry("DANGLING SYMLINK", loci=(fs.realpath(self._x),))]
+            return [ErrorEntry("DANGLING SYMLINK", loci=(fs.realpath(p),))]
         cls = type(self)
         # [_] TRY: print this info on 2nd/3rd line below the link, as auxinfo
         #   BAD: we are losing unified access to copy/edit/navi the interpreted symlink values as regular items

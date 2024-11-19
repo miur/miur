@@ -30,6 +30,7 @@ class AppOptions:
     xpath: str | None
     ####
     signal: int | None
+    choosedir: str | None = None
 
 
 # ATT: use these FD explicitly: don't ever use "sys.std{in,out,err}"

@@ -4,7 +4,7 @@ from contextlib import ExitStack
 from . import curses_ext as CE
 from . import iomgr
 from .app import AppCursesUI, AppGlobals
-from .util.envlevel import increment_envlevel
+from .util.envlevel import increment_envlevel, save_choosedir
 from .util.exchook import enable_warnings, log_excepthook
 from .util.logger import log
 from .util.pidfile import pidfile_path, send_pidfile_signal, temp_pidfile
@@ -28,6 +28,8 @@ def miur_main(g: AppGlobals) -> None:
         # BAD: log is too early to be redirected by stdlog_redir()
         log.verbose(f"{pid=}")
         do(log_excepthook())
+        if tmp := g.opts.choosedir:
+            do(save_choosedir(tmp))
 
         # MOVE? as early as possible
         do(iomgr.stdlog_redir(g))
@@ -43,7 +45,11 @@ def miur_main(g: AppGlobals) -> None:
         ui.resize = lambda: resize(g)
         ui.handle_input = lambda: handle_input(g)
         g.curses_ui = ui
-        xpath = getattr(g.opts, "xpath", None) or "/d/airy"
+        xpath = getattr(g.opts, "xpath", None)
+        if xpath is None:
+            xpath = __import__("os").getcwd()
+        elif xpath == "":
+            xpath = "/d/airy"
         g.root_wdg = RootWidget(FSEntry(xpath))
         # g.root_wdg.set_entity(FSEntry("/etc/udev"))
 

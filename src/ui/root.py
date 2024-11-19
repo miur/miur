@@ -1,6 +1,7 @@
 import _curses as C
 
 from ..curses_ext import g_style as S
+from ..util.logger import log
 from .entity_base import Representable
 from .entries import ErrorEntry
 from .navi import NaviWidget
@@ -57,17 +58,27 @@ class RootWidget:
         header = f"[{self._navi._history_idx+1}⁄{len(self._navi._history_stack)}] "
         stdscr.addstr(0, 0, header, S.auxinfo)
         xpath = wdg.focused_item.loci if wdg._lst else self._navi._view._ent.loci + "/"
+
+        # FUT: "compress" header beside simply "cutting" it
+        def capx() -> int:
+            return stdscr.getmaxyx()[1] - stdscr.getyx()[1]
+
         try:
             iname = xpath.rindex("/")
-            stdscr.addstr(0, len(header), xpath[:iname], S.footer | C.A_BOLD)
-            try:
-                ilnum = xpath.index(":", iname)
-                stdscr.addstr(0, len(header) + iname, xpath[iname:ilnum], S.item)
-                stdscr.addstr(0, len(header) + ilnum, xpath[ilnum:], S.iteminfo)
-            except ValueError:
-                stdscr.addstr(0, len(header) + iname, xpath[iname:], S.item)
         except ValueError:
-            stdscr.addstr(0, len(header), xpath, S.footer | C.A_BOLD)
+            stdscr.addnstr(xpath, capx(), S.footer | C.A_BOLD)
+        else:
+            if (lim := capx()) > 0:
+                stdscr.addnstr(xpath[:iname], lim, S.footer | C.A_BOLD)
+                if (lim := capx()) > 0:
+                    try:
+                        ilnum = xpath.index(":", iname)
+                    except ValueError:
+                        stdscr.addnstr(xpath[iname:], lim, S.item)
+                    else:
+                        stdscr.addnstr(xpath[iname:ilnum], lim, S.item)
+                        if (lim := capx()) > 0:
+                            stdscr.addnstr(xpath[ilnum:], lim, S.iteminfo)
 
         self._navi.redraw(stdscr)
 

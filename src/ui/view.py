@@ -54,7 +54,8 @@ class EntityView:
 
     def _apply_default_policy(self) -> None:
         # pylint:disable=protected-access
-        if isinstance(self._ent, FSEntry) and fs.isdir(self._ent._x):
-            os.chdir(self._ent._x)
-            if not fs.islink(self._ent.loci) or self._ent._alt is True:
+        if isinstance(self._ent, FSEntry) and fs.isdir(p := self._ent.loci):
+            if os.access(p, os.R_OK):
+                os.chdir(p)
+            if not fs.islink(p) or self._ent._alt is True:
                 self._xfm_lst.sort()
