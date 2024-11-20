@@ -1,5 +1,5 @@
 import os
-from typing import Callable, Optional, Sequence
+from typing import Optional, Sequence
 
 import _curses as C
 
@@ -117,7 +117,7 @@ def run_ranger(g: AppGlobals, path: str) -> None:
                 resize(g)  # <COS: term could have been resized when using nested app
             # ALT: if os.exists(cwd) and cwd != os.getcwd():
             #     os.chdir(cwd)
-        except Exception:
+        except Exception:  # pylint:disable=broad-exception-caught
             pass
 
     asyncio_primary_out(g, CE.shell_async(g.stdscr, cmdv), cb=_cb)
@@ -167,6 +167,8 @@ def _loci() -> str:
 #         and combine them as a type for root_wdg dispatch function
 #         NICE: we can type-check all dispatched "messages" with their args as actual fn calls
 # ALT: match to string, and then resolve to appropriate function
+# TODO: navigate this keymap inside #miur itself
+#   NEED: central node with list of all possible initial nodes
 _modal_default: KeyTable = {
     # C.KEY_RESIZE: resize,
     "^[": exitloop,  # <Esc>
@@ -202,7 +204,7 @@ _modal_default: KeyTable = {
     C.KEY_NPAGE: lambda g: g.root_wdg._navi.cursor_step_by(
         g.root_wdg._navi._view._wdg._viewport_height_lines // 2
     ),
-    ",": lambda g: modal_switch_to(_modal_comma, nm=","),
+    # ",": lambda g: modal_switch_to(","),
 }
 
 _modal_comma: KeyTable = {
@@ -210,16 +212,88 @@ _modal_comma: KeyTable = {
     "m": lambda g: shell_out(g, _loci()),
 }
 
+_modal: dict[str, KeyTable] = {
+    **_modal_default,
+    ",": _modal_comma,
+}
+
 
 # WKRND: using Optional as {"fwd-type" | None} isn't supported (yet)
 #   REF: https://github.com/python/mypy/issues/11582
-def modal_switch_to(m: Optional[KeyTable], nm: str = "") -> None:
+def modal_switch_to(m: str | Optional[KeyTable], nm: str = "") -> None:
     if m is None:
-        m = _modal_default
         nm = nm or "Default"
-    g_app.keytable = m
+        t = _modal
+    elif isinstance(m, str):
+        nm = nm or m
+        t = _modal[m]
+    elif isinstance(m, dict):
+        # nm = nm or m
+        t = m
+    else:
+        raise NotImplementedError()
 
     g_app.keytablename = nm
+    g_app.keytable = t
+
+
+# TODO: lazy_load
+def keytable_insert_aura_pathes() -> None:
+    ## Generate key bindings for fast directory jumping
+    fpathes = "/d/airy/airy/pathes"
+    lst = []
+    try:
+        with open(fpathes, "r", encoding="utf-8") as f:
+            lst = f.readlines()
+    except IOError as exc:
+        from .util.exchook import log_exc
+
+        log_exc(exc)
+        return
+
+    import os.path as fs
+
+    from .ui.entries import FSEntry
+
+    # FIXME: allow ".#"
+    entries = [l.partition("#")[0].strip().split(None, 1) for l in lst]
+    it = sorted(filter(lambda e: len(e) > 1, entries), key=lambda l: l[0])
+    for e in it:
+        assert len(e) in [2, 3]
+        k, fl, path = e[0], (e[1] if len(e) == 3 else None), e[-1]
+        t = _modal
+        for s in k[:-1]:
+            if s in t:
+                if not isinstance(t, dict):
+                    raise ValueError("Overlapping keybind vs keytable")
+            else:
+                t[s] = {}
+            t = t[s]
+        if not fl:
+            pass
+        elif fl == "-l":
+            lpath = os.readlink(path)
+            # NOTE: resolve only basename (relative to its dir)
+            if lpath.startswith("/"):
+                anchor = fs.realpath(fs.dirname(path))
+                relpath = fs.relpath(fs.realpath(path), anchor)
+                path = fs.join(fs.dirname(path), relpath)  # MAYBE:USE fs.abspath()
+            else:
+                path = fs.join(fs.dirname(path), lpath)
+        elif fl == "-L":
+            path = fs.realpath(path)
+        elif fl == "-m":
+            from stat import S_ISREG as isfile
+
+            files = __import__("glob").glob(path + "/**", recursive=True)
+            path = max(
+                (st.st_mtime, x) for x in files if isfile((st := os.stat(x)).st_mode)
+            )[1]
+
+        # log.info(_modal["."])
+        if k[-1] in t:
+            raise ValueError("Conflicting keybind")
+        t[k[-1]] = lambda g, v=path: g.root_wdg._navi.view_jump_to(FSEntry(v))
 
 
 def handle_input(g: AppGlobals) -> None:
@@ -232,7 +306,7 @@ def handle_input(g: AppGlobals) -> None:
     loci_override = ""
     cmd = g_app.keytable.get(wch, None)
     if cmd:
-        if (nm := cmd.__name__) == "<lambda>":
+        if (nm := getattr(cmd, "__name__", "")) == "<lambda>":
             lns, lnum = __import__("inspect").getsourcelines(cmd)
             mod = __import__("inspect").getmodule(cmd).__name__.partition(".")[2]
             loci_override = f"*{mod}:{lnum}"
@@ -246,7 +320,22 @@ def handle_input(g: AppGlobals) -> None:
     log.at(LogLevel.WARNING, repr(wch) + comment, loci=loci_override)
     # print(repr(wch))
     # import sys; sys.stdout.write(repr(wch))
-    if cmd:
+    if not cmd:
+        if g_app.keytable is not _modal:
+            modal_switch_to(None)
+            g.root_wdg.redraw(g.stdscr)
+            g.stdscr.refresh()
+    elif isinstance(cmd, dict):
+        # modal_switch_to(wch)
+        if g_app.keytable == _modal:
+            g_app.keytablename = str(wch)
+        else:
+            g_app.keytablename += " " + str(wch)
+        g_app.keytable = cmd
+        g.root_wdg.redraw(g.stdscr)
+        g.stdscr.refresh()
+    elif callable(cmd):
+        modal_switch_to(None)
         # TEMP: don't exit !miur when developing in REPL
         if g.opts.ipykernel:
             try:
@@ -263,7 +352,5 @@ def handle_input(g: AppGlobals) -> None:
         #   BUT: uix needs visual feedback on each keypress, so it's better to always redraw
         g.root_wdg.redraw(g.stdscr)
         g.stdscr.refresh()
-    elif g_app.keytable is not _modal_default:
-        modal_switch_to(None)
-        g.root_wdg.redraw(g.stdscr)
-        g.stdscr.refresh()
+    else:
+        raise NotImplementedError()

@@ -55,7 +55,7 @@ class AppCursesUI:
     handle_input: "Callable[[], None]"
 
 
-KeyTable: "TypeAlias" = "dict[str | int, Callable[[AppGlobals], None]]"
+KeyTable: "TypeAlias" = "dict[str | int, Callable[[AppGlobals], None] | KeyTable]"
 
 
 # FUT:RENAME? c = g_ctx = AppContext() | ns = AppNamespace()

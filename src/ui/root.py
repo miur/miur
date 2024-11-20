@@ -93,7 +93,7 @@ class RootWidget:
 
         from ..app import g_app
 
-        modal = "[" + g_app.keytablename.upper() + "]"
+        modal = "[" + g_app.keytablename + "]"
 
         # HACK:PERF: skip the check if you haven't even loaded jupyter plugin into !miur
         if __package__.partition(".")[0] + ".util.jupyter" in __import__("sys").modules:

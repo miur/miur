@@ -99,7 +99,8 @@ def log_exc(value: "BaseException") -> "Any":
                     # sep = ">"  # "\n"
                     if ctx := t.locals:
                         sfx = "".join(
-                            f"\n\t{k} = {_ct}{v}{_r}" for k, v in sorted(ctx.items())
+                            f"\n\t{k} = {_ct}{v:.40s}{_r}"
+                            for k, v in sorted(ctx.items())
                         )
                 l = t._line.rstrip()  # pylint:disable=protected-access
                 indent = l[: len(l) - len(l.lstrip())]
