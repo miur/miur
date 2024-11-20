@@ -34,13 +34,15 @@ alias miur.prof="python -SIB -m cProfile -s cumulative -- '$app'"
 ## alias mi-='miur-'
 
 alias m='miur'
+alias m-='mi-'
 alias ma='miur -a'
-alias ml='tail -F /t/miur.log'
+alias mb='miur --bare'
+alias mj='miur -a -I'  # auto-connected to -K
 alias mk='miur -a -K --logredir /t/miur.log'
-alias mI='miur -aI'
+alias ml='tail -F /t/miur.log'
 
 if [[ ${ZSH_NAME:+zsh} ]]; then
-    alias -g M='|miur -a'
+    alias -g M='|miur'
 fi
 
 

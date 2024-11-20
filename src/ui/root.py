@@ -1,9 +1,9 @@
 import _curses as C
 
-from ..app import g_app
 from ..curses_ext import g_style as S
-from ..util.logger import log
-from .entity_base import Representable
+
+# from ..util.logger import log
+from .entity_base import Golden
 from .entries import ErrorEntry
 from .navi import NaviWidget
 
@@ -13,10 +13,10 @@ class RootWidget:
     _ww: int
 
     # USE? {RootWidget(HaltEntry("NOTHING"))} for a "default" ctor
-    def __init__(self, ent: Representable) -> None:
+    def __init__(self, ent: Golden) -> None:
         self.set_entity(ent)
 
-    def set_entity(self, ent: Representable) -> None:
+    def set_entity(self, ent: Golden) -> None:
         # FUT: may create different widgets based on `Entity and `Policy
         self._navi = NaviWidget(ent)
 
@@ -90,7 +90,18 @@ class RootWidget:
         footer = f"--- {ci:2d}/{sz} | by={sortby}{"￪" if sortrev else "￬"}"
         ## DEBUG:NEED:(__main__.py): -X tracemalloc
         # footer += f"  --- {{RAM={__import__("tracemalloc").get_traced_memory()[0]//1024:,}kB}}"
-        modal = "[" + g_app.curses_ui.modal.upper() + "]"
+
+        from ..app import g_app
+
+        modal = "[" + g_app.keytablename.upper() + "]"
+
+        # HACK:PERF: skip the check if you haven't even loaded jupyter plugin into !miur
+        if __package__.partition(".")[0] + ".util.jupyter" in __import__("sys").modules:
+            from ..util.jupyter import g_running_ipykernel
+
+            pfx = "+" if g_running_ipykernel else "-"
+            modal = f"({pfx}jupyter) {modal}"
+
         if (spacerlen := self._ww - len(footer) - len(modal) - 1) > 0:
             footer += " " * spacerlen + modal
         stdscr.addnstr(self._wh - 1, 0, footer, self._ww, S.footer)

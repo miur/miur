@@ -1,10 +1,10 @@
 from typing import Protocol, Sequence
 
-from .entity_base import Representable
+from .entity_base import Golden, Representable
 
 
 class SatelliteViewport_DataProtocol(Protocol):
-    _lst: Sequence[Representable]
+    _lst: Sequence[Golden]
     _viewport_followeditem_lstindex: int
     _viewport_followeditem_linesfromtop: int
     _viewport_origin_yx: tuple[int, int]
@@ -26,7 +26,7 @@ class SatelliteViewport_DataProtocol(Protocol):
 # pylint:disable=too-many-instance-attributes
 class SatelliteViewportBase(SatelliteViewport_DataProtocol):
     def __init__(self) -> None:
-        self._lst: Sequence[Representable]
+        self._lst: Sequence[Golden]
         # ARCH:
         #  * when "viewport follows cursor", then followeditem==item_under_cursor,
         #    with offset being the same as for cursor itself
@@ -48,7 +48,7 @@ class SatelliteViewportBase(SatelliteViewport_DataProtocol):
     # ARCH: when we have multiple cursors "focused_item" is the item under currently active cursor
     #    MAYBE:THINK: use .subfocus(canvas_line/word) to apply actions to specific auxinfo of focused item
     @property
-    def focused_item(self) -> Representable:
+    def focused_item(self) -> Golden:
         # MAYBE:XLR: point cursor to folder/_ent itself
         #   + makes cursor always deterministic
         #   + allows you the subset of operations, like adding new files to the folder
@@ -72,7 +72,7 @@ class SatelliteViewportBase(SatelliteViewport_DataProtocol):
             self._viewport_followeditem_linesfromtop = int(vh * ratio)
 
     # CASE:(lightweight): to be able to re-assign ~same list after external xfm, e.g. after "order-by"
-    def assign(self, lst: Sequence[Representable], hint_idx: int | None = None) -> None:
+    def assign(self, lst: Sequence[Golden], hint_idx: int | None = None) -> None:
         pidx = self._cursor_item_lstindex if hint_idx is None else hint_idx
         focused = self._lst[pidx] if getattr(self, "_lst", None) else None
         # WARN: whole function should be atomic
@@ -85,7 +85,7 @@ class SatelliteViewportBase(SatelliteViewport_DataProtocol):
         ## DISABLED: we always keep the previous position of cursor on the screen
         #   self._viewport_followeditem_linesfromtop = 0
 
-    def _reindex(self, pidx: int, focused: Representable | None) -> int:
+    def _reindex(self, pidx: int, focused: Golden | None) -> int:
         # NOTE: keep cursor on same item::
         #   * if any items were inserted/deleted before idx
         #   * if "order-by" have changed its item's idx in _lst

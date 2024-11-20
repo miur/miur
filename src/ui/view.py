@@ -2,7 +2,7 @@ import os
 import os.path as fs
 from typing import Callable, Self, Sequence
 
-from .entity_base import Representable
+from .entity_base import Golden
 from .entries import FSEntry
 from .vlst import SatelliteViewport
 
@@ -13,13 +13,13 @@ from .vlst import SatelliteViewport
 
 # ALT:SPLIT: make an `EntityContext for serialization/restoration on restart
 class EntityView:
-    _ent: Representable
+    _ent: Golden
     _originator: Self | None
     _wdg: SatelliteViewport
-    _act: Callable[[], Sequence[Representable]]
-    # _lstpxy: ListCachingProxy[Representable]
-    _orig_lst: Sequence[Representable]
-    _xfm_lst: list[Representable]
+    _act: Callable[[], Sequence[Golden]]
+    # _lstpxy: ListCachingProxy[Golden]
+    _orig_lst: Sequence[Golden]
+    _xfm_lst: list[Golden]
     # TBD: _overlay/_aug_lst -- to inject on-the-fly or from db
     #   NICE:IDEA: show those entries as expanded subtree on node parent level
     #     inof as regular entries inside node itself
@@ -27,7 +27,7 @@ class EntityView:
     # ALT:BAD?PERF: store in each TextEntity a backref to "originator"
     #   == to be able to return to its "parent"
     #   NICE: only "navigated-to" items will store this backref
-    def __init__(self, ent: Representable, originator: Self | None = None) -> None:
+    def __init__(self, ent: Golden, originator: Self | None = None) -> None:
         self._ent = ent
         # NOTE: remember which `View have created this one -- tba to return back
         self._originator = originator

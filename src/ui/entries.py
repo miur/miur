@@ -2,8 +2,8 @@ import os
 import os.path as fs
 from typing import Iterable, override
 
-from ..util.logger import log
-from .entity_base import Golden, Representable
+# from ..util.logger import log
+from .entity_base import Golden
 
 
 # class ErrorEntry(HaltEntry(Atomic))
@@ -23,7 +23,7 @@ class ErrorEntry(Golden):
         return "".join(self._orig) if self._orig else "∅ " + repr(self)
 
     @override
-    def explore(self) -> Iterable[Representable]:
+    def explore(self) -> Iterable[Golden]:
         raise NotImplementedError(self._msg)
 
 
@@ -45,7 +45,7 @@ class TextEntry(Golden):
         return "".join(self._at) if self._at else "∅ " + repr(self)
 
     @override
-    def explore(self) -> Iterable[Representable]:
+    def explore(self) -> Iterable[Golden]:
         from re import finditer
 
         cls = type(self)
@@ -96,7 +96,7 @@ class FSEntry(Golden):
 
     # i.e. =InterpretUnchangedDirListingPropertyAsFSEntriesInUsualWay
     @override
-    def explore(self) -> Iterable[Representable]:
+    def explore(self) -> Iterable[Golden]:
         p = self._x
         if not fs.lexists(p):
             return [ErrorEntry("FILE NOT FOUND", loci=(p,))]

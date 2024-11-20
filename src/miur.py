@@ -28,8 +28,6 @@ def miur_main(g: AppGlobals) -> None:
         # BAD: log is too early to be redirected by stdlog_redir()
         log.verbose(f"{pid=}")
         do(log_excepthook())
-        if tmp := g.opts.choosedir:
-            do(save_choosedir(tmp))
 
         # MOVE? as early as possible
         do(iomgr.stdlog_redir(g))
@@ -53,6 +51,9 @@ def miur_main(g: AppGlobals) -> None:
             xpath = "/d/airy"
         g.root_wdg = RootWidget(FSEntry(xpath))
         # g.root_wdg.set_entity(FSEntry("/etc/udev"))
+
+        if tmp := g.opts.choosedir:
+            do(save_choosedir(tmp))
 
         if g.opts.bare:  # NOTE: much faster startup w/o asyncio machinery
             from .curses_cmds import g_input_handlers

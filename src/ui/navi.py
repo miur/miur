@@ -3,7 +3,7 @@ import os.path as fs
 import _curses as C
 
 from ..util.logger import log
-from .entity_base import Representable
+from .entity_base import Golden, Representable
 from .entries import ErrorEntry, FSEntry
 from .view import EntityView
 
@@ -12,7 +12,7 @@ from .view import EntityView
 class NaviWidget:
     _view: EntityView
 
-    def __init__(self, ent: Representable) -> None:
+    def __init__(self, ent: Golden) -> None:
         # NOTE: we create a separate `SatelliteViewport per each `Entity assigned
         #   NICE: preserve "pos,vh,margin" as-is, and then reinterpret/resize only when going back
         #   ++ NICE: preserve the *generated* items as-is in the "_wdg._lst"

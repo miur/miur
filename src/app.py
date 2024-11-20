@@ -3,9 +3,11 @@
 if globals().get("TYPE_CHECKING"):
     from io import StringIO
     from types import ModuleType
-    from typing import Any, Callable, Optional, TextIO, Union
+    from typing import Callable, Optional, TextIO, TypeAlias, Union
 
     import _curses as C
+
+    from .ui.root import RootWidget
 
 
 # BET: don't reassing cmdline opts -- treat them as Final, and SEP from active "AppState"
@@ -51,7 +53,9 @@ class AppIO:
 class AppCursesUI:
     resize: "Callable[[], None]"
     handle_input: "Callable[[], None]"
-    modal: str
+
+
+KeyTable: "TypeAlias" = "dict[str | int, Callable[[AppGlobals], None]]"
 
 
 # FUT:RENAME? c = g_ctx = AppContext() | ns = AppNamespace()
@@ -63,7 +67,9 @@ class AppGlobals:
     io = AppIO()
     opts = AppOptions()
     curses_ui: AppCursesUI
-    root_wdg: "Any"  # Root/FM/ListWidget
+    root_wdg: "RootWidget"  # Root/FM/ListWidget
+    keytable: KeyTable
+    keytablename: str
 
 
 g_app = AppGlobals()

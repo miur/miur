@@ -125,7 +125,9 @@ def log_exc(value: "BaseException") -> "Any":
                 err += "".join(NL + "  \\ " + note for note in due.__notes__)
             log.error(err)
 
-            due = due.__cause__
+            due = due.__cause__ or due.__context__
+            if due:
+                log.warning(":Chained-From:")  # TEMP
 
         ## ALSO:MAYBE:
         # _orig_excepthook(etype, value, tb)  # OR: sys.__excepthook__(...)

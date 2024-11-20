@@ -1,6 +1,6 @@
 import os
 import sys
-from typing import TYPE_CHECKING, Any, Final
+from typing import Any, Awaitable, Final
 
 from .logger import log
 
@@ -85,7 +85,8 @@ def inject_ipykernel_into_asyncio(myloop: Any, myns: dict[str, Any]) -> None:
     ns["kapp"] = kapp
     ns.update(myns)
 
-    # FIXED: no color in shell_out due to overwritten TERM by IPKernelApp<ZMQInteractiveShell>.init_environment()
+    ## FIXED: no color in shell_out due to overwritten TERM by
+    ##     IPKernelApp<ZMQInteractiveShell>.init_environment()
     #   from ..app import g_app
     #   print(os.environ["TERM"], file=g_app.io.ttyalt)
     os.environ.update(_penv)
@@ -97,12 +98,7 @@ def inject_ipykernel_into_asyncio(myloop: Any, myns: dict[str, Any]) -> None:
     g_running_ipykernel = True
 
 
-if TYPE_CHECKING:
-    from collections.abc import Coroutine
-    from typing import Optional
-
-
-def ipyconsole_async(shutdown: bool = False) -> "Coroutine[Any, Any, Any]":
+def ipyconsole_async(shutdown: bool = False) -> Awaitable[None]:
     global g_running_ipyconsole  # pylint:disable=global-statement
     if g_running_ipyconsole:
         # log.warning("ipyconsole is already running! ignored")
@@ -118,11 +114,11 @@ def ipyconsole_async(shutdown: bool = False) -> "Coroutine[Any, Any, Any]":
     console.existing = CONNECTION_FILE
     console.initialize([])  # CASE: .load_config_file()
     # pylint:disable=protected-access
-    coro = console.shell._main_task()  # = app.start()
+    coro: Awaitable[None] = console.shell._main_task()  # = app.start()
     if shutdown:
         console.shell.client.shutdown()
     g_running_ipyconsole = console
-    return cast(coro, "Coroutine[Any, Any, Any]")
+    return coro
 
 
 def jupyter_client() -> None:
@@ -131,7 +127,7 @@ def jupyter_client() -> None:
     # from jupyter_client.asynchronous.client import AsyncKernelClient
     from jupyter_client.client import KernelClient
 
-    with open("confs/c1.json", "r") as f:
+    with open("confs/c1.json", "r", encoding="utf-8") as f:
         data = json.load(f)
     shell_port = data["shell_port"]
     iopub_port = data["iopub_port"]
@@ -151,7 +147,7 @@ def jupyter_client() -> None:
     code = """import os
     current_dir = os.getcwd()
     print("Current working directory:", current_dir)"""
-    msg_id = kc.execute(code)
+    _msg_id = kc.execute(code)
 
     # OR:BET: jupyter-run = jupyter_client.runapp:RunApp.launch_instance
     # kc.shutdown(code)

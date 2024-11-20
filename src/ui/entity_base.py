@@ -30,7 +30,7 @@ class Addressable(Protocol):
 #    ALT:BET? remove the method itself and use getattr() to verify its presence
 # RENAME? .browse()
 class Explorable(Protocol):
-    def explore(self) -> Iterable[Representable]: ...
+    def explore(self) -> "Iterable[Golden]": ...
 
 
 class Atomic(Addressable, Representable, Protocol):

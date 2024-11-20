@@ -29,8 +29,8 @@ class SatelliteViewport_StepbyMixin:
     # TODO:OPT: always step by whole item ~~ should be the same as "step_by(+/-inf)"
     # pylint:disable=too-many-statements,too-many-branches,too-many-locals
     def step_by(self: SatelliteViewport_DataProtocol, steps: int) -> None:
-        if steps not in (-1, 1):
-            raise NotImplementedError("DECI:WiP")
+        # if steps not in (-1, 1):
+        #     raise NotImplementedError("DECI:WiP")
 
         if not self._lst:
             log.trace("EMPTY")

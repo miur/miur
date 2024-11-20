@@ -1,12 +1,12 @@
 import os
-from typing import Callable, Sequence, TypeAlias
+from typing import Callable, Optional, Sequence
 
 import _curses as C
 
 from . import curses_ext as CE
-from .app import AppGlobals
+from .app import AppGlobals, KeyTable, g_app
 from .loop_asyncio import asyncio_primary_out
-from .util.logger import log
+from .util.logger import LogLevel, log
 
 # def raise_(exc: BaseException) -> None:
 #     raise exc
@@ -132,6 +132,13 @@ def ipykernel_start(g: AppGlobals) -> None:
     inject_ipykernel_into_asyncio(loop, myns)
 
 
+def redirect_logs(g: AppGlobals) -> None:
+    from .iomgr import init_explicit_io
+
+    g.opts.logredir = "/t/miur.log"
+    init_explicit_io(g)
+
+
 def ipyconsole_out(g: AppGlobals) -> None:
     async def _ipy_async() -> None:
         from .util.jupyter import ipyconsole_async
@@ -146,13 +153,10 @@ def ipython_out(g: AppGlobals) -> None:
     CE.ipython_out(g.stdscr)
 
 
-def _loci(g: AppGlobals) -> str:
+def _loci() -> str:
     # pylint:disable=protected-access
-    return g.root_wdg._navi._view._wdg.focused_item.loci
+    return g_app.root_wdg._navi._view._wdg.focused_item.loci
 
-
-_KeyMap: TypeAlias = dict[str | int, Callable[[AppGlobals], None]]
-g_input_handlers: _KeyMap
 
 # ALT:BET: allow direct access to contained _objects methods ?
 #   i.e. remove "_" private prefix from *._navi._view.*
@@ -163,20 +167,21 @@ g_input_handlers: _KeyMap
 #         and combine them as a type for root_wdg dispatch function
 #         NICE: we can type-check all dispatched "messages" with their args as actual fn calls
 # ALT: match to string, and then resolve to appropriate function
-_modal_default: _KeyMap = {
+_modal_default: KeyTable = {
     # C.KEY_RESIZE: resize,
     "^[": exitloop,  # <Esc>
     "q": exitloop,
     # "s": shell_out,  # CE.shell_out
-    "s": lambda g: shell_out(g, _loci(g)),
+    "s": lambda g: shell_out(g, _loci()),
     # "a": shell_out_prompt,
-    "S": lambda g: shell_out_prompt(g, _loci(g)),
-    # "o": run_quickfix,
-    "E": run_quickfix,
-    "e": lambda g: run_editor(g, _loci(g)),
-    "r": lambda g: run_ranger(g, _loci(g)),
+    "S": lambda g: shell_out_prompt(g, _loci()),
+    # "o": lambda g: run_quickfix(g, _loci()),
+    "E": lambda g: run_quickfix(g, _loci()),
+    "e": lambda g: run_editor(g, _loci()),
+    "r": lambda g: run_ranger(g, _loci()),
     # "R": lambda g: run_ranger(g, g.root_wdg._navi._view._ent.loci),
     "K": ipykernel_start,
+    "L": redirect_logs,
     "I": ipyconsole_out,
     "^I": ipython_out,  # <Tab>
     "^J": run_editor,  # <CR>
@@ -189,24 +194,32 @@ _modal_default: _KeyMap = {
     "G": lambda g: g.root_wdg._navi.cursor_jump_to(-1),
     "h": lambda g: g.root_wdg.view_go_back(),
     "l": lambda g: g.root_wdg.view_go_into(),
+    C.KEY_HOME: lambda g: g.root_wdg._navi.cursor_jump_to(0),
+    C.KEY_END: lambda g: g.root_wdg._navi.cursor_jump_to(-1),
+    C.KEY_PPAGE: lambda g: g.root_wdg._navi.cursor_step_by(
+        -g.root_wdg._navi._view._wdg._viewport_height_lines // 2
+    ),
+    C.KEY_NPAGE: lambda g: g.root_wdg._navi.cursor_step_by(
+        g.root_wdg._navi._view._wdg._viewport_height_lines // 2
+    ),
     ",": lambda g: modal_switch_to(_modal_comma, nm=","),
 }
 
-_modal_comma: _KeyMap = {
-    "s": lambda g: shell_out(g, _loci(g)),
-    "m": lambda g: shell_out(g, _loci(g)),
+_modal_comma: KeyTable = {
+    "s": lambda g: shell_out(g, _loci()),
+    "m": lambda g: shell_out(g, _loci()),
 }
 
 
-def modal_switch_to(m: _KeyMap | None, nm: str = "") -> None:
+# WKRND: using Optional as {"fwd-type" | None} isn't supported (yet)
+#   REF: https://github.com/python/mypy/issues/11582
+def modal_switch_to(m: Optional[KeyTable], nm: str = "") -> None:
     if m is None:
         m = _modal_default
         nm = nm or "Default"
-    global g_input_handlers
-    g_input_handlers = m
-    from .app import g_app
+    g_app.keytable = m
 
-    g_app.curses_ui.modal = nm
+    g_app.keytablename = nm
 
 
 def handle_input(g: AppGlobals) -> None:
@@ -216,16 +229,21 @@ def handle_input(g: AppGlobals) -> None:
 
     # IDEA: partially restore TTY to preserve NLs in unexpected exc/backtrace
     #  C.nocbreak() ... C.cbreak()
-    cmd = g_input_handlers.get(wch, None)
+    loci_override = ""
+    cmd = g_app.keytable.get(wch, None)
     if cmd:
         if (nm := cmd.__name__) == "<lambda>":
-            srcbody = __import__("inspect").getsource(cmd).partition("lambda")[2]
+            lns, lnum = __import__("inspect").getsourcelines(cmd)
+            mod = __import__("inspect").getmodule(cmd).__name__.partition(".")[2]
+            loci_override = f"*{mod}:{lnum}"
+            srcbody = ";".join(lns).partition("lambda")[2]
             comment = " : " + srcbody.partition(":")[2].strip(" ,\n")
+            # + f"  // :{lnum}"
         else:
             comment = f" ({nm})"
     else:
         comment = ""
-    log.warning(repr(wch) + comment)
+    log.at(LogLevel.WARNING, repr(wch) + comment, loci=loci_override)
     # print(repr(wch))
     # import sys; sys.stdout.write(repr(wch))
     if cmd:
@@ -245,7 +263,7 @@ def handle_input(g: AppGlobals) -> None:
         #   BUT: uix needs visual feedback on each keypress, so it's better to always redraw
         g.root_wdg.redraw(g.stdscr)
         g.stdscr.refresh()
-    elif g_input_handlers is not _modal_default:
+    elif g_app.keytable is not _modal_default:
         modal_switch_to(None)
         g.root_wdg.redraw(g.stdscr)
         g.stdscr.refresh()
