@@ -163,7 +163,8 @@ class SatelliteViewport_StepbyMixin:
             idx += steps
             if idx > last:
                 remainder = idx - last
-                advance = int(remainder * step_incr)
+                # BAD:(1): no gradual gravitation: still moves by jumping over whole empty_space
+                advance = 1  # int(remainder * step_incr)
                 idx = last
 
             if idx == last:
@@ -171,7 +172,7 @@ class SatelliteViewport_StepbyMixin:
                 # BAD! should also apply to above branch {pos==bot}
                 #   ~~ BUT: may occur only if "RND:(invariant): cursor should be on margin" was broken
                 # RENAME? visible_{part,below,range,room}/preview_{span,window}
-                visible_room = vh - pos
+                visible_room = vh - pos - 1
                 hidden_part = ih - visible_room
                 if hidden_part > 0:
                     # NOTE:(zoom-out): move vp away to make room for the last item to be visible on screen
@@ -199,9 +200,9 @@ class SatelliteViewport_StepbyMixin:
                         knock, residue = divmod(advance - empty_space, step_incr)
                         if residue > 0:
                             knock += 1
-                        pos += empty_space
+                        pos += min(empty_space, advance)
                     else:
-                        pos += advance
+                        pos += min(empty_space, advance)
                         assert pos + ih <= bot
                 else:
                     raise ValueError("unexpected")

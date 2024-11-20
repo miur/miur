@@ -17,7 +17,7 @@ class AppOptions:
     PROFILE_STARTUP = False  # =DEBUG
     devroot: str | None = None
     ####
-    bare: bool = True
+    bare: bool = False
     devinstall: bool = False
     ipykernel: bool = False
     ipyconsole: bool | None = None

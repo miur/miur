@@ -3,6 +3,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, override
 
 from . import _pkg
+from .app import AppOptions, g_app
 from .util.logger import LogLevel, log
 
 if TYPE_CHECKING:
@@ -50,14 +51,14 @@ class LogLevelCvt(Action):
         setattr(ns, self.dest, m)
 
 
-def cli_spec(parser: ArgumentParser) -> ArgumentParser:
+def cli_spec(parser: ArgumentParser, *, dfl: AppOptions) -> ArgumentParser:
     o = parser.add_argument
     o("xpath", nargs="?")
     o("-v", "--version", action="version", version=_pkg.__version__)
     _sigset = "HUP INT KILL USR1 USR2 TERM CONT STOP WINCH".split()
     o("-s", "--signal", choices=_sigset, action=SigAction)
-    o("-a", "--asyncio", dest="bare", action="store_false")
-    o("-b", "--bare", action="store_true")
+    o("-a", "--asyncio", dest="bare", default=dfl.bare, action="store_false")
+    o("-b", "--bare", default=dfl.bare, action="store_true")
     o("-D", "--devinstall", action="store_true")
     o("-K", "--ipykernel", default=False, action="store_true")
     o("-I", "--ipyconsole", default=None, action="store_false")
@@ -80,13 +81,11 @@ def miur_argparse(argv: list[str]) -> None:
     #    os re sys tokenize token types functools builtins keyword operator collections
     from inspect import get_annotations
 
-    from .app import g_app
-
     # MAYBE:TODO: different actions based on appname=argv[0]
 
-    _ap = ArgumentParser(prog=_pkg.__appname__, description=_pkg.__doc__)
-    _ns = cli_spec(_ap).parse_args(argv[1:])
     o = g_app.opts
+    _ap = ArgumentParser(prog=_pkg.__appname__, description=_pkg.__doc__)
+    _ns = cli_spec(_ap, dfl=o).parse_args(argv[1:])
     anno = get_annotations(type(o))
     loci = o.__class__.__qualname__
     for k, v in _ns.__dict__.items():

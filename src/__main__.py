@@ -47,7 +47,9 @@ def select_entrypoint(devroot: str):  # type:ignore[no-untyped-def]
     o.devroot = devroot
 
     # BAD: log is too early to be redirected by stdlog_redir()
-    venv_path = f"{p} ; {b}" if (p := sys.prefix) != (b := sys.base_prefix) else "---"
+    venv_path = p if (p := sys.prefix) != sys.base_prefix else "---"
+    if (b := sys.base_prefix) != "/usr":
+        venv_path += " ; " + b
     log.verbose(f"(.venv): {venv_path}")
     log.verbose(f"<$ {' '.join(repr(a) if ' ' in a else a for a in get_py_args())}")
     if o.PROFILE_STARTUP:

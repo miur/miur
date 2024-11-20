@@ -61,7 +61,10 @@ def miur_main(g: AppGlobals) -> None:
             def _shell_out(g: AppGlobals) -> None:
                 CE.shell_out(g.stdscr)
 
+            ## FAIL: fixes shell only in _modal_defaults, but not _modal_comma
+            ##   >> THINK: better way to overcome it, e.g. replace API itself
             g_input_handlers["s"] = _shell_out
+
             return mainloop_selectors(g)
 
         from .loop_asyncio import mainloop_asyncio, my_asyncio_loop
