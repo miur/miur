@@ -31,6 +31,7 @@ def miur_main(g: AppGlobals) -> None:
 
         # MOVE? as early as possible
         do(iomgr.stdlog_redir(g))
+        log.sep()
         g.stdscr = do(CE.curses_stdscr())
 
         # raise RuntimeError()
@@ -118,7 +119,6 @@ def _live() -> None:
 
     stdscr = g.stdscr
 
-    # ALT: $ jupyter console --existing miur-ipython.json
     # pylint:disable=used-before-assignment
     stdscr.addstr(4, 1, "hello")
     stdscr.refresh()

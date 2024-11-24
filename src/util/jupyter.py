@@ -98,6 +98,7 @@ def inject_ipykernel_into_asyncio(myloop: Any, myns: dict[str, Any]) -> None:
     g_running_ipykernel = True
 
 
+# ALT:ONELINE: $ jupyter console --existing miur-ipython.json
 def ipyconsole_async(shutdown: bool = False) -> Awaitable[None]:
     global g_running_ipyconsole  # pylint:disable=global-statement
     if g_running_ipyconsole:

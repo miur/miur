@@ -166,8 +166,13 @@ def shell_out(
         return run(cmdv, env=envp, check=False, text=True)
 
 
-async def shell_async(stdscr: C.window, cmdv: Sequence[str] = (), **envkw: str) -> int:
-    interactive = False
+async def shell_async(
+    stdscr: C.window,
+    cmdv: Sequence[str] = (),
+    input: str | None = None,
+    interactive: bool = False,
+    **envkw: str,
+) -> int:
     if not cmdv:
         cmdv = (os.environ.get("SHELL", "sh"),)
         interactive = True
@@ -177,20 +182,42 @@ async def shell_async(stdscr: C.window, cmdv: Sequence[str] = (), **envkw: str) 
     #    or embed small curses popups directly around cursor
     with curses_altscreen(stdscr):
         import asyncio
+        import subprocess
 
         from .app import g_app as g
+        from .util.logger import log
+
+        log.trace(f"Running: {"" if input is None else "...| "}{cmdv}")
 
         # SRC: https://docs.python.org/3/library/asyncio-subprocess.html#examples
         proc = await asyncio.create_subprocess_exec(
             *cmdv,
             env=envp,
-            stdin=g.io.ttyin,
+            stdin=g.io.ttyin if input is None else subprocess.PIPE,
             stdout=g.io.ttyout,
-            stderr=(g.io.pipeerr or g.io.ttyout),
+            # FIXED:WTF: !nvim freezes up if stderr=g.io.ttyout
+            stderr=(g.io.pipeerr if interactive else (g.io.pipeerr or g.io.ttyout)),
         )
-        rc = await proc.wait()
+        if input is None:
+            rc = await proc.wait()
+        else:
+            # BET?CHG: popen
+            # io - A non-blocking read on a subprocess.PIPE in Python - Stack Overflow ⌇⡧⠾⣪⢇
+            #   https://stackoverflow.com/questions/375427/a-non-blocking-read-on-a-subprocess-pipe-in-python
+            # Python asyncio subprocess write stdin and read stdout/stderr continuously - Stack Overflow ⌇⡧⡁⡩⠠
+            #   https://stackoverflow.com/questions/57730010/python-asyncio-subprocess-write-stdin-and-read-stdout-stderr-continuously
+            (_out, _err) = await proc.communicate(input=input.encode("utf-8"))
+            rc = proc.returncode
+            # ALT:(manually): only for single pipe, otherwise deadblocks
+            # try:
+            #     proc.stdin.write(input.encode("utf-8"))
+            #     await proc.stdin.drain()
+            # except (BrokenPipeError, ConnectionResetError) as _exc:
+            #     pass
+            # proc.stdin.close()
+            # rc = await proc.wait()
         if rc:
-            from .util.logger import log
+            # from .util.logger import log
 
             msg = f"{rc=} <- {cmdv} {proc}"
             log.error(msg)

@@ -19,7 +19,7 @@ class LogLevel(enum.IntEnum):
     ERROR = 50
     WARNING = 40
     INFO = 30  # +NOTICE | SUCCESS = 25
-    # DEBUG = 25
+    DEBUG = 25
     # OPTIONAL = 20
     VERBOSE = 15  # DETAILED = 10
     TRACE = 10  # OR? =KPI  // :PERF: latency/cpu/memory
@@ -37,7 +37,7 @@ TERMSTYLE: Final = {
     LogLevel.INFO: "\033[m",  # dfl-on-dfl (none)
     # LogLevel.SUCCESS|TRACE: "\033[32m",  # green
     # LogLevel.NOTICE: "\033[34m",  # blue
-    # LogLevel.DEBUG: "\033[95m",  # purple
+    LogLevel.DEBUG: "\033[95m",  # purple
     LogLevel.VERBOSE: "\033[36m",  # cyan
     LogLevel.TRACE: "\033[36m",  # cyan
     # LogLevel.DETAILED: "\033[93m",  # grey
@@ -60,6 +60,13 @@ class _LoggerOpts(TypedDict, total=False):
 class Logger:  # pylint:disable=too-many-instance-attributes
     __slots__ = """minlevel stackframe termcolor write at
         _initts _pts _counter _pms _fnmlen _pcpu at""".split()
+
+    ## RND:HACK: reassign levels to class itself to avoid importing unnecessary keyword
+    #   ALT:FAIL: to use 'setattr()' _after_ class def we need to add all short names to __slots__
+    #   ALT: inherit Logger from LogLevel
+    # USAGE: log.at(log.E, ...)
+    for l in LogLevel:
+        vars()[l.name[0]] = l
 
     def __init__(self) -> None:
         # HACK: approximate ps creation time (w/o IO delays)
@@ -140,6 +147,9 @@ class Logger:  # pylint:disable=too-many-instance-attributes
     def info(self, fmt: _Loggable, /) -> None:
         self.at(LogLevel.INFO, fmt)
 
+    def debug(self, fmt: _Loggable, /) -> None:
+        self.at(LogLevel.DEBUG, fmt)
+
     def verbose(self, fmt: _Loggable, /) -> None:
         self.at(LogLevel.VERBOSE, fmt)
 
@@ -151,7 +161,7 @@ class Logger:  # pylint:disable=too-many-instance-attributes
         line = "\n----- " + time.strftime("[%Y%m%d_%H%M%S] -----", time.localtime())
         if fmt:
             line += " " + str(fmt)
-        self.at(LogLevel.TRACE, line)
+        self.at(LogLevel.DEBUG, line)
 
     def kpi(self, fmt: _Loggable, /) -> None:
         ## PERF: to run startup 100 times and calc average
@@ -172,6 +182,15 @@ class Logger:  # pylint:disable=too-many-instance-attributes
         # ms = (time.monotonic() - self._initts) * 1000
         # self.at(LogLevel.TRACE, f"KPI({ms=:.3f} {cpu=:.3f}) {fmt}")
 
+    @property
+    def ts(self) -> float:
+        ts = time.monotonic()
+        relts = ts - self._initts
+        # dts = ts - self._pts
+        # self._pts = ts
+        # self._counter += 1
+        return relts
+
     def _format(self, lvl: LogLevel, fmt: _Loggable, loci: str, /) -> str:
         if isinstance(fmt, str):
             body = fmt
@@ -179,11 +198,6 @@ class Logger:  # pylint:disable=too-many-instance-attributes
             body = fmt()
         else:
             body = str(fmt)
-        ts = time.monotonic()
-        relts = ts - self._initts
-        # dts = ts - self._pts
-        # self._pts = ts
-        # self._counter += 1
 
         ## EXPL: assignment is only feasible for several first lines (and outliers)
         ##   >> majority of times access to the VAR is solely read-only
@@ -198,7 +212,7 @@ class Logger:  # pylint:disable=too-many-instance-attributes
         else:
             _c = _b = _r = ""
         # ADD? "#{self._counter:03d} {dts:+6.3f} ..."
-        return f"{relts:8.3f}  {_c}{lvl.name[0]}{_b}{f'[{loci}]':<{self._fnmlen+2}s} {_c}{body}{_r}\n"
+        return f"{self.ts:8.3f}  {_c}{lvl.name[0]}{_b}{f'[{loci}]':<{self._fnmlen+2}s} {_c}{body}{_r}\n"
 
 
 log = Logger()

@@ -89,7 +89,7 @@ class NaviWidget:
 
     def view_go_back(self) -> None:
         # pylint:disable=protected-access
-        pwdg = self._view._wdg
+        pview = self._view
         if self._history_idx > 0:
             self._history_idx -= 1
             self._view = self._history_stack[self._history_idx]
@@ -100,13 +100,24 @@ class NaviWidget:
             self._view = EntityView(parent_ent)  # , hint_idx=0)
             self._history_stack = [self._view]
             self._history_idx = len(self._history_stack) - 1
+            # NOTE: set cursor onto entity you came back from
+            for i, e in enumerate(self._view._wdg._lst):
+                if e.name == pview._ent.name:
+                    self._view._wdg._viewport_followeditem_lstindex = i
+                    self._view._wdg._cursor_item_lstindex = i
+                    # BAD: hardcoding pos to avoid last item at top
+                    pos = pview._wdg._viewport_height_lines // 2
+                    self._view._wdg._viewport_followeditem_linesfromtop = pos
+                    break
+            if self._view._wdg._cursor_item_lstindex != i:
+                log.error("WTF: pview not found")
         else:
             raise NotImplementedError()
         # NOTE: resize() old/cached wdg, as window may had resized from then.
         self._view._wdg.resize(
-            pwdg._viewport_height_lines,
-            pwdg._viewport_width_columns,
-            origin=pwdg._viewport_origin_yx,
+            pview._wdg._viewport_height_lines,
+            pview._wdg._viewport_width_columns,
+            origin=pview._wdg._viewport_origin_yx,
         )
 
     def redraw(self, stdscr: C.window) -> None:

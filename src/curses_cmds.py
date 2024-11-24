@@ -1,12 +1,12 @@
 import os
-from typing import Optional, Sequence
+from typing import Mapping, Optional, Sequence
 
 import _curses as C
 
 from . import curses_ext as CE
 from .app import AppGlobals, KeyTable, g_app
 from .loop_asyncio import asyncio_primary_out
-from .util.logger import LogLevel, log
+from .util.logger import log
 
 # def raise_(exc: BaseException) -> None:
 #     raise exc
@@ -56,29 +56,51 @@ def shell_out_prompt(g: AppGlobals, loci: str) -> None:
     asyncio_primary_out(g, CE.shell_async(g.stdscr, ZSH_BUFFER=loci, f=loci))
 
 
-def run_editor(g: AppGlobals, *args: str | Sequence[str]) -> None:
+def run_editor(g: AppGlobals, *args: str | Sequence[str], **kw: str) -> None:
     cmdv = [os.getenv("EDITOR", "nvim")]
     for a in args:
         if isinstance(a, str):
             cmdv.append(a)
-        else:
+        elif isinstance(a, Sequence):
             cmdv.extend(a)
+        elif isinstance(a, Mapping):
+            for k, v in a.items():
+                if len(k) == 1:
+                    cmdv.extend(("-" + k, v))
+                else:
+                    cmdv.append(f"--{k}={v}")
+        else:
+            raise NotImplementedError()
     # TODO: when open dir -- focus netrw on same file, as dir's cached view (if present)
-    asyncio_primary_out(g, CE.shell_async(g.stdscr, cmdv))
+    # cmdv = "sed -u p".split()
+    asyncio_primary_out(g, CE.shell_async(g.stdscr, cmdv, interactive=True, **kw))
 
 
+# FUT:SPLIT: feed_lst_into_stdin(formatter) && read_quickfix_from_stdin(nvim_cmdv)
 # TBD: feed non-FSEntry or mixed/virtual Entities into vim (+pre-filter pre-sorted lists)
 #   i.e. when current Entity isn't .isdir() -- you need to pass the list through stdin
 def run_quickfix(g: AppGlobals, *args: str) -> None:
-    # TODO: focus/position cursor in both buffer and in quickfix on same item
+    # CHECK:TODO: focus/position cursor in both buffer and in quickfix on same item
     #   * CASE: list of filenames -- buffer on file, no quickfix
     #   * CASE: list of search results -- quickfix on result, hide/delete original buffer
+    ## BET?NICE:IDEA: construct and feed vimscript or .lua to setqflist()
+    #   ++ more freedom on all options specified
+    # pylint:disable=protected-access
+    wdg = g.root_wdg._navi._view._wdg
+    lst = os.linesep.join(x.name for x in wdg._lst)
+    idx = 1 + wdg._cursor_item_lstindex
+    # [_] FIXME:WKRND: use tempfile inof stdin -- orse nvim ignores keypresses
+    # [_] OR:BET: fix the issues with STDIN/keypresses,
+    #   as I will need that to work for other programs anyway
     return run_editor(
         g,
-        "-",
-        ("-c", "setl noro ma bt=nofile nowrap"),
-        ("-c", "au User LazyPluginsLoaded cgetb|copen"),
+        ("-q-", "+cc%d" % idx, "-c", "copen|only"),
+        # V -c "au User LazyPluginsLoaded cgetb|copen"
+        # ("-c", "cgetfile -"),  # FAIL: can't open "-"
+        # "-", ("-c", "setl noro ma bt=nofile nowrap"),
+        # ("-c", "au User LazyPluginsLoaded cgetb|copen"),
         args,
+        input=lst,
     )
 
 
@@ -178,7 +200,7 @@ _modal_default: KeyTable = {
     # "a": shell_out_prompt,
     "S": lambda g: shell_out_prompt(g, _loci()),
     # "o": lambda g: run_quickfix(g, _loci()),
-    "E": lambda g: run_quickfix(g, _loci()),
+    "E": lambda g: run_quickfix(g),
     "e": lambda g: run_editor(g, _loci()),
     "r": lambda g: run_ranger(g, _loci()),
     # "R": lambda g: run_ranger(g, g.root_wdg._navi._view._ent.loci),
@@ -186,7 +208,7 @@ _modal_default: KeyTable = {
     "L": redirect_logs,
     "I": ipyconsole_out,
     "^I": ipython_out,  # <Tab>
-    "^J": run_editor,  # <CR>
+    # "^J": execute_abyss,  # <CR>
     "^L": resize,  # <C-l> manually trigger redraw
     # pylint:disable=protected-access
     "^R": lambda g: g.root_wdg._navi._view.fetch(),  # <C-r> refresh cached list
@@ -204,6 +226,10 @@ _modal_default: KeyTable = {
     C.KEY_NPAGE: lambda g: g.root_wdg._navi.cursor_step_by(
         g.root_wdg._navi._view._wdg._viewport_height_lines // 2
     ),
+    C.KEY_DOWN: lambda g: g.root_wdg._navi.cursor_step_by(1),
+    C.KEY_UP: lambda g: g.root_wdg._navi.cursor_step_by(-1),
+    C.KEY_LEFT: lambda g: g.root_wdg.view_go_back(),
+    C.KEY_RIGHT: lambda g: g.root_wdg.view_go_into(),
     # ",": lambda g: modal_switch_to(","),
 }
 
@@ -317,7 +343,7 @@ def handle_input(g: AppGlobals) -> None:
             comment = f" ({nm})"
     else:
         comment = ""
-    log.at(LogLevel.WARNING, repr(wch) + comment, loci=loci_override)
+    log.at(log.W, repr(wch) + comment, loci=loci_override)
     # print(repr(wch))
     # import sys; sys.stdout.write(repr(wch))
     if not cmd:
@@ -336,6 +362,7 @@ def handle_input(g: AppGlobals) -> None:
         g.stdscr.refresh()
     elif callable(cmd):
         modal_switch_to(None)
+        # MOVE: extract try-catch into wrapper assigned to "g.ui.handle_input"
         # TEMP: don't exit !miur when developing in REPL
         if g.opts.ipykernel:
             try:
@@ -354,3 +381,20 @@ def handle_input(g: AppGlobals) -> None:
         g.stdscr.refresh()
     else:
         raise NotImplementedError()
+
+
+# TRY:MOVE: into src/__init__.py
+#   COS:IDEA: automatically run this code when I jupyter reloads files
+def _live() -> None:
+    ## HACK: only load code below when working in !jupyter
+    # if not hasattr(__import__("__main__"), "__file__"):
+    # if hasattr(__import__("builtins"), "__IPYTHON__"):
+    # if hasattr(__builtins__, "__IPYTHON__"):
+    # if 'JPY_PARENT_PID' in os.environ:
+    from .app import g_app as g
+
+    log.debug("<reload>")
+    ntf = "reload=%.3f" % log.ts
+    vh = g.stdscr.getmaxyx()[1]
+    g.stdscr.addnstr(0, vh - len(ntf), ntf, len(ntf))
+    g.stdscr.refresh()
