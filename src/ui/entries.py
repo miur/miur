@@ -54,9 +54,12 @@ class TextEntry(Golden):
                 m.group(0),
                 loci=(
                     (
-                        self._at[0],
-                        f":{m.start()}+{m.end() - m.start()}",
-                        self._at[-1],
+                        ## DISABLED: interferes with !nvim jumping to line under cursor
+                        # self._at[0],
+                        # f":{m.start()}+{m.end() - m.start()}",
+                        # self._at[-1],
+                        *self._at,
+                        f":{m.start()+1}",
                     )
                     if self._at
                     else ("∅", f":{m.start()}+{m.end() - m.start()}")
@@ -144,7 +147,7 @@ class FSEntry(Golden):
                         #     }
                         # fmtr = Terminal256Formatter(style=MyStyle)
 
-                        code = f.read(1024)
+                        code = f.read(4096)
                         # ALT? render into HTML -> load as tree -> walk it and translate to curses
                         result = highlight(code, PythonLexer(), Terminal256Formatter())
                         # DEBUG: log.trace(result)
@@ -152,11 +155,10 @@ class FSEntry(Golden):
                         linelst = [TextEntry(x) for x in result.split("\n")]
                     else:
                         i = 1
-                        # ALT:(python>=3.13): lines = f.readlines(sizehint=1024, keepends=False)
-                        while (boff := f.tell()) < 1024 and (line := f.readline(1024)):
-                            ent = TextEntry(
-                                line.removesuffix("\n"), loci=(p, f":{i}", f"  `{boff}")
-                            )
+                        # ALT:(python>=3.13): lines = f.readlines(sizehint=4096, keepends=False)
+                        while (boff := f.tell()) < 4096 and (line := f.readline(4096)):
+                            # DISABLED(, f"  `{boff}"): interferes with !nvim jumping to line under cursor
+                            ent = TextEntry(line.removesuffix("\n"), loci=(p, f":{i}"))
                             linelst.append(ent)
                             i += 1
                 return linelst
