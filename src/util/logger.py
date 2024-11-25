@@ -65,6 +65,8 @@ class Logger:  # pylint:disable=too-many-instance-attributes
     #   ALT:FAIL: to use 'setattr()' _after_ class def we need to add all short names to __slots__
     #   ALT: inherit Logger from LogLevel
     # USAGE: log.at(log.E, ...)
+    # BUG:(log.W): [no-member] Instance of 'Logger' has no 'W' member; maybe 'l'?
+    #   FAIL: adding to __slots__ doesn't help
     for l in LogLevel:
         vars()[l.name[0]] = l
 

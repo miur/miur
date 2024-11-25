@@ -68,8 +68,9 @@ class AppGlobals:
     opts = AppOptions()
     curses_ui: AppCursesUI
     root_wdg: "RootWidget"  # Root/FM/ListWidget
-    keytable: KeyTable
+    keytable: KeyTable  # =current/cursor
     keytablename: str
+    keytableroot: KeyTable  # =read-only, whole tree
 
 
 g_app = AppGlobals()

@@ -46,7 +46,8 @@ good-names-rgxs = ^[a-z][a-z0-9]?$
 ## USE: inof W0511
 # NOTE: enable only during clean-up, LSP being very intrusive and distracting
 # notes=FIX,BAD,TODO
-notes=WTF:,BUG:,REGR:,FAIL:,ERR:,FIXME:,CHECK:,&next,[_]
+# notes=WTF:,BUG:,REGR:,FAIL:,ERR:,FIXME:,CHECK:,&next,[_]
+notes = [_],[!]
 
 
 # [SPELLING]

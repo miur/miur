@@ -5,6 +5,9 @@ if globals().get("TYPE_CHECKING"):
     from types import TracebackType
     from typing import Any, Callable, Iterator, Optional, Type
 
+# def raise_(exc: BaseException) -> None:
+#     raise exc
+
 
 @contextmanager
 def enable_warnings(error: bool = True) -> "Iterator[None]":

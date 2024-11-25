@@ -5,7 +5,7 @@ from typing import Any, Callable, Iterator, cast
 
 from . import iomgr
 from .app import AppGlobals
-from .util.exchook import exception_handler
+from .util.exchook import exception_handler, log_exc
 from .util.logger import log
 
 
@@ -120,7 +120,7 @@ def asyncio_primary_out(
                 log.warning("cancelled" + sfx)
             elif exc := fut.exception():
                 exc.add_note(sfx)
-                exception_handler(type(exc), exc, exc.__traceback__)
+                log_exc(exc)
                 C.flash()
             else:
                 log.info(f"rc={fut.result()}{sfx}")
@@ -135,7 +135,10 @@ def asyncio_primary_out(
             _primary = None
         # HACK: chain callback() hook/stmt after successfully executed task
         if success and cb:
-            cb()
+            try:
+                cb()
+            except Exception as exc:  # pylint:disable=broad-exception-caught
+                log_exc(exc)
 
     # MAYBE: do it immediately before launching SHELL itself
     #   (otherwise #miur may sleep in-between and still leak some input to SHELL)

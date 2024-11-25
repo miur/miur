@@ -6,7 +6,7 @@ from contextlib import contextmanager
 from subprocess import CompletedProcess, run
 from threading import BoundedSemaphore
 from types import SimpleNamespace
-from typing import Any, Callable, Iterator, Sequence
+from typing import Any, Callable, Iterator, Mapping, Sequence
 
 import _curses as C
 
@@ -150,6 +150,36 @@ class curses_altscreen:
         self._sema1.release()
 
 
+def resize() -> None:
+    from .app import g_app as g
+    from .util.logger import log
+
+    ## HACK:SRC: https://stackoverflow.com/questions/1022957/getting-terminal-width-in-c
+    ##   >> make curses to calc sizes by itself (as it does on each .refresh)
+    # HACK: force size reinit (as ncurses only does it in .iniscr())
+    # SRC:OLD: https://post.bytes.com/forum/topic/python/541442-curses-and-resizing-windows
+    C.def_prog_mode()
+    C.endwin()
+    g.stdscr.refresh()
+    # HACK: remove KEY_RESIZE from queue to avoid multi-refresh after several resizes
+    #   ALT:FAIL: _ch = g.stdscr.getch(); assert _ch == C.KEY_RESIZE, _ch
+    C.flushinp()
+
+    log.info("resize: [{}x{}]".format(*g.stdscr.getmaxyx()))
+    ## DEP:configure(--enable-sigwinch)
+    # BAD: does not work inside jupyter
+    # BAD: should press some key before ev:410 will be reported
+    #   ::: it's due to epoll() doesn't listen for SIGWINCH
+    #     SEE: /usr/lib/python3.12/site-packages/pexpect/pty_spawn.py
+    #   2024-05-11 BUT it works if get_wch() used directly
+    # REGR: redraw() during KEY_RESIZE results in ncurses crash
+    #   THINK: how to prevent/block redraw in that case?
+    g.stdscr.clear()  # CHECK:NEED:OR:NOT? e.g. to clear bkgr (which earlier wasn't redrawn on resize)
+    g.root_wdg.resize(g.stdscr)
+    g.root_wdg.redraw(g.stdscr)
+    g.stdscr.refresh()
+
+
 def shell_out(
     stdscr: C.window, cmdv: Sequence[str] = (), **envkw: str
 ) -> CompletedProcess[str]:
@@ -171,12 +201,9 @@ async def shell_async(
     cmdv: Sequence[str] = (),
     input: str | None = None,
     interactive: bool = False,
-    **envkw: str,
+    env: Mapping[str, str] | None = None,
 ) -> int:
-    if not cmdv:
-        cmdv = (os.environ.get("SHELL", "sh"),)
-        interactive = True
-    envp = dict(os.environ, **envkw)
+
     # WARN: #miur can run in bkgr, but is not allowed to interact with TTY
     #   OR:MAYBE: we can allow it -- like create notifications,
     #    or embed small curses popups directly around cursor
@@ -192,10 +219,11 @@ async def shell_async(
         # SRC: https://docs.python.org/3/library/asyncio-subprocess.html#examples
         proc = await asyncio.create_subprocess_exec(
             *cmdv,
-            env=envp,
+            env=env,
             stdin=g.io.ttyin if input is None else subprocess.PIPE,
             stdout=g.io.ttyout,
             # FIXED:WTF: !nvim freezes up if stderr=g.io.ttyout
+            #   BUT:WTF:(this works OK): $ echo hi | nvim - 2>/t/err
             stderr=(g.io.pipeerr if interactive else (g.io.pipeerr or g.io.ttyout)),
         )
         if input is None:

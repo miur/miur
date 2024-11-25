@@ -1,8 +1,3 @@
-import sys
-from contextlib import ExitStack
-
-from . import curses_ext as CE
-from . import iomgr
 from .app import AppCursesUI, AppGlobals
 from .util.envlevel import increment_envlevel, save_choosedir
 from .util.exchook import enable_warnings, log_excepthook
@@ -17,6 +12,8 @@ def miur_main(g: AppGlobals) -> None:
         # ALT/ADD: emit sys.audit() event to use !lttng for uniform startup profiling
         log.kpi("main")
 
+    from contextlib import ExitStack
+
     with ExitStack() as stack:  # MOVE:> with Application() as app:
         do = stack.enter_context
         do(enable_warnings())
@@ -29,23 +26,29 @@ def miur_main(g: AppGlobals) -> None:
         log.verbose(f"{pid=}")
         do(log_excepthook())
 
+        from . import iomgr
+
         # MOVE? as early as possible
         do(iomgr.stdlog_redir(g))
         log.sep()
+
+        from . import curses_ext as CE
+
         g.stdscr = do(CE.curses_stdscr())
 
         # raise RuntimeError()
 
-        from . import curses_cmds as CC
+        from . import keymap as KM
+        from .integ.aura import keytable_insert_aura_pathes
         from .ui.entries import FSEntry
         from .ui.root import RootWidget
 
         ui = AppCursesUI()
-        ui.resize = lambda: CC.resize(g)
-        ui.handle_input = lambda: CC.handle_input(g)
+        ui.resize = CE.resize
+        ui.handle_input = lambda: KM.handle_input(g)
         g.curses_ui = ui
-        CC.keytable_insert_aura_pathes()
-        CC.modal_switch_to(None)
+        g.keytableroot = keytable_insert_aura_pathes(KM.g_modal_default)
+        KM.modal_switch_to(None)
         xpath = getattr(g.opts, "xpath", None)
         if xpath is None:
             xpath = __import__("os").getcwd()
@@ -58,7 +61,6 @@ def miur_main(g: AppGlobals) -> None:
             do(save_choosedir(tmp))
 
         if g.opts.bare:  # NOTE: much faster startup w/o asyncio machinery
-            from .curses_cmds import g_input_handlers
             from .loop_selectors import mainloop_selectors
 
             def _shell_out(g: AppGlobals) -> None:
@@ -66,7 +68,8 @@ def miur_main(g: AppGlobals) -> None:
 
             ## FAIL: fixes shell only in _modal_defaults, but not _modal_comma
             ##   >> THINK: better way to overcome it, e.g. replace API itself
-            g_input_handlers["s"] = _shell_out
+            # g.keytableroot["s"] = _shell_out
+            raise NotImplementedError("FIXME: should properly replace underlying shell")
 
             return mainloop_selectors(g)
 
@@ -88,6 +91,8 @@ def miur_main(g: AppGlobals) -> None:
 
 # TBD: frontend to various ways to run miur API with different UI
 def miur_frontend(g: AppGlobals) -> None:
+    import sys
+
     if g.opts.devinstall:
         from .util import devenv
 
