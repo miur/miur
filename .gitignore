@@ -7,3 +7,6 @@ tags
 
 # cached ZSH scripts
 *.zwc
+
+## Local-only reference materials, temporary cloned repos, etc.
+&*/

@@ -88,9 +88,9 @@ class FSEntry(Golden):
     @override
     @property
     def name(self) -> str:
-        # return str(self._x)
-        # TEMP:TEST: multiline entries
-        return self._nm.replace("o", "o⬎\n")
+        return str(self._x)
+        # TEMP:DEBUG: multiline entries
+        # return self._nm.replace("o", "o⬎\n")
 
     @override
     @property

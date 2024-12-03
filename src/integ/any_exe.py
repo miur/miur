@@ -1,9 +1,9 @@
 import os
 
 # if globals().get("TYPE_CHECKING"):
-from typing import Callable, Mapping, Sequence, TypeAlias, Union
+from typing import Callable, Mapping, Sequence, Union
 
-ArgType: "TypeAlias" = "Union[str, int, Sequence[str | int], Mapping[str, str | int]]"
+type ArgType = "Union[str, int, Sequence[str | int], Mapping[str, str | int]]"
 
 ## REF: repeated args for all popen-based functions
 # python - Generate TypedDict from function's keyword arguments - Stack Overflow ⌇⡧⡄⡌⢶

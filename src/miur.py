@@ -57,6 +57,21 @@ def miur_main(g: AppGlobals) -> None:
         g.root_wdg = RootWidget(FSEntry(xpath))
         # g.root_wdg.set_entity(FSEntry("/etc/udev"))
 
+        # TEMP:HACK: directly append stdin to current node
+        if f := g.io.pipein:
+            cls = g.opts.stdinfmt or FSEntry
+            lst = g.root_wdg._navi._view._wdg._lst
+            i = 1
+            # WARN: offset is in chars/codepoints inof bytes (same with .read(size=chars))
+            cpoff = 0  # BAD:(no byte offset): sys.stdin.tell() not supported
+            while cpoff < 4096 and (line := f.readline(4096)):
+                # TODO: allow re-interpreting arbitrary words/lines as paths and vice versa
+                # RND:(xpath): use "cwd" as .loci for euphemeral entries
+                # FIXME: put into independent linked node, inof extending baselist
+                lst.append(cls(line.removesuffix("\n"), loci=(xpath, f":{i}")))
+                i += 1
+                cpoff += len(line)
+
         if tmp := g.opts.choosedir:
             do(save_choosedir(tmp))
 

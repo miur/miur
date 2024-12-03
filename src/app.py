@@ -3,10 +3,11 @@
 if globals().get("TYPE_CHECKING"):
     from io import StringIO
     from types import ModuleType
-    from typing import Callable, Optional, TextIO, TypeAlias, Union
+    from typing import Callable, Optional, TextIO, Union
 
     import _curses as C
 
+    from .ui.entity_base import Golden
     from .ui.root import RootWidget
 
 
@@ -30,6 +31,7 @@ class AppOptions:
     loglevel: int
     ####
     xpath: str | None
+    stdinfmt: "Optional[Golden]"
     ####
     signal: int | None
     choosedir: str | None = None
@@ -55,7 +57,7 @@ class AppCursesUI:
     handle_input: "Callable[[], None]"
 
 
-KeyTable: "TypeAlias" = "dict[str | int, Callable[[AppGlobals], None] | KeyTable]"
+type KeyTable = "dict[str | int, Callable[[AppGlobals], None] | KeyTable]"
 
 
 # FUT:RENAME? c = g_ctx = AppContext() | ns = AppNamespace()

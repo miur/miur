@@ -1,4 +1,5 @@
-from typing import Iterable, Protocol, Self
+from abc import ABCMeta
+from typing import Any, Iterable, Protocol, Self
 
 
 class Representable(Protocol):
@@ -40,5 +41,16 @@ class Atomic(Addressable, Representable, Protocol):
     explore: str = "NOT EXPLORABLE (YET)"
 
 
-class Golden(Explorable, Addressable, Representable, Protocol):
+g_entries_cls: "list[Golden]" = []
+
+
+class Golden(Explorable, Addressable, Representable, Protocol, metaclass=ABCMeta):
     __slots__ = ()
+
+    def __new__(cls, *_args: Any, **_kwds: Any) -> Self:
+        # OFF:REF:(no args/kwds): https://mail.python.org/pipermail/python-dev/2008-February/076854.html
+        # def __new__[**P](cls, *_args: P.args, **_kwds: P.kwargs) -> Self:
+        # BAD:(false-positive): https://github.com/pylint-dev/pylint/issues/8325
+        obj = super().__new__(cls)
+        g_entries_cls.append(obj)
+        return obj

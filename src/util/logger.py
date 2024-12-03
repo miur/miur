@@ -6,10 +6,10 @@
 import enum
 import sys
 import time
-from typing import Any, Callable, Final, TypeAlias, TypedDict, Unpack
+from typing import Any, Callable, Final, TypedDict, Unpack
 
 _LAMBDA: Final = lambda: ""  # pylint:disable=unnecessary-lambda-assignment
-_Loggable: TypeAlias = str | Callable[[], str] | Any
+type _Loggable = str | Callable[[], str] | Any
 
 
 @enum.unique
