@@ -55,15 +55,14 @@ class LogLevelCvt(Action):
 class EntryCvt(Action):
     @override
     def __call__(self, _ap, ns, s, s_opt=None):  # type:ignore[no-untyped-def]
-        s = s.upper()
         if s.islower():
             cls = next(
                 x
                 for x in g_entries_cls
-                if s == x.__class__.__name__.removesuffix("Entry").lower()
+                if s == x.altname or s == x.__name__.removesuffix("Entry").lower()
             )
         else:
-            cls = next(x for x in g_entries_cls if s == x.__class__.__name__)
+            cls = next(x for x in g_entries_cls if s == x.__name__)
         setattr(ns, self.dest, cls)
 
 
@@ -75,10 +74,12 @@ def cli_spec(parser: ArgumentParser, *, dfl: AppOptions) -> ArgumentParser:
     o("-s", "--signal", choices=_sigset, action=SigAction)
     o("-a", "--asyncio", dest="bare", default=dfl.bare, action="store_false")
     o("-b", "--bare", default=dfl.bare, action="store_true")
-    # FAIL: empty list
+    # WARN:RQ: import/declare all classess -- to register them
+    from .ui import entries  # pylint:disable=unused-import
+
     _entrycls = (
-        *(x.__class__.__name__.removesuffix("Entry").lower() for x in g_entries_cls),
-        *(x.__class__.__name__ for x in g_entries_cls),
+        *(x.altname or x.__name__.removesuffix("Entry").lower() for x in g_entries_cls),
+        *(x.__name__ for x in g_entries_cls),
     )
     o("-i", "--stdinfmt", default=None, choices=_entrycls, action=EntryCvt)
     o("-D", "--devinstall", action="store_true")
