@@ -81,7 +81,7 @@ class RootWidget:
                         if (lim := capx()) > 0:
                             stdscr.addnstr(xpath[ilnum:], lim, S.iteminfo)
 
-        self._navi.redraw(stdscr)
+        cy, cx = self._navi.redraw(stdscr)
 
         ci = 1 + wdg._cursor_item_lstindex
         sz = len(wdg._lst)
@@ -107,12 +107,4 @@ class RootWidget:
         stdscr.addnstr(self._wh - 1, 0, footer, self._ww, S.footer)
 
         # NOTE: place real cursor to where list-cursor is, to make tmux overlay selection more intuitive
-        cy = wdg._viewport_origin_yx[0]
-        if not wdg._lst or isinstance(wdg.focused_item, ErrorEntry):
-            cx = 0
-        else:
-            cx = wdg._viewport_origin_yx[1] + 3  # = len(pfx)
-        pos = wdg._viewport_followeditem_linesfromtop
-        if 0 <= pos < wdg._viewport_height_lines:
-            cy += pos
         stdscr.move(cy, cx)

@@ -96,21 +96,24 @@ class NaviWidget:
         elif isinstance(self._view._ent, FSEntry):
             # RND:(controversial): as we basically navigate to *new* nodes to the left,
             #   so we should keep the history of this navigation, but we discard that
-            parent_ent = FSEntry(fs.dirname(self._view._ent._x))
-            self._view = EntityView(parent_ent)  # , hint_idx=0)
-            self._history_stack = [self._view]
-            self._history_idx = len(self._history_stack) - 1
-            # NOTE: set cursor onto entity you came back from
-            for i, e in enumerate(self._view._wdg._lst):
-                if e.name == pview._ent.name:
-                    self._view._wdg._viewport_followeditem_lstindex = i
-                    self._view._wdg._cursor_item_lstindex = i
-                    # BAD: hardcoding pos to avoid last item at top
-                    pos = pview._wdg._viewport_height_lines // 2
-                    self._view._wdg._viewport_followeditem_linesfromtop = pos
-                    break
-            if self._view._wdg._cursor_item_lstindex != i:
-                log.error("WTF: pview not found")
+            p = self._view._ent._x
+            pp = fs.dirname(p)
+            if pp != p:
+                parent_ent = FSEntry(pp)
+                self._view = EntityView(parent_ent)  # , hint_idx=0)
+                self._history_stack = [self._view]
+                self._history_idx = len(self._history_stack) - 1
+                # NOTE: set cursor onto entity you came back from
+                for i, e in enumerate(self._view._wdg._lst):
+                    if e.name == pview._ent.name:
+                        self._view._wdg._viewport_followeditem_lstindex = i
+                        self._view._wdg._cursor_item_lstindex = i
+                        # BAD: hardcoding pos to avoid last item at top
+                        pos = pview._wdg._viewport_height_lines // 2
+                        self._view._wdg._viewport_followeditem_linesfromtop = pos
+                        break
+                if self._view._wdg._cursor_item_lstindex != i:
+                    log.error("WTF: pview not found")
         else:
             raise NotImplementedError()
         # NOTE: resize() old/cached wdg, as window may had resized from then.
@@ -120,12 +123,12 @@ class NaviWidget:
             origin=pview._wdg._viewport_origin_yx,
         )
 
-    def redraw(self, stdscr: C.window) -> None:
+    def redraw(self, stdscr: C.window) -> tuple[int, int]:
         # FIXED: prevent crash when window shrinks past the cursor
         # self.cursor_step_by(0)
         # NOTE: actually _lst here stands for a generic _augdbpxy with read.API
         #   i.e. DB augmented by virtual entries, all generated-and-cleared on demand
-        self._view._wdg.redraw(stdscr)
+        return self._view._wdg.redraw(stdscr)
 
     # USE: log.info(str(wdg))
     # def __str__(self) -> str:

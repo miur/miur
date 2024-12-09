@@ -15,6 +15,7 @@ from .app import g_app
 
 # SEE: https://bugs.python.org/issue40284
 # CHECK: it seems "S.<Tab>" completion doesn't work
+# BAD: not typed at all. BET: generate @dataclass or IntEnum inside function ?
 g_style = SimpleNamespace()
 _registered_color_pairs: dict[tuple[int, int], int] = {}
 

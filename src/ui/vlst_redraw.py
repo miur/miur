@@ -2,6 +2,7 @@ import os
 import os.path as fs
 from functools import cache
 from types import ModuleType
+from typing import cast
 
 import _curses as C
 
@@ -9,6 +10,7 @@ from ..curses_ext import g_style as S
 from ..curses_ext import termcolor2
 from ..util.exchook import log_exc
 from ..util.logger import log
+from .entity_base import Addressable
 from .entries import ErrorEntry, FSEntry
 from .vlst_base import SatelliteViewport_DataProtocol
 
@@ -29,9 +31,34 @@ def ranger_ansi() -> ModuleType | None:
     return ansi  # type:ignore
 
 
+def resolve_colorscheme(item: Addressable) -> int:
+    attr = S.item
+    if isinstance(item, FSEntry):
+        path = item.loci
+        if not fs.exists(path):
+            attr = S.error
+            if fs.lexists(path):
+                attr |= C.A_ITALIC | C.A_BOLD
+        elif fs.isdir(path):
+            attr = S.fsdir
+            if fs.islink(path):
+                # ALT:TRY: use color "in the middle" bw dir and filesymlink
+                #   i.e. introduce S.fsdirlink color
+                attr = S.fslink | C.A_BOLD
+        elif fs.isfile(path):
+            attr = S.item
+            if fs.islink(path):
+                attr = S.fslink | C.A_ITALIC | C.A_BOLD
+            elif os.access(path, os.X_OK):
+                attr = S.fsexe | C.A_BOLD
+    return cast(int, attr)
+
+
 class SatelliteViewport_RedrawMixin:
     # pylint:disable=too-many-statements,too-many-branches,too-many-locals
-    def redraw(self: SatelliteViewport_DataProtocol, stdscr: C.window) -> None:
+    def redraw(
+        self: SatelliteViewport_DataProtocol, stdscr: C.window
+    ) -> tuple[int, int]:
         # draw_footer(stdscr)
         # ARCH:WARN: we actually need to render whatever is *shown in viewport* (even if cursor is far outside)
         #   COS: when cursor is outside -- most "write" actions will be disabled
@@ -45,7 +72,7 @@ class SatelliteViewport_RedrawMixin:
             # if fs.isdir(emptylist._originator):
             #   msg = "EMPTY DIR"
             stdscr.addstr(vy, vx, "<<EMPTY>>", S.error | S.cursor)
-            return
+            return vy, vx
 
         ## CHECK: if more than one redraw per one keypress
         # log.verbose(f"list: [<={vp.h}/{len(lst)}]")
@@ -55,6 +82,12 @@ class SatelliteViewport_RedrawMixin:
         vh = self._viewport_height_lines
         vw = self._viewport_width_columns
         top_idx = self._viewport_followeditem_lstindex
+
+        # SUM:(cy,cx): real cursor pos (either focused item or top/bot linebeg)
+        #   DFL: we assume cursor is above/below viewport, unless loop confirms otherwise
+        cy = vy if ci < top_idx else vy + vh
+        cx = vx
+
         # WARN! we assume that: { top of NaviWidget = top of RootWidget = 0,0 }
         top_y = self._viewport_followeditem_linesfromtop
         while top_idx > 0 and top_y > 0:
@@ -68,8 +101,12 @@ class SatelliteViewport_RedrawMixin:
             item = self._lst[i]
             if isinstance(item, ErrorEntry):
                 stdscr.addstr(vy + y, vx + 0, f"[ {item.name} ]", S.error | S.cursor)
+                # HACK:WKRND: hover cursor on error, unless we already looped through cursor
+                #   >> meaning "cx" now become indented
+                if cx == vx:
+                    cy = vy + y
                 i += 1
-                return
+                continue  # RND: draw both err and lst interchangeably
 
             rel = i - top_idx
             pfxrel = f"{1+rel:02d}| "
@@ -78,39 +115,22 @@ class SatelliteViewport_RedrawMixin:
             indent = len(pfxrel) + len(pfxidx)
             nm, *lines = item.name.split("\n")
             py = y
+
+            # FIXME:RELI: resize(<) may occur during redraw loop, invalidating "vh"
             if 0 <= y < vh:
                 stdscr.addstr(vy + y, vx + 0, pfxrel, S.pfxrel)
-                stdscr.addstr(
-                    vy + y, vx + len(pfxrel), pfxidx, S.cursor if i == ci else S.pfxidx
-                )
-                xoff = vx + indent
-                c_schema = S.item
-                if isinstance(item, FSEntry):
-                    path = item.loci
-                    if not fs.exists(path):
-                        c_schema = S.error
-                        if fs.lexists(path):
-                            c_schema |= C.A_ITALIC | C.A_BOLD
-                    elif fs.isdir(path):
-                        c_schema = S.fsdir
-                        if fs.islink(path):
-                            # ALT:TRY: use color "in the middle" bw dir and filesymlink
-                            #   i.e. introduce S.fsdirlink color
-                            c_schema = S.fslink | C.A_BOLD
-                    elif fs.isfile(path):
-                        c_schema = S.item
-                        if fs.islink(path):
-                            c_schema = S.fslink | C.A_ITALIC | C.A_BOLD
-                        elif os.access(path, os.X_OK):
-                            c_schema = S.fsexe | C.A_BOLD
+                stdscr.addstr(pfxidx, S.cursor if i == ci else S.pfxidx)
+                xoff = vx + indent  # OR: cy, cx = stdscr.getyx()
+                if i == ci:
+                    cy = vy + y
+                    cx = xoff - 1
 
                 ansi = ranger_ansi()
                 if not ansi or len(ansi.split_ansi_from_text(nm)) <= 1:
+                    c_schema = resolve_colorscheme(item)
                     stdscr.addnstr(
-                        vy + y,
-                        xoff,
                         nm,
-                        vw - xoff,
+                        vw - xoff,  # OR: lim = stdscr.getmaxyx()[1] - stdscr.getyx()[1]
                         c_schema | S.cursor if i == ci else c_schema,
                     )
                 else:
@@ -133,6 +153,7 @@ class SatelliteViewport_RedrawMixin:
                         else:
                             stdscr.addstr(chunk, pattr)
 
+            # SUM: draw rest of multiline item (2nd line onwards)
             y += 1
             for l in lines:
                 if 0 <= y < vh:
@@ -160,3 +181,4 @@ class SatelliteViewport_RedrawMixin:
         # cx = len(_pfx(vctx.wndcurpos0))
         # cn = len(lst[vctx.wndcurpos0 + vctx.wndabsoff0].name)
         # stdscr.chgat(vctx.wndcurpos0, cx, cn, ccurs)
+        return cy, cx
