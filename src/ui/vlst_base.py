@@ -26,6 +26,8 @@ class SatelliteViewport_DataProtocol(Protocol):
 # pylint:disable=too-many-instance-attributes
 class SatelliteViewportBase(SatelliteViewport_DataProtocol):
     def __init__(self) -> None:
+        # NOTE: actually _lst here stands for a generic _augdbpxy with read.API
+        #   i.e. DB augmented by virtual entries, all generated-and-cleared on demand
         self._lst: Sequence[Golden]
         # ARCH:
         #  * when "viewport follows cursor", then followeditem==item_under_cursor,

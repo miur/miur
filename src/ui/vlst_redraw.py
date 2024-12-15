@@ -57,7 +57,10 @@ def resolve_colorscheme(item: Addressable) -> int:
 class SatelliteViewport_RedrawMixin:
     # pylint:disable=too-many-statements,too-many-branches,too-many-locals
     def redraw(
-        self: SatelliteViewport_DataProtocol, stdscr: C.window
+        self: SatelliteViewport_DataProtocol,
+        stdscr: C.window,
+        *,
+        numcol: bool = True,
     ) -> tuple[int, int]:
         # draw_footer(stdscr)
         # ARCH:WARN: we actually need to render whatever is *shown in viewport* (even if cursor is far outside)
@@ -108,19 +111,26 @@ class SatelliteViewport_RedrawMixin:
                 i += 1
                 continue  # RND: draw both err and lst interchangeably
 
-            rel = i - top_idx
-            pfxrel = f"{1+rel:02d}| "
-            # TODO: for binary/hex show "file offset in hex" inof "item idx in _xfm_list"
-            pfxidx = f"{1+i:03d}{">" if i == ci else ":"} "
-            indent = len(pfxrel) + len(pfxidx)
+            if numcol:
+                rel = i - top_idx
+                pfxrel = f"{1+rel:02d}| "
+                # TODO: for binary/hex show "file offset in hex" inof "item idx in _xfm_list"
+                pfxidx = f"{1+i:03d}{">" if i == ci else ":"} "
+                indent = len(pfxrel) + len(pfxidx)
+            else:
+                indent = 0
+
             nm, *lines = item.name.split("\n")
             py = y
 
             # FIXME:RELI: resize(<) may occur during redraw loop, invalidating "vh"
             if 0 <= y < vh:
-                stdscr.addstr(vy + y, vx + 0, pfxrel, S.pfxrel)
-                stdscr.addstr(pfxidx, S.cursor if i == ci else S.pfxidx)
-                xoff = vx + indent  # OR: cy, cx = stdscr.getyx()
+                stdscr.move(vy + y, vx + 0)
+                if numcol:
+                    stdscr.addstr(pfxrel, S.pfxrel)
+                    stdscr.addstr(pfxidx, S.cursor if i == ci else S.pfxidx)
+                xoff = vx + indent  # OR: _, xoff = stdscr.getyx()
+
                 if i == ci:
                     cy = vy + y
                     cx = xoff - 1

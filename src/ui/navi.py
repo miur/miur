@@ -26,10 +26,56 @@ class NaviWidget:
         self._history_idx = len(self._history_stack) - 1
         # NOTE: tba to restore view when opening previously visited nodes
         self._history_pool = {ent: self._view}
+        ## NOTE: show N previous view on the left and 1 future node on the right
+        # LIOR? int=Fixed/Column=-min/max, float=Percent/Ratio=-rest/full
+        self._miller_ratio = (20, 0, 0.5)
+        self._view_rect = (0, 0, 0, 0)  # (vh,vw,vy,vx)
+
+    def _calc_abs_width(self, vw: int) -> list[int]:
+        vws = [
+            int(w) if w >= 1 else int(w * vw) if w > 0 else 0
+            for w in self._miller_ratio
+        ]
+        flex = vw - sum(vws)
+        if flex < 0:
+            raise ValueError(self._miller_ratio)
+        for i, w in enumerate(self._miller_ratio):
+            if w < 0:
+                assert -1 < w, "TEMP: Not supported"
+                assert vws[i] == 0, "sanity"
+                vws[i] = int(-w * flex)
+        spacer = (vw - sum(vws)) // sum(1 for w in self._miller_ratio if w == 0)
+        for i, w in enumerate(self._miller_ratio):
+            if w == 0:
+                assert vws[i] == 0, "sanity"
+                vws[i] = spacer
+        if vw != sum(vws):
+            raise ValueError(self._miller_ratio)
+        return vws
+
+    def _resize_miller(self) -> None:
+        # pylint:disable=protected-access
+        vh, vw, vy, vx = self._view_rect
+        vws = self._calc_abs_width(vw)
+        if not vws:
+            raise RuntimeError(vws)
+        if len(vws) == 1:
+            self._view._wdg.resize(vh, vws[0], origin=(vy, vx))
+        elif len(vws) == 2:
+            if (pidx := self._history_idx - 1) > 0:
+                self._history_stack[pidx]._wdg.resize(vh, vws[0], origin=(vy, vx))
+            self._view._wdg.resize(vh, vws[1], origin=(vy, vx + vws[0]))
+        else:
+            leftmostidx = self._history_idx + 2 - len(vws)
+            for i, cw in enumerate(vws):
+                if 0 <= (idx := leftmostidx + i) < len(self._history_stack):
+                    ## ALT:(origin): do C.move(y,x) b4 .redraw(), and remember getyx() inside each .redraw()
+                    self._history_stack[idx]._wdg.resize(vh, cw, origin=(vy, vx))
+                vx += cw
 
     def resize(self, vh: int, vw: int, origin: tuple[int, int] = (0, 0)) -> None:
-        # pylint:disable=protected-access
-        self._view._wdg.resize(vh, vw, origin=origin)
+        self._view_rect = vh, vw, *origin
+        self._resize_miller()
 
     def cursor_jump_to(self, idx: int) -> None:
         # pylint:disable=protected-access
@@ -52,7 +98,7 @@ class NaviWidget:
             log.trace(nent.name)
             return
 
-        pwdg = self._view._wdg
+        # pwdg = self._view._wdg
 
         def _histappend() -> None:
             if v := self._history_pool.get(nent):
@@ -81,11 +127,7 @@ class NaviWidget:
         else:
             _histappend()
         # NOTE: resize() *new* wdg to same dimensions as *pwdg*
-        self._view._wdg.resize(
-            pwdg._viewport_height_lines,
-            pwdg._viewport_width_columns,
-            origin=pwdg._viewport_origin_yx,
-        )
+        self._resize_miller()
 
     def view_go_back(self) -> None:
         # pylint:disable=protected-access
@@ -117,18 +159,20 @@ class NaviWidget:
         else:
             raise NotImplementedError()
         # NOTE: resize() old/cached wdg, as window may had resized from then.
-        self._view._wdg.resize(
-            pview._wdg._viewport_height_lines,
-            pview._wdg._viewport_width_columns,
-            origin=pview._wdg._viewport_origin_yx,
-        )
+        self._resize_miller()
 
     def redraw(self, stdscr: C.window) -> tuple[int, int]:
         # FIXED: prevent crash when window shrinks past the cursor
         # self.cursor_step_by(0)
-        # NOTE: actually _lst here stands for a generic _augdbpxy with read.API
-        #   i.e. DB augmented by virtual entries, all generated-and-cleared on demand
-        return self._view._wdg.redraw(stdscr)
+        curyx = (0, 0)  # BAD: undetectable if error
+        leftmostidx = self._history_idx + 2 - len(self._miller_ratio)
+        for i in range(len(self._miller_ratio)):
+            if 0 <= (idx := leftmostidx + i) < len(self._history_stack):
+                if idx == self._history_idx:
+                    curyx = self._history_stack[idx]._wdg.redraw(stdscr, numcol=True)
+                else:
+                    self._history_stack[idx]._wdg.redraw(stdscr, numcol=False)
+        return curyx
 
     # USE: log.info(str(wdg))
     # def __str__(self) -> str:
