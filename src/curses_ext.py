@@ -79,6 +79,7 @@ def curses_stdscr() -> Iterator[C.window]:
         C.noecho()  # echoing of keys = off
         C.cbreak()  # buffering on keyboard input = off
         stdscr.keypad(True)  # sup special escape seq for e.g. curses.KEY_LEFT
+        pvis = C.curs_set(0)
         C.start_color()  # WAIT: which exception does it throw? TRY: TERM=dummy
         stdscr.nodelay(True)
         init_colorscheme(stdscr)
@@ -98,6 +99,7 @@ def curses_stdscr() -> Iterator[C.window]:
         try:
             stdscr.refresh()
             stdscr.nodelay(False)
+            C.curs_set(pvis)
             stdscr.keypad(False)
             # del stdscr  # TRY? ALT:BAD: not ported :: delscreen(stdscr)
             C.echo()

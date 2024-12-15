@@ -57,6 +57,7 @@ class NaviWidget:
         # pylint:disable=protected-access
         vh, vw, vy, vx = self._view_rect
         vws = self._calc_abs_width(vw)
+        log.info(vws)  # TEMP:DEBUG:
         if not vws:
             raise RuntimeError(vws)
         if len(vws) == 1:

@@ -60,7 +60,7 @@ class SatelliteViewport_RedrawMixin:
         self: SatelliteViewport_DataProtocol,
         stdscr: C.window,
         *,
-        numcol: bool = True,
+        numcol: bool | None = None,
     ) -> tuple[int, int]:
         # draw_footer(stdscr)
         # ARCH:WARN: we actually need to render whatever is *shown in viewport* (even if cursor is far outside)
@@ -85,6 +85,10 @@ class SatelliteViewport_RedrawMixin:
         vh = self._viewport_height_lines
         vw = self._viewport_width_columns
         top_idx = self._viewport_followeditem_lstindex
+
+        if numcol is None:
+            # HACK: hide both numcol when viewport is too small
+            numcol = vw >= 25
 
         # SUM:(cy,cx): real cursor pos (either focused item or top/bot linebeg)
         #   DFL: we assume cursor is above/below viewport, unless loop confirms otherwise
@@ -120,7 +124,32 @@ class SatelliteViewport_RedrawMixin:
             else:
                 indent = 0
 
-            nm, *lines = item.name.split("\n")
+            # VIZ:(wrap/lines): separately, combined, unlimited
+            # maxlines = 0
+            maxwrap = 1
+            iw = vw - 2 - indent
+            assert iw > 4
+            ## [_] TODO: !hi last char in line differently
+            # nm, *lines = [
+            #     l[c * iw : c * (iw + 1)] + ("↩" if c < maxwrap else "…")
+            #     for l in item.name.split("\n")
+            #     for c in range((len(l) // iw) + 1)
+            #     if c <= maxwrap
+            # ]
+            # log.trace(lines)
+            lines: list[str] = []
+            s = item.name
+            c = 0
+            while c < len(s) and len(lines) <= maxwrap:
+                nc = min(c + iw, len(s) - c)
+                if (nn := s.find("\n", c)) >= 0:
+                    nc = min(nn, nc)
+                lines.append(s[c:nc])
+                c = nc
+            log.trace(lines)
+            nm, *lines = lines
+
+            # nm, *lines = item.name.split("\n")
             py = y
 
             # FIXME:RELI: resize(<) may occur during redraw loop, invalidating "vh"
@@ -133,7 +162,7 @@ class SatelliteViewport_RedrawMixin:
 
                 if i == ci:
                     cy = vy + y
-                    cx = xoff - 1
+                    cx = xoff
 
                 ansi = ranger_ansi()
                 if not ansi or len(ansi.split_ansi_from_text(nm)) <= 1:

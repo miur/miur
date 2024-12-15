@@ -61,6 +61,7 @@ class SatelliteViewportBase(SatelliteViewport_DataProtocol):
             raise IndexError("empty list")
         return self._lst[self._cursor_item_lstindex]
 
+    # RENAME: set_viewport(vw, vh, vy, vx)
     def resize(self, vh: int, vw: int, origin: tuple[int, int] = (0, 0)) -> None:
         pvh = self._viewport_height_lines
         self._viewport_origin_yx = origin
