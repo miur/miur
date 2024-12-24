@@ -17,13 +17,15 @@ class LogLevel(enum.IntEnum):
     # FATAL = 90  # EMERGENCY, ABORT
     # CRITICAL = 70  # +ALERT
     ERROR = 50
-    WARNING = 40
+    WARNING = 45
+    PERF = 42  # OR? =KPI  // :PERF: latency/cpu/memory
+    STATE = 35  # STATUS | ARGS | STARTUP // env/pwd/args/etc. (crucial exec ctx)
+    # HAPPEN = 32  # ACTION|NORMAL|FLOW|HAPPYPATH|SEQ  // keypress, tasklet, events, comm
     INFO = 30  # +NOTICE | SUCCESS = 25
     DEBUG = 25
     # OPTIONAL = 20
     VERBOSE = 15  # DETAILED = 10
-    TRACE = 10  # OR? =KPI  // :PERF: latency/cpu/memory
-    # +TR1..TR9 (USE: gradually dimming gray colors, darker than .INFO)
+    TRACE = 10  # +TR1..TR9 (USE: gradually dimming gray colors, darker than .INFO)
     COMMENT = 2
     ANYTHING = 0  # OR: lvl=None
 
@@ -34,12 +36,14 @@ TERMSTYLE: Final = {
     LogLevel.ERROR: "\033[31m",  # regul-red-on-dfl
     # LogLevel.ALERT: "\033[91m",  # regul-orange-on-dfl
     LogLevel.WARNING: "\033[33m",  # yellow
-    LogLevel.INFO: "\033[m",  # dfl-on-dfl (none)
+    LogLevel.PERF: "\033[34m",  # green or blue
+    LogLevel.STATE: "\033[34m",  # green or blue
+    LogLevel.INFO: "\033[36m",  # cyan
     # LogLevel.SUCCESS|TRACE: "\033[32m",  # green
     # LogLevel.NOTICE: "\033[34m",  # blue
     LogLevel.DEBUG: "\033[95m",  # purple
     LogLevel.VERBOSE: "\033[36m",  # cyan
-    LogLevel.TRACE: "\033[36m",  # cyan
+    LogLevel.TRACE: "\033[m",  # dfl-on-dfl (none)
     # LogLevel.DETAILED: "\033[93m",  # grey
     LogLevel.COMMENT: "\033[93m",  # grey
     None: "\033[m",  # none
@@ -146,6 +150,9 @@ class Logger:  # pylint:disable=too-many-instance-attributes
         # ALT: LogLevel[sys._getframe().f_code.co_name.upper()]
         self.at(LogLevel.WARNING, fmt)
 
+    def state(self, fmt: _Loggable, /) -> None:
+        self.at(LogLevel.STATE, fmt)
+
     def info(self, fmt: _Loggable, /) -> None:
         self.at(LogLevel.INFO, fmt)
 
@@ -174,7 +181,7 @@ class Logger:  # pylint:disable=too-many-instance-attributes
         dms = ms - self._pms
         dcpu = cpu - self._pcpu
         line = f"KPI[ms={ms*1000:.3f}({dms*1000:+.3f}) cpu={cpu*1000:.3f}({dcpu*1000:+.3f})] {fmt}"
-        self.at(LogLevel.TRACE, line)
+        self.at(LogLevel.PERF, line)
         # HACK: force show last KPI before exit
         # self.write.__self__.flush()
         self._pms = ms

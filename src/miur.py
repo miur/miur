@@ -23,7 +23,7 @@ def miur_main(g: AppGlobals) -> None:
         # MAYBE: only enable PIDFILE when run by miur_frontend() to avoid global VAR ?
         pid = do(temp_pidfile(pidfile_path()))
         # BAD: log is too early to be redirected by stdlog_redir()
-        log.verbose(f"{pid=}")
+        log.state(f"{pid=}")
         do(log_excepthook())
 
         from . import iomgr
@@ -51,9 +51,12 @@ def miur_main(g: AppGlobals) -> None:
         KM.modal_switch_to(None)
         xpath = getattr(g.opts, "xpath", None)
         if xpath is None:
-            xpath = __import__("os").getcwd()
+            import os
+
+            xpath = os.getenv("PWD", "") or os.getcwd()
         elif xpath == "":
             xpath = "/d/airy"
+        log.state(xpath)
         g.root_wdg = RootWidget(FSEntry(xpath))
         # g.root_wdg.set_entity(FSEntry("/etc/udev"))
 

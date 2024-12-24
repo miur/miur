@@ -50,8 +50,8 @@ def select_entrypoint(devroot: str):  # type:ignore[no-untyped-def]
     venv_path = p if (p := sys.prefix) != sys.base_prefix else "---"
     if (b := sys.base_prefix) != "/usr":
         venv_path += " ; " + b
-    log.verbose(f"(.venv): {venv_path}")
-    log.verbose(f"<$ {' '.join(repr(a) if ' ' in a else a for a in get_py_args())}")
+    log.state(f"(.venv): {venv_path}")
+    log.state(f"<$ {' '.join(repr(a) if ' ' in a else a for a in get_py_args())}")
     if o.PROFILE_STARTUP:
         log.kpi("entrypoint")
 
