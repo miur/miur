@@ -3,7 +3,7 @@ import os.path as fs
 import _curses as C
 
 from ..util.logger import log
-from .entity_base import Golden, Representable
+from .entity_base import Golden
 from .entries import ErrorEntry, FSEntry
 from .view import EntityView
 
@@ -18,6 +18,8 @@ class NaviWidget:
         #   ++ NICE: preserve the *generated* items as-is in the "_wdg._lst"
         #   +++ NICE: can use totally different *widgets* based on the type(_ent)
         #     e.g. Dashboard or Editor
+        # CHG: store _view and _history in outside CacheDB and pass here only refs
+        #   >> then I can switch bw MillerNaviWidget and NPanelNaviWidget, preserving PWD/state/cache
         self._view = EntityView(ent)
         # MAYBE:CHG: directly store "ent" in _stack to represent "xpath",
         #   as now we can use "_pool" -- to map it to temporarily cached "_view"
@@ -29,6 +31,7 @@ class NaviWidget:
         ## NOTE: show N previous view on the left and 1 future node on the right
         # LIOR? int=Fixed/Column=-min/max, float=Percent/Ratio=-rest/full
         self._miller_ratio = (20, 0, 0.5)
+        # self._miller_ratio = (20, 0)
         self._view_rect = (0, 0, 0, 0)  # (vh,vw,vy,vx)
 
     def _calc_abs_width(self, vw: int) -> list[int]:
@@ -92,9 +95,9 @@ class NaviWidget:
         if not pwdg._lst:
             log.trace("<<EMPTY>>")
             return
-        self.view_jump_to(pwdg.focused_item)
+        self.view_jump_to(pwdg.focused_item._ent)
 
-    def view_jump_to(self, nent: Representable) -> None:
+    def view_jump_to(self, nent: Golden) -> None:
         if isinstance(nent, ErrorEntry):
             log.trace(nent.name)
             return
@@ -130,6 +133,7 @@ class NaviWidget:
         # NOTE: resize() *new* wdg to same dimensions as *pwdg*
         self._resize_miller()
 
+    # THINK:SPLIT: `NaviModel which knows when to yeild `RootEntry (which holds rootfs/stdin/etc providers)
     def view_go_back(self) -> None:
         # pylint:disable=protected-access
         pview = self._view

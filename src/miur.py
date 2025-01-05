@@ -63,7 +63,7 @@ def miur_main(g: AppGlobals) -> None:
         # TEMP:HACK: directly append stdin to current node
         if f := g.io.pipein:
             cls = g.opts.stdinfmt or FSEntry
-            lst = g.root_wdg._navi._view._wdg._lst
+            lst = []
             i = 1
             # WARN: offset is in chars/codepoints inof bytes (same with .read(size=chars))
             cpoff = 0  # BAD:(no byte offset): sys.stdin.tell() not supported
@@ -74,6 +74,8 @@ def miur_main(g: AppGlobals) -> None:
                 lst.append(cls(line.removesuffix("\n"), loci=(xpath, f":{i}")))
                 i += 1
                 cpoff += len(line)
+            v = g.root_wdg._navi._view
+            v._wdg.assign(v._xfm_lst + lst)
 
         if tmp := g.opts.choosedir:
             do(save_choosedir(tmp))

@@ -15,7 +15,7 @@ class SatelliteViewport_StepbyMixin:
             pos = 0
         elif idx in (-1, len(self._lst) - 1):
             idx = len(self._lst) + idx if idx < 0 else idx
-            pos = self._viewport_height_lines - self._itemheight(self._lst[idx])
+            pos = self._viewport_height_lines - self._fih(idx)
         else:
             # FAIL: it steps by "steps" inof "items"
             # self.step_by((len(self._lst) + idx if idx < 0 else idx) - self._cursor_item_lstindex)
@@ -36,14 +36,11 @@ class SatelliteViewport_StepbyMixin:
             log.trace("EMPTY")
             return
 
-        def _fih(i: int) -> int:
-            return self._itemheight(self._lst[i])
-
         idx = self._cursor_item_lstindex
         last = len(self._lst) - 1
         if idx < 0 or idx > last:
             raise IndexError(idx)
-        ih = _fih(idx)
+        ih = self._fih(idx)
 
         # rng = range(min(idx, newidx), max(idx, newidx))
         # hlines = sum(self._itemheight(self._lst[i]) for i in rng)
@@ -81,7 +78,7 @@ class SatelliteViewport_StepbyMixin:
         if (
             idx == last
             and pos + ih < bot
-            and (last >= bot or sum(_fih(i) for i in range(0, last + 1)) >= bot)
+            and (last >= bot or sum(self._fih(i) for i in range(0, last + 1)) >= bot)
         ):
             raise NotImplementedError(
                 "RQ: last item can be above bot only if list is shorter than vp"
@@ -133,8 +130,8 @@ class SatelliteViewport_StepbyMixin:
                 idx = 0
             if pos > idx:  # <PERF:HACK
                 # NOTE: if some item ih=0, then enclosing perf hack will leave gaps till first item
-                assert all(_fih(i) >= 1 for i in range(0, idx))
-                lines_top = sum(_fih(i) for i in range(0, idx))
+                assert all(self._fih(i) >= 1 for i in range(0, idx))
+                lines_top = sum(self._fih(i) for i in range(0, idx))
                 if lines_top < margin:
                     pos = lines_top
         elif pos >= bot - margin and steps > 0:
@@ -210,11 +207,11 @@ class SatelliteViewport_StepbyMixin:
             # DEBUG: log.trace("".join(f"\n\t{k}={v}" for k,v in locals().items()))
 
             if bot - pos >= last - idx:  # <PERF:HACK
-                assert all(_fih(i) >= 1 for i in range(idx, last + 1))
+                assert all(self._fih(i) >= 1 for i in range(idx, last + 1))
                 ## NOTE: gravitate to bot
                 # ALT:NOT? calc from bot-up until found how much items fit under margin
                 #   ~~ for i in range(last, max(0,last-margin)); do if ... break; bot_edge_idx = i;
-                lines_bot = sum(_fih(i) for i in range(idx, last + 1)) - 1
+                lines_bot = sum(self._fih(i) for i in range(idx, last + 1)) - 1
                 if lines_bot <= margin:
                     # NOTE: immediately show last {small} items fully
                     pos = bot - lines_bot
@@ -233,14 +230,14 @@ class SatelliteViewport_StepbyMixin:
             if idx < 0:
                 knock = idx
                 idx = 0
-            lines_step_up = sum(_fih(i) for i in range(idx, pidx))
+            lines_step_up = sum(self._fih(i) for i in range(idx, pidx))
             pos -= lines_step_up
             # NOTE: keep at margin, or step over it, or adhere to the end
             if pos <= margin:
                 pos = margin
                 if idx <= margin:
-                    assert all(_fih(i) >= 1 for i in range(0, idx))
-                    lines_top = sum(_fih(i) for i in range(0, idx))
+                    assert all(self._fih(i) >= 1 for i in range(0, idx))
+                    lines_top = sum(self._fih(i) for i in range(0, idx))
                     if lines_top <= margin:
                         pos = lines_top
         elif steps > 0:
@@ -252,13 +249,13 @@ class SatelliteViewport_StepbyMixin:
                 knock = idx - last
                 idx = last
             # FUT: allow advancing by partial items
-            lines_step_down = sum(_fih(i) for i in range(pidx, idx))
+            lines_step_down = sum(self._fih(i) for i in range(pidx, idx))
             pos += lines_step_down
             if pos >= bot - margin:
                 pos = bot - margin
                 if bot - pos >= last - idx:
-                    assert all(_fih(i) >= 1 for i in range(idx, last + 1))
-                    lines_bot = sum(_fih(i) for i in range(idx, last + 1)) - 1
+                    assert all(self._fih(i) >= 1 for i in range(idx, last + 1))
+                    lines_bot = sum(self._fih(i) for i in range(idx, last + 1)) - 1
                     if lines_bot <= margin:
                         pos = bot - lines_bot
                         assert 0 <= pos <= bot

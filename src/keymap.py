@@ -16,7 +16,7 @@ def M(mod: str) -> ModuleType:
 
 def _loci() -> str:
     # pylint:disable=protected-access
-    return g_app.root_wdg._navi._view._wdg.focused_item.loci
+    return g_app.root_wdg._navi._view._wdg.focused_item._ent.loci
 
 
 # ALT:BET: allow direct access to contained _objects methods ?

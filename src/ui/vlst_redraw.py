@@ -31,10 +31,10 @@ def ranger_ansi() -> ModuleType | None:
     return ansi  # type:ignore
 
 
-def resolve_colorscheme(item: Addressable) -> int:
+def resolve_colorscheme(ent: Addressable) -> int:
     attr = S.item
-    if isinstance(item, FSEntry):
-        path = item.loci
+    if isinstance(ent, FSEntry):
+        path = ent.loci
         if not fs.exists(path):
             attr = S.error
             if fs.lexists(path):
@@ -99,15 +99,16 @@ class SatelliteViewport_RedrawMixin:
         top_y = self._viewport_followeditem_linesfromtop
         while top_idx > 0 and top_y > 0:
             top_idx -= 1
-            top_y -= self._itemheight(self._lst[top_idx])
+            top_y -= self._fih(top_idx)
         # log.trace(f"{top_y} {top_idx=}")
 
         last = len(self._lst) - 1
         i, y = top_idx, top_y
         while i <= last and y < vh:
             item = self._lst[i]
-            if isinstance(item, ErrorEntry):
-                stdscr.addstr(vy + y, vx + 0, f"[ {item.name} ]", S.error | S.cursor)
+            ent = item._ent
+            if isinstance(ent, ErrorEntry):
+                stdscr.addstr(vy + y, vx + 0, f"[ {ent.name} ]", S.error | S.cursor)
                 # HACK:WKRND: hover cursor on error, unless we already looped through cursor
                 #   >> meaning "cx" now become indented
                 if cx == vx:
@@ -124,32 +125,12 @@ class SatelliteViewport_RedrawMixin:
             else:
                 indent = 0
 
-            # VIZ:(wrap/lines): separately, combined, unlimited
-            # maxlines = 0
-            maxwrap = 1
-            iw = vw - 2 - indent
-            assert iw > 4
-            ## [_] TODO: !hi last char in line differently
-            # nm, *lines = [
-            #     l[c * iw : c * (iw + 1)] + ("↩" if c < maxwrap else "…")
-            #     for l in item.name.split("\n")
-            #     for c in range((len(l) // iw) + 1)
-            #     if c <= maxwrap
-            # ]
-            # log.trace(lines)
-            lines: list[str] = []
-            s = item.name
-            c = 0
-            while c < len(s) and len(lines) <= maxwrap:
-                nc = min(c + iw, len(s) - c)
-                if (nn := s.find("\n", c)) >= 0:
-                    nc = min(nn, nc)
-                lines.append(s[c:nc])
-                c = nc
-            log.trace(lines)
-            nm, *lines = lines
-
-            # nm, *lines = item.name.split("\n")
+            # iw = vw - 2 - indent
+            # assert iw > 4
+            # maxln = 1 + (self._viewport_height_lines // 10)
+            # nm, *lines = item.struct(wrapwidth=iw, maxlines=maxln)
+            # log.trace(lines)  # <DEBUG:(line split/wrap)
+            nm, *lines = ent.name.split("\n")
             py = y
 
             # FIXME:RELI: resize(<) may occur during redraw loop, invalidating "vh"
@@ -166,7 +147,7 @@ class SatelliteViewport_RedrawMixin:
 
                 ansi = ranger_ansi()
                 if not ansi or len(ansi.split_ansi_from_text(nm)) <= 1:
-                    c_schema = resolve_colorscheme(item)
+                    c_schema = resolve_colorscheme(ent)
                     stdscr.addnstr(
                         nm,
                         vw - xoff,  # OR: lim = stdscr.getmaxyx()[1] - stdscr.getyx()[1]
@@ -205,8 +186,8 @@ class SatelliteViewport_RedrawMixin:
                         S.cursor if i == ci else S.iteminfo,
                     )
                 y += 1
-            if y - py != self._itemheight(item):
-                log.error(f"{y - py} != {self._itemheight(item)}")
+            if y - py != self._fih(i):
+                log.error(f"{y - py} != {self._fih(i)}")
                 raise RuntimeError("WTF: this exception is silently ignored")
             i += 1
 

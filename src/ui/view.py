@@ -42,6 +42,8 @@ class EntityView:
             self._transform()
             assert getattr(self, "_xfm_lst", None) is not None
             if not getattr(self, "_wdg", None):
+                # MAYBE:BET? reuse existing _wdg (from outside `*Layout) inof creating it per each entity
+                #   OR:(vice versa): pass whole _view to any existing _wdg to display _lst
                 self._wdg = SatelliteViewport()
             self._wdg.assign(self._xfm_lst)
         else:

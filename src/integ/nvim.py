@@ -21,7 +21,7 @@ def _render_lst() -> tuple[str, int, str | None]:
     # IDEA: populate qf list with <lnum:col> from cached `View for the nodes
     lst = os.linesep.join(x.name for x in wdg._lst)
     idx = 1 + wdg._cursor_item_lstindex
-    name = wdg.focused_item.name if wdg._lst else None
+    name = wdg.focused_item._ent.name if wdg._lst else None
     return lst, idx, name
 
 

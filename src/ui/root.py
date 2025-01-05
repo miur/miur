@@ -58,7 +58,9 @@ class RootWidget:
         # ALT:([]): use ⸤⸣ OR ⸢⸥
         header = f"[{self._navi._history_idx+1}⁄{len(self._navi._history_stack)}] "
         stdscr.addstr(0, 0, header, S.auxinfo)
-        xpath = wdg.focused_item.loci if wdg._lst else self._navi._view._ent.loci + "/"
+        xpath = (
+            wdg.focused_item._ent.loci if wdg._lst else self._navi._view._ent.loci + "/"
+        )
 
         # FUT: "compress" header beside simply "cutting" it
         def capx() -> int:
@@ -84,6 +86,8 @@ class RootWidget:
         cy, cx = self._navi.redraw(stdscr)
 
         ci = 1 + wdg._cursor_item_lstindex
+        # NICE:IDEA: make scrollbar ~imprecise/elastic~ and scroll through *items* when jumping far,
+        #   but scroll by lines when scrolling around current viewport, where we already know all items heights
         sz = len(wdg._lst)
         sortby = "name"
         sortrev = False
