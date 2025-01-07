@@ -1,57 +1,13 @@
-import os
-import os.path as fs
-from functools import cache
-from types import ModuleType
-from typing import cast
-
 import _curses as C
 
 from ..curses_ext import g_style as S
-from ..curses_ext import termcolor2
-from ..util.exchook import log_exc
 from ..util.logger import log
-from .entity_base import Addressable
-from .entries import ErrorEntry, FSEntry
+from .entries import ErrorEntry
+from .itemcolor import text_highlight
 from .vlst_base import SatelliteViewport_DataProtocol
 
 # TRY: split into single-dispatch generic functions to draw elements
 #   i.e. rev-dep for isolated curses:draw(XXX) inof distributed XXX.draw_curses()
-
-
-@cache
-def ranger_ansi() -> ModuleType | None:
-    if __import__("sys").flags.isolated:
-        __import__("site").main()  # lazy init for "site" in isolated mode
-    try:
-        from ranger.gui import ansi
-    except Exception as exc:
-        log.error("You need to monkey-patch 'curses.setupterm()' in .venv")
-        log_exc(exc)
-        return None
-    return ansi  # type:ignore
-
-
-def resolve_colorscheme(ent: Addressable) -> int:
-    attr = S.item
-    if isinstance(ent, FSEntry):
-        path = ent.loci
-        if not fs.exists(path):
-            attr = S.error
-            if fs.lexists(path):
-                attr |= C.A_ITALIC | C.A_BOLD
-        elif fs.isdir(path):
-            attr = S.fsdir
-            if fs.islink(path):
-                # ALT:TRY: use color "in the middle" bw dir and filesymlink
-                #   i.e. introduce S.fsdirlink color
-                attr = S.fslink | C.A_BOLD
-        elif fs.isfile(path):
-            attr = S.item
-            if fs.islink(path):
-                attr = S.fslink | C.A_ITALIC | C.A_BOLD
-            elif os.access(path, os.X_OK):
-                attr = S.fsexe | C.A_BOLD
-    return cast(int, attr)
 
 
 class SatelliteViewport_RedrawMixin:
@@ -107,6 +63,8 @@ class SatelliteViewport_RedrawMixin:
         while i <= last and y < vh:
             item = self._lst[i]
             ent = item._ent
+
+            # MAYBE: make special kind of ErrorWidget and pass rendering to it inof directly here ?
             if isinstance(ent, ErrorEntry):
                 stdscr.addstr(vy + y, vx + 0, f"[ {ent.name} ]", S.error | S.cursor)
                 # HACK:WKRND: hover cursor on error, unless we already looped through cursor
@@ -117,6 +75,11 @@ class SatelliteViewport_RedrawMixin:
                 continue  # RND: draw both err and lst interchangeably
 
             if numcol:
+                # TODO:OPT: number-column variants:
+                #   * [rel]linenum
+                #   * [rel]viewpos
+                #   * [rel]itemidx
+                #   * combined=itemidx+viewpos
                 rel = i - top_idx
                 pfxrel = f"{1+rel:02d}| "
                 # TODO: for binary/hex show "file offset in hex" inof "item idx in _xfm_list"
@@ -125,15 +88,19 @@ class SatelliteViewport_RedrawMixin:
             else:
                 indent = 0
 
+            # WF?: RasterizeViewportItems/CacheDB -> HxW -> StepBy -> RenderVisibleItems
+            #   OPT: pre-rasterize everything (more RAM, less CPU/lag during scroll)
+
             # iw = vw - 2 - indent
             # assert iw > 4
-            # maxln = 1 + (self._viewport_height_lines // 10)
-            # nm, *lines = item.struct(wrapwidth=iw, maxlines=maxln)
+            nm, *lines = item.struct(wrapwidth=vw, maxlines=self._item_maxheight_hint)
             # log.trace(lines)  # <DEBUG:(line split/wrap)
-            nm, *lines = ent.name.split("\n")
+            # nm, *lines = ent.name.split("\n")
             py = y
 
-            # FIXME:RELI: resize(<) may occur during redraw loop, invalidating "vh"
+            # FIXME:RELI: resize(<) may occur during any point in redraw loop, invalidating "vh/vw"
+            # wh, ww = stdscr.getmaxyx()
+            # assert wh>=vh and ww >= vw
             if 0 <= y < vh:
                 stdscr.move(vy + y, vx + 0)
                 if numcol:
@@ -145,33 +112,15 @@ class SatelliteViewport_RedrawMixin:
                     cy = vy + y
                     cx = xoff
 
-                ansi = ranger_ansi()
-                if not ansi or len(ansi.split_ansi_from_text(nm)) <= 1:
-                    c_schema = resolve_colorscheme(ent)
-                    stdscr.addnstr(
-                        nm,
-                        vw - xoff,  # OR: lim = stdscr.getmaxyx()[1] - stdscr.getyx()[1]
-                        c_schema | S.cursor if i == ci else c_schema,
-                    )
-                else:
-                    ## ALT:(messy decoding): simply use non-curses libs
-                    #  * https://github.com/peterbrittain/asciimatics
-                    #  * https://github.com/urwid/urwid
-                    #  * ...
-                    nm_visible = ansi.char_slice(nm, 0, vw - xoff)
-                    # RND: we allow curses to calc() offset by itself
-                    stdscr.move(vy + y, xoff)
-                    pattr = 0
-                    for chunk in ansi.text_with_fg_bg_attr(nm_visible):
-                        # log.trace(chunk)
-                        if isinstance(chunk, tuple):
-                            fg, bg, attr = chunk
-                            if i == ci:
-                                attr |= S.cursor
-                            pattr = termcolor2(fg, bg) | attr
-                            # log.info(pattr)
-                        else:
-                            stdscr.addstr(chunk, pattr)
+                # RND: we allow curses to calc() offset by itself
+                stdscr.move(vy + y, xoff)
+                lim = vx + vw - stdscr.getyx()[1]
+                for chunk, cattr in text_highlight(ent, nm, lim, cursor=i == ci):
+                    lim = vx + vw - stdscr.getyx()[1]
+                    assert (
+                        len(chunk) < lim
+                    ), "Err: item.struct() ought to fit text into vw"
+                    stdscr.addnstr(chunk, lim, cattr)
 
             # SUM: draw rest of multiline item (2nd line onwards)
             y += 1

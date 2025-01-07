@@ -30,8 +30,10 @@ class NaviWidget:
         self._history_pool = {ent: self._view}
         ## NOTE: show N previous view on the left and 1 future node on the right
         # LIOR? int=Fixed/Column=-min/max, float=Percent/Ratio=-rest/full
-        self._miller_ratio = (20, 0, 0.5)
+        self._miller_ratio = (20, 0.4, 0)
         # self._miller_ratio = (20, 0)
+        ## BAD: on narrow window it draws 3rd column over 2nd one, triggering {assert iw>4}
+        # self._miller_ratio = (20, 0, 0.5)
         self._view_rect = (0, 0, 0, 0)  # (vh,vw,vy,vx)
 
     def _calc_abs_width(self, vw: int) -> list[int]:
@@ -152,7 +154,7 @@ class NaviWidget:
                 self._history_idx = len(self._history_stack) - 1
                 # NOTE: set cursor onto entity you came back from
                 for i, e in enumerate(self._view._wdg._lst):
-                    if e.name == pview._ent.name:
+                    if e._ent.name == pview._ent.name:
                         self._view._wdg._viewport_followeditem_lstindex = i
                         self._view._wdg._cursor_item_lstindex = i
                         # BAD: hardcoding pos to avoid last item at top

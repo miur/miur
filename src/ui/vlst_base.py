@@ -14,6 +14,7 @@ class SatelliteViewport_DataProtocol(Protocol):
     _viewport_width_columns: int
     _viewport_margin_lines: int
     _cursor_item_lstindex: int
+    _item_maxheight_hint: int
 
     @lru_cache
     def _fih(self, i: int) -> int:
@@ -47,6 +48,7 @@ class SatelliteViewportBase(SatelliteViewport_DataProtocol):
         #   !! orse margin over several large multiline items may even push cursor out of the viewport
         self._viewport_margin_lines = 0
         self._cursor_item_lstindex = 0
+        self._item_maxheight_hint = 0
 
     # ARCH: when we have multiple cursors "focused_item" is the item under currently active cursor
     #    MAYBE:THINK: use .subfocus(canvas_line/word) to apply actions to specific auxinfo of focused item
@@ -69,6 +71,7 @@ class SatelliteViewportBase(SatelliteViewport_DataProtocol):
         self._viewport_height_lines = vh
         self._viewport_width_columns = vw
         self._viewport_margin_lines = vh // 8  # OR: fixed=2
+        self._item_maxheight_hint = 1 + (vh // 10)
         # KEEP: self._viewport_followeditem_lstindex
         # RND: adjust resulting offset to align onto margin
         #   ALT:BAD: self._viewport_followeditem_linesfromtop = 0
