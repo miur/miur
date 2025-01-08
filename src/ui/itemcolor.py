@@ -60,7 +60,10 @@ def text_highlight(
     ansi = ranger_ansi()
     if not ansi or len(ansi.split_ansi_from_text(text)) <= 1:
         c_schema = resolve_colorscheme(ent)
-        yield (text, c_schema | S.cursor if cursor else c_schema)
+        if cursor:
+            c_schema |= S.cursor
+            text += " " * (lim - len(text))  # HACK: make cursor for full viewport width
+        yield (text, c_schema)
         return
 
     ## ALT:(messy decoding): simply use non-curses libs

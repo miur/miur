@@ -1,12 +1,13 @@
-from typing import override
-
 import _curses as C
 
-from .entity_base import Golden, Representable
+from ..curses_ext import g_style as S
+from .entity_base import Golden
+from .itemcolor import text_highlight
 
 
 ## FUT:TRY: make any `*Widget into valid Entity to be destructured and explored
 ##   class ItemWidget(Golden):
+# RENAME?(TextItemWidget): to override .struct returning wrapped text inof composite substructure
 class ItemWidget:
     # RENAME? .boxheight
     # def nr_lines(self, wrap: int = 0) -> int:
@@ -75,5 +76,46 @@ class ItemWidget:
     # DECI: pass XY to redraw/render ? OR store as .origin ?
     #   ~store~ makes it possible to .redraw() individual elements only
     #     BAD: all XY should be updated each time we scroll :(
-    def redraw(self, stdscr: C.window, **kw: int) -> None:
-        pass
+    def render_curses(
+        self,
+        stdscr: C.window,
+        absy: int,
+        absx: int,
+        maxw: int,
+        **kw: int | None,
+    ) -> int:
+        # RND: we allow curses to calc() offset by itself
+        stdscr.move(absy, absx)
+        cursor = bool(kw.get("cursor"))
+
+        # [_] FIXME: item.struct() linewrap should account for linenum prefix
+        # TODO:OPT: number-column variants:
+        #   * [rel]linenum
+        #   * [rel]viewpos
+        #   * [rel]itemidx
+        #   * combined=itemidx+viewpos
+        if (vpidx := kw.get("vpidx")) is not None:
+            pfxvp = f"{1+vpidx:02d}| "
+            stdscr.addstr(pfxvp, S.pfxrel)
+        # TODO: for binary/hex show "file offset in hex" inof "item idx in _xfm_list"
+        if (lstidx := kw.get("lstidx")) is not None:
+            # IDEA: shorten long numbers >999 to ‥33 i.e. last digits significant for column
+            #   (and only print cursor line with full index)
+            pfxlst = f"{1+lstidx:03d}{">" if cursor else ":"} "
+            stdscr.addstr(pfxlst, S.cursor if cursor else S.pfxidx)
+
+        # NOTE: textbody position (to place cursor there)
+        #  ALT= len(pfxvp) + len(pfxlst)
+        _by, bx = stdscr.getyx()
+
+        lim = absx + maxw - bx
+        # TODO: combine with item.struct() linewrap to split chunks and dup cattr on wrapwidth
+        # MOVE: it only has sense for plaintext items -- nested structures don't have ANSI, do they?
+        for chunk, cattr in text_highlight(
+            self._ent, self._ent.name, lim, cursor=cursor
+        ):
+            lim = absx + maxw - stdscr.getyx()[1]
+            assert len(chunk) <= lim, "Err: item.struct() ought to fit text into vw"
+            stdscr.addnstr(chunk, lim, cattr)
+
+        return bx - absx

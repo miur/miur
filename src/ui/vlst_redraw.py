@@ -3,11 +3,10 @@ import _curses as C
 from ..curses_ext import g_style as S
 from ..util.logger import log
 from .entries import ErrorEntry
-from .itemcolor import text_highlight
 from .vlst_base import SatelliteViewport_DataProtocol
 
-# TRY: split into single-dispatch generic functions to draw elements
-#   i.e. rev-dep for isolated curses:draw(XXX) inof distributed XXX.draw_curses()
+# TRY: split into single-dispatch generic functions to draw elements (./frontend/curses.py)
+#   i.e. rev-dep for isolated curses:draw(type:XXX) inof distributed XXX.draw_curses()
 
 
 class SatelliteViewport_RedrawMixin:
@@ -74,20 +73,6 @@ class SatelliteViewport_RedrawMixin:
                 i += 1
                 continue  # RND: draw both err and lst interchangeably
 
-            if numcol:
-                # TODO:OPT: number-column variants:
-                #   * [rel]linenum
-                #   * [rel]viewpos
-                #   * [rel]itemidx
-                #   * combined=itemidx+viewpos
-                rel = i - top_idx
-                pfxrel = f"{1+rel:02d}| "
-                # TODO: for binary/hex show "file offset in hex" inof "item idx in _xfm_list"
-                pfxidx = f"{1+i:03d}{">" if i == ci else ":"} "
-                indent = len(pfxrel) + len(pfxidx)
-            else:
-                indent = 0
-
             # WF?: RasterizeViewportItems/CacheDB -> HxW -> StepBy -> RenderVisibleItems
             #   OPT: pre-rasterize everything (more RAM, less CPU/lag during scroll)
 
@@ -101,26 +86,27 @@ class SatelliteViewport_RedrawMixin:
             # FIXME:RELI: resize(<) may occur during any point in redraw loop, invalidating "vh/vw"
             # wh, ww = stdscr.getmaxyx()
             # assert wh>=vh and ww >= vw
+            #   ALT:BET:TRY: wrap all stdscr.* calls and raise "EAGAIN" if resize had occured
+            #     &why to avoid drawing outside curses if window had shrinked
+            #     ALT:BET! delay resize() processing until current draw-frame finishes
             if 0 <= y < vh:
-                stdscr.move(vy + y, vx + 0)
-                if numcol:
-                    stdscr.addstr(pfxrel, S.pfxrel)
-                    stdscr.addstr(pfxidx, S.cursor if i == ci else S.pfxidx)
-                xoff = vx + indent  # OR: _, xoff = stdscr.getyx()
-
+                indent = item.render_curses(
+                    stdscr,
+                    # ctx::
+                    # [_] ADD: offi/span to print only "range" for partially shown top/bot items
+                    #   and to show only middle part of very large item
+                    #   IDEA: pass "y" as-is with y<0 and y+ih>vy meaning "top/bot partially shown"
+                    absy=vy + y,
+                    absx=vx + 0,
+                    maxw=vw,
+                    lstidx=i if numcol else None,
+                    vpidx=(i - top_idx) if numcol else None,
+                    vpline=y if numcol else None,
+                    cursor=1 if i == ci else None,
+                )
                 if i == ci:
                     cy = vy + y
-                    cx = xoff
-
-                # RND: we allow curses to calc() offset by itself
-                stdscr.move(vy + y, xoff)
-                lim = vx + vw - stdscr.getyx()[1]
-                for chunk, cattr in text_highlight(ent, nm, lim, cursor=i == ci):
-                    lim = vx + vw - stdscr.getyx()[1]
-                    assert (
-                        len(chunk) < lim
-                    ), "Err: item.struct() ought to fit text into vw"
-                    stdscr.addnstr(chunk, lim, cattr)
+                    cx = vx + indent
 
             # SUM: draw rest of multiline item (2nd line onwards)
             y += 1
@@ -143,6 +129,7 @@ class SatelliteViewport_RedrawMixin:
         ## ALT:NOTE: draw cursor AGAIN after footer (i.e. over-draw on top of full list)
         ##   NICE: no need to hassle with storing cursor prefix length for cx/cy
         ##   NICE: can redraw only two lines (prev item and cursor) inof whole list
+        ##   BAD: impossible to override already rendered item (e.g. textlog or opengl)
         # cx = len(_pfx(vctx.wndcurpos0))
         # _draw_item_at(vctx.wndcurpos0, citem)
         # stdscr.move(vctx.wndcurpos0, cx)
