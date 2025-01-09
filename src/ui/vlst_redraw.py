@@ -3,6 +3,7 @@ import _curses as C
 from ..curses_ext import g_style as S
 from ..util.logger import log
 from .entries import ErrorEntry
+from .rect import Rect
 from .vlst_base import SatelliteViewport_DataProtocol
 
 # TRY: split into single-dispatch generic functions to draw elements (./frontend/curses.py)
@@ -41,10 +42,6 @@ class SatelliteViewport_RedrawMixin:
         vw = self._viewport_width_columns
         top_idx = self._viewport_followeditem_lstindex
 
-        if numcol is None:
-            # HACK: hide both numcol when viewport is too small
-            numcol = vw >= 25
-
         # SUM:(cy,cx): real cursor pos (either focused item or top/bot linebeg)
         #   DFL: we assume cursor is above/below viewport, unless loop confirms otherwise
         cy = vy if ci < top_idx else vy + vh
@@ -71,17 +68,11 @@ class SatelliteViewport_RedrawMixin:
                 if cx == vx:
                     cy = vy + y
                 i += 1
+                y += 1
                 continue  # RND: draw both err and lst interchangeably
 
             # WF?: RasterizeViewportItems/CacheDB -> HxW -> StepBy -> RenderVisibleItems
             #   OPT: pre-rasterize everything (more RAM, less CPU/lag during scroll)
-
-            # iw = vw - 2 - indent
-            # assert iw > 4
-            nm, *lines = item.struct(wrapwidth=vw, maxlines=self._item_maxheight_hint)
-            # log.trace(lines)  # <DEBUG:(line split/wrap)
-            # nm, *lines = ent.name.split("\n")
-            py = y
 
             # FIXME:RELI: resize(<) may occur during any point in redraw loop, invalidating "vh/vw"
             # wh, ww = stdscr.getmaxyx()
@@ -89,41 +80,23 @@ class SatelliteViewport_RedrawMixin:
             #   ALT:BET:TRY: wrap all stdscr.* calls and raise "EAGAIN" if resize had occured
             #     &why to avoid drawing outside curses if window had shrinked
             #     ALT:BET! delay resize() processing until current draw-frame finishes
-            if 0 <= y < vh:
-                indent = item.render_curses(
-                    stdscr,
-                    # ctx::
-                    # [_] ADD: offi/span to print only "range" for partially shown top/bot items
-                    #   and to show only middle part of very large item
-                    #   IDEA: pass "y" as-is with y<0 and y+ih>vy meaning "top/bot partially shown"
-                    absy=vy + y,
-                    absx=vx + 0,
-                    maxw=vw,
-                    lstidx=i if numcol else None,
-                    vpidx=(i - top_idx) if numcol else None,
-                    vpline=y if numcol else None,
-                    cursor=1 if i == ci else None,
-                )
-                if i == ci:
-                    cy = vy + y
-                    cx = vx + indent
-
-            # SUM: draw rest of multiline item (2nd line onwards)
-            y += 1
-            for l in lines:
-                if 0 <= y < vh:
-                    # stdscr.addstr(vy+y, 2, "|", S.pfxrel)
-                    xoff = vx + indent + 2
-                    stdscr.addstr(
-                        vy + y,
-                        xoff,
-                        l[: vw - xoff],
-                        S.cursor if i == ci else S.iteminfo,
-                    )
-                y += 1
-            if y - py != self._fih(i):
-                log.error(f"{y - py} != {self._fih(i)}")
-                raise RuntimeError("WTF: this exception is silently ignored")
+            indent = item.render_curses(
+                stdscr,
+                rect=Rect(w=vw, h=(vh if y < 0 else vh - y), x=vx, y=vy + y),
+                offy=(-y if y < 0 else 0),
+                ih_hint=self._item_maxheight_hint,
+                # infoctx::
+                lstidx=i if numcol else None,
+                vpidx=(i - top_idx) if numcol else None,
+                vpline=y if numcol else None,
+                focused=((y - top_y) if i == ci else None),  # CHG> substruct_ptr
+            )
+            if i == ci:
+                cy = vy + y
+                cx = vx + indent
+            # BAD: desynchronized from default item.height due to ext-supplied "maxlines"
+            #   MAYBE: totally eliminate item.height usage -- jump step_by() bw internal structures
+            y += self._fih(i)
             i += 1
 
         ## ALT:NOTE: draw cursor AGAIN after footer (i.e. over-draw on top of full list)

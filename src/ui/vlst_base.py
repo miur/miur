@@ -21,7 +21,7 @@ class SatelliteViewport_DataProtocol(Protocol):
         # IDEA:OPT: scale maxlines with viewport height, i.e. use smaller preview for smaller windows
         # BAD: should account for indents inside viewport {wrapw = vw - 2 - indent; assert iw > 4}
         wrapw = self._viewport_width_columns
-        maxln = 1 + (self._viewport_height_lines // 10)
+        maxln = self._item_maxheight_hint
         return len(self._lst[i].struct(wrapwidth=wrapw, maxlines=maxln))
 
 

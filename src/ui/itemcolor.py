@@ -10,7 +10,7 @@ from ..curses_ext import g_style as S
 from ..curses_ext import termcolor2
 from ..util.exchook import log_exc
 from ..util.logger import log
-from .entity_base import Addressable
+from .entity_base import Golden
 from .entries import FSEntry
 
 
@@ -27,7 +27,7 @@ def ranger_ansi() -> ModuleType | None:
     return ansi  # type:ignore
 
 
-def resolve_colorscheme(ent: Addressable) -> int:
+def resolve_colorscheme(ent: Golden) -> int:
     attr = S.item
     if isinstance(ent, FSEntry):
         path = ent.loci
@@ -50,17 +50,24 @@ def resolve_colorscheme(ent: Addressable) -> int:
     return cast(int, attr)
 
 
-def text_highlight(
-    ent: Addressable,
+def colored_ansi_or_schema(
+    ent: Golden,
     text: str,
     lim: int,
     *,
-    cursor: bool = False,
+    focused: bool = False,
 ) -> Iterable[tuple[str, int]]:
     ansi = ranger_ansi()
     if not ansi or len(ansi.split_ansi_from_text(text)) <= 1:
+        # NICE:IDEA: we can yield multiple colorpairs per filetype too
+        #   e.g. for broken symlinks -- highlight existing and not existing parts differently
         c_schema = resolve_colorscheme(ent)
-        if cursor:
+
+        # BAD:PERF:RND: dim multiline non-ANSI items for more contrasting structure
+        # if not ent.name.startswith(text):
+        #     cattr = S.iteminfo
+
+        if focused:
             c_schema |= S.cursor
             text += " " * (lim - len(text))  # HACK: make cursor for full viewport width
         yield (text, c_schema)
@@ -76,7 +83,7 @@ def text_highlight(
         # log.trace(chunk)
         if isinstance(chunk, tuple):
             fg, bg, attr = chunk
-            if cursor:
+            if focused:
                 attr |= S.cursor
             pattr = termcolor2(fg, bg) | attr
             # log.info(pattr)
