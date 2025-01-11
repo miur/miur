@@ -30,6 +30,7 @@ def handle_SIGWINCH(sel: selectors.DefaultSelector, sigfd: int, g: AppGlobals) -
 
 def mainloop_selectors(g: AppGlobals) -> None:
     def _doexit() -> None:
+        g.exiting = True
         raise SystemExit()  # OR:(same): import sys; sys.exit()
 
     g.doexit = _doexit

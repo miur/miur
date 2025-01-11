@@ -3,6 +3,7 @@ import os
 import _curses as C
 
 from ..curses_ext import g_style as S
+from ..util.logger import log
 from .entity_base import Golden
 from .itemcolor import colored_ansi_or_schema
 from .rect import Rect
@@ -54,12 +55,15 @@ class ItemWidget:
     #     ~~ though, I can pass list index ctx into ItemWidget.render(ctx[index=i])
     ## NOTE: :maxlines is only a "hint", i.e. if ItemWidget absolutely must -- it can be more than viewport
     # TODO: when setting HxW you should specify if H,W are "fixed/box" or "relaxed/shrink"
-    # FIXME: on lastline .replace("\n","⬎") when {maxlines < len(name.splitlines())} to compress short newlines
+    # FIXME: compress short NLs on lastline (preserving tail NL) when {maxlines < len(name.splitlines())}
+    #   :: if os.linesep in l: l = l[:-1].replace([os.linesep, "\n", "\r"], "⬎") + l[-1]
     # WARN: all contained "\n" should be *preserved* after splitting into individual lines
-    def struct(self, wrapwidth: int = 0, maxlines: int = 0) -> list[str]:
+    def struct(
+        self, wrapwidth: int = 0, maxlines: int = 0, extendlast: int = 1
+    ) -> list[str]:
         # TEMP:DEBUG: multiline entries
         # nm, *lines = ent.name.split("\n")
-        return self._ent.name.replace("o", "o⬎" + os.linesep).splitlines(keepends=True)
+        return self._ent.name.replace("o", "o" + os.linesep).splitlines(keepends=True)
         ## ALSO:IDEA: when wrapwidth=0, insert "‥" at the end of each linepart, which longer than viewport
         ##   OR: smart-compress in the middle each part of .name bw newlines
         ## [_] TODO: !hi last char in each line differently
@@ -97,12 +101,13 @@ class ItemWidget:
         **infoctx: int | None,
     ) -> int:
         stdscr.move(rect.y, rect.x)
-        focused = bool(infoctx.get("focused"))
+        focused = infoctx.get("focusid") is not None
 
         def lim() -> int:
-            nchar = rect.x + rect.w - stdscr.getyx()[1]
-            assert nchar > 0
-            return nchar
+            cx = stdscr.getyx()[1]
+            ncells = rect.x + rect.w - cx
+            assert ncells >= 0
+            return ncells
 
         # TODO:OPT: number-column variants:
         #   * [rel]linenum
@@ -120,14 +125,15 @@ class ItemWidget:
             # IDEA: shorten long numbers >999 to ‥33 i.e. last digits significant for column
             #   (and only print cursor line with full index)
             pfxlst = f"{1+lstidx:03d}{">" if focused else ":"} "
-            stdscr.addstr(pfxlst, S.cursor if focused else S.pfxidx)
+            stdscr.addstr(pfxlst, S.pfxidx | (S.cursor if focused else 0))
 
         # NOTE: textbody position (to place cursor there)
         _bodyy, bodyx = stdscr.getyx()
         indent = bodyx - rect.x  # ALT =len(pfxvp)+len(pfxlst) | =rect.w-lim()
-        boxw = (
-            lim() - 1
-        )  # = width_of_box_indented_by_prefix_minus_decortail  | ALT=rect.w-indent-1
+        # TODO:(extendlast): drop "-1" and use {boxw=lim()} for last (or only) line
+        #   BUT? we currently draw decortail over columns-spacer, so we shouldn't extend textbody there
+        boxw = lim() - 1  # = width_of_box_indented_by_prefix_minus_decortail
+        # boxw = rect.w-indent-1  # <ALT
 
         # INFO:(rect.h): "self._item_maxheight_hint" is only a recommendation
         #   >> real limitator is either viewport vh
@@ -138,6 +144,7 @@ class ItemWidget:
         # IDEA: don't always wrap unconditionally on "wrapwidth" -- use nowrap for narrow windows {vw<10}
         #   OPT:BET: allow to pan such cropped name left/right manually (OR by "running line")
         lines = self.struct(
+            # INFO: we can pass {boxw>vw}, enabling horizontal panning, marked by "‥"
             wrapwidth=(boxw if boxw > 10 else 0),
             maxlines=(ih_hint if boxw > 10 else 1),
         )
@@ -165,34 +172,70 @@ class ItemWidget:
         #   - align all lines onwards on postfix
 
         # TODO: combine with item.struct() linewrap to split chunks and dup cattr on wrapwidth
+        last = len(lines) - 1
         for i, l in enumerate(lines):
             stdscr.move(rect.y + i, bodyx)  #  ALT=(,rect.x+2)
+            if newl := l.endswith(os.linesep):
+                l = l.rstrip(os.linesep)
+            assert all(c not in l for c in "\r\n"), "TEMP: sub() or repr() embedded NLs"
+
+            # DEBUG: log.info(f"{focused=} | {l=}")
 
             # MOVE: it only has sense for plaintext items -- nested structures don't have ANSI, do they?
             #   SPLIT:VIZ: `CompositeItem, `PlaintextItem, `AnsitermItem : based on originator `Entity
             # NOTE:(boxw): we crop everything outside "rect" area
             #   >> item.struct() ought to pre-wrap text on {boxw < rect.w}
-            for chunk, cattr in colored_ansi_or_schema(
-                self._ent, l, boxw, focused=focused
+            cattr = S.cursor
+
+            boff = len(l)
+            for chunk, cattr, boff in colored_ansi_or_schema(
+                self._ent, l, maxcells=boxw, focused=focused
             ):
+                # RND: curses calc() offset for each next addstr() by itself
                 # WARN: possibly wraps onto next line, if {len(_visual(chunk))>lim()}
-                #   BAD:PERF: you should call addnstr(,lim(),) -- and can't pass "boxw" there
-                # RND: curses calc() offset for each next addstr() by itself and hope it won't wrap
+                # FAIL:(addnstr(,lim(),)): wrong byte-cropping for multi-cell CJK fonts
+                #   BAD:PERF: you can't pass "boxw" inof "lim()" here
                 stdscr.addstr(chunk, cattr)
 
-            # [_] WIP:CONT
+            # ALT:(len(l)>boxw):FAIL: doesn't work due to term-ANSI
+            cropped = boff != len(l)
+
+            # NOTE: "colored_ansi_or_schema" should ensure all chunks totally fit
+            # ATT: we crop to prevent "lim()" from ever becoming negative
+            #   TBD: assert() : only applicable to the last chunk of several, orse ivts were broken
+            if (avail := lim()) <= 0:
+                raise RuntimeError(avail)
+
+            if focused:
+                # HACK: make cursor span to full viewport width (minus decortail),
+                #   colored same as the last chunk
+                stdscr.addstr(" " * (avail - 1), cattr | S.cursor)
+
+            assert i <= last
+            # ALT? hide decortail {if not focused} for cleaner !tmux screen-copy
             # MAYBE:PERF: insert "⬎" by item.struct() once inof repeated checks during rendering
             #   FAIL: substruct should be *copyable*, so decortail can't be part of item.struct()
-            # if os.linesep in l: l = l.replace(os.linesep, "⬎")
+            #   ALSO:BAD: to apply different hi for decortail -- we shouldn't include it into line body
+            #
             # SUM: calculate appropriate leading/trailing decortail symbols
             #   ENH: prepend leading "‥" when "offx>0"
             #   ENH: "…" to 1st line when "offs>0"
-            # BAD: to apply different hi for decortail -- we shouldn't include it into line body
-            # ALT:(len(l)>boxw):FAIL: doesn't work for term ANSI
-            # if lim() > 0:
-            #     tail = "⬎" if l.endswith(os.linesep) else "↩"
-            # else:
-            #     tail = "‥" if i < len(lines) - 1 else "…"
-            # stdscr.addstr(tail, S.auxinfo)
+            #   ENH: "…" as stem into mid/beg of compressed line
+            #     │ for smart-compression "…" may also appear in the middle of last/each line,
+            #     │ or even replace several lines by two "…" e.g. "…[snippet]…" OR "line1…\n…lineN"
+            if cropped:
+                # BET: always print c-tail over spacer bw columns
+                # ALT: print compression "tail" over last char in total "line+tail"
+                # FIXME: "…" should be only used if item.struct() had cropped item,
+                #   orse if item doesn't fit into navi viewport -- it should always use "‥"
+                tail = "…" if i == last else "‥"
+            else:
+                # MAYBE: print wraps over columns-spacer too (FIXED: tail^=" "*(avail-1))
+                # REVL:NICE: current cursor has got behavior of dynamic left-right justifying
+                tail = "" if i == last else "⬎" if newl else "↩"
+            if tail:
+                ## BAD:DISABLED: cursor-highlight over column-spacer is very distracting
+                # stdscr.addstr(tail, S.iteminfo | (S.cursor if focused else 0))
+                stdscr.addstr(tail, S.iteminfo)
 
         return indent

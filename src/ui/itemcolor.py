@@ -3,6 +3,7 @@ import os.path as fs
 from functools import cache
 from types import ModuleType
 from typing import Iterable, cast
+from unicodedata import east_asian_width
 
 import _curses as C
 
@@ -53,10 +54,10 @@ def resolve_colorscheme(ent: Golden) -> int:
 def colored_ansi_or_schema(
     ent: Golden,
     text: str,
-    lim: int,
     *,
+    maxcells: int,
     focused: bool = False,
-) -> Iterable[tuple[str, int]]:
+) -> Iterable[tuple[str, int, int]]:
     ansi = ranger_ansi()
     if not ansi or len(ansi.split_ansi_from_text(text)) <= 1:
         # NICE:IDEA: we can yield multiple colorpairs per filetype too
@@ -69,16 +70,32 @@ def colored_ansi_or_schema(
 
         if focused:
             c_schema |= S.cursor
-            text += " " * (lim - len(text))  # HACK: make cursor for full viewport width
-        yield (text, c_schema)
+
+        # FIXED:BAD:PERF: curses.addnstr(,Nbytes,) doesn't understand multi-cell CJK fonts
+        if text.isascii():
+            text = text[:maxcells]
+        else:
+            s, nc = "", 0
+            for ch in text:
+                # BAD: actual char width may depend on !st.render and !font (chosen by !fontconfig)
+                #   >> some chars have triple-cell width, and some fonts fit wide chars in single cell
+                cw = 2 if (prop := east_asian_width(ch)) == "W" or prop == "F" else 1
+                if nc + cw > maxcells:
+                    break
+                s += ch
+                nc += cw
+            text = s
+
+        yield (text, c_schema, len(text))  # len=cursor.byteoffset()
         return
 
     ## ALT:(messy decoding): simply use non-curses libs
     #  * https://github.com/peterbrittain/asciimatics
     #  * https://github.com/urwid/urwid
     #  * ...
-    nm_visible = ansi.char_slice(text, 0, lim)
+    nm_visible = ansi.char_slice(text, 0, maxcells)
     pattr = 0
+    boff = len(nm_visible)  # boff = 0
     for chunk in ansi.text_with_fg_bg_attr(nm_visible):
         # log.trace(chunk)
         if isinstance(chunk, tuple):
@@ -88,4 +105,6 @@ def colored_ansi_or_schema(
             pattr = termcolor2(fg, bg) | attr
             # log.info(pattr)
         else:
-            yield (chunk, pattr)
+            # TEMP:(boff): always return whole line byteoffset for all chunks
+            #   FUT:SEIZE: "ansi.text_with_fg_bg_attr" should yield boff by itself
+            yield (chunk, pattr, boff)

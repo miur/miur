@@ -22,5 +22,9 @@ class Rect:
 
     @override
     def __str__(self) -> str:
+        return f"[{self.w}x{self.h}+{self.x}+{self.y}]"
+
+    @override
+    def __repr__(self) -> str:
         clsnm = self.__class__.__name__
         return f"{clsnm}(w={self.w}, h={self.h}, x={self.x}, y={self.y})"

@@ -4,7 +4,6 @@ from ..curses_ext import g_style as S
 
 # from ..util.logger import log
 from .entity_base import Golden
-from .entries import ErrorEntry
 from .navi import NaviWidget
 
 

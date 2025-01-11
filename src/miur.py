@@ -43,9 +43,26 @@ def miur_main(g: AppGlobals) -> None:
         from .ui.entries import FSEntry
         from .ui.root import RootWidget
 
+        crashsafe = True
+        if g.opts.ipykernel:
+            crashsafe = True
+
+        def handle_input_safe() -> None:
+            """Don't exit !miur when developing in REPL or CLI"""
+            try:
+                KM.handle_input(g)
+            except Exception as exc:  # pylint:disable=broad-exception-caught
+                from .util.exchook import log_exc
+
+                log_exc(exc)
+                # FUT:RELI: rollback to prev good state (atomic transaction) ※⡧⢁⢦⢽
+                #   >> stability for both devs and end-user
+                # ALT:FAIL:(CE.resize()): will re-trigger exception in .redraw()
+                g.stdscr.refresh()
+
         ui = AppCursesUI()
         ui.resize = CE.resize
-        ui.handle_input = lambda: KM.handle_input(g)
+        ui.handle_input = handle_input_safe if crashsafe else lambda: KM.handle_input(g)
         g.curses_ui = ui
         g.keytableroot = keytable_insert_aura_pathes(KM.g_modal_default)
         KM.modal_switch_to(None)

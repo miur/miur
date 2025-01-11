@@ -145,24 +145,15 @@ def handle_input(g: AppGlobals) -> None:
         g.stdscr.refresh()
     elif callable(cmd):
         modal_switch_to(None)
-        # MOVE: extract try-catch into wrapper assigned to "g.ui.handle_input"
-        # TEMP: don't exit !miur when developing in REPL
-        # FUT: always do this, even for regular usage (i.e. stability for end-user)
-        if g.opts.ipykernel:
-            try:
-                cmd(g)
-            except Exception as exc:  # pylint:disable=broad-exception-caught
-                from .util.exchook import log_exc
-
-                log_exc(exc)
-        else:
-            # WARN: last stmt in loop COS: may raise SystemExit
-            cmd(g)
-        # CHG: only do partial redraw e.g. prev/next cursor areas
-        # MAYBE: redraw only if anything had changed (not all cmds to that)
-        #   BUT: uix needs visual feedback on each keypress, so it's better to always redraw
-        g.root_wdg.redraw(g.stdscr)
-        g.stdscr.refresh()
+        cmd(g)  # WARN: should be last stmt in loop COS: may raise SystemExit
+        ## NOTE: don't redraw on .doexit() for PERF: faster exit
+        #   (unless exit is blocked by slow bkgr cleanup -- then redraw only spinner OR manually)
+        if not g.exiting:
+            # CHG: only do partial redraw e.g. prev/next cursor areas
+            # MAYBE: redraw only if anything had changed (not all cmds to that)
+            #   BUT: uix needs visual feedback on each keypress, so it's better to always redraw
+            g.root_wdg.redraw(g.stdscr)
+            g.stdscr.refresh()
     else:
         raise NotImplementedError()
 

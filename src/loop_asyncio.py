@@ -63,7 +63,13 @@ async def mainloop_asyncio(g: AppGlobals) -> None:
     loop = asyncio.get_running_loop()
     # FAIL: RuntimeError: Event loop stopped before Future completed.
     ev_shutdown = asyncio.Event()
-    g.doexit = ev_shutdown.set
+
+    def _doexit() -> None:
+        g.exiting = True
+        ev_shutdown.set()
+
+    g.doexit = _doexit
+
     loop.add_signal_handler(signal.SIGINT, ev_shutdown.set)
     # FIND:MAYBE: don't process in handler directly, and only schedule callback ?
     loop.add_signal_handler(signal.SIGWINCH, g.curses_ui.resize)

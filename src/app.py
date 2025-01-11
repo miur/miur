@@ -65,6 +65,7 @@ type KeyTable = "dict[str | int, Callable[[AppGlobals], None] | KeyTable]"
 class AppGlobals:
     _main: "ModuleType"
     stdscr: "C.window"
+    # MAYBE:(inof doexit/exiting): directly store {ev_shutdown: asyncio.Event}.is_set()
     doexit: "Callable[[], None]"
     io = AppIO()
     opts = AppOptions()
@@ -73,6 +74,11 @@ class AppGlobals:
     keytable: KeyTable  # =current/cursor
     keytablename: str
     keytableroot: KeyTable  # =read-only, whole tree
+    ## IMPL(exiting): change FSM operation mode
+    #   - stop accepting new cmds/input-data
+    #   - reduce bkgr tasks timeout to close faster
+    #   - don't refresh screen beside spinner area
+    exiting: bool = False
 
 
 g_app = AppGlobals()

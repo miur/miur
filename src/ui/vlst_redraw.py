@@ -74,24 +74,43 @@ class SatelliteViewport_RedrawMixin:
             # WF?: RasterizeViewportItems/CacheDB -> HxW -> StepBy -> RenderVisibleItems
             #   OPT: pre-rasterize everything (more RAM, less CPU/lag during scroll)
 
-            # FIXME:RELI: resize(<) may occur during any point in redraw loop, invalidating "vh/vw"
-            # wh, ww = stdscr.getmaxyx()
-            # assert wh>=vh and ww >= vw
-            #   ALT:BET:TRY: wrap all stdscr.* calls and raise "EAGAIN" if resize had occured
-            #     &why to avoid drawing outside curses if window had shrinked
-            #     ALT:BET! delay resize() processing until current draw-frame finishes
-            indent = item.render_curses(
-                stdscr,
-                rect=Rect(w=vw, h=(vh if y < 0 else vh - y), x=vx, y=vy + y),
-                offy=(-y if y < 0 else 0),
-                ih_hint=self._item_maxheight_hint,
-                # infoctx::
-                lstidx=i if numcol else None,
-                vpidx=(i - top_idx) if numcol else None,
-                vpline=y if numcol else None,
-                focused=((y - top_y) if i == ci else None),  # CHG> substruct_ptr
-            )
+            indent = 0
+            try:
+                # FIXME:RELI: resize(<) may occur during any point in redraw loop, invalidating "vh/vw"
+                # wh, ww = stdscr.getmaxyx()
+                # assert wh>=vh and ww >= vw
+                #   ALT:BET:TRY: wrap all stdscr.* calls and raise "EAGAIN" if resize had occured
+                #     &why to avoid drawing outside curses if window had shrinked
+                #     ALT:BET! delay resize() processing until current draw-frame finishes
+                indent = item.render_curses(
+                    stdscr,
+                    # SEE:ARCH: !urwid for inspiration on `Rect and `TextBox
+                    rect=Rect(
+                        w=vw, h=(vh if y < 0 else vh - y), x=vx, y=vy + max(0, y)
+                    ),
+                    offy=(-y if y < 0 else 0),
+                    ih_hint=self._item_maxheight_hint,
+                    # infoctx::
+                    lstidx=i if numcol else None,
+                    vpidx=(i - top_idx) if numcol else None,
+                    vpline=y if numcol else None,
+                    focusid=((y - top_y) if i == ci else None),  # CHG> substruct_ptr
+                )
+            except Exception as exc:  # pylint:disable=broad-exception-caught
+                from ..util.exchook import log_exc
+
+                log_exc(exc)
+                # HACK: log and draw error-entries inof breaking stack by unrolled exception
+                #   == NICE> it's unobstructive visual cue to go check !miur logs for any errors/exceptions
+                # FUT:CHG: C.A_BLINK -> strikethrough (=ATTR_STRUCK); BAD: not supported by !ncurses=2024
+                # FAIL:(unicode strikethrough): text = "\u0336".join(ent.name) + "\u0336"
+                eattr = S.error | (S.cursor if i == ci else 0) | C.A_REVERSE | C.A_DIM
+                # BAD:TEMP: hardcoded .bc. indent is lost on exception
+                indent = 9
+                stdscr.addstr(vy + y, vx + indent, ent.name, eattr)
+
             if i == ci:
+                log.info(f"{i=}: {ent.name}")
                 cy = vy + y
                 cx = vx + indent
             # BAD: desynchronized from default item.height due to ext-supplied "maxlines"
