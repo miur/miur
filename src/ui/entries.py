@@ -176,3 +176,22 @@ class FSEntry(Golden):
                     hexlst if hexlst else [ErrorEntry("UnicodeDecodeError / NoAccess")]
                 )
         raise NotImplementedError(p)
+
+
+class RootEntry(Golden):
+    def __init__(self) -> None:
+        pass
+
+    @override
+    @property
+    def name(self) -> str:
+        return ""
+
+    @override
+    @property
+    def loci(self) -> str:
+        return ""
+
+    @override
+    def explore(self) -> Iterable[Golden]:
+        return [FSEntry("/", nm="file:///")]

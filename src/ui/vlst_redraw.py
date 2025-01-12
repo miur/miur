@@ -110,7 +110,7 @@ class SatelliteViewport_RedrawMixin:
                 stdscr.addstr(vy + y, vx + indent, ent.name, eattr)
 
             if i == ci:
-                log.info(f"{i=}: {ent.name}")
+                # log.info(f"{i=}: {ent.name}")  # <DEBUG
                 cy = vy + y
                 cx = vx + indent
             # BAD: desynchronized from default item.height due to ext-supplied "maxlines"

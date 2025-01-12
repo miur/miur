@@ -5,6 +5,7 @@ from ..curses_ext import g_style as S
 # from ..util.logger import log
 from .entity_base import Golden
 from .navi import NaviWidget
+from .navihistory import HistoryCursor
 
 
 class RootWidget:
@@ -17,7 +18,7 @@ class RootWidget:
 
     def set_entity(self, ent: Golden) -> None:
         # FUT: may create different widgets based on `Entity and `Policy
-        self._navi = NaviWidget(ent)
+        self._navi = NaviWidget(HistoryCursor(ent))
 
     ## DISABLED: we need explicit methods for type-checking
     ##   and to appropriately update header/footer on action
@@ -55,7 +56,8 @@ class RootWidget:
 
         # pylint:disable=protected-access
         # ALT:([]): use ⸤⸣ OR ⸢⸥
-        header = f"[{self._navi._history_idx+1}⁄{len(self._navi._history_stack)}] "
+        hidx, hlen = self._navi._hist.pos
+        header = f"[{hidx+1}⁄{hlen}] "
         stdscr.addstr(0, 0, header, S.auxinfo)
         xpath = (
             wdg.focused_item._ent.loci if wdg._lst else self._navi._view._ent.loci + "/"

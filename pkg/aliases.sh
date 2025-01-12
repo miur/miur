@@ -41,8 +41,12 @@ alias mj='miur -a -I'  # auto-connected to -K
 alias mk='miur -a -K --logredir /t/miur.log'
 alias ml='tail -F /t/miur.log'
 
+alias m.a="source '$app'"  # ALT: '. =mi'
+alias m.e="source '$pj/.venv/bin/activate'"
+alias m.E="deactivate"
+
 if [[ ${ZSH_NAME:+zsh} ]]; then
-    alias -g M='|miur'
+  alias -g M='|miur'
 fi
 
 

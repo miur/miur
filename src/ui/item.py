@@ -223,6 +223,8 @@ class ItemWidget:
             #   ENH: "…" as stem into mid/beg of compressed line
             #     │ for smart-compression "…" may also appear in the middle of last/each line,
             #     │ or even replace several lines by two "…" e.g. "…[snippet]…" OR "line1…\n…lineN"
+            #   ENH: hi leading/trailing spaces as "·" (nbsp="␣") and tabs as "▸ " (like vim)
+            #     << stick them to the text, never overlay onto column-separator
             if cropped:
                 # BET: always print c-tail over spacer bw columns
                 # ALT: print compression "tail" over last char in total "line+tail"
