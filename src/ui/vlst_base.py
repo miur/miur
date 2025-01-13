@@ -1,6 +1,7 @@
 from functools import lru_cache
-from typing import Protocol, Sequence
+from typing import Callable, Protocol, Sequence
 
+from ..util.logger import log
 from .entity_base import Golden
 from .item import ItemWidget
 
@@ -64,6 +65,10 @@ class SatelliteViewportBase(SatelliteViewport_DataProtocol):
             raise IndexError("empty list")
         return self._lst[self._cursor_item_lstindex]
 
+    @property
+    def sizehw(self) -> tuple[int, int]:
+        return (self._viewport_height_lines, self._viewport_width_columns)
+
     # RENAME: set_viewport(vw, vh, vy, vx)
     def resize(self, vh: int, vw: int, origin: tuple[int, int] = (0, 0)) -> None:
         pvh = self._viewport_height_lines
@@ -77,6 +82,74 @@ class SatelliteViewportBase(SatelliteViewport_DataProtocol):
         #   ALT:BAD: self._viewport_followeditem_linesfromtop = 0
         if pvh > 0 and (ratio := self._viewport_followeditem_linesfromtop / pvh) > 0:
             self._viewport_followeditem_linesfromtop = int(vh * ratio)
+
+    ## IDEA: if not found -- repeat search once again for _orig_lst,
+    #     but set cursor on the first visible item (or completely hide cursor)
+    #   NICE: should work even if this entry was hidden/filtered from parent.xfm_lst
+    def focus_on(
+        self,
+        key: int | float | ItemWidget | Golden | str | Callable[[ItemWidget], bool],
+        # HACK:(vh_fallback): is needed by history.jump_to() before .resize() call
+        #   BET:(init): call .resize() and then explicitly .jump_to(intermediates=True)
+        #   ALT:API: pos_hint=
+        vh_fallback: int = 0,
+    ) -> ItemWidget | None:
+        if not self._lst:
+            raise NotImplementedError("DECI:WiP")
+
+        vh = self._viewport_height_lines or vh_fallback
+        assert 0 < vh < 100
+
+        def _match(cond: Callable[[ItemWidget], bool]) -> int | None:
+            return next((i for i, w in enumerate(self._lst) if cond(w)), None)
+
+        idx: int | None
+        match key:
+            case int():
+                idx = key
+            case float():  # ALT:USAGE: float(fractions.Fraction('3/7'))
+                idx = round(vh * key)
+            case ItemWidget():
+                try:
+                    idx = self._lst.index(key)
+                except ValueError:
+                    idx = None
+            case Golden():
+                # pylint:disable=protected-access
+                idx = _match(lambda w: w._ent == key)
+            case str():
+                # pylint:disable=protected-access
+                # TEMP:BAD: it's a mess to cmp either .name or .loci (NEED: strict FMT)
+                idx = _match(lambda w: w._ent.loci == key)
+            case cond if callable(cond):
+                idx = _match(cond)
+            case _:
+                raise TypeError("Unsupported type")
+
+        if idx is None:
+            return None
+        if idx < 0:
+            idx += len(self._lst)
+        if idx < 0 or idx >= len(self._lst):
+            raise ValueError((idx, key))
+        self._viewport_followeditem_lstindex = self._cursor_item_lstindex = idx
+
+        # NOTE: recalc anticipated "pos" for the focused item
+        #   ENH? inof DFL=vh//2 tiac .margin and direction of last step_by()
+        #   BET?ALT:(reuse "step_by" IMPL):FAIL: it steps by "steps" inof "items"
+        #     self.step_by((len(self._lst) + idx if idx < 0 else idx) - self._cursor_item_lstindex)
+        pos = vh // 2
+        if idx < pos and (top := sum(self._fih(i) for i in range(0, idx))) < pos:
+            pos = top
+        elif (
+            idx > len(self._lst) - pos
+            and (bot := sum(self._fih(i) for i in range(idx, len(self._lst) - 1))) < pos
+        ):
+            pos = vh - self._fih(len(self._lst) - 1) - bot
+        self._viewport_followeditem_linesfromtop = pos
+        log.warning(pos)
+
+        return self._lst[idx]
 
     # CASE:(lightweight): to be able to re-assign ~same list after external xfm, e.g. after "order-by"
     def assign(self, lst: Sequence[Golden], hint_idx: int | None = None) -> None:
@@ -105,6 +178,7 @@ class SatelliteViewportBase(SatelliteViewport_DataProtocol):
         if pidx < len(self._lst) and focused is self._lst[pidx]:
             return pidx
         try:
+            # FIXME: should search by constant `Entity inof volatile `ItemWidget
             return self._lst.index(focused)
         except ValueError:
             ## TEMP: reset *cursor* position on .assign(newlst)

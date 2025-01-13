@@ -1,4 +1,4 @@
-from typing import Any, Iterable, Protocol, Self, Type, override
+from typing import Any, Iterable, Protocol, Self, Type, override, runtime_checkable
 
 
 class Representable(Protocol):
@@ -43,6 +43,7 @@ class Atomic(Addressable, Representable, Protocol):
 g_entries_cls: "list[Type[Golden]]" = []
 
 
+@runtime_checkable  # TEMP: to focus_on(match-case Golden())
 class Golden(Explorable, Addressable, Representable, Protocol):
     __slots__ = ()
     altname: str | None = None
@@ -75,3 +76,13 @@ class Golden(Explorable, Addressable, Representable, Protocol):
         # global: _g_actions: dict[type, list[type]] = {}
         # ta = tuple(signature(cls.__call__).parameters.values())[1].annotation
         # _g_actions.setdefault(ta, []).append(cls)
+
+    @override
+    def __repr__(self) -> str:
+        loci = self.loci
+        if not loci.endswith(nm := self.name):
+            loci = nm + "=" + loci
+        if loci.startswith("/"):
+            return f"`{loci}"
+        else:
+            return f"{type(self).__name__}({loci})"

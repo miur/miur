@@ -1,8 +1,6 @@
-import os.path as fs
-
 from ..util.logger import log
 from .entity_base import Golden
-from .entries import ErrorEntry, FSEntry, RootEntry
+from .entries import ErrorEntry, FSEntry, RootNode
 from .view import EntityView
 
 
@@ -15,17 +13,20 @@ from .view import EntityView
 class HistoryCursor:
     def __init__(self, ent: Golden) -> None:
         ## NOTE: history is always prepopulated by known state (at least a Root Node)
-        #   MAYBE: make RootEntry into singleton ?
-        #     ~~ BUT: I may need different "wf-restricted/focused" alt-views for RootEntry
+        #   MAYBE: make RootNode into singleton ?
+        #     ~~ BUT: I may need different "wf-restricted/focused" alt-views for RootNode
         # MAYBE:CHG: directly store "ent" in _stack to represent "xpath",
         #   as now we can use "_pool" -- to map it to temporarily cached "_view"
         #   RENAME? _cursor_chain/navi_stack | _pool_cached_view/_view_pool
-        self._view_stack = [EntityView(RootEntry())]
-        self._cursor_idx = len(self._view_stack) - 1
-        # pylint:disable=protected-access
+        view = EntityView(RootNode())
+        # BAD: hardcoding initial "vh" to derive "rel.pos" for jump_to()
+        #   BET:(init): call .resize() and then explicitly .jump_to(intermediates=True)
+        view._wdg.resize(99, 72)
+        self._view_stack = [view]
+        self._cursor_idx = 0
         # NOTE: tba to restore view when opening previously visited nodes
-        self._cache_pool = {x._ent: x for x in self._view_stack}
-        if ent != self.focused_view._ent:
+        self._cache_pool = {view._ent: view}
+        if ent != self.focused_view._ent:  # pylint:disable=protected-access
             self.jump_to(ent, intermediates=True)
 
     @property
@@ -46,15 +47,19 @@ class HistoryCursor:
     def go_back(self) -> None:
         if self._cursor_idx <= 0:
             # pylint:disable=protected-access
-            log.trace(self.focused_view._ent.name)
+            log.trace("No back=" + self.focused_view._ent.name)
             return
         self._cursor_idx -= 1
 
-    def _advance_or_retrieve_or_emplace(self, nent: Golden) -> None:
+    # BAD:ARCH:(part of distributed FSM): hard to track index permutations
+    def _advance_or_retrieve_or_emplace(self, nent: Golden) -> int:
+        log.trace(f"{nent.loci=} | {self.pos}")  # <DEBUG
         # NOTE: don't discard hist Entry on .go_back() to be able to return and see same EntityView
+        #   CASE: advance inof discarding cached fs.commonpath() parents from left
+        #     == verify path cmpts exist in expected positions of stack
+        #     ALT~: .rfind() backwards until fs.commonpath(), then append as usual
         if (nview := self.get_relative(1)) and nview._ent == nent:
-            self._cursor_idx += 1
-            return
+            return self._cursor_idx + 1
         # NOTE: retrieve cached View -- if we ever visited that Entry before
         if not (v := self._cache_pool.get(nent)):
             # NOTE: we create a separate `SatelliteViewport per each `Entity assigned
@@ -63,14 +68,19 @@ class HistoryCursor:
             #   +++ NICE: can use totally different *widgets* based on the type(_ent)
             #     e.g. Dashboard or Editor
             v = self._cache_pool[nent] = EntityView(nent)
+            # HACK: clone current vlst vh/ww to newly created View
+            # log.info(self._view_stack[self._cursor_idx]._wdg.sizehw)
+            # CHECK: do I really need to do it? FAIL: initial node is also not resized
+            v._wdg.resize(*self._view_stack[self._cursor_idx]._wdg.sizehw)
+        # log.trace(f"{v._ent.loci=} | {self.pos}")  # <DEBUG
         ## SPLIT?: _append_or_replace(v)
         # NOTE: discard the rest of navi stack if we go into different route (but preserve in _pool)
-        # BAD? if we back-n-forth "jump_to(unrelated path)" (e.g. after !ranger),
-        #   then that jumped path will be discarded from history :(
         self._view_stack[self._cursor_idx + 1 :] = [v]
-        self._cursor_idx = len(self._view_stack) - 1
+        return len(self._view_stack) - 1
+        # log.trace(f"{self._view_stack} | {self.pos}")  # <DEBUG
 
     # NOTE: can jump to distant/unrelated node in one step
+    #   BAD!※⡧⢄⠋⡎ "jump_to(unrelated path)" is discarded from history after back-n-forth
     # BET?RENAME?(jump_to): restore_or_load(ent)
     # RENAME?(:intermediates): {remember,cache,traverse}_parents
     def jump_to(self, nent: Golden, intermediates: bool = False) -> None:
@@ -84,47 +94,33 @@ class HistoryCursor:
         #     return
         assert self.focused_view._ent != nent
 
-        if not intermediates:
-            self._advance_or_retrieve_or_emplace(nent)
+        # log.trace(list(nent.parents_loci()))
+        log.trace(f"{nent}{self.pos}")  # <DEBUG
 
-        # CASE:(intermediates=True)::
-        if not isinstance(nent, FSEntry):
-            raise NotImplementedError(type(nent))
-        assert fs.isabs(nent.loci)
-        path = fs.normpath(nent.loci)
-        # BAD:PERF: we are forced to traverse each intermediate entity
-        #   to use the *same* instances of FSEntry as returned by .explore()
-        #   ALT~: .rfind() backwards until fs.commonpath(), then append as usual
-        self._cursor_idx = 0
-        k = 0
-        while (k := path.find(fs.sep, k + 1)) > 0:
-            pview = self.focused_view
-            loci = path[: k or 1]
-            found = False
-            for i, w in enumerate(pview._wdg._lst):
-                if isinstance(w._ent, FSEntry) and w._ent.loci == loci:
-                    found = True
-                    # SUM: advance inof discarding cached fs.commonpath() parents from left
-                    self._advance_or_retrieve_or_emplace(w._ent)
-                    # NOTE: set cursor onto entity you came back from
-                    wdg = self.focused_view._wdg
-                    wdg._viewport_followeditem_lstindex = i
-                    wdg._cursor_item_lstindex = i
-                    # BAD: hardcoding pos to avoid last item at top
-                    pos = pview._wdg._viewport_height_lines // 2
-                    wdg._viewport_followeditem_linesfromtop = pos
-                    break
-            ## IDEA: if "w" not found -- repeat search once again for _orig_lst,
-            #     but set cursor on the first visisible item (or completely hide cursor)
-            #   NICE: works even if entry was hidden/filtered from .xfm_lst
-            # ent = next(x for x in pview._orig_lst if x.loci == loci)
-            if not found:
-                raise RuntimeError("WTF: node had disappeared")
-                self._advance_or_retrieve_or_emplace(FSEntry(loci))
+        if intermediates:
+            if not isinstance(nent, FSEntry):
+                raise NotImplementedError(type(nent))
+            # vh_fallback = self.focused_view._wdg._viewport_height_lines
+            self._cursor_idx = 0
+            for ploci in nent.parents_loci():
+                # NOTE: adjust cursor to hover over entity you came back from
+                #   !! should fixup existing entities in history._stack too
+                # BAD:PERF: we are forced to traverse each intermediate entity
+                #   to use the *same* instances of FSEntry as returned by .explore()
+                if w := self.focused_view._wdg.focus_on(ploci):
+                    self._cursor_idx = self._advance_or_retrieve_or_emplace(w._ent)
+                else:
+                    raise ValueError("WTF: node doens't exist: loci=" + ploci)
+
+        self._cursor_idx = self._advance_or_retrieve_or_emplace(nent)
+        # log.trace(f"{nent}{self.pos}")  # <DEBUG
+        # log.trace(self._view_stack)  # <DEBUG
+        log.trace(self._cache_pool)  # <DEBUG
 
     ## FAIL: `Entry.parent() is not generalizable ※⡧⢃⠬⢖
     ## BET: traverse and preload all intermediate parents on __init__(path)
-    ##   NICE: for untraversables (e.g. "mpd://song") we always have preloaded RootEntry as "prev"
+    ##   NICE: for untraversables (e.g. "mpd://song") we always have preloaded RootNode as "prev"
+    ##     BAD!※⡧⢄⠋⡎ "jump_to(unrelated path)" is discarded from history after back-n-forth
     # def go_parent(self):
     #     # pylint:disable=protected-access
     #     if not isinstance(self._view._ent, FSEntry):

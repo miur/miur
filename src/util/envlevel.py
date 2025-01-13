@@ -27,5 +27,6 @@ def save_choosedir(path: str) -> Iterator[None]:
         from ..app import g_app
 
         loci = g_app.root_wdg._navi._view._ent.loci
+        log.state(f"cwd={loci}")
         with open(path, "w", encoding="utf-8") as f:
             f.write(loci)

@@ -178,7 +178,7 @@ def resize() -> None:
     # REGR: redraw() during KEY_RESIZE results in ncurses crash
     #   THINK: how to prevent/block redraw in that case?
     g.stdscr.clear()  # CHECK:NEED:OR:NOT? e.g. to clear bkgr (which earlier wasn't redrawn on resize)
-    g.root_wdg.resize(g.stdscr)
+    g.root_wdg.resize(*g.stdscr.getmaxyx())
     g.root_wdg.redraw(g.stdscr)
     g.stdscr.refresh()
 

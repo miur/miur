@@ -47,6 +47,7 @@ class NaviWidget:
 
     def _resize_miller(self) -> None:
         vh, vw, vy, vx = self._view_rect
+        # return self._hist.focused_view._wdg.resize(vh, vw, origin=(vy, vx))  # <TEMP:DEBUG
         vws = self._calc_abs_width(vw)
         assert vws
         log.info(vws)  # <TEMP:DEBUG
@@ -63,7 +64,7 @@ class NaviWidget:
 
     def cursor_jump_to(self, idx: int) -> None:
         # pylint:disable=protected-access
-        self._view._wdg.jump_to(idx)
+        self._view._wdg.focus_on(idx)
 
     def cursor_step_by(self, steps: int) -> None:
         # pylint:disable=protected-access
@@ -82,17 +83,21 @@ class NaviWidget:
         # NOTE: resize() *new* wdg to same dimensions as *pwdg*
         self._resize_miller()
 
-    # THINK:SPLIT: `NaviModel which knows when to yeild `RootEntry (which holds rootfs/stdin/etc providers)
+    # THINK:SPLIT: `NaviModel which knows when to yeild `RootNode (which holds rootfs/stdin/etc providers)
     def view_go_back(self) -> None:
         self._hist.go_back()
         # NOTE: resize() old/cached wdg, as window may had resized from then.
         self._resize_miller()
 
     def redraw(self, stdscr: C.window) -> tuple[int, int]:
+        # return self._hist.focused_view._wdg.redraw(stdscr, numcol=True)  # <TEMP:DEBUG
+
         # FIXED: prevent crash when window shrinks past the cursor
         # self.cursor_step_by(0)
         curyx = (0, 0)  # BAD: undeterminable if error
         # DFL:(prio): browser:0 -> preview:1 -> parent:2 [-> pparent:3]
+        # [_] FIXME:BET: directly draw "preview" panel/entity from _pool
+        #   &why to avoid constantly rewriting history on each cursor move up/down
         for i in range(2 - len(self._miller_ratio), 2):
             if view := self._hist.get_relative(i):
                 # pylint:disable=protected-access

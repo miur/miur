@@ -1,6 +1,6 @@
 import os
 import os.path as fs
-from typing import Callable, Self, Sequence
+from typing import Callable, Self, Sequence, override
 
 from .entity_base import Golden
 from .entries import FSEntry
@@ -33,6 +33,13 @@ class EntityView:
         self._originator = originator
         self.fetch()
 
+    @override
+    def __repr__(self) -> str:
+        ent = self._ent
+        olst = self._orig_lst
+        xlst = self._xfm_lst
+        return "{{" + f"{ent}: {len(xlst)}/{len(olst)}" + "}}"
+
     def fetch(self) -> None:
         # ALT:PERF(slow): @runtime_checkable : isinstance(ent, Explorable)
         #   https://mypy.readthedocs.io/en/latest/protocols.html#using-isinstance-with-protocols
@@ -60,4 +67,6 @@ class EntityView:
             if os.access(p, os.R_OK):
                 os.chdir(p)
             if not fs.islink(p) or self._ent._alt is True:
+                # TODO: sort folders before files
+                # TODO: sort ignorecase
                 self._xfm_lst.sort()

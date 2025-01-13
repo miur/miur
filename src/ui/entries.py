@@ -98,6 +98,16 @@ class FSEntry(Golden):
     def loci(self) -> str:
         return self._x
 
+    ## FAIL: `Entry.parent() is not generalizable ※⡧⢃⠬⢖
+    def parents_loci(self) -> Iterable[str]:
+        assert fs.isabs(self._x)
+        path = fs.normpath(self._x)
+        if path != "/":
+            yield "/"
+        k = 0
+        while (k := path.find(fs.sep, k + 1)) > 0:
+            yield path[:k]
+
     # i.e. =InterpretUnchangedDirListingPropertyAsFSEntriesInUsualWay
     @override
     def explore(self) -> Iterable[Golden]:
@@ -178,7 +188,9 @@ class FSEntry(Golden):
         raise NotImplementedError(p)
 
 
-class RootEntry(Golden):
+# RENAME?~ {Root,Central,Menu}Entry
+#   BET? rename all top-lvl providers to `*Node ex~: 'FSEntry("/")' -> "FSNode"
+class RootNode(Golden):
     def __init__(self) -> None:
         pass
 
@@ -190,7 +202,7 @@ class RootEntry(Golden):
     @override
     @property
     def loci(self) -> str:
-        return ""
+        return ""  # NOTE:(""): it's sole non-ambiguous loci for central menu
 
     @override
     def explore(self) -> Iterable[Golden]:

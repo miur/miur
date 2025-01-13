@@ -4,26 +4,7 @@ from .vlst_base import SatelliteViewport_DataProtocol
 
 # pylint:disable=too-many-instance-attributes
 class SatelliteViewport_StepbyMixin:
-
     # TBD: def scroll_by(self, advance: int) -> None:
-
-    def jump_to(self: SatelliteViewport_DataProtocol, idx: int) -> None:
-        if not self._lst or idx not in (-1, 0):
-            raise NotImplementedError("DECI:WiP")
-
-        if idx == 0:
-            pos = 0
-        elif idx in (-1, len(self._lst) - 1):
-            idx = len(self._lst) + idx if idx < 0 else idx
-            pos = self._viewport_height_lines - self._fih(idx)
-        else:
-            # FAIL: it steps by "steps" inof "items"
-            # self.step_by((len(self._lst) + idx if idx < 0 else idx) - self._cursor_item_lstindex)
-            raise NotImplementedError(idx)
-
-        self._viewport_followeditem_lstindex = self._cursor_item_lstindex = idx
-        self._viewport_followeditem_linesfromtop = pos
-
     # NOTE: elastic scroll, where "step" is anything between 1 line/word or whole multiline item,
     #   depending on what less disrupts the perception flow
     # TODO:OPT: always step by whole item ~~ should be the same as "step_by(+/-inf)"

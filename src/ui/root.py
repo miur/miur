@@ -41,8 +41,8 @@ class RootWidget:
         self._navi.view_go_back()
         # self._invalidate_header_footer()
 
-    def resize(self, stdscr: C.window) -> None:
-        self._wh, self._ww = stdscr.getmaxyx()
+    def resize(self, wh: int, ww: int) -> None:
+        self._wh, self._ww = wh, ww
         orig_yx = (1, 1)
         size_yx = (self._wh - orig_yx[0] - 1, self._ww - orig_yx[1])
         self._navi.resize(*size_yx, origin=orig_yx)
@@ -57,7 +57,7 @@ class RootWidget:
         # pylint:disable=protected-access
         # ALT:([]): use ⸤⸣ OR ⸢⸥
         hidx, hlen = self._navi._hist.pos
-        header = f"[{hidx+1}⁄{hlen}] "
+        header = f"[{hidx}/{hlen-1}] "  # NOTE:FMT: "0/0" means we are at RootNode with no history
         stdscr.addstr(0, 0, header, S.auxinfo)
         xpath = (
             wdg.focused_item._ent.loci if wdg._lst else self._navi._view._ent.loci + "/"
