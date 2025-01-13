@@ -65,8 +65,10 @@ class ItemWidget:
         self, wrapwidth: int = 0, maxlines: int = 0, extendlast: int = 1
     ) -> list[str]:
         # TEMP:DEBUG: multiline entries
-        # nm, *lines = ent.name.split("\n")
-        return self._ent.name.replace("o", "o" + os.linesep).splitlines(keepends=True)
+        NL, NUL = os.linesep, "\0"
+        # ALT:(splitlines):FAIL: discards empty lines
+        return self._ent.name.replace("o", "o" + NL).replace(NL, NL + NUL).split(NUL)
+
         ## ALSO:IDEA: when wrapwidth=0, insert "‥" at the end of each linepart, which longer than viewport
         ##   OR: smart-compress in the middle each part of .name bw newlines
         ## [_] TODO: !hi last char in each line differently

@@ -23,7 +23,9 @@ class SatelliteViewport_DataProtocol(Protocol):
         # BAD: should account for indents inside viewport {wrapw = vw - 2 - indent; assert iw > 4}
         wrapw = self._viewport_width_columns
         maxln = self._item_maxheight_hint
-        return len(self._lst[i].struct(wrapwidth=wrapw, maxlines=maxln))
+        lines = self._lst[i].struct(wrapwidth=wrapw, maxlines=maxln)
+        assert lines
+        return len(lines)
 
 
 # pylint:disable=too-many-instance-attributes

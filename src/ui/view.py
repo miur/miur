@@ -69,4 +69,5 @@ class EntityView:
             if not fs.islink(p) or self._ent._alt is True:
                 # TODO: sort folders before files
                 # TODO: sort ignorecase
+                # TODO: sort by tuple of keys (filetype, name/case, ...)
                 self._xfm_lst.sort()

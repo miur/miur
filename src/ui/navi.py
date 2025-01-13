@@ -11,7 +11,8 @@ class NaviWidget:
         self._hist = hist
         ## NOTE:(triplet preview): show N previous view on the left and 1 future node on the right
         # LIOR? int=Fixed/Column=-min/max, float=Percent/Ratio=-rest/full
-        self._miller_ratio = (20, 0.4, 0)
+        # self._miller_ratio = (20, 0.4, 0)
+        self._miller_ratio = (12, 12, 12, 0.4, 0)
         # self._miller_ratio = (20, 0)
         ## BAD: on narrow window it draws 3rd column over 2nd one, triggering {assert iw>4}
         # self._miller_ratio = (20, 0, 0.5)

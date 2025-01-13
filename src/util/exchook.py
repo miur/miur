@@ -64,6 +64,17 @@ def log_exc(value: "BaseException") -> "Any":
     )
     value.args = (msg, *value.args[1:])
 
+    # NOTE:("ignorables"): hide the top of the exception stack
+    #   == everything above one of any regular happy-path key points
+    # RENAME? ignored_srcframes | ignored_happy_path
+    # MAYBE: store tuple (module_qualname, srcline) to
+    ignorables = [
+        "sys.exit(as_pkg_or_exe(select_entrypoint)())",
+        "return lambda: miur_argparse(argv)",
+        "return miur_frontend(g_app)",
+        "return miur_main(g)",
+    ]
+
     # MAYBE: write unconditionally to tty/stderr
     # _orig_write = log.write
     # log.config(write=g.io.ttyout.write)
@@ -87,7 +98,23 @@ def log_exc(value: "BaseException") -> "Any":
             # bt = "".join(TR.format_tb(tb)).rstrip().replace(NL, NL + "\\")
             # log.info("Traceback (most recent call last):" + NL + "\\" + bt)
             last = len(tb) - 1
+            lastignored: tuple[int, TR.FrameSummary] | None = None
             for i, t in enumerate(tb):
+                # NOTE:("ignorables"): hide the top of the exception stack
+                #   == everything above one of any regular happy-path key points
+                if (
+                    i < len(ign := ignorables)
+                    and ign[i]
+                    and (l := t.line)
+                    and l.startswith(ign[i])
+                ):
+                    lastignored = (i, t)
+                    continue
+                if lastignored:
+                    li, _lt = lastignored
+                    log.info(f"... (collapsed {li+1}/{last+1} regular frames)")
+                    lastignored = None
+
                 modnm = t.filename.rpartition("/")[2]
                 lnum = str(t.lineno)
                 if t.lineno != t.end_lineno:
@@ -105,7 +132,9 @@ def log_exc(value: "BaseException") -> "Any":
                             f"\n\t{k} = {_ct}{v:.40s}{_r}"
                             for k, v in sorted(ctx.items())
                         )
-                l = t._line.rstrip()  # pylint:disable=protected-access
+                # NOTE: use unstripped srcline
+                l = t._original_line  # pylint:disable=protected-access
+                l = "<NOT SRC>" if l is None else l.rstrip()
                 indent = l[: len(l) - len(l.lstrip())]
                 code = (
                     f"{indent}{_cc}{l[len(indent):t.colno]}"

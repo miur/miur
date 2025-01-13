@@ -85,6 +85,8 @@ def init_explicit_io(g: "AppGlobals") -> None:
         if cerr.isatty():
             io.pipeerr = None
             cerr.close()
+            ## BUG: after closing "cerr" we lose proper BT from here
+            ## raise RuntimeError()  # <DEBUG
             # FIXME? open os.pipe to cvt libc.stderr into py.log inof spitting over TTY
             #   FAIL: !deadlock! if underlying native C code fills os.pipe internal buffers
             io.ttyalt = __import__("io").StringIO()
@@ -95,6 +97,11 @@ def init_explicit_io(g: "AppGlobals") -> None:
         # TBD: g.opts.redirerr
         sys.stderr = io.ttyalt  # sys.__stderr__ =
         sys.stdout = io.ttyalt  # sys.__stdout__ =
+
+    from .util.logger import log
+
+    # NOTE: print before redirect to notify user where to search for logs
+    log.state(f"log={"(buf)" if (o := g.opts.logredir) is None else o}")
 
     _scope_in(sys.stdin, CURSES_STDIN_FD)
     _scope_out(sys.stdout, CURSES_STDOUT_FD)
@@ -114,6 +121,7 @@ def init_explicit_io(g: "AppGlobals") -> None:
         if isinstance(o, int):
             io.logsout = os.fdopen(o, "w", encoding="locale")
         elif isinstance(o, str):
+            # raise RuntimeError(o)  # BUG: !miur silently exists here w/o backtrace
             # ALSO:DEV: generic support for other redir schemas
             #   TODO: ... | file:///path/to/log?mode=a+&buffering=1 | (fifo|socket)://...
             #   DFL=ringbuf
@@ -123,7 +131,7 @@ def init_explicit_io(g: "AppGlobals") -> None:
         else:
             raise NotImplementedError
 
-        def _logwrite(s: str):
+        def _logwrite(s: str) -> None:
             io.logsout.write(s)
             # NOTE: immediate buffering after each log line
             io.logsout.flush()
@@ -133,8 +141,6 @@ def init_explicit_io(g: "AppGlobals") -> None:
             io.ttyalt = __import__("io").StringIO()
         io.logsout = io.ttyalt  # BAD: possible double-close for same FD
         _logwrite = io.logsout.write
-
-    from .util.logger import log
 
     # [_] CHECK:WTF:BUG: why logs are printed on TTY even after previous sys.stdout.close()
     log.write = _logwrite  # TBD? restore back on scope ?
