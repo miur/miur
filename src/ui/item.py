@@ -1,10 +1,13 @@
 import os
+from typing import Callable
 
 import _curses as C
 
 from ..curses_ext import g_style as S
-from ..util.logger import log
+
+# from ..util.logger import log
 from .entity_base import Golden
+from .entries import TextEntry
 from .itemcolor import colored_ansi_or_schema
 from .rect import Rect
 
@@ -85,6 +88,50 @@ class ItemWidget:
             c = nc
         return lines
 
+    # TODO:OPT: number-column variants:
+    #   * [rel]linenum
+    #   * [rel]viewpos
+    #   * [rel]itemidx
+    #   * combined=itemidx+[rel]viewpos
+    def _render_itemnum_prefix(
+        self,
+        stdscr: C.window,
+        lim: Callable[[], int],
+        **infoctx: int | None,
+    ) -> None:
+        focused = infoctx.get("focusid") is not None
+        combined = True  # OPT:TEMP: hardcode
+        if combined:
+            cidx = infoctx.get("lstidx")
+            bidx = infoctx.get("vpidx")
+            if isinstance(self._ent, TextEntry):
+                if "`0x" in self._ent.loci:
+                    bpfx = cpfx = "" if cidx is None else f"{cidx*16:02x}"
+                else:
+                    bpfx = cpfx = "" if cidx is None else f"{1+cidx:02d}"
+            else:  # e.g. FSEntry, etc.
+                cpfx = "" if cidx is None else f"{1+cidx:02d}"
+                bpfx = "" if bidx is None else f"{1+bidx:02d}"
+
+            if focused:
+                if cpfx:
+                    stdscr.addstr(f"{cpfx:>3s}> ", S.pfxrel | S.cursor)
+            else:
+                if bpfx:
+                    stdscr.addstr(f"{bpfx:>3s}: ", S.pfxidx)
+        else:
+            # HACK: hide both numcol when viewport is too small
+            if lim() > 25 and (vpidx := infoctx.get("vpidx")) is not None:
+                pfxvp = f"{1+vpidx:02d}| "
+                stdscr.addstr(pfxvp, S.pfxrel)
+            # TODO: for binary/hex show "file offset in hex" inof "item idx in _xfm_list"
+            #   ALSO: start offsets from "0x0" inof "1"
+            if lim() > 21 and (lstidx := infoctx.get("lstidx")) is not None:
+                # IDEA: shorten long numbers >999 to ‥33 i.e. last digits significant for column
+                #   (and only print cursor line with full index)
+                pfxlst = f"{1+lstidx:03d}{">" if focused else ":"} "
+                stdscr.addstr(pfxlst, S.pfxidx | (S.cursor if focused else 0))
+
     # DECI: pass XY to redraw/render ? OR store as .origin ?
     #   ~store~ makes it possible to .redraw() individual elements only
     #     BAD: all XY should be updated each time we scroll :(
@@ -109,23 +156,8 @@ class ItemWidget:
             assert ncells >= 0
             return ncells
 
-        # TODO:OPT: number-column variants:
-        #   * [rel]linenum
-        #   * [rel]viewpos
-        #   * [rel]itemidx
-        #   * combined=itemidx+viewpos
-
-        # HACK: hide both numcol when viewport is too small
-        if lim() > 25 and (vpidx := infoctx.get("vpidx")) is not None:
-            pfxvp = f"{1+vpidx:02d}| "
-            stdscr.addstr(pfxvp, S.pfxrel)
-
-        # TODO: for binary/hex show "file offset in hex" inof "item idx in _xfm_list"
-        if lim() > 21 and (lstidx := infoctx.get("lstidx")) is not None:
-            # IDEA: shorten long numbers >999 to ‥33 i.e. last digits significant for column
-            #   (and only print cursor line with full index)
-            pfxlst = f"{1+lstidx:03d}{">" if focused else ":"} "
-            stdscr.addstr(pfxlst, S.pfxidx | (S.cursor if focused else 0))
+        if lim() > 21:
+            self._render_itemnum_prefix(stdscr, lim, **infoctx)
 
         # NOTE: textbody position (to place cursor there)
         _bodyy, bodyx = stdscr.getyx()
