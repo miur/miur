@@ -21,17 +21,16 @@ class PanelView:
 class NaviWidget:
     def __init__(self, hist: HistoryCursor) -> None:
         self._hist = hist
-        self._miller_ratio = (20, 0.4, 0)
-        # self._miller_ratio = (12, 12, 12, 0.4, 0)
         self._view_rect = (0, 0, 0, 0)  # FMT:(vh,vw,vy,vx)
 
         # TODO:(`AdaptiveLayout): change/hide based on total window size
         #   DFL:(prio): browser:0 -> preview:1 -> parent:2 [-> pparent:3]
-        self._cfg = PanelView(ratio=(24, 0.4, 0))
-        self._cfg_prevloci = PanelView(ratio=(2, 3))
-        self._cfg_browse = PanelView(ratio=(1,))
-        # self._cfg_interp = PanelView(ratio=(1,))
-        self._cfg_preview = PanelView(ratio=(1,))
+        self._cfg_layout = "prevloci browse preview".split()
+        self._cfg = PanelView(ratio=(22, 0.5, 0))
+        self._cfg_prevloci = PanelView(ratio=(0.4, 0))
+        self._cfg_browse = PanelView(ratio=(0,))
+        # self._cfg_interp = PanelView(ratio=(0,))
+        self._cfg_preview = PanelView(ratio=(0.7, 0))
 
     # PERF?IDEA: use @cached and reset by "del self._view" in "view_go_*()"
     # RENAME:(view) make it publicly accessible from keymap:lambda
@@ -46,6 +45,13 @@ class NaviWidget:
 
     def resize(self, vh: int, vw: int, origin: tuple[int, int] = (0, 0)) -> None:
         self._view_rect = vh, vw, *origin
+        # TODO: incorporate .visible=0/1 to affect flexed area
+        self._layout = {
+            nm: getattr(self, "_cfg_" + nm).sizes(w)
+            for i, w in enumerate(self._cfg.sizes(vw))
+            if (nm := self._cfg_layout[i])
+        }
+        log.info(f"{self._layout=}")  # <TEMP:DEBUG
         self._resize_layout(*self._view_rect)
         # BAD:AGAIN: we init very first preview() on very first resize event
         self._update_preview()
@@ -81,54 +87,77 @@ class NaviWidget:
         self._resize_layout(*self._view_rect)
         self._update_preview()
 
-    def _update_preview(self) -> EntityView:
+    def _update_preview(self) -> None:
         # pylint:disable=protected-access
-        cent = self.focused_ent
+        vh, vw, vy, vx = self._view_rect
         pool = self._hist._cache_pool
-        view = pool.get(cent)
-        if not view:
-            view = pool[cent] = EntityView(cent)
-            ## ALT:HACK: clone rect size from old.preview
-            ##   FAIL: on startup there is no "old.preview"
-            ##     BUT: you can't create one in "__init__" either
-            ##       COS you need to wait until .resize() to calc abs-sz
-            #   view._wdg.resize(*self._preview._wdg.sizehw)
-            # BAD:PERF: we calc() preview= size AGAIN here (after _resize_layout)
-            vh, vw, vy, vx = self._view_rect
-            wlst = flowratio_to_abs(self._miller_ratio, vw)
-            view._wdg.resize(vh, wlst[2], origin=(vy, vx + wlst[0] + wlst[1]))
-        return view
+        cent = self.focused_ent
+        vx += sum(self._layout["prevloci"]) + sum(self._layout["browse"])
+        for w in self._layout["preview"]:
+            if cent not in pool:
+                peek = pool[cent] = EntityView(cent)
+                ## ALT:HACK: clone rect size from old.preview
+                ##   FAIL: on startup there is no "old.preview"
+                ##     BUT: you can't create one in "__init__" either
+                ##       COS you need to wait until .resize() to calc abs-sz
+                #   peek._wdg.resize(*self._preview._wdg.sizehw)
+                # BAD:PERF: we calc() preview= coords AGAIN here (after _resize_layout)
+                peek._wdg.resize(vh, w, origin=(vy, vx))
+            vx += w
+        # return pool.get(self.focused_ent)
 
     def _resize_layout(self, vh: int, vw: int, vy: int, vx: int) -> None:
-        assert len(self._miller_ratio) == 3, "TEMP: until RFC explicit panels"
-        wlst = flowratio_to_abs(self._miller_ratio, vw)
-        log.info(f"{wlst=}")  # <TEMP:DEBUG
-
         # pylint:disable=protected-access
-        if prev := self._hist.get_relative(-1):
-            prev._wdg.resize(vh, wlst[0], origin=(vy, vx))
-            # RND: we make leftmost column navigatable when we "collapse" to showing only RootNode
-            #   CHECK:WF: is it intuitive or irritating ?
-            vx += wlst[0]
+        wprevloci = self._layout["prevloci"]
+        for i, w in enumerate(wprevloci, start=-len(wprevloci)):
+            if prev := self._hist.get_relative(i):
+                prev._wdg.resize(vh, w, origin=(vy, vx))
+                # RND: we make leftmost column navigatable when we "collapse" to showing only RootNode
+                #   CHECK:WF: is it intuitive or irritating ?
+                vx += w
 
-        ## ALT:(origin): do C.move(y,x) b4 .redraw(), and remember getyx() inside each .redraw()
-        self._view._wdg.resize(vh, wlst[1], origin=(vy, vx))
-        vx += wlst[1]
+        for w in self._layout["browse"]:
+            ## ALT:(origin): do C.move(y,x) b4 .redraw(), and remember getyx() inside each .redraw()
+            self._view._wdg.resize(vh, w, origin=(vy, vx))
+            vx += w
 
         # CHG: use external shared `CachedEntities inof `HistoryCursor
-        if peek := self._hist._cache_pool.get(self.focused_ent):
-            peek._wdg.resize(vh, wlst[2], origin=(vy, vx))
+        cent = self.focused_ent
+        for w in self._layout["preview"]:
+            peek = self._hist._cache_pool.get(cent)
+            if not peek:
+                break  # COS: consequent previews are depending on previous ones
+            peek._wdg.resize(vh, w, origin=(vy, vx))
+            vx += w
+            if not peek._wdg._lst:
+                break
+            cent = peek._wdg.focused_item._ent
 
     def redraw(self, stdscr: C.window) -> tuple[int, int]:
+        wprevloci, wbrowse, wpreview = (self._layout[nm] for nm in self._cfg_layout)
         # pylint:disable=protected-access
-        if prev := self._hist.get_relative(-1):
-            prev._wdg.redraw(stdscr, numcol=False)
+        wprevloci = self._layout["prevloci"]
+        for i, w in enumerate(wprevloci, start=-len(wprevloci)):
+            if prev := self._hist.get_relative(i):
+                prev._wdg.redraw(stdscr, numcol=False)
 
         # CHG: use external shared `CachedEntities inof `HistoryCursor
         # NOTE: directly draw "preview" panel/entity from _pool
         #   &why to avoid constantly rewriting history on each cursor move up/down
-        if peek := self._hist._cache_pool.get(self.focused_ent):
+        cent = self.focused_ent
+        for w in self._layout["preview"]:
+            # if isinstance(cent, ErrorEntry):
+            peek = self._hist._cache_pool.get(cent)
+            if not peek:
+                break  # COS: consequent previews are depending on previous ones
             peek._wdg.redraw(stdscr, numcol=False)
+            if not peek._wdg._lst:
+                break
+            cent = peek._wdg.focused_item._ent
 
         # NOTE: draw main Browse column very last to always be on top
-        return self._view._wdg.redraw(stdscr, numcol=True)
+        curyx = (0, 0)
+        for w in self._layout["browse"]:
+            curyx = self._view._wdg.redraw(stdscr, numcol=True)
+        # TODO: return curyx from focused panel inof the last one on the right
+        return curyx
