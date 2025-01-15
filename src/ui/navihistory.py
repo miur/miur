@@ -10,6 +10,7 @@ from .view import EntityView
 #     to their own instance of NaviWidget with shared cached pool of Entities
 # SEP? "Cursor" vs "CacheDB"
 # SEP? "load_all_parents_until" vs "history_switch_focus/trim"
+# RENAME? {Navi,Loci}HistoryCursor
 class HistoryCursor:
     def __init__(self, ent: Golden) -> None:
         ## NOTE: history is always prepopulated by known state (at least a Root Node)
@@ -33,6 +34,8 @@ class HistoryCursor:
     def pos(self) -> tuple[int, int]:
         return self._cursor_idx, len(self._view_stack)
 
+    # FAIL: when split(horz) we will have *two* "current view" for same history
+    #   MAYBE: store only "previous items" for history? but how to be with fwd-history ?
     @property
     def focused_view(self) -> EntityView:
         return self._view_stack[self._cursor_idx]
@@ -61,7 +64,11 @@ class HistoryCursor:
         if (nview := self.get_relative(1)) and nview._ent == nent:
             return self._cursor_idx + 1
         # NOTE: retrieve cached View -- if we ever visited that Entry before
+        # MOVE:RFC: use external shared `CachedEntities
         if not (v := self._cache_pool.get(nent)):
+            # REMOVE? do we need this fallback code to ensure EntityView was created ?
+            #   ~ preview() is ought to always create `EntityView in _pool
+            #     before we are able to "move into" that node
             # NOTE: we create a separate `SatelliteViewport per each `Entity assigned
             #   NICE: preserve "pos,vh,margin" as-is, and then reinterpret/resize only when going back
             #   ++ NICE: preserve the *generated* items as-is in the "_wdg._lst"

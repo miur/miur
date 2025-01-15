@@ -45,6 +45,7 @@ class RootWidget:
         self._wh, self._ww = wh, ww
         orig_yx = (1, 1)
         size_yx = (self._wh - orig_yx[0] - 1, self._ww - orig_yx[1])
+        ## ALT:(origin): do C.move(y,x) b4 .redraw(), and remember getyx() inside each .redraw()
         self._navi.resize(*size_yx, origin=orig_yx)
 
     def redraw(self, stdscr: C.window) -> None:
@@ -84,6 +85,9 @@ class RootWidget:
                         if (lim := capx()) > 0:
                             stdscr.addnstr(xpath[ilnum:], lim, S.iteminfo)
 
+        # CHECK: is it still needed ?
+        # FIXED: prevent crash when window shrinks past the cursor
+        # self._navi.cursor_step_by(0)
         cy, cx = self._navi.redraw(stdscr)
 
         ci = 1 + wdg._cursor_item_lstindex

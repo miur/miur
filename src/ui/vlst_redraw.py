@@ -11,6 +11,15 @@ from .vlst_base import SatelliteViewport_DataProtocol
 
 
 class SatelliteViewport_RedrawMixin:
+    # USE: log.info(str(wdg))
+    # def __str__(self) -> str:
+    #     s = "  " * 0 + str(0) + ": " + self._ent.name
+    #     for i, x in enumerate(self._lstpxy, start=1):
+    #         s += "\n  " * 1 + str(i) + ": " + x.name
+    #     s += "\r"
+    #     s += str(v) if isinstance((v := self._valpxy.get()), int) else repr(v)
+    #     return s
+
     # pylint:disable=too-many-statements,too-many-branches,too-many-locals
     def redraw(
         self: SatelliteViewport_DataProtocol,
