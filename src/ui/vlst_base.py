@@ -80,27 +80,39 @@ class SatelliteViewportBase(SatelliteViewport_DataProtocol):
         self._viewport_margin_lines = vh // 8  # OR: fixed=2
         self._item_maxheight_hint = 1 + (vh // 10)
         # KEEP: self._viewport_followeditem_lstindex
+        # HACK: for correct .pos trigger centering on very first .resize()
+        pos = self._viewport_followeditem_linesfromtop
+        if pvh == 0 and pos == 0:
+            self.center_viewport_on_cursor()
         # RND: adjust resulting offset to align onto margin
         #   ALT:BAD: self._viewport_followeditem_linesfromtop = 0
-        if pvh > 0 and (ratio := self._viewport_followeditem_linesfromtop / pvh) > 0:
+        elif pvh > 0 and (ratio := pos / pvh) > 0:
+            # BAD: rounding of long lists may jump by +/-3  e.g. 33 -> 36
             self._viewport_followeditem_linesfromtop = int(vh * ratio)
 
     ## IDEA: if not found -- repeat search once again for _orig_lst,
     #     but set cursor on the first visible item (or completely hide cursor)
     #   NICE: should work even if this entry was hidden/filtered from parent.xfm_lst
+    # [_] FAIL:ALSO: we can't set subcursor w/o proper ._item_maxheight_hint derived from vh
+    #   => therefore we still need "vh_fallback" to focus_on()
+    #   ALSO:(key=vpidx): focus on item visible at viewport fraction or at Nth position
     def focus_on(
         self,
         key: int | float | ItemWidget | Golden | str | Callable[[ItemWidget], bool],
         # HACK:(vh_fallback): is needed by history.jump_to() before .resize() call
         #   BET:(init): call .resize() and then explicitly .jump_to(intermediates=True)
         #   ALT:API: pos_hint=
-        vh_fallback: int = 0,
+        # vh_fallback: int = 0,
     ) -> ItemWidget | None:
+        # NOTE: "ListIsEmpty" should behave the same as "ItemNotFound"
+        #   COS: you can't find *any* item inside of empty list, and it's fine
+        #   WF: .focus_on() is used in many direct and derived keybinds,
+        #     which expect to silently ignore the error OR to notify of needle absence.
+        #   INFO: by same logic there is no sense to raise exception from .focus_on(),
+        #     only to be forced to intercept it in *each* keybind-related API
         if not self._lst:
-            raise NotImplementedError("DECI:WiP")
-
-        vh = self._viewport_height_lines or vh_fallback
-        assert 0 < vh < 100
+            log.trace("ListIsEmpty <- .focus_on " + str(key))
+            return None  # MAYBE? return ErrorEntity("ListIsEmpty")
 
         def _match(cond: Callable[[ItemWidget], bool]) -> int | None:
             return next((i for i, w in enumerate(self._lst) if cond(w)), None)
@@ -108,9 +120,13 @@ class SatelliteViewportBase(SatelliteViewport_DataProtocol):
         idx: int | None
         match key:
             case int():
+                # ALSO:(key=vpidx): focus on Nth item visible in viewport
                 idx = key
             case float():  # ALT:USAGE: float(fractions.Fraction('3/7'))
-                idx = round(vh * key)
+                # ALSO:(key=vpidx): focus on item visible at viewport fraction
+                # idx = round(vh * key)
+                assert 0.0 <= key <= 1.0
+                idx = round(len(self._lst) * key)
             case ItemWidget():
                 try:
                     idx = self._lst.index(key)
@@ -122,6 +138,7 @@ class SatelliteViewportBase(SatelliteViewport_DataProtocol):
             case str():
                 # pylint:disable=protected-access
                 # TEMP:BAD: it's a mess to cmp either .name or .loci (NEED: strict FMT)
+                #   [_] BET:TODO: use "str" solely for .name and use custom `Loci() for composite .loci ※⡧⢈⢲⠜
                 idx = _match(lambda w: w._ent.loci == key)
             case cond if callable(cond):
                 idx = _match(cond)
@@ -129,17 +146,27 @@ class SatelliteViewportBase(SatelliteViewport_DataProtocol):
                 raise TypeError("Unsupported type")
 
         if idx is None:
-            return None
+            log.trace("ItemNotFound <- .focus_on " + str(key))
+            return None  # MAYBE? return ErrorEntity("ItemNotFound")
         if idx < 0:
             idx += len(self._lst)
         if idx < 0 or idx >= len(self._lst):
             raise ValueError((idx, key))
         self._viewport_followeditem_lstindex = self._cursor_item_lstindex = idx
+        log.warning(f"{idx=} <- .focus_on {key}")
+        # RND: always center cursor on .focus_on() to see the most surroundings of cursor
+        if self._viewport_height_lines > 0:
+            self.center_viewport_on_cursor()
+        return self._lst[idx]
 
+    def center_viewport_on_cursor(self) -> None:
         # NOTE: recalc anticipated "pos" for the focused item
         #   ENH? inof DFL=vh//2 tiac .margin and direction of last step_by()
         #   BET?ALT:(reuse "step_by" IMPL):FAIL: it steps by "steps" inof "items"
         #     self.step_by((len(self._lst) + idx if idx < 0 else idx) - self._cursor_item_lstindex)
+        vh = self._viewport_height_lines
+        assert 0 < vh < 100
+        idx = self._viewport_followeditem_lstindex
         pos = vh // 2
         if idx < pos and (top := sum(self._fih(i) for i in range(0, idx))) < pos:
             pos = top
@@ -147,11 +174,11 @@ class SatelliteViewportBase(SatelliteViewport_DataProtocol):
             idx > len(self._lst) - pos
             and (bot := sum(self._fih(i) for i in range(idx, len(self._lst) - 1))) < pos
         ):
+            # BUG: snaps vlst to bot
+            # BET: use step_by(0) to refresh .pos and reuse DFL:ALG
             pos = vh - self._fih(len(self._lst) - 1) - bot
+        log.warning(f"{pos=} vs {vh//2=} <- .center_cursor")
         self._viewport_followeditem_linesfromtop = pos
-        log.warning(pos)
-
-        return self._lst[idx]
 
     # CASE:(lightweight): to be able to re-assign ~same list after external xfm, e.g. after "order-by"
     def assign(self, lst: Sequence[Golden], hint_idx: int | None = None) -> None:

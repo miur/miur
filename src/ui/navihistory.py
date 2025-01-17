@@ -1,6 +1,6 @@
 from ..util.logger import log
 from .entity_base import Golden
-from .entries import ErrorEntry, FSEntry, RootNode
+from .entries import ErrorEntry, FSEntry
 from .view import EntityView
 
 
@@ -12,23 +12,20 @@ from .view import EntityView
 # SEP? "load_all_parents_until" vs "history_switch_focus/trim"
 # RENAME? {Navi,Loci}HistoryCursor
 class HistoryCursor:
-    def __init__(self, ent: Golden) -> None:
-        ## NOTE: history is always prepopulated by known state (at least a Root Node)
+    def __init__(self, rootent: Golden) -> None:
+        ## NOTE: history is always prepopulated by known state (at least a RootNode)
         #   MAYBE: make RootNode into singleton ?
         #     ~~ BUT: I may need different "wf-restricted/focused" alt-views for RootNode
-        # MAYBE:CHG: directly store "ent" in _stack to represent "xpath",
-        #   as now we can use "_pool" -- to map it to temporarily cached "_view"
+        # MAYBE:CHG: directly store "ent" (inof "view") in _stack to represent "xpath",
+        #   as now we can use "_pool" -- to map it to temporarily cached "_view" when needed
         #   RENAME? _cursor_chain/navi_stack | _pool_cached_view/_view_pool
-        view = EntityView(RootNode())
-        # BAD: hardcoding initial "vh" to derive "rel.pos" for jump_to()
-        #   BET:(init): call .resize() and then explicitly .jump_to(intermediates=True)
-        view._wdg.resize(99, 72)
+        view = EntityView(rootent)
         self._view_stack = [view]
         self._cursor_idx = 0
         # NOTE: tba to restore view when opening previously visited nodes
         self._cache_pool = {view._ent: view}
-        if ent != self.focused_view._ent:  # pylint:disable=protected-access
-            self.jump_to(ent, intermediates=True)
+        # DISABLED:FAIL: you need to hardcode .vh to make all nodes in ctor
+        # self.jump_to(ent, intermediates=True)
 
     @property
     def pos(self) -> tuple[int, int]:
@@ -78,7 +75,9 @@ class HistoryCursor:
             # HACK: clone current vlst vh/ww to newly created View
             # log.info(self._view_stack[self._cursor_idx]._wdg.sizehw)
             # CHECK: do I really need to do it? FAIL: initial node is also not resized
-            v._wdg.resize(*self._view_stack[self._cursor_idx]._wdg.sizehw)
+            #   DISABLED: on startup it clones sz=(0,0), which is useless, and then we got proper resize()
+            # v._wdg.resize(*self._view_stack[self._cursor_idx]._wdg.sizehw)
+
         # log.trace(f"{v._ent.loci=} | {self.pos}")  # <DEBUG
         ## SPLIT?: _append_or_replace(v)
         # NOTE: discard the rest of navi stack if we go into different route (but preserve in _pool)
@@ -114,15 +113,20 @@ class HistoryCursor:
                 #   !! should fixup existing entities in history._stack too
                 # BAD:PERF: we are forced to traverse each intermediate entity
                 #   to use the *same* instances of FSEntry as returned by .explore()
-                if w := self.focused_view._wdg.focus_on(ploci):
-                    self._cursor_idx = self._advance_or_retrieve_or_emplace(w._ent)
+                if wi := self.focused_view._wdg.focus_on(ploci):
+                    self._cursor_idx = self._advance_or_retrieve_or_emplace(wi._ent)
                 else:
                     raise ValueError("WTF: node doens't exist: loci=" + ploci)
+
+        if not self.focused_view._wdg.focus_on(nent.loci):
+            raise ValueError(
+                f"TEMP:DECI: current view={self.focused_view} doesn't have: loci={nent.loci}"
+            )
 
         self._cursor_idx = self._advance_or_retrieve_or_emplace(nent)
         # log.trace(f"{nent}{self.pos}")  # <DEBUG
         # log.trace(self._view_stack)  # <DEBUG
-        log.trace(self._cache_pool)  # <DEBUG
+        log.trace(list(self._cache_pool.values()))  # <DEBUG
 
     ## FAIL: `Entry.parent() is not generalizable ※⡧⢃⠬⢖
     ## BET: traverse and preload all intermediate parents on __init__(path)

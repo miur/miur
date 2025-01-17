@@ -38,7 +38,8 @@ class EntityView:
         ent = self._ent
         olst = self._orig_lst
         xlst = self._xfm_lst
-        return "{{" + f"{ent}: {len(xlst)}/{len(olst)}" + "}}"
+        # return "{{" + f"{ent}={len(xlst)}/{len(olst)}" + "}}"
+        return f"V({ent},{len(xlst)}/{len(olst)})"
 
     def fetch(self) -> None:
         # ALT:PERF(slow): @runtime_checkable : isinstance(ent, Explorable)

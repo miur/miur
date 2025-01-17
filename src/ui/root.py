@@ -18,7 +18,7 @@ class RootWidget:
 
     def set_entity(self, ent: Golden) -> None:
         # FUT: may create different widgets based on `Entity and `Policy
-        self._navi = NaviWidget(HistoryCursor(ent))
+        self._navi = NaviWidget(ent)
 
     ## DISABLED: we need explicit methods for type-checking
     ##   and to appropriately update header/footer on action

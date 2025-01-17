@@ -206,4 +206,6 @@ class RootNode(Golden):
 
     @override
     def explore(self) -> Iterable[Golden]:
-        return [FSEntry("/", nm="file:///")]
+        # OR: do we really need "file://" ?
+        #   isn't it prolifiration from "http://" ? -- which is wrong and should had been "http:"
+        return [FSEntry("/", nm="file:")]

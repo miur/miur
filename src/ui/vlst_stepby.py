@@ -14,7 +14,7 @@ class SatelliteViewport_StepbyMixin:
         #     raise NotImplementedError("DECI:WiP")
 
         if not self._lst:
-            log.trace("EMPTY")
+            log.trace(f"ListIsEmpty <- .step_by({steps})")
             return
 
         idx = self._cursor_item_lstindex
@@ -242,6 +242,9 @@ class SatelliteViewport_StepbyMixin:
                         assert 0 <= pos <= bot
         else:
             raise ValueError("unexpected")
+
+        if knock:
+            log.trace(f"{knock=} <- .step_by({steps})")
 
         # FUT: don't assign if the same
         self._cursor_item_lstindex = idx

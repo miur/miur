@@ -81,7 +81,7 @@ class Golden(Explorable, Addressable, Representable, Protocol):
     def __repr__(self) -> str:
         loci = self.loci
         if not loci.endswith(nm := self.name):
-            loci = nm + "=" + loci
+            loci = nm + loci
         if loci.startswith("/"):
             return f"`{loci}"
         else:

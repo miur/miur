@@ -3,6 +3,7 @@ import _curses as C
 from ..alg.flowratio import flowratio_to_abs
 from ..util.logger import log
 from .entity_base import Golden
+from .entries import ErrorEntry, RootNode
 from .navihistory import HistoryCursor
 from .view import EntityView
 
@@ -19,8 +20,9 @@ class PanelView:
 
 # SPLIT:(`NaviLayout): to cvt {(ww,wh) -> [panel].rect}, adapt based on size and toggle visibility
 class NaviWidget:
-    def __init__(self, hist: HistoryCursor) -> None:
-        self._hist = hist
+    def __init__(self, ent: Golden) -> None:
+        self._hist = HistoryCursor(RootNode())
+        self._hist.jump_to(ent, intermediates=True)
         self._view_rect = (0, 0, 0, 0)  # FMT:(vh,vw,vy,vx)
 
         # TODO:(`AdaptiveLayout): change/hide based on total window size
@@ -38,11 +40,6 @@ class NaviWidget:
     def _view(self) -> EntityView:
         return self._hist.focused_view
 
-    @property
-    def focused_ent(self) -> Golden:
-        # pylint:disable=protected-access
-        return self._hist.focused_view._wdg.focused_item._ent
-
     def resize(self, vh: int, vw: int, origin: tuple[int, int] = (0, 0)) -> None:
         self._view_rect = vh, vw, *origin
         # TODO: incorporate .visible=0/1 to affect flexed area
@@ -52,9 +49,14 @@ class NaviWidget:
             if (nm := self._cfg_layout[i])
         }
         log.info(f"{self._layout=}")  # <TEMP:DEBUG
-        self._resize_layout(*self._view_rect)
+
         # BAD:AGAIN: we init very first preview() on very first resize event
+        # BAD: we can't discard .resize() from _update_preview, COS we need to do it for older nodes on <j/k>
+        #   BUT:NICE: if we could discard it -- we could call _update_preview() from __init__ inof resize(),
+        #     and then on startup first ever resize() would put proper sizes for all widgets
+        #   SPLIT? make _resize_preview() function to call on <j/k> and achieve everything mentioned ?
         self._update_preview()
+        self._resize_layout(*self._view_rect)
 
     def cursor_jump_to(self, idx: int) -> None:
         # pylint:disable=protected-access
@@ -76,33 +78,42 @@ class NaviWidget:
 
     def view_jump_to(self, nent: Golden) -> None:
         self._hist.jump_to(nent)
+        self._update_preview()
         # NOTE: forced resize() *new* wdg to same dimensions as *pwdg*
         self._resize_layout(*self._view_rect)
-        self._update_preview()
 
     # THINK:SPLIT: `NaviModel which knows when to yeild `RootNode (which holds rootfs/stdin/etc providers)
     def view_go_back(self) -> None:
         self._hist.go_back()
+        # WHY: after previous jump_to() we may return to disjoint parent with different preview()
+        self._update_preview()
         # NOTE: forced resize() old/cached wdg, as window may had resized from then.
         self._resize_layout(*self._view_rect)
-        self._update_preview()
 
+    # MAYBE? merge with _resize_layout(), as they always called together ?
     def _update_preview(self) -> None:
         # pylint:disable=protected-access
         vh, vw, vy, vx = self._view_rect
         pool = self._hist._cache_pool
-        cent = self.focused_ent
+        wdg = self._hist.focused_view._wdg
         vx += sum(self._layout["prevloci"]) + sum(self._layout["browse"])
         for w in self._layout["preview"]:
-            if cent not in pool:
+            if not wdg._lst:
+                break
+            cent = wdg.focused_item._ent
+            if isinstance(cent, ErrorEntry):
+                break  # TEMP: until I make errors explorable
+            peek = pool.get(cent, None)
+            if not peek:
                 peek = pool[cent] = EntityView(cent)
-                ## ALT:HACK: clone rect size from old.preview
-                ##   FAIL: on startup there is no "old.preview"
-                ##     BUT: you can't create one in "__init__" either
-                ##       COS you need to wait until .resize() to calc abs-sz
-                #   peek._wdg.resize(*self._preview._wdg.sizehw)
-                # BAD:PERF: we calc() preview= coords AGAIN here (after _resize_layout)
-                peek._wdg.resize(vh, w, origin=(vy, vx))
+            ## ALT:HACK: clone rect size from old.preview
+            ##   FAIL: on startup there is no "old.preview"
+            ##     BUT: you can't create one in "__init__" either
+            ##       COS you need to wait until .resize() to calc abs-sz
+            #   peek._wdg.resize(*self._preview._wdg.sizehw)
+            # BAD:PERF: we calc() preview= coords AGAIN here (after _resize_layout)
+            wdg = peek._wdg
+            wdg.resize(vh, w, origin=(vy, vx))
             vx += w
         # return pool.get(self.focused_ent)
 
@@ -122,16 +133,16 @@ class NaviWidget:
             vx += w
 
         # CHG: use external shared `CachedEntities inof `HistoryCursor
-        cent = self.focused_ent
+        wdg = self._hist.focused_view._wdg
         for w in self._layout["preview"]:
-            peek = self._hist._cache_pool.get(cent)
+            if not wdg._lst:
+                break
+            peek = self._hist._cache_pool.get(wdg.focused_item._ent)
             if not peek:
                 break  # COS: consequent previews are depending on previous ones
-            peek._wdg.resize(vh, w, origin=(vy, vx))
+            wdg = peek._wdg
+            wdg.resize(vh, w, origin=(vy, vx))
             vx += w
-            if not peek._wdg._lst:
-                break
-            cent = peek._wdg.focused_item._ent
 
     def redraw(self, stdscr: C.window) -> tuple[int, int]:
         wprevloci, wbrowse, wpreview = (self._layout[nm] for nm in self._cfg_layout)
@@ -144,16 +155,15 @@ class NaviWidget:
         # CHG: use external shared `CachedEntities inof `HistoryCursor
         # NOTE: directly draw "preview" panel/entity from _pool
         #   &why to avoid constantly rewriting history on each cursor move up/down
-        cent = self.focused_ent
+        wdg = self._hist.focused_view._wdg
         for w in self._layout["preview"]:
-            # if isinstance(cent, ErrorEntry):
-            peek = self._hist._cache_pool.get(cent)
+            if not wdg._lst:
+                break
+            peek = self._hist._cache_pool.get(wdg.focused_item._ent)
             if not peek:
                 break  # COS: consequent previews are depending on previous ones
-            peek._wdg.redraw(stdscr, numcol=False)
-            if not peek._wdg._lst:
-                break
-            cent = peek._wdg.focused_item._ent
+            wdg = peek._wdg
+            wdg.redraw(stdscr, numcol=False)
 
         # NOTE: draw main Browse column very last to always be on top
         curyx = (0, 0)
