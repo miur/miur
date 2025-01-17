@@ -4,7 +4,7 @@ from ..alg.flowratio import flowratio_to_abs
 from ..util.logger import log
 from .entity_base import Golden
 from .entries import ErrorEntry, RootNode
-from .navihistory import HistoryCursor
+from .navihistory import EntityViewCachePool, HistoryCursor
 from .view import EntityView
 
 
@@ -21,7 +21,8 @@ class PanelView:
 # SPLIT:(`NaviLayout): to cvt {(ww,wh) -> [panel].rect}, adapt based on size and toggle visibility
 class NaviWidget:
     def __init__(self, ent: Golden) -> None:
-        self._hist = HistoryCursor(RootNode())
+        self._pool = EntityViewCachePool()
+        self._hist = HistoryCursor(RootNode(), self._pool)
         self._hist.jump_to(ent, intermediates=True)
         self._view_rect = (0, 0, 0, 0)  # FMT:(vh,vw,vy,vx)
 
@@ -94,7 +95,6 @@ class NaviWidget:
     def _update_preview(self) -> None:
         # pylint:disable=protected-access
         vh, vw, vy, vx = self._view_rect
-        pool = self._hist._cache_pool
         wdg = self._hist.focused_view._wdg
         vx += sum(self._layout["prevloci"]) + sum(self._layout["browse"])
         for w in self._layout["preview"]:
@@ -103,9 +103,9 @@ class NaviWidget:
             cent = wdg.focused_item._ent
             if isinstance(cent, ErrorEntry):
                 break  # TEMP: until I make errors explorable
-            peek = pool.get(cent, None)
+            peek = self._pool.get(cent)
             if not peek:
-                peek = pool[cent] = EntityView(cent)
+                peek = self._pool.add(EntityView(cent))
             ## ALT:HACK: clone rect size from old.preview
             ##   FAIL: on startup there is no "old.preview"
             ##     BUT: you can't create one in "__init__" either
@@ -137,7 +137,7 @@ class NaviWidget:
         for w in self._layout["preview"]:
             if not wdg._lst:
                 break
-            peek = self._hist._cache_pool.get(wdg.focused_item._ent)
+            peek = self._pool.get(wdg.focused_item._ent)
             if not peek:
                 break  # COS: consequent previews are depending on previous ones
             wdg = peek._wdg
@@ -159,7 +159,7 @@ class NaviWidget:
         for w in self._layout["preview"]:
             if not wdg._lst:
                 break
-            peek = self._hist._cache_pool.get(wdg.focused_item._ent)
+            peek = self._pool.get(wdg.focused_item._ent)
             if not peek:
                 break  # COS: consequent previews are depending on previous ones
             wdg = peek._wdg

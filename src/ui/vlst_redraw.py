@@ -1,7 +1,8 @@
 import _curses as C
 
 from ..curses_ext import g_style as S
-from ..util.logger import log
+
+# from ..util.logger import log
 from .entries import ErrorEntry
 from .rect import Rect
 from .vlst_base import SatelliteViewport_DataProtocol
@@ -32,6 +33,8 @@ class SatelliteViewport_RedrawMixin:
         #   COS: when cursor is outside -- most "write" actions will be disabled
         #   => you always need to know the span of items present in viewport to be rendered in O(1)
 
+        vh = self._viewport_height_lines
+        vw = self._viewport_width_columns
         vy, vx = self._viewport_origin_yx
         if not self._lst:
             ## [_] DECI!. insert proper "EMPTY" nodes
@@ -39,7 +42,9 @@ class SatelliteViewport_RedrawMixin:
             ##   ALT:BET? prevent whole redraw() inside root_wdg()
             # if fs.isdir(emptylist._originator):
             #   msg = "EMPTY DIR"
-            stdscr.addstr(vy, vx, "<<EMPTY>>", S.error | S.cursor)
+            boxw = vx + vw - 1 - stdscr.getyx()[1]
+            assert boxw > 0
+            stdscr.addnstr(vy, vx, "<<EMPTY>>", boxw, S.error | S.cursor)
             return vy, vx
 
         ## CHECK: if more than one redraw per one keypress
@@ -47,8 +52,6 @@ class SatelliteViewport_RedrawMixin:
 
         # self._viewport_margin_lines
         ci = self._cursor_item_lstindex
-        vh = self._viewport_height_lines
-        vw = self._viewport_width_columns
         top_idx = self._viewport_followeditem_lstindex
 
         # SUM:(cy,cx): real cursor pos (either focused item or top/bot linebeg)
@@ -71,7 +74,9 @@ class SatelliteViewport_RedrawMixin:
 
             # MAYBE: make special kind of ErrorWidget and pass rendering to it inof directly here ?
             if isinstance(ent, ErrorEntry):
-                stdscr.addstr(vy + y, vx + 0, f"[ {ent.name} ]", S.error | S.cursor)
+                boxw = vx + vw - stdscr.getyx()[1]
+                assert boxw > 0
+                stdscr.addnstr(vy + y, vx, f"[ {ent.name} ]", boxw, S.error | S.cursor)
                 # HACK:WKRND: hover cursor on error, unless we already looped through cursor
                 #   >> meaning "cx" now become indented
                 if cx == vx:

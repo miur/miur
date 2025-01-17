@@ -1,7 +1,30 @@
+from typing import Iterator, override
+
 from ..util.logger import log
 from .entity_base import Golden
 from .entries import ErrorEntry, FSEntry
 from .view import EntityView
+
+
+class EntityViewCachePool:
+    def __init__(self) -> None:
+        self._d: dict[Golden, EntityView] = {}
+
+    def __iter__(self) -> Iterator[EntityView]:
+        return iter(self._d.values())
+
+    def get(self, ent: Golden) -> EntityView | None:
+        return self._d.get(ent, None)
+
+    # TODO: discard by frecency when we try to allocate more
+    def add(self, view: EntityView) -> EntityView:
+        self._d[view._ent] = view
+        return view
+
+    # USAGE: sys.getsizeof()
+    @override
+    def __sizeof__(self) -> int:
+        raise NotImplementedError()
 
 
 # CHG: store _view and _history in outside CacheDB and pass into NaviWidget only refs
@@ -12,18 +35,18 @@ from .view import EntityView
 # SEP? "load_all_parents_until" vs "history_switch_focus/trim"
 # RENAME? {Navi,Loci}HistoryCursor
 class HistoryCursor:
-    def __init__(self, rootent: Golden) -> None:
+    def __init__(self, rootent: Golden, pool: EntityViewCachePool) -> None:
         ## NOTE: history is always prepopulated by known state (at least a RootNode)
         #   MAYBE: make RootNode into singleton ?
         #     ~~ BUT: I may need different "wf-restricted/focused" alt-views for RootNode
         # MAYBE:CHG: directly store "ent" (inof "view") in _stack to represent "xpath",
         #   as now we can use "_pool" -- to map it to temporarily cached "_view" when needed
         #   RENAME? _cursor_chain/navi_stack | _pool_cached_view/_view_pool
-        view = EntityView(rootent)
+        view = pool.add(EntityView(rootent))
         self._view_stack = [view]
         self._cursor_idx = 0
         # NOTE: tba to restore view when opening previously visited nodes
-        self._cache_pool = {view._ent: view}
+        self._pool = pool
         # DISABLED:FAIL: you need to hardcode .vh to make all nodes in ctor
         # self.jump_to(ent, intermediates=True)
 
@@ -62,7 +85,7 @@ class HistoryCursor:
             return self._cursor_idx + 1
         # NOTE: retrieve cached View -- if we ever visited that Entry before
         # MOVE:RFC: use external shared `CachedEntities
-        if not (v := self._cache_pool.get(nent)):
+        if not (v := self._pool.get(nent)):
             # REMOVE? do we need this fallback code to ensure EntityView was created ?
             #   ~ preview() is ought to always create `EntityView in _pool
             #     before we are able to "move into" that node
@@ -71,7 +94,7 @@ class HistoryCursor:
             #   ++ NICE: preserve the *generated* items as-is in the "_wdg._lst"
             #   +++ NICE: can use totally different *widgets* based on the type(_ent)
             #     e.g. Dashboard or Editor
-            v = self._cache_pool[nent] = EntityView(nent)
+            v = self._pool.add(EntityView(nent))
             # HACK: clone current vlst vh/ww to newly created View
             # log.info(self._view_stack[self._cursor_idx]._wdg.sizehw)
             # CHECK: do I really need to do it? FAIL: initial node is also not resized
@@ -126,7 +149,7 @@ class HistoryCursor:
         self._cursor_idx = self._advance_or_retrieve_or_emplace(nent)
         # log.trace(f"{nent}{self.pos}")  # <DEBUG
         # log.trace(self._view_stack)  # <DEBUG
-        log.trace(list(self._cache_pool.values()))  # <DEBUG
+        log.trace(list(self._pool))  # <DEBUG
 
     ## FAIL: `Entry.parent() is not generalizable ※⡧⢃⠬⢖
     ## BET: traverse and preload all intermediate parents on __init__(path)
