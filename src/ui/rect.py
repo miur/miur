@@ -1,4 +1,4 @@
-from typing import override
+from typing import Iterator, override
 
 
 # ALT:SEE: /usr/lib/python3.12/site-packages/Onboard/utils.py:425
@@ -11,6 +11,12 @@ class Rect:
         self.h = h
         self.x = x
         self.y = y
+
+    def __iter__(self) -> Iterator[int]:
+        yield self.w
+        yield self.h
+        yield self.x
+        yield self.y
 
     @property
     def xw(self) -> int:

@@ -46,7 +46,7 @@ class RootWidget:
         orig_yx = (1, 1)
         size_yx = (self._wh - orig_yx[0] - 1, self._ww - orig_yx[1])
         ## ALT:(origin): do C.move(y,x) b4 .redraw(), and remember getyx() inside each .redraw()
-        self._navi.resize(*size_yx, origin=orig_yx)
+        self._navi.resize(*size_yx, orig_yx=orig_yx)
 
     def redraw(self, stdscr: C.window) -> None:
         # FUT: dispatch to either curses/cli/Qt

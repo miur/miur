@@ -1,8 +1,12 @@
-def flowratio_to_abs(ratio: tuple[int | float, ...], maxw: int) -> list[int]:
+from typing import Iterable
+
+
+def flowratio_to_abs(ratio: Iterable[int | float], maxw: int) -> list[int]:
     """
     Convert fixed/flexed width hints to abs width fitting into maxw
     LIOR? int=Fixed/Column=-min/max, float=Percent/Ratio=-rest/full
     """
+    ratio = tuple(ratio)
     assert ratio and maxw > 0
     assert all(r > -1 for r in ratio), "TEMP:DECI: meaning of negative int"
     wlst = [int(r * maxw) if 0 < r < 1 else int(r) if r >= 1 else 0 for r in ratio]
