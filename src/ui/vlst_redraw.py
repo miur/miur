@@ -42,9 +42,7 @@ class SatelliteViewport_RedrawMixin:
             ##   ALT:BET? prevent whole redraw() inside root_wdg()
             # if fs.isdir(emptylist._originator):
             #   msg = "EMPTY DIR"
-            boxw = vx + vw - 1 - stdscr.getyx()[1]
-            assert boxw > 0
-            stdscr.addnstr(vy, vx, "<<EMPTY>>", boxw, S.error | S.cursor)
+            stdscr.addnstr(vy, vx, "<<EMPTY>>", vw, S.error | S.cursor)
             return vy, vx
 
         ## CHECK: if more than one redraw per one keypress
@@ -74,9 +72,7 @@ class SatelliteViewport_RedrawMixin:
 
             # MAYBE: make special kind of ErrorWidget and pass rendering to it inof directly here ?
             if isinstance(ent, ErrorEntry):
-                boxw = vx + vw - stdscr.getyx()[1]
-                assert boxw > 0
-                stdscr.addnstr(vy + y, vx, f"[ {ent.name} ]", boxw, S.error | S.cursor)
+                stdscr.addnstr(vy + y, vx, f"[ {ent.name} ]", vw, S.error | S.cursor)
                 # HACK:WKRND: hover cursor on error, unless we already looped through cursor
                 #   >> meaning "cx" now become indented
                 if cx == vx:
