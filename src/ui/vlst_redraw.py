@@ -42,6 +42,7 @@ class SatelliteViewport_RedrawMixin:
             ##   ALT:BET? prevent whole redraw() inside root_wdg()
             # if fs.isdir(emptylist._originator):
             #   msg = "EMPTY DIR"
+            # [_] FIXME: if error is previewed inside pv0 -- we can extend it over pv1 too
             stdscr.addnstr(vy, vx, "<<EMPTY>>", vw, S.error | S.cursor)
             return vy, vx
 

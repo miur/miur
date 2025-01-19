@@ -126,6 +126,7 @@ class HistoryCursor:
         # log.trace(list(nent.parents_loci()))
         log.trace(f"{nent}{self.pos}")  # <DEBUG
 
+        # ALT:THINK:SPLIT: `NaviModel which knows when to yeild `RootNode (which holds rootfs/stdin/etc providers)
         if intermediates:
             if not isinstance(nent, FSEntry):
                 raise NotImplementedError(type(nent))
