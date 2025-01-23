@@ -134,6 +134,58 @@ class ItemWidget:
                 pfxlst = f"{1+lstidx:03d}{">" if focused else ":"} "
                 stdscr.addstr(pfxlst, S.pfxidx | (S.cursor if focused else 0))
 
+    def _render_ansi(self, stdscr: C.window, **kw) -> tuple[int, bool]:
+        # MOVE: it only has sense for plaintext items -- nested structures don't have ANSI, do they?
+        #   SPLIT:VIZ: `CompositeItem, `PlaintextItem, `AnsitermItem : based on originator `Entity
+        # NOTE:(boxw): we crop everything outside "rect" area
+        #   >> item.struct() ought to pre-wrap text on {boxw < rect.w}
+        cattr = S.cursor
+        boff = len(kw["text"])
+        for chunk, cattr, boff in colored_ansi_or_schema(**kw):
+            # RND: curses calc() offset for each next addstr() by itself
+            # WARN: possibly wraps onto next line, if {len(_visual(chunk))>lim()}
+            # FAIL:(addnstr(,lim(),)): wrong byte-cropping for multi-cell CJK fonts
+            #   BAD:PERF: you can't pass "boxw" inof "lim()" here
+            stdscr.addstr(chunk, cattr)
+        # ALT:(len(l)>boxw):FAIL: doesn't work due to term-ANSI
+        cropped = boff != len(kw["text"])
+        return cattr, cropped
+
+    def _render_decortail(
+        self,
+        stdscr: C.window,
+        **infoctx: int | None,
+    ) -> None:
+        lastline: bool = infoctx.get("lastline")
+
+        # ALT? hide decortail {if not focused} for cleaner !tmux screen-copy
+        # MAYBE:PERF: insert "⬎" by item.struct() once inof repeated checks during rendering
+        #   FAIL: substruct should be *copyable*, so decortail can't be part of item.struct()
+        #   ALSO:BAD: to apply different hi for decortail -- we shouldn't include it into line body
+        #
+        # SUM: calculate appropriate leading/trailing decortail symbols
+        #   ENH: prepend leading "‥" when "offx>0"
+        #   ENH: "…" to 1st line when "offs>0"
+        #   ENH: "…" as stem into mid/beg of compressed line
+        #     │ for smart-compression "…" may also appear in the middle of last/each line,
+        #     │ or even replace several lines by two "…" e.g. "…[snippet]…" OR "line1…\n…lineN"
+        #   ENH: hi leading/trailing spaces as "·" (nbsp="␣") and tabs as "▸ " (like vim)
+        #     << stick them to the text, never overlay onto column-separator
+        if infoctx.get("cropped"):
+            # BET: always print c-tail over spacer bw columns
+            # ALT: print compression "tail" over last char in total "line+tail"
+            # FIXME: "…" should be only used if item.struct() had cropped item,
+            #   orse if item doesn't fit into navi viewport -- it should always use "‥"
+            tail = "…" if lastline else "‥"
+        else:
+            # MAYBE: print wraps over columns-spacer too (FIXED: tail^=" "*(avail-1))
+            # REVL:NICE: current cursor has got behavior of dynamic left-right justifying
+            tail = "" if lastline else "⬎" if infoctx.get("newl") else "↩"
+        if tail:
+            ## BAD? cursor-highlight over column-spacer is very distracting
+            cattr = S.iteminfo  # | (S.cursor if infoctx.get("focused") else 0)
+            stdscr.addstr(tail, cattr)
+
     # DECI: pass XY to redraw/render ? OR store as .origin ?
     #   ~store~ makes it possible to .redraw() individual elements only
     #     BAD: all XY should be updated each time we scroll :(
@@ -153,8 +205,7 @@ class ItemWidget:
         focused = infoctx.get("focusid") is not None
 
         def lim() -> int:
-            cx = stdscr.getyx()[1]
-            ncells = rect.x + rect.w - cx
+            ncells = rect.xw - stdscr.getyx()[1]
             assert ncells >= 0
             return ncells
 
@@ -181,6 +232,7 @@ class ItemWidget:
             # INFO: we can pass {boxw>vw}, enabling horizontal panning, marked by "‥"
             wrapwidth=(boxw if boxw > 10 else 0),
             maxlines=(ih_hint if boxw > 10 else 1),
+            # reserve_for_decortail=1,
         )
         # log.trace(lines)  # <DEBUG:(line split/wrap)
 
@@ -208,31 +260,20 @@ class ItemWidget:
         # TODO: combine with item.struct() linewrap to split chunks and dup cattr on wrapwidth
         last = len(lines) - 1
         for i, l in enumerate(lines):
+            lastline = i == last
             stdscr.move(rect.y + i, bodyx)  #  ALT=(,rect.x+2)
             if newl := l.endswith(os.linesep):
                 l = l.rstrip(os.linesep)
             assert all(c not in l for c in "\r\n"), "TEMP: sub() or repr() embedded NLs"
 
             # DEBUG: log.info(f"{focused=} | {l=}")
-
-            # MOVE: it only has sense for plaintext items -- nested structures don't have ANSI, do they?
-            #   SPLIT:VIZ: `CompositeItem, `PlaintextItem, `AnsitermItem : based on originator `Entity
-            # NOTE:(boxw): we crop everything outside "rect" area
-            #   >> item.struct() ought to pre-wrap text on {boxw < rect.w}
-            cattr = S.cursor
-
-            boff = len(l)
-            for chunk, cattr, boff in colored_ansi_or_schema(
-                self._ent, l, maxcells=boxw, focused=focused
-            ):
-                # RND: curses calc() offset for each next addstr() by itself
-                # WARN: possibly wraps onto next line, if {len(_visual(chunk))>lim()}
-                # FAIL:(addnstr(,lim(),)): wrong byte-cropping for multi-cell CJK fonts
-                #   BAD:PERF: you can't pass "boxw" inof "lim()" here
-                stdscr.addstr(chunk, cattr)
-
-            # ALT:(len(l)>boxw):FAIL: doesn't work due to term-ANSI
-            cropped = boff != len(l)
+            cattr, cropped = self._render_ansi(
+                stdscr,
+                ent=self._ent,
+                text=l,
+                maxcells=boxw,  # (boxw + 1 if lastline else boxw),
+                focused=focused,
+            )
 
             # NOTE: "colored_ansi_or_schema" should ensure all chunks totally fit
             # ATT: we crop to prevent "lim()" from ever becoming negative
@@ -240,38 +281,17 @@ class ItemWidget:
             if (avail := lim()) <= 0:
                 raise RuntimeError(avail)
 
-            if focused:
+            if focused and (filler := " " * (avail - 1)):
                 # HACK: make cursor span to full viewport width (minus decortail),
                 #   colored same as the last chunk
-                stdscr.addstr(" " * (avail - 1), cattr | S.cursor)
+                stdscr.addstr(filler, cattr | S.cursor)
 
-            assert i <= last
-            # ALT? hide decortail {if not focused} for cleaner !tmux screen-copy
-            # MAYBE:PERF: insert "⬎" by item.struct() once inof repeated checks during rendering
-            #   FAIL: substruct should be *copyable*, so decortail can't be part of item.struct()
-            #   ALSO:BAD: to apply different hi for decortail -- we shouldn't include it into line body
-            #
-            # SUM: calculate appropriate leading/trailing decortail symbols
-            #   ENH: prepend leading "‥" when "offx>0"
-            #   ENH: "…" to 1st line when "offs>0"
-            #   ENH: "…" as stem into mid/beg of compressed line
-            #     │ for smart-compression "…" may also appear in the middle of last/each line,
-            #     │ or even replace several lines by two "…" e.g. "…[snippet]…" OR "line1…\n…lineN"
-            #   ENH: hi leading/trailing spaces as "·" (nbsp="␣") and tabs as "▸ " (like vim)
-            #     << stick them to the text, never overlay onto column-separator
-            if cropped:
-                # BET: always print c-tail over spacer bw columns
-                # ALT: print compression "tail" over last char in total "line+tail"
-                # FIXME: "…" should be only used if item.struct() had cropped item,
-                #   orse if item doesn't fit into navi viewport -- it should always use "‥"
-                tail = "…" if i == last else "‥"
-            else:
-                # MAYBE: print wraps over columns-spacer too (FIXED: tail^=" "*(avail-1))
-                # REVL:NICE: current cursor has got behavior of dynamic left-right justifying
-                tail = "" if i == last else "⬎" if newl else "↩"
-            if tail:
-                ## BAD:DISABLED: cursor-highlight over column-spacer is very distracting
-                # stdscr.addstr(tail, S.iteminfo | (S.cursor if focused else 0))
-                stdscr.addstr(tail, S.iteminfo)
+            self._render_decortail(
+                stdscr,
+                lastline=lastline,
+                cropped=cropped,
+                newl=newl,
+                focused=focused,
+            )
 
         return indent

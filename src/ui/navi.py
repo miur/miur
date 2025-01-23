@@ -43,14 +43,15 @@ class Panel:
     def __iter__(self) -> Iterator[Self]:
         return iter(self._split)
 
-    def __getitem__(self, name: str) -> Self:
-        # FIXME: search recursively
-        return next(p for p in self._split if p.name == name)
+    def __getitem__(self, nm: str) -> Self | None:
+        if nm == self.name:
+            return self
+        return next((p for p in self._split if p[nm] is not None), None)
 
-    def __contains__(self, nm: str) -> bool:
-        if self.name == nm:
-            return True
-        return any(nm in p for p in self._split)
+    # def __contains__(self, nm: str) -> bool:
+    #     if nm == self.name:
+    #         return True
+    #     return any(nm in p for p in self._split)
 
     def named_rects(self) -> Iterable[tuple[str, Rect]]:
         for p in self._split:
@@ -137,24 +138,21 @@ class NaviWidget:
         rect = Rect(vw, vh, x=orig_yx[1], y=orig_yx[0])
         self._layout = pick_adaptive_layout_cfg(rect, self._layout)
         self._layout.resize(rect)
-        # log.debug(f"{self._layout=}")  # <TEMP:DEBUG
-        if "preview" in self._layout:
-            # WHY: adaptive layout on bigger window may need more preview nodes
-            self._update_preview()
-            self._resize_cached_preview()
+        log.debug(f"{self._layout=}")  # <TEMP:DEBUG
+        # WHY: adaptive layout on bigger window may need more preview nodes
+        self._update_preview()
+        self._resize_cached_preview()
         self._resize_cached_hist_browse()
 
     def cursor_jump_to(self, idx: int) -> None:
         self._view._wdg.focus_on(idx)  # pylint:disable=protected-access
-        if "preview" in self._layout:
-            self._update_preview()
-            self._resize_cached_preview()
+        self._update_preview()
+        self._resize_cached_preview()
 
     def cursor_step_by(self, steps: int) -> None:
         self._view._wdg.step_by(steps)  # pylint:disable=protected-access
-        if "preview" in self._layout:
-            self._update_preview()
-            self._resize_cached_preview()
+        self._update_preview()
+        self._resize_cached_preview()
 
     def view_go_into(self) -> None:
         # pylint:disable=protected-access
@@ -166,25 +164,25 @@ class NaviWidget:
 
     def view_jump_to(self, nent: Golden) -> None:
         self._hist.jump_to(nent)
-        if "preview" in self._layout:
-            self._update_preview()
-            self._resize_cached_preview()
+        self._update_preview()
+        self._resize_cached_preview()
         self._resize_cached_hist_browse()
 
     def view_go_back(self) -> None:
         self._hist.go_back()
-        if "preview" in self._layout:
-            # WHY: after previous jump_to() we may return to disjoint parent with different preview()
-            self._update_preview()
-            self._resize_cached_preview()
+        # WHY: after previous jump_to() we may return to disjoint parent with different preview()
+        self._update_preview()
+        self._resize_cached_preview()
         # WHY: forced resize() old/cached wdg, as window may had resized from then.
         self._resize_cached_hist_browse()
 
     def _update_preview(self) -> None:
+        if not (pvs := self._layout["preview"]):
+            return
         # pylint:disable=protected-access
         wdg = self._hist.focused_view._wdg
         # [_] RFC: isolate same ALG of traversing list of `Panels for _resize_cached*(), etc.
-        for _ in self._layout["preview"]:
+        for _ in pvs:
             if not wdg._lst:
                 break
             cent = wdg.focused_item._ent
@@ -194,14 +192,16 @@ class NaviWidget:
             #   &why to avoid constantly rewriting history on each cursor move up/down
             peek = self._pool.get(cent)
             if not peek:
-                peek = self._pool.add(EntityView(cent))
+                peek = self._pool.add(cent)
             wdg = peek._wdg
 
     def _resize_cached_preview(self) -> None:
+        if not (pvs := self._layout["preview"]):
+            return
         # ALT:HACK: clone rect size from old.preview
         #   BUT:FAIL: on startup there is yet no "old.preview" nor initial .resize()
         #   wdg.resize(*self._preview._wdg.sizehw)
-        rects = [p.rect for p in self._layout["preview"]]
+        rects = [p.rect for p in pvs]
         roomw = sum(r.w for r in rects)
         wdg = self._hist.focused_view._wdg
         for r in rects:
@@ -215,50 +215,54 @@ class NaviWidget:
             ## NOTE: if `Error is inside preview= pv0 -- we can extend it over empty pv1
             haspv1 = wdg._lst and not isinstance(wdg.focused_item._ent, ErrorEntry)
             w = r.w if haspv1 else roomw
-            log.debug(w)
             wdg.resize(r.h, w, origin=(r.y, r.x))
             roomw -= w
 
     def _resize_cached_hist_browse(self) -> None:
-        rects = [p.rect for p in self._layout["prevloci"]]
-        pr: Rect | None = None
-        for i, r in enumerate(rects, start=-len(rects)):
-            if pr is None:
-                pr = r
-            else:
-                # NOTE:(for N=2): extend first hist.w when len(hist)<len(prevloci)
-                #   FIXME:(for N>=3): re-balance same vw bw lower number of hist nodes
-                pr.w += r.w
-            if prev := self._hist.get_relative(i):
-                prev._wdg.resize(pr.h, pr.w, origin=(pr.y, pr.x))
-                pr = None
+        if plocs := self._layout["prevloci"]:
+            rects = [p.rect for p in plocs]
+            pr: Rect | None = None
+            for i, r in enumerate(rects, start=-len(rects)):
+                if pr is None:
+                    pr = r
+                else:
+                    # NOTE:(for N=2): extend first hist.w when len(hist)<len(prevloci)
+                    #   FIXME:(for N>=3): re-balance same vw bw lower number of hist nodes
+                    pr.w += r.w
+                if prev := self._hist.get_relative(i):
+                    prev._wdg.resize(pr.h, pr.w, origin=(pr.y, pr.x))
+                    pr = None
 
         # MAYBE: extend browse= to whole hist/preview when hist=none or preview=none
-        for p in self._layout["browse"]:
-            r = p.rect
-            self._view._wdg.resize(r.h, r.w, origin=(r.y, r.x))
+        if browse := self._layout["browse"]:
+            for p in browse:
+                r = p.rect
+                self._view._wdg.resize(r.h, r.w, origin=(r.y, r.x))
 
     def redraw(self, stdscr: C.window) -> tuple[int, int]:
         # pylint:disable=protected-access
-        wprevloci = self._layout["prevloci"]
-        for i, _ in enumerate(wprevloci, start=-len(wprevloci)):
-            if prev := self._hist.get_relative(i):
-                prev._wdg.redraw(stdscr, numcol=False)
+        if plocs := self._layout["prevloci"]:
+            for i, _ in enumerate(plocs, start=-len(plocs)):
+                if prev := self._hist.get_relative(i):
+                    prev._wdg.redraw(stdscr, numcol=False)
 
-        if "preview" in self._layout:
+        if pvs := self._layout["preview"]:
             wdg = self._hist.focused_view._wdg
-            for _ in self._layout["preview"]:
+            for p in pvs:
                 if not wdg._lst:
                     break
                 peek = self._pool.get(wdg.focused_item._ent)
                 if not peek:
                     break  # COS: consequent previews are depending on previous ones
                 wdg = peek._wdg
-                wdg.redraw(stdscr, numcol=False)
+                # NOTE: we don't need spacer column after rightmost vlst
+                colsep = p.rect.xw < self._layout.rect.xw
+                wdg.redraw(stdscr, numcol=False, colsep=colsep)
 
         # NOTE: draw main Browse column very last to always be on top
         curyx = (0, 0)
-        for _ in self._layout["browse"]:
-            curyx = self._view._wdg.redraw(stdscr, numcol=True)
+        if browse := self._layout["browse"]:
+            for _ in browse:
+                curyx = self._view._wdg.redraw(stdscr, numcol=True)
         # TODO: return curyx from focused panel inof the last one on the right
         return curyx

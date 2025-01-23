@@ -1,4 +1,4 @@
-from typing import Callable, Sequence
+from typing import TYPE_CHECKING, Callable, Sequence
 
 from ..util.logger import log
 from .entity_base import Golden
@@ -7,21 +7,33 @@ from .vlst_base import SatelliteViewport_DataProtocol
 from .vlst_redraw import SatelliteViewport_RedrawMixin
 from .vlst_stepby import SatelliteViewport_StepbyMixin
 
+if TYPE_CHECKING:
+    # FIXED: circular import
+    #   ALT:BET?(C++-style): use pure `PoolProtocol (w/o IMPL)
+    from .navihistory import EntityViewCachePool
+
 
 # pylint:disable=too-many-instance-attributes
 class SatelliteViewport(
     # REF: https://stackoverflow.com/questions/10018757/how-does-the-order-of-mixins-affect-the-derived-class
     #   (order): same as "class Viewport(Stepby(Redraw(Base))"
     # BUG:(mypy): base protocol can't be placed last (after mix-ins, as it's supposed to be)
-    #  | Cannot determine type of "_viewport_followeditem_linesfromtop" in base class "SatelliteViewport_StepbyMixin"
+    #  | Cannot determine type of "_viewport_*" in base class "SatelliteViewport_StepbyMixin"
     SatelliteViewport_DataProtocol,
     SatelliteViewport_StepbyMixin,
     SatelliteViewport_RedrawMixin,
 ):
-    def __init__(self) -> None:
-        # NOTE: actually _lst here stands for a generic _augdbpxy with read.API
-        #   i.e. DB augmented by virtual entries, all generated-and-cleared on demand
-        self._lst: Sequence[ItemWidget]
+    # NOTE: actually _lst here stands for a generic _augdbpxy with read.API
+    #   i.e. DB augmented by virtual entries, all generated-and-cleared on demand
+    _lst: Sequence[ItemWidget]
+
+    ## XP~HACK: split class over several files w/o mix-ins (inof complex inheriting)
+    ## SRC: https://stackoverflow.com/questions/39740632/python-type-hinting-without-cyclic-imports
+    ## INFO: import global mix-in methods directly into class
+    # from .vlst_stepby import SatelliteViewport_StepbyMixin.step_by
+
+    def __init__(self, pool: "EntityViewCachePool") -> None:
+        self._pool = pool  # TEMP: only for render(spacermark)
         # ARCH:
         #  * when "viewport follows cursor", then followeditem==item_under_cursor,
         #    with offset being the same as for cursor itself

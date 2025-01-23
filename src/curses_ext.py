@@ -51,8 +51,10 @@ def init_colorscheme(stdscr: C.window) -> None:
     S.pfxrel = S.auxinfo
     S.pfxidx = S.iteminfo
     S.cursor = C.A_REVERSE | C.A_BOLD  # OR: termcolor2(8, 4)
+    S.mark = termcolor2(61, -1)  # 13/purple
     S.footer = termcolor2(217, 17)
     S.error = termcolor2(160, -1)  # 1
+    S.empty = S.error
     S.fsdir = termcolor2(33, -1)  # 4
     S.fslink = termcolor2(37, -1)  # 6
     S.fsexe = termcolor2(64, -1)  # 2

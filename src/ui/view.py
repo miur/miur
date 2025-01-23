@@ -1,6 +1,6 @@
 import os
 import os.path as fs
-from typing import Callable, Self, Sequence, override
+from typing import Callable, Sequence, override
 
 from .entity_base import Golden
 from .entries import FSEntry
@@ -13,13 +13,12 @@ from .vlst import SatelliteViewport
 
 # ALT:SPLIT: make an `EntityContext for serialization/restoration on restart
 class EntityView:
-    _ent: Golden
-    _originator: Self | None
     _wdg: SatelliteViewport
     _act: Callable[[], Sequence[Golden]]
     # _lstpxy: ListCachingProxy[Golden]
     _orig_lst: Sequence[Golden]
     _xfm_lst: list[Golden]
+    _visited: bool | None
     # TBD: _overlay/_aug_lst -- to inject on-the-fly or from db
     #   NICE:IDEA: show those entries as expanded subtree on node parent level
     #     inof as regular entries inside node itself
@@ -27,11 +26,19 @@ class EntityView:
     # ALT:BAD?PERF: store in each TextEntity a backref to "originator"
     #   == to be able to return to its "parent"
     #   NICE: only "navigated-to" items will store this backref
-    def __init__(self, ent: Golden, originator: Self | None = None) -> None:
+    def __init__(
+        self,
+        ent: Golden,
+        wdgfactory: Callable[[], SatelliteViewport],
+        # originator: Self | None = None,
+    ) -> None:
         self._ent = ent
+        self._wdgfactory = wdgfactory
         # NOTE: remember which `View have created this one -- tba to return back
-        self._originator = originator
+        # self._originator = originator
         self.fetch()
+        # ALG: re-assign to None on ctor, and then to False each update by .fetch()
+        self._visited = None
 
     @override
     def __repr__(self) -> str:
@@ -50,10 +57,9 @@ class EntityView:
             self._transform()
             assert getattr(self, "_xfm_lst", None) is not None
             if not getattr(self, "_wdg", None):
-                # MAYBE:BET? reuse existing _wdg (from outside `*Layout) inof creating it per each entity
-                #   OR:(vice versa): pass whole _view to any existing _wdg to display _lst
-                self._wdg = SatelliteViewport()
+                self._wdg = self._wdgfactory()
             self._wdg.assign(self._xfm_lst)
+            self._visited = False
         else:
             raise NotImplementedError()
 

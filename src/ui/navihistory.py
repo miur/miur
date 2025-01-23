@@ -4,6 +4,7 @@ from ..util.logger import log
 from .entity_base import Golden
 from .entries import ErrorEntry, FSEntry
 from .view import EntityView
+from .vlst import SatelliteViewport
 
 
 class EntityViewCachePool:
@@ -17,8 +18,11 @@ class EntityViewCachePool:
         return self._d.get(ent, None)
 
     # TODO: discard by frecency when we try to allocate more
-    def add(self, view: EntityView) -> EntityView:
-        self._d[view._ent] = view
+    def add(self, ent: Golden) -> EntityView:
+        # MAYBE:BET? reuse existing _wdg (from outside `*Layout) inof creating it per each entity
+        #   OR:(vice versa): pass whole _view to any existing _wdg to display _lst
+        view = EntityView(ent, wdgfactory=lambda: SatelliteViewport(self))
+        self._d[ent] = view
         return view
 
     # USAGE: sys.getsizeof()
@@ -42,7 +46,7 @@ class HistoryCursor:
         # MAYBE:CHG: directly store "ent" (inof "view") in _stack to represent "xpath",
         #   as now we can use "_pool" -- to map it to temporarily cached "_view" when needed
         #   RENAME? _cursor_chain/navi_stack | _pool_cached_view/_view_pool
-        view = pool.add(EntityView(rootent))
+        view = pool.add(rootent)
         self._view_stack = [view]
         self._cursor_idx = 0
         # NOTE: tba to restore view when opening previously visited nodes
@@ -94,7 +98,7 @@ class HistoryCursor:
             #   ++ NICE: preserve the *generated* items as-is in the "_wdg._lst"
             #   +++ NICE: can use totally different *widgets* based on the type(_ent)
             #     e.g. Dashboard or Editor
-            v = self._pool.add(EntityView(nent))
+            v = self._pool.add(nent)
             # HACK: clone current vlst vh/ww to newly created View
             # log.info(self._view_stack[self._cursor_idx]._wdg.sizehw)
             # CHECK: do I really need to do it? FAIL: initial node is also not resized
@@ -105,6 +109,7 @@ class HistoryCursor:
         ## SPLIT?: _append_or_replace(v)
         # NOTE: discard the rest of navi stack if we go into different route (but preserve in _pool)
         self._view_stack[self._cursor_idx + 1 :] = [v]
+        v._visited = True
         return len(self._view_stack) - 1
         # log.trace(f"{self._view_stack} | {self.pos}")  # <DEBUG
 
@@ -150,7 +155,7 @@ class HistoryCursor:
         self._cursor_idx = self._advance_or_retrieve_or_emplace(nent)
         # log.trace(f"{nent}{self.pos}")  # <DEBUG
         # log.trace(self._view_stack)  # <DEBUG
-        log.trace(list(self._pool))  # <DEBUG
+        # log.trace(list(self._pool))  # <DEBUG
 
     ## FAIL: `Entry.parent() is not generalizable ※⡧⢃⠬⢖
     ## BET: traverse and preload all intermediate parents on __init__(path)

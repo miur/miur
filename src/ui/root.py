@@ -43,8 +43,8 @@ class RootWidget:
 
     def resize(self, wh: int, ww: int) -> None:
         self._wh, self._ww = wh, ww
-        orig_yx = (1, 1)
-        size_yx = (self._wh - orig_yx[0] - 1, self._ww - orig_yx[1])
+        orig_yx = (1, 0)
+        size_yx = (self._wh - 1 - orig_yx[0], self._ww - orig_yx[1])
         ## ALT:(origin): do C.move(y,x) b4 .redraw(), and remember getyx() inside each .redraw()
         self._navi.resize(*size_yx, orig_yx=orig_yx)
 
@@ -96,7 +96,7 @@ class RootWidget:
         sz = len(wdg._lst)
         sortby = "name"
         sortrev = False
-        footer = f"--- {ci:2d}/{sz} | by={sortby}{"￪" if sortrev else "￬"}"
+        footer = f"--- {ci:2d}/{sz} | by={sortby}"  # {"￪" if sortrev else "￬"}"
         ## DEBUG:NEED:(__main__.py): -X tracemalloc
         # footer += f"  --- {{RAM={__import__("tracemalloc").get_traced_memory()[0]//1024:,}kB}}"
 
@@ -111,9 +111,12 @@ class RootWidget:
             pfx = "+" if g_running_ipykernel else "-"
             modal = f"({pfx}jupyter) {modal}"
 
-        if (spacerlen := self._ww - len(footer) - len(modal) - 1) > 0:
+        if (spacerlen := self._ww - len(footer) - len(modal)) > 0:
             footer += " " * spacerlen + modal
-        stdscr.addnstr(self._wh - 1, 0, footer, self._ww, S.footer)
+        # WKRND:(curses): print into last line last col w/o error due to cursor-postmove
+        # stdscr.addnstr(self._wh - 1, 0, footer[:-1], self._ww - 1, S.footer)
+        # stdscr.insnstr(self._wh - 1, self._ww - 1, footer[-1], 1, S.footer)
+        stdscr.insnstr(self._wh - 1, 0, footer, self._ww, S.footer)
 
         # NOTE: place real cursor to where list-cursor is, to make tmux overlay selection more intuitive
         stdscr.move(cy, cx)
