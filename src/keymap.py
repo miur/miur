@@ -14,6 +14,11 @@ def M(mod: str) -> ModuleType:
     return importlib.import_module(mod, __package__)
 
 
+def _dir() -> str:
+    # pylint:disable=protected-access
+    return g_app.root_wdg._navi._view._ent.loci
+
+
 def _loci() -> str:
     # pylint:disable=protected-access
     return g_app.root_wdg._navi._view._wdg.focused_item._ent.loci
@@ -71,12 +76,18 @@ _modal_generic: KeyTable = {
     # ",": lambda g: modal_switch_to(","),
 }
 
+_modal_yank: KeyTable = {
+    "d": lambda g: M(".integ.xclip").to_system_clipboard(_dir()),
+    "p": lambda g: M(".integ.xclip").to_system_clipboard(_loci()),
+}
+
 _modal_comma: KeyTable = {
     "s": lambda g: M(".integ.shell").shell_out(_loci()),
     "m": lambda g: M(".integ.shell").shell_out(_loci()),
 }
 
 g_modal_default: KeyTable = _modal_generic | {
+    "y": _modal_yank,
     ",": _modal_comma,
 }
 

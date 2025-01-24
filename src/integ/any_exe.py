@@ -3,7 +3,7 @@ import os
 # if globals().get("TYPE_CHECKING"):
 from typing import Callable, Mapping, Sequence, Union
 
-type ArgType = "Union[str, int, Sequence[str | int], Mapping[str, str | int]]"
+type ArgType = Union[str, int, Sequence[str | int], Mapping[str, str | int]]
 
 ## REF: repeated args for all popen-based functions
 # python - Generate TypedDict from function's keyword arguments - Stack Overflow ⌇⡧⡄⡌⢶
@@ -101,7 +101,9 @@ def run_bg_wait(
         input=kw.get("input", None),
         stdout=DEVNULL if split is None else PIPE,
         # OR: special "pipebuf"
-        stderr=g_app.io.pipeerr or g_app.io.ttyalt,
+        # ERR: io.UnsupportedOperation: fileno
+        # stderr=g_app.io.pipeerr or g_app.io.ttyalt,
+        stderr=g_app.io.pipeerr,
     )
     if split is None:
         return None
