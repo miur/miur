@@ -1,9 +1,8 @@
 import _curses as C
 
 from ..curses_ext import g_style as S
+from ..util.logger import log
 from .entity_base import Golden
-
-# from ..util.logger import log
 from .entries import ErrorEntry
 from .rect import Rect
 from .vlst_base import SatelliteViewport_DataProtocol
@@ -22,41 +21,13 @@ class SatelliteViewport_RedrawMixin:
     #     s += str(v) if isinstance((v := self._valpxy.get()), int) else repr(v)
     #     return s
 
-    # RENAME?MOVE? EntityView.classify_preview()
-    # ALT:PERF: do it only once on vlst.assign() and store inside `ItemWidget
-    def _pick_spacermark(
-        self: SatelliteViewport_DataProtocol, ent: Golden
-    ) -> tuple[int, str]:
-        ## NOTE: preview-hint to be aware of next steps w/o moving cursor
-        ## BAD: only shows marker for already cached views, so you NEED to move cursor
-        ##   FIXME? gen-preview for all items in list -- BUT:PERF
-        # pylint:disable=protected-access
-        v = self._pool.get(ent)
-        if not v:
-            return (0, "")  # OR=﹖?⹔⸮՞¿
-        if not v._orig_lst:  # = if dir/file is truly empty
-            return (S.empty, "∅")  # OR=○◌
-        if any(isinstance(x._ent, ErrorEntry) for x in v._wdg._lst):
-            return (S.error, "‼")  # OR=⁈ ❕❗
-        ## BET: modify color of visited mark, COS: it overlaps with all other marks
-        if v._visited:  # OR: if ent in self._pool_visited:
-            return (S.fsexe, "⋄")  # OR=+↔
-        if not v._wdg._lst:  # = if filtered result is empty
-            return (S.mark, "⊙")  # OR=⊗⦼⦰ ⦱ ⦲ ⦳
-        # = regular non-empty node
-        return (S.mark, "*")  # OR=⊕⊛
-
     # pylint:disable=too-many-statements,too-many-branches,too-many-locals
     def redraw(
         self: SatelliteViewport_DataProtocol,
         stdscr: C.window,
         *,
         numcol: bool = False,
-        colsep: bool | str = True,
     ) -> tuple[int, int]:
-        # MOVE? to `Navi.redraw() to draw it in one go
-        if isinstance(colsep, bool):
-            colsep = "|" if colsep else ""
 
         # draw_footer(stdscr)
         # ARCH:WARN: we actually need to render whatever is *shown in viewport* (even if cursor is far outside)
@@ -72,7 +43,6 @@ class SatelliteViewport_RedrawMixin:
             ##   ALT:BET? prevent whole redraw() inside root_wdg()
             # if fs.isdir(emptylist._originator):
             #   msg = "EMPTY DIR"
-            # [_] FIXME: if error is previewed inside pv0 -- we can extend it over pv1 too
             stdscr.addnstr(vy, vx, "<<EMPTY>>", vw, S.empty | S.cursor)
             return vy, vx
 
@@ -100,11 +70,9 @@ class SatelliteViewport_RedrawMixin:
         while i <= last and y < vh:
             item = self._lst[i]
             ent = item._ent
-            spmrk = self._pick_spacermark(ent)
             # SEE:ARCH: !urwid for inspiration on `Rect and `TextBox
             rect = Rect(
-                # FIXME: len() -> cellwidth()
-                w=vw - len(spmrk) - len(colsep),
+                w=vw,  # FIXME: len() -> cellwidth()
                 h=(vh if y < 0 else vh - y),
                 x=vx,
                 y=vy + max(0, y),
@@ -126,7 +94,7 @@ class SatelliteViewport_RedrawMixin:
             # WF?: RasterizeViewportItems/CacheDB -> HxW -> StepBy -> RenderVisibleItems
             #   OPT: pre-rasterize everything (more RAM, less CPU/lag during scroll)
 
-            indent = 0
+            bodyx = rect.x
             try:
                 # FIXME:RELI: resize(<) may occur during any point in redraw loop, invalidating "vh/vw"
                 # wh, ww = stdscr.getmaxyx()
@@ -134,9 +102,10 @@ class SatelliteViewport_RedrawMixin:
                 #   ALT:BET:TRY: wrap all stdscr.* calls and raise "EAGAIN" if resize had occured
                 #     &why to avoid drawing outside curses if window had shrinked
                 #     ALT:BET! delay resize() processing until current draw-frame finishes
-                indent = item.render_curses(
+                bodyx = item.render_curses(
                     stdscr,
                     rect=rect,
+                    pool=self._pool,
                     offy=(-y if y < 0 else 0),
                     ih_hint=self._item_maxheight_hint,
                     # infoctx::
@@ -155,23 +124,13 @@ class SatelliteViewport_RedrawMixin:
                 # FAIL:(unicode strikethrough): text = "\u0336".join(ent.name) + "\u0336"
                 eattr = S.error | (S.cursor if i == ci else 0) | C.A_REVERSE | C.A_DIM
                 # BAD:TEMP: hardcoded .bc. indent is lost on exception
-                indent = 9
-                stdscr.addstr(rect.y, rect.x + indent, ent.name, eattr)
-
-            # RND: draw column-spacer here inof `ItemWidget, as spacer belongs to vlst
-            #   and may even be drawn outside item boundaries (e.g. as a bundle of graph-edges in OpenGL)
-            # BAD: spacermark will override decortail when len(name)==boxw
-            if spmrk and spmrk[1]:
-                # NOTE: we always draw spacermark out of top-right corner of visible part of multiline item
-                #   NEED: "boxw=vw-2" to reserve space so spacermark won't override decortail
-                stdscr.addstr(rect.y, rect.xw, spmrk[1], spmrk[0])
-            if colsep:
-                stdscr.addstr(rect.y, rect.xw + 1, colsep, S.default)
+                bodyx = rect.x + 9
+                stdscr.addstr(rect.y, bodyx, ent.name, eattr)
 
             if i == ci:
                 # log.info(f"{i=}: {ent.name}")  # <DEBUG
-                cy = vy + y
-                cx = vx + indent
+                cy = rect.y
+                cx = bodyx
             # BAD: desynchronized from default item.height due to ext-supplied "maxlines"
             #   MAYBE: totally eliminate item.height usage -- jump step_by() bw internal structures
             y += self._fih(i)

@@ -177,7 +177,7 @@ class SatelliteViewport(
             # BUG: snaps vlst to bot
             # BET: use step_by(0) to refresh .pos and reuse DFL:ALG
             pos = vh - self._fih(len(self._lst) - 1) - bot
-        log.warning(f"{pos=} vs {vh//2=} <- .center_cursor")
+        # log.warning(f"{pos=} vs {vh//2=} <- .center_cursor")  # <DEBUG
         self._viewport_followeditem_linesfromtop = pos
 
     # CASE:(lightweight): to be able to re-assign ~same list after external xfm, e.g. after "order-by"

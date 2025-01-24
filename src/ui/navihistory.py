@@ -77,10 +77,13 @@ class HistoryCursor:
             log.trace("No back=" + self.focused_view._ent.name)
             return
         self._cursor_idx -= 1
+        # NOTE: if we jumped over intermediates, we need to mark them, when they are shown in browse=
+        self.focused_view._visited = True
 
     # BAD:ARCH:(part of distributed FSM): hard to track index permutations
     def _advance_or_retrieve_or_emplace(self, nent: Golden) -> int:
-        log.trace(f"{nent.loci=} | {self.pos}")  # <DEBUG
+        # log.trace(f"{nent.loci=} | {self.pos}")  # <DEBUG
+        log.info(f"{id(nent):x} {nent}")  # <DEBUG
         # NOTE: don't discard hist Entry on .go_back() to be able to return and see same EntityView
         #   CASE: advance inof discarding cached fs.commonpath() parents from left
         #     == verify path cmpts exist in expected positions of stack
@@ -109,7 +112,6 @@ class HistoryCursor:
         ## SPLIT?: _append_or_replace(v)
         # NOTE: discard the rest of navi stack if we go into different route (but preserve in _pool)
         self._view_stack[self._cursor_idx + 1 :] = [v]
-        v._visited = True
         return len(self._view_stack) - 1
         # log.trace(f"{self._view_stack} | {self.pos}")  # <DEBUG
 
@@ -129,13 +131,14 @@ class HistoryCursor:
         assert self.focused_view._ent != nent
 
         # log.trace(list(nent.parents_loci()))
-        log.trace(f"{nent}{self.pos}")  # <DEBUG
+        # log.trace(f"{nent}{self.pos}")  # <DEBUG
 
         # ALT:THINK:SPLIT: `NaviModel which knows when to yeild `RootNode (which holds rootfs/stdin/etc providers)
         if intermediates:
             if not isinstance(nent, FSEntry):
                 raise NotImplementedError(type(nent))
             # vh_fallback = self.focused_view._wdg._viewport_height_lines
+            # FIXME: start from nearest common parent inof always from RootNode
             self._cursor_idx = 0
             for ploci in nent.parents_loci():
                 # NOTE: adjust cursor to hover over entity you came back from
@@ -147,12 +150,15 @@ class HistoryCursor:
                 else:
                     raise ValueError("WTF: node doens't exist: loci=" + ploci)
 
-        if not self.focused_view._wdg.focus_on(nent.loci):
+        if not (wi := self.focused_view._wdg.focus_on(nent.loci)):
             raise ValueError(
                 f"TEMP:DECI: current view={self.focused_view} doesn't have: loci={nent.loci}"
             )
-
-        self._cursor_idx = self._advance_or_retrieve_or_emplace(nent)
+        # WARN: {id(wi._ent) != id(nent)}
+        #  COS: "nent" is an arbitrary `Entity, and "wi._ent" is from a contiguous graph
+        self._cursor_idx = self._advance_or_retrieve_or_emplace(wi._ent)
+        # NOTE: we skip intermediates, COS they weren't shown in browse= yet
+        self.focused_view._visited = True
         # log.trace(f"{nent}{self.pos}")  # <DEBUG
         # log.trace(self._view_stack)  # <DEBUG
         # log.trace(list(self._pool))  # <DEBUG
