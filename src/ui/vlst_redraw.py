@@ -70,10 +70,16 @@ class SatelliteViewport_RedrawMixin:
         while i <= last and y < vh:
             item = self._lst[i]
             ent = item._ent
+
+            # BAD: desynchronized from default item.height due to ext-supplied "maxlines"
+            #   MAYBE: totally eliminate item.height usage -- jump step_by() bw internal structures
+            # CHG? return actually drawn height from item.render_curses()
+            h_item = self._fih(i)
+
             # SEE:ARCH: !urwid for inspiration on `Rect and `TextBox
             rect = Rect(
                 w=vw,  # FIXME: len() -> cellwidth()
-                h=(vh if y < 0 else vh - y),
+                h=min(h_item, (vh if y < 0 else vh - y)),
                 x=vx,
                 y=vy + max(0, y),
             )
@@ -108,11 +114,15 @@ class SatelliteViewport_RedrawMixin:
                     pool=self._pool,
                     offy=(-y if y < 0 else 0),
                     ih_hint=self._item_maxheight_hint,
+                    numcol=numcol,
                     # infoctx::
-                    lstidx=i if numcol else None,
-                    vpidx=(i - top_idx) if numcol else None,
-                    vpline=y if numcol else None,
+                    lstidx=i,
+                    vpidx=(i - top_idx),
+                    vpline=y,
                     focusid=((y - top_y) if i == ci else None),  # CHG> substruct_ptr
+                    # NOTE: single large multiline item may have both top+bot scroll markers
+                    moreup=top_idx if i == top_idx else None,
+                    moredown=last - i if y + h_item >= vh else None,
                 )
             except Exception as exc:  # pylint:disable=broad-exception-caught
                 from ..util.exchook import log_exc
@@ -131,9 +141,7 @@ class SatelliteViewport_RedrawMixin:
                 # log.info(f"{i=}: {ent.name}")  # <DEBUG
                 cy = rect.y
                 cx = bodyx
-            # BAD: desynchronized from default item.height due to ext-supplied "maxlines"
-            #   MAYBE: totally eliminate item.height usage -- jump step_by() bw internal structures
-            y += self._fih(i)
+            y += h_item
             i += 1
 
         ## ALT:NOTE: draw cursor AGAIN after footer (i.e. over-draw on top of full list)

@@ -56,7 +56,6 @@ def colored_ansi_or_schema(
     text: str,
     *,
     maxcells: int,
-    focused: bool = False,
 ) -> Iterable[tuple[str, int, int]]:
     ansi = ranger_ansi()
     if not ansi or len(ansi.split_ansi_from_text(text)) <= 1:
@@ -67,9 +66,6 @@ def colored_ansi_or_schema(
         # BAD:PERF:RND: dim multiline non-ANSI items for more contrasting structure
         # if not ent.name.startswith(text):
         #     cattr = S.iteminfo
-
-        if focused:
-            c_schema |= S.cursor
 
         # FIXED:BAD:PERF: curses.addnstr(,Nbytes,) doesn't understand multi-cell CJK fonts
         if text.isascii():
@@ -100,8 +96,6 @@ def colored_ansi_or_schema(
         # log.trace(chunk)
         if isinstance(chunk, tuple):
             fg, bg, attr = chunk
-            if focused:
-                attr |= S.cursor
             pattr = termcolor2(fg, bg) | attr
             # log.info(pattr)
         else:

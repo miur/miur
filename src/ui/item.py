@@ -1,47 +1,25 @@
 import os
-from typing import TYPE_CHECKING, Any, Callable, Final
+from typing import TYPE_CHECKING, Final
 
 import _curses as C
 
 from ..curses_ext import g_style as S
+from ..util.termansi import ChunkKind as K
+from ..util.termansi import cellchunk, cellwidth, num_lo, num_up
+from . import itemparts as P
 
 # from ..util.logger import log
 from .entity_base import Golden
-from .entries import ErrorEntry, TextEntry
-from .itemcolor import colored_ansi_or_schema
 from .rect import Rect
 
 if TYPE_CHECKING:
     from .navihistory import EntityViewCachePool
 
-
-# RENAME?MOVE? EntityView.classify_preview()
-# ALT:PERF: do it only once on vlst.assign() and store inside `ItemWidget
-def _pick_spacermark(pool: "EntityViewCachePool", ent: Golden) -> tuple[int, str]:
-    ## NOTE: preview-hint to be aware of next steps w/o moving cursor
-    ## BAD: only shows marker for already cached views, so you NEED to move cursor
-    ##   FIXME? gen-preview for all items in list -- BUT:PERF
-    # BET:PERF: cache weak fwd-ref to corresponding `EntityView inside `ItemWidget
-    # MAYBE:ARCH: access directly to global "g_app.entvpool"
-    # pylint:disable=protected-access
-    v = pool.get(ent)
-    if not v:
-        ## DEBUG: when _pool contains different `Entity instance than .explore
-        # if ent.name == "user":
-        #     log.debug(f"{id(list(self._pool)[3]._ent):x}, {id(ent):x}")  # <DEBUG
-        #     log.debug(f"{list(self._pool)[3]._ent == ent}")  # <DEBUG
-        return (S.default, "")  # OR=﹖?⹔⸮՞¿
-    if not v._orig_lst:  # = if dir/file is truly empty
-        return (S.empty, "∅")  # OR=○◌
-    if any(isinstance(x._ent, ErrorEntry) for x in v._wdg._lst):
-        return (S.error, "‼")  # OR=⁈ ❕❗
-    ## BET: modify color of visited mark, COS: it overlaps with all other marks
-    if v._visited:  # OR: if ent in self._pool_visited:
-        return (S.fsexe, "⋄")  # OR=+↔
-    if not v._wdg._lst:  # = if filtered result is empty
-        return (S.mark, "⊙")  # OR=⊗⦼⦰ ⦱ ⦲ ⦳
-    # = regular non-empty node
-    return (S.mark, "*")  # OR=⊕⊛
+hint_numcol_len: Final = 5
+hint_minbody_len: Final = 8  # CASE: only when prefix is shown
+hint_mintext_len: Final = 4  # CASE: only when meta is shown; orse =1
+decortail_len: Final = 1
+hint_minboxw: Final = hint_numcol_len + hint_minbody_len + decortail_len  # =14
 
 
 ## FUT:TRY: make any `*Widget into valid Entity to be destructured and explored
@@ -85,7 +63,7 @@ class ItemWidget:
     #   ALT:BET? directly produce grouped oneline TextItems inof single wrapped multiline .name
     #     OR:ENH: make nested `ItemWidget inside `ItemWidget
     #   NICE:USAGE: substruct can be used to select/copy individual elements in table row, e.g. FSEntry filesize
-    # MOVE? make ItemWidget to calc() item height and draw it (or only ItemXfm) inof directly drawing Item/Entity
+    # MOVE? make ItemWidget to calc item height and draw it (or only ItemXfm) inof directly drawing Item/Entity
     #   WARN: don't store "index" inside ItemWidget << PERF:(slow): rebuild on each order-by
     #     ~~ though, I can pass list index ctx into ItemWidget.render(ctx[index=i])
     ## NOTE: :maxlines is only a "hint", i.e. if ItemWidget absolutely must -- it can be more than viewport
@@ -101,8 +79,9 @@ class ItemWidget:
     ) -> list[str]:
         # TEMP:DEBUG: multiline entries
         NL, NUL = os.linesep, "\0"
+        text = self._ent.name.replace("o", "o" + NL).replace("\t", "▸ ")
         # ALT:(splitlines):FAIL: discards empty lines
-        lines = self._ent.name.replace("o", "o" + NL).replace(NL, NL + NUL).split(NUL)
+        lines = text.replace(NL, NL + NUL).split(NUL)
         if not wrapwidth:
             return lines
         maxw = wrapwidth - wrapreserve
@@ -117,125 +96,17 @@ class ItemWidget:
                         wrapped[-1] += l[i : i + maxw]
                     else:
                         wrapped.append(l[i : i + maxw])
+        # lines: list[str] = []
+        # s = self._ent.name
+        # c = 0
+        # # VIZ: separately(maxwrap+maxnewlines), combined(maxwrap<maxlines), unlimited
+        # while c < len(s) and len(lines) <= maxlines:
+        #     nc = min(c + wrapwidth, len(s) - c)
+        #     if (nn := s.find("\n", c, c + wrapwidth)) >= 0:
+        #         nc = min(nn, nc)
+        #     lines.append(s[c:nc])
+        #     c = nc
         return lines
-
-        ## ALSO:IDEA: when wrapwidth=0, insert "‥" at the end of each linepart, which longer than viewport
-        ##   OR: smart-compress in the middle each part of .name bw newlines
-        ## [_] TODO: !hi last char in each line differently
-        # return [
-        #     l[c * iw : c * (iw + 1)] + ("↩" if c < maxwrap else "…")
-        #     for l in item.name.split("\n")
-        #     for c in range((len(l) // iw) + 1)
-        #     if c <= maxwrap
-        # ]
-        lines: list[str] = []
-        s = self._ent.name
-        c = 0
-        # VIZ: separately(maxwrap+maxnewlines), combined(maxwrap<maxlines), unlimited
-        while c < len(s) and len(lines) <= maxlines:
-            nc = min(c + wrapwidth, len(s) - c)
-            if (nn := s.find("\n", c, c + wrapwidth)) >= 0:
-                nc = min(nn, nc)
-            lines.append(s[c:nc])
-            c = nc
-        return lines
-
-    # TODO:OPT: number-column variants:
-    #   * [rel]linenum
-    #   * [rel]viewpos
-    #   * [rel]itemidx
-    #   * combined=itemidx+[rel]viewpos
-    def _render_itemnum_prefix(
-        self,
-        stdscr: C.window,
-        lim: Callable[[], int],
-        **infoctx: int | None,
-    ) -> int:
-        focused = infoctx.get("focusid") is not None
-        combined = True  # OPT:TEMP: hardcode
-        if combined:
-            cidx = infoctx.get("lstidx")
-            bidx = infoctx.get("vpidx")
-            if isinstance(self._ent, TextEntry):
-                if "`0x" in self._ent.loci:
-                    bpfx = cpfx = "" if cidx is None else f"{cidx*16:02x}"
-                else:
-                    bpfx = cpfx = "" if cidx is None else f"{1+cidx:02d}"
-            else:  # e.g. FSEntry, etc.
-                cpfx = "" if cidx is None else f"{1+cidx:02d}"
-                bpfx = "" if bidx is None else f"{1+bidx:02d}"
-
-            if focused:
-                if cpfx:
-                    stdscr.addstr(f"{cpfx:>3s}> ", S.pfxrel | S.cursor)
-            else:
-                if bpfx:
-                    stdscr.addstr(f"{bpfx:>3s}: ", S.pfxidx)
-        else:
-            # HACK: hide both numcol when viewport is too small
-            if lim() > 25 and (vpidx := infoctx.get("vpidx")) is not None:
-                pfxvp = f"{1+vpidx:02d}| "
-                stdscr.addstr(pfxvp, S.pfxrel)
-            # TODO: for binary/hex show "file offset in hex" inof "item idx in _xfm_list"
-            #   ALSO: start offsets from "0x0" inof "1"
-            if lim() > 21 and (lstidx := infoctx.get("lstidx")) is not None:
-                # IDEA: shorten long numbers >999 to ‥33 i.e. last digits significant for column
-                #   (and only print cursor line with full index)
-                pfxlst = f"{1+lstidx:03d}{">" if focused else ":"} "
-                stdscr.addstr(pfxlst, S.pfxidx | (S.cursor if focused else 0))
-        return stdscr.getyx()[1]  # ALT =len(pfxvp)+len(pfxlst) | =rect.w-lim()
-
-    def _render_ansi(self, stdscr: C.window, **kw: Any) -> tuple[int, bool]:
-        # MOVE: it only has sense for plaintext items -- nested structures don't have ANSI, do they?
-        #   SPLIT:VIZ: `CompositeItem, `PlaintextItem, `AnsitermItem : based on originator `Entity
-        # NOTE:(boxw): we crop everything outside "rect" area
-        #   >> item.struct() ought to pre-wrap text on {boxw < rect.w}
-        cattr = S.cursor
-        boff = len(kw["text"])
-        for chunk, cattr, boff in colored_ansi_or_schema(**kw):
-            # RND: curses calc() offset for each next addstr() by itself
-            # WARN: possibly wraps onto next line, if {len(_visual(chunk))>lim()}
-            # FAIL:(addnstr(,lim(),)): wrong byte-cropping for multi-cell CJK fonts
-            #   BAD:PERF: you can't pass "boxw" inof "lim()" here
-            stdscr.addstr(chunk, cattr)
-        # ALT:(len(l)>boxw):FAIL: doesn't work due to term-ANSI
-        cropped = boff != len(kw["text"])
-        return cattr, cropped
-
-    def _render_decortail(
-        self,
-        stdscr: C.window,
-        **infoctx: int | None,
-    ) -> None:
-        lastline: bool = infoctx.get("lastline")
-
-        # ALT? hide decortail {if not focused} for cleaner !tmux screen-copy
-        # MAYBE:PERF: insert "⬎" by item.struct() once inof repeated checks during rendering
-        #   FAIL: substruct should be *copyable*, so decortail can't be part of item.struct()
-        #   ALSO:BAD: to apply different hi for decortail -- we shouldn't include it into line body
-        #
-        # SUM: calculate appropriate leading/trailing decortail symbols
-        #   ENH: prepend leading "‥" when "offx>0"
-        #   ENH: "…" to 1st line when "offs>0"
-        #   ENH: "…" as stem into mid/beg of compressed line
-        #     │ for smart-compression "…" may also appear in the middle of last/each line,
-        #     │ or even replace several lines by two "…" e.g. "…[snippet]…" OR "line1…\n…lineN"
-        #   ENH: hi leading/trailing spaces as "·" (nbsp="␣") and tabs as "▸ " (like vim)
-        #     << stick them to the text, never overlay onto column-separator
-        if infoctx.get("cropped"):
-            # BET: always print c-tail over spacer bw columns
-            # ALT: print compression "tail" over last char in total "line+tail"
-            # FIXME: "…" should be only used if item.struct() had cropped item,
-            #   orse if item doesn't fit into navi viewport -- it should always use "‥"
-            tail = "…" if lastline else "‥"
-        else:
-            # MAYBE: print wraps over columns-spacer too (FIXED: tail^=" "*(avail-1))
-            # REVL:NICE: current cursor has got behavior of dynamic left-right justifying
-            tail = "" if lastline else "⬎" if infoctx.get("newl") else "↩"
-        if tail:
-            ## BAD? cursor-highlight over column-spacer is very distracting
-            cattr = S.iteminfo  # | (S.cursor if infoctx.get("focused") else 0)
-            stdscr.addstr(tail, cattr)
 
     # DECI: pass XY to redraw/render ? OR store as .origin ?
     #   ~store~ makes it possible to .redraw() individual elements only
@@ -251,24 +122,23 @@ class ItemWidget:
         # offs,  # = for one/multiline "running line" (i.e. simply use {nm=ent.name[offs:]})
         offy: int = 0,  # = skip Y lines from multiline body
         ih_hint: int = 1,  # TEMP? pass ViewportPolicy hint, to calculate item.height in same way
+        numcol: bool = False,
         **infoctx: int | None,
     ) -> int:
-        stdscr.move(rect.y, rect.x)
         focused = infoctx.get("focusid") is not None
+        moreup = infoctx.get("moreup")
+        moredown = infoctx.get("moredown")
 
-        smattr, smchar = _pick_spacermark(pool, self._ent)
-        decortail_len: Final = 1
-        boxend: Final = rect.xw - len(smchar)
+        maxlines = min(rect.h, ih_hint if rect.w > 10 else 2)  # , self.height())
+        cursorx = rect.x
 
-        def lim() -> int:
-            ncells = boxend - stdscr.getyx()[1]
-            assert ncells >= 0
-            return ncells
+        text = self._ent.name.replace("o", "o\n")
+        kind, cw, ti = K.partial, 0, 0
 
-        bodyx = rect.x
-        if lim() > 21:
-            bodyx = self._render_itemnum_prefix(stdscr, lim, **infoctx)
-        boxw = boxend - bodyx
+        view = pool.get(self._ent)
+        smattr, smchar = P.pick_spacermark(view)
+        # TEMP: only draw metainfo for cached nodes
+        meta = str(len(view._orig_lst)) if view else ""
 
         # INFO:(rect.h): "self._item_maxheight_hint" is only a recommendation
         #   >> real limitator is either viewport vh
@@ -278,22 +148,25 @@ class ItemWidget:
 
         # IDEA: don't always wrap unconditionally on "wrapwidth" -- use nowrap for narrow windows {vw<10}
         #   OPT:BET: allow to pan such cropped name left/right manually (OR by "running line")
-        lines = self.struct(
-            # INFO: we can pass {boxw>vw}, enabling horizontal panning, marked by "‥"
-            wrapwidth=(boxw if boxw > 10 else 0),
-            maxlines=(ih_hint if boxw > 10 else 1),
-            wrapreserve=1,
-        )
+        # ENH: allow wrapping each line on different length (based on cellwidth(meta[i]))
+        #   MAYBE:ALSO:TEMP: do wrapreserve=1 for this unconditionally
+        # BET?:API: self.chunk(maxw, start=...) to both reflow/split
+        # lines = self.struct(
+        #     # INFO: we can pass {boxw>vw}, enabling horizontal panning, marked by "‥"
+        #     wrapwidth=(boxw if boxw > 10 else 0),
+        #     maxlines=(ih_hint if boxw > 10 else 1),
+        #     wrapreserve=decortail_len,
+        # )
         # log.trace(lines)  # <DEBUG:(line split/wrap)
 
         # PERF~BAD? replace by pre-advanced iterator to avoid unnecessary copying
         #   https://stackoverflow.com/questions/11383468/python-iterate-over-a-sublist
         # ALT: insert into loop {if i > rect.h or i < offy: continue; i-=offy}
-        if offy:
-            assert 0 <= offy < len(lines)
-            lines = lines[offy:]
-        if len(lines) > rect.h:
-            lines = lines[: rect.h]
+        # if offy:
+        #     assert 0 <= offy < len(lines)
+        #     lines = lines[offy:]
+        # if len(lines) > rect.h:
+        #     lines = lines[: rect.h]
 
         # OPT? margins for prefix/postfix on nextlines
         #   - print prefix on a separate first line (heading)
@@ -307,54 +180,140 @@ class ItemWidget:
         #   - print all lines till the end (minus dedent)
         #   - align all lines onwards on postfix
 
+        stdscr.move(rect.y, rect.x)
+
+        # last = len(lines) - 1
+        # for i, l in enumerate(lines):
+        last = maxlines - 1
+        assert 0 <= offy <= last
+        i = -offy - 1
         # TODO: combine with item.struct() linewrap to split chunks and dup cattr on wrapwidth
-        last = len(lines) - 1
-        for i, l in enumerate(lines):
-            lastline = i == last
+        while (i := i + 1) <= last:
+            # {if i > rect.h or i < offy: continue; i-=offy}
+            # FIXME:BET:(stable reflow): don't draw numcol {if i < offy}
+            if i == 0:
+                ## FMT:0: rect.w = [numcol + boxw(bodyw(text + roomw/nfill?) + decortail? + meta?)] + smchar?
+                ## FMT:N: rect.w = [indent + boxw(bodyw + decortail?)]
+                ##   * &prio: (bodyw==smchar) > decortail > numcol > meta
+                ##   * TODO: skip decortail_len=1 if meta and not decortail
+                ##   * TODO: skip decortail_len=1 if i==last and not colsep and "bodyx+boxw"==rect.xw
+                ##       &why to have visual gap bw columns when colsep=""
+                ##   RENAME? boxw -> ncells
+                boxw = rect.w - cellwidth(smchar)
+                if numcol and boxw > hint_minboxw:
+                    bodyx = P.render_itemnum_prefix(stdscr, self._ent, boxw, **infoctx)
+                    cursorx = bodyx
+                else:
+                    bodyx = rect.x
+                boxw -= bodyx - rect.x
+                # NOTE: reserve space for metainfo at the end of *first* line-part (OR: *each*)
+                if (namew := boxw - cellwidth(meta)) >= hint_mintext_len:
+                    bodyw = namew
+                else:
+                    meta = ""
+                    bodyw = boxw
+            else:
+                indent = 2 if cursorx > rect.x else 1
+                bodyx = rect.x + indent
+                boxw = rect.w - (bodyx - rect.x)
+                bodyw = boxw
+
+            # [_] XP~TRY: wrap by max(30,roomw), and then crop into actual roomw :NEED:(K.cropped)
+            #   &why NICE: less noisy presentation in narrow columns for more items
+            # NOTE: multiline items are always shortened for nice blocky look
+            #       and to have visual gap bw columns when colsep=""
+            roomw = bodyw - decortail_len
+            assert roomw > 1
             stdscr.move(rect.y + i, bodyx)
-            if newl := l.endswith(os.linesep):
-                l = l.rstrip(os.linesep)
-            assert all(c not in l for c in "\r\n"), "TEMP: sub() or repr() embedded NLs"
+            while roomw > 0 and ti < len(text) and kind not in (K.charwrap, K.NL):
+                kind, cw, te = cellchunk(text, roomw, ti)
+                if kind == K.TAB:
+                    chunk, cattr = "▸ ", S.iteminfo
+                elif kind == K.NUL:
+                    chunk, cattr = "␀", S.error
+                elif kind == K.DEL:
+                    chunk, cattr = "␡", S.error
+                elif kind == K.ctrl:
+                    chunk = "^" + chr(ord("A") + ord(text[ti:te]))
+                    cattr = S.error
+                else:
+                    chunk = text[ti:te]
+                    cattr = S.default  # =FIXME: =resolve_colorscheme(ent)
+                stdscr.addstr(chunk, cattr | (S.cursor if focused else 0))
+                roomw -= cw
+                ti = te
 
             # DEBUG: log.info(f"{focused=} | {l=}")
-            cattr, cropped = self._render_ansi(
-                stdscr,
-                ent=self._ent,
-                text=l,
-                # TODO:(wrapreserve): use {boxw=lim()} for last (or only) line
-                # maxcells=(boxw if lastline else boxw - decortail_len),
-                maxcells=boxw - decortail_len,
-                focused=focused,
-            )
+            # if newl := l.endswith(os.linesep):
+            #     l = l.rstrip(os.linesep)
+            # assert all(c not in l for c in "\r\n"), "TEMP: sub() or repr() embedded NLs"
+            # NOTE: "colored_ansi_or_schema" should ensure all chunks totally fit bodyw
+            # cattr, cropped, bodyend = P.render_ansi(
+            #     stdscr,
+            #     ent=self._ent,
+            #     text=l,
+            #     # TODO:(wrapreserve): use {boxw=lim()} for last (or only) line
+            #     # maxcells=(boxw if lastline else boxw - decortail_len),
+            #     maxcells=boxw - decortail_len,
+            # )
 
-            # NOTE: "colored_ansi_or_schema" should ensure all chunks totally fit
-            # ATT: we crop to prevent "lim()" from ever becoming negative
-            #   TBD: assert() : only applicable to the last chunk of several, orse ivts were broken
-            if (nfill := lim()) < 0:
-                raise RuntimeError(nfill)
+            if roomw < 0:
+                raise RuntimeError(roomw)
 
-            # NOTE:(last): multiline items are always shortened for nice blocky look
-            if last > 0 or not lastline or cropped:
-                nfill -= decortail_len
+            # HACK: skip upper lines of half-shown item
+            # BET?(don't draw numcol at all): if i < offy: continue
+            if i < 0:
+                continue
 
-            if focused and nfill:
+            if focused and roomw:
                 # HACK: make cursor span to full viewport width (minus decortail),
                 #   colored same as the last chunk
-                stdscr.addstr(" " * nfill, cattr | S.cursor)
+                stdscr.addstr(" " * roomw, cattr | S.cursor)
 
-            if not lastline or cropped:
-                self._render_decortail(
+            # NICE: don't override decortail, to indicate if line was wrapping or not
+            if kind != K.end:
+                P.render_decortail(
                     stdscr,
-                    lastline=lastline,
-                    cropped=cropped,
-                    newl=newl,
+                    # FIXME! lastline of half-visible bot item needs decortail=wrap,newl
+                    lastline=i == last,
+                    cropped=ti < len(text),  # CHG:SEE:NEED:(K.cropped)
+                    newl=kind == K.NL,
                     focused=focused,
                 )
 
-        # NOTE: spacermark may be drawn *twice* -- once as charmarker/framecolor for `ItemWidget,
-        #   and once again outside item boundaries in `Navi as e.g. a bundle of graph-edges in OpenGL
-        if smchar:
-            # INFO: we always draw spacermark in top-right corner of visible part of multiline item
-            stdscr.addstr(rect.y, rect.xw - 1, smchar, smattr)
+            ## BAD: other kinds of morechar overlay
+            #  * char0: feels as if belongs to *prev* column; messes text readability
+            #  * decortail: feels like it belongs to *next* column
+            #  * append: distractingly changes position on scroll due to varying cellwidth(name)
+            #  * midchar: "always there, always shown", which distracts from reading actual name
+            #    IDEA: hide it temporarily during scroll, and show back by timeout after key-release
+            #  * BET? put morechar left of decortail, to keep it untouched
+            ## XP~ALT: put hasmore into "meta" inof doing overlay
+            ##   OR put new "element" bw meta and smchar, and reflow bodyw
+            if moreup and i == 0:
+                ms = "△" + num_up(moreup)  # ALT="△⁽¹²³⁾"
+                mn = cellwidth(ms)
+                ms = ms if boxw > hint_mintext_len + mn else ms[0]
+                mx = rect.xw - 1 - mn  # OR=rect.x + rect.w // 2
+                stdscr.addstr(rect.y + i, mx, ms, S.empty)
+            elif moredown and i == last:
+                assert not moreup or last > 0, "FIX: print both up/dn on same line"
+                ms = "▽" + num_lo(moredown)  # ALT="▽₍₁₂₃₎"
+                mn = cellwidth(ms)
+                ms = ms if boxw > hint_mintext_len + mn else ms[0]
+                mx = rect.xw - 1 - mn  # OR=rect.x + rect.w // 2
+                stdscr.addstr(rect.y + i, mx, ms, S.empty)
 
-        return bodyx  # NOTE: textbody position (to place cursor there)
+            if i == 0:
+                if meta:
+                    if not focused and roomw:
+                        stdscr.addstr(" " * roomw, cattr)
+                    # ALT: print "meta" on the last linepart, where item more likely to have empty space
+                    stdscr.addstr(meta, S.auxinfo)
+                # NOTE: spacermark may be drawn *twice* -- once as charmarker/framecolor for `ItemWidget,
+                #   and once again outside item boundaries in `Navi as e.g. a bundle of graph-edges in OpenGL
+                if smchar:
+                    # INFO: we always draw spacermark in top-right corner of visible part of multiline item
+                    stdscr.addstr(rect.y + i, rect.xw - 1, smchar, smattr)
+
+        return cursorx  # NOTE: textbody position (to place cursor there)
