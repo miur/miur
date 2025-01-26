@@ -3,13 +3,14 @@ from typing import TYPE_CHECKING, Final
 
 import _curses as C
 
-from ..curses_ext import g_style as S
+from ..util.logger import log
 from ..util.termansi import ChunkKind as K
 from ..util.termansi import cellchunk, cellwidth, num_lo, num_up
 from . import itemparts as P
-
-# from ..util.logger import log
+from .colorscheme import g_style as S
+from .colorscheme import termcolor2
 from .entity_base import Golden
+from .itemcolor import resolve_colorscheme
 from .rect import Rect
 
 if TYPE_CHECKING:
@@ -108,6 +109,47 @@ class ItemWidget:
         #     c = nc
         return lines
 
+    # INFO:(rect.h): "self._item_maxheight_hint" is only a recommendation: we can make item taller!
+    #   >> real limitator is either viewport vh (or whatever is left of it till bot of screen)
+    #     (in which case we crop item, keeping "⬎" inof "…" on last line),
+    #   or we adhere to *policy* of individual item on its current maxheight (OR=item.struct.maxlines)
+    #     (with "…" char on last line to indicate "end of item")
+    # FIXME: should use the same `Reflow as render_curses()
+    #   TEMP: return N "no less then" (at least for scrollbar)
+    #     IDEA: minln=len(text)//maxw + (1 if len(text)%maxw else 0)
+    # IDEA: pre-render everything into [(kind, text)...] chunks, but don't draw yet,
+    #   and in item.render() simply cvt kind->cattr and sub text->rplc special syms
+    def numlines(self, maxw: int, hhint: int) -> int:
+        reflow_hint = (
+            # fmt:off
+            60 if maxw > 45 else
+            30 if maxw > 30 else
+            15 if maxw > 20 else
+            5 if maxw > 10 else 2
+        )
+        maxln = min(hhint, reflow_hint)
+        text = self._ent.name.replace("o", "o\n")
+        n = 0
+        kind, cw, ti = K.partial, 0, 0
+        boxw = maxw - 1  # =len(smchar)
+        if boxw > hint_minboxw:
+            boxw -= hint_numcol_len
+        roomw = boxw - decortail_len
+        assert roomw > 1
+        while ti < len(text):
+            kind, cw, te = cellchunk(text, roomw, ti)
+            # log.comment(f"{te}: {text[ti:te]!r} {kind.name}={cw}")  # <DEBUG
+            roomw -= cw
+            assert roomw >= 0
+            ti = te
+            if kind in (K.charwrap, K.NL, K.end):
+                # NOTE: roomw 1st line != 2nd+ lines
+                roomw = maxw - decortail_len - 2  # =indent
+                n += 1
+                if n >= maxln:
+                    break
+        return n
+
     # DECI: pass XY to redraw/render ? OR store as .origin ?
     #   ~store~ makes it possible to .redraw() individual elements only
     #     BAD: all XY should be updated each time we scroll :(
@@ -129,22 +171,28 @@ class ItemWidget:
         moreup = infoctx.get("moreup")
         moredown = infoctx.get("moredown")
 
-        maxlines = min(rect.h, ih_hint if rect.w > 10 else 2)  # , self.height())
+        maxlines = self.numlines(rect.w, min(rect.h, ih_hint))
         cursorx = rect.x
 
-        text = self._ent.name.replace("o", "o\n")
+        ent = self._ent
+        text = ent.name.replace("o", "o\n")
         kind, cw, ti = K.partial, 0, 0
 
-        view = pool.get(self._ent)
+        debug_log = False
+        # debug_log = focused  # and numcol
+        # debug_log = "DreamCo" in ent.name
+
+        if debug_log:
+            vpidx, vpline = infoctx.get("vpidx", 0), infoctx.get("vpline", 0)
+            log.trace(
+                f"({vpidx}={vpidx*16:02x}|{vpline}/{rect.h}vs{maxlines})"
+                f" {text!r}:{len(text)} ({maxlines})"
+            )
+
+        view = pool.get(ent)
         smattr, smchar = P.pick_spacermark(view)
         # TEMP: only draw metainfo for cached nodes
         meta = str(len(view._orig_lst)) if view else ""
-
-        # INFO:(rect.h): "self._item_maxheight_hint" is only a recommendation
-        #   >> real limitator is either viewport vh
-        #     (in which case we crop item, keeping "⬎" inof "…" on last line),
-        #   or we adhere to *policy* of individual item on its current maxheight (OR=item.struct.maxlines)
-        #     (with "…" char on last line to indicate "end of item")
 
         # IDEA: don't always wrap unconditionally on "wrapwidth" -- use nowrap for narrow windows {vw<10}
         #   OPT:BET: allow to pan such cropped name left/right manually (OR by "running line")
@@ -191,9 +239,10 @@ class ItemWidget:
         while (i := i + 1) <= last:
             # {if i > rect.h or i < offy: continue; i-=offy}
             # FIXME:BET:(stable reflow): don't draw numcol {if i < offy}
-            if i == 0:
-                ## FMT:0: rect.w = [numcol + boxw(bodyw(text + roomw/nfill?) + decortail? + meta?)] + smchar?
-                ## FMT:N: rect.w = [indent + boxw(bodyw + decortail?)]
+            # HACK: skip upper lines of half-shown item (and don't draw numcol at all)
+            if i == -offy:
+                ## FMT:0: rect.w = numcol + boxw[bodyw(roomw(namew + nfill) + decortail?) + meta?] + smchar?
+                ## FMT:N: rect.w = indent + boxw[bodyw + decortail?]
                 ##   * &prio: (bodyw==smchar) > decortail > numcol > meta
                 ##   * TODO: skip decortail_len=1 if meta and not decortail
                 ##   * TODO: skip decortail_len=1 if i==last and not colsep and "bodyx+boxw"==rect.xw
@@ -201,47 +250,84 @@ class ItemWidget:
                 ##   RENAME? boxw -> ncells
                 boxw = rect.w - cellwidth(smchar)
                 if numcol and boxw > hint_minboxw:
-                    bodyx = P.render_itemnum_prefix(stdscr, self._ent, boxw, **infoctx)
+                    bodyx = rect.x
+                    for cattr, numpfx in P.pick_itemnum_prefix(
+                        self._ent, boxw, **infoctx
+                    ):
+                        if i >= 0:
+                            stdscr.addstr(numpfx, cattr | (S.cursor if focused else 0))
+                        bodyx += cellwidth(numpfx)
+                    # OR: bodyx = stdscr.getyx()[1]  # ALT =len(pfxvp)+len(pfxlst) | =rect.w-lim()
                     cursorx = bodyx
                 else:
                     bodyx = rect.x
-                boxw -= bodyx - rect.x
+                indent = bodyx - rect.x
+                boxw -= indent
                 # NOTE: reserve space for metainfo at the end of *first* line-part (OR: *each*)
-                if (namew := boxw - cellwidth(meta)) >= hint_mintext_len:
-                    bodyw = namew
-                else:
+                if (bodyw := boxw - cellwidth(meta)) < hint_mintext_len:
                     meta = ""
                     bodyw = boxw
+                if debug_log:
+                    log.debug(
+                        f"{rect.w}={indent}+{boxw}[{bodyw}(nm…+{decortail_len})"
+                        f"+{cellwidth(meta)}]+{cellwidth(smchar)}"
+                    )
             else:
-                indent = 2 if cursorx > rect.x else 1
+                # IDEA: print decorhead over indent inof using decortail
+                #   WHY: we can't reduce indent anyways, orse multiline items become a mess
+                #   NICE: we will win one more char of estate per line (unless colsep="")
+                # INFO: thanks to stripped "altbkgr" we can indent=0 inof "1" when numcol=False
+                # indent = 2 if cursorx > rect.x else 1
+                indent = numlen if (numlen := cursorx - rect.x) > 0 else 1
                 bodyx = rect.x + indent
                 boxw = rect.w - (bodyx - rect.x)
                 bodyw = boxw
+                if debug_log:
+                    log.debug(f"{rect.w}={indent}+{boxw}[{bodyw}(nm…+{decortail_len})]")
 
             # [_] XP~TRY: wrap by max(30,roomw), and then crop into actual roomw :NEED:(K.cropped)
             #   &why NICE: less noisy presentation in narrow columns for more items
             # NOTE: multiline items are always shortened for nice blocky look
             #       and to have visual gap bw columns when colsep=""
-            roomw = bodyw - decortail_len
+            # HACK:(last!=0): extend first line if there is no decortail expected
+            roomw = bodyw - (decortail_len if last != 0 else 0)
             assert roomw > 1
-            stdscr.move(rect.y + i, bodyx)
-            while roomw > 0 and ti < len(text) and kind not in (K.charwrap, K.NL):
+            if i >= 0:
+                stdscr.move(rect.y + i, bodyx)
+            while ti < len(text):
                 kind, cw, te = cellchunk(text, roomw, ti)
-                if kind == K.TAB:
-                    chunk, cattr = "▸ ", S.iteminfo
-                elif kind == K.NUL:
-                    chunk, cattr = "␀", S.error
-                elif kind == K.DEL:
-                    chunk, cattr = "␡", S.error
-                elif kind == K.ctrl:
-                    chunk = "^" + chr(ord("A") + ord(text[ti:te]))
-                    cattr = S.error
-                else:
-                    chunk = text[ti:te]
-                    cattr = S.default  # =FIXME: =resolve_colorscheme(ent)
-                stdscr.addstr(chunk, cattr | (S.cursor if focused else 0))
+                if debug_log:
+                    log.verbose(
+                        f" {i}: {cw}/{roomw} {text[ti:te]!r} [{te-ti}+{ti}] {kind.name}"
+                    )
+                if i >= 0:
+                    if kind is K.TAB:
+                        chunk, cattr = kind.value, S.iteminfo
+                    elif kind is K.NUL:
+                        chunk, cattr = kind.value, S.error
+                    elif kind is K.DEL:
+                        chunk, cattr = kind.value, S.error
+                    elif kind is K.ctrl:
+                        chunk = kind.value[0] + chr(ord("@") + ord(text[ti:te]))
+                        cattr = S.error
+                    else:
+                        chunk = text[ti:te]
+                        cattr = resolve_colorscheme(ent)
+                    if cw:
+                        # FIXME: altbkgr should also span over {numcol, nfill, meta} i.e. whole rect square
+                        if alt := infoctx.get("vpidx", 0) % 2:
+                            # OR: cattr |= C.A_DIM
+                            (fg, _) = C.pair_content(C.pair_number(cattr))
+                            (_, bg) = C.pair_content(C.pair_number(S.itemalt))
+                            cattr = termcolor2(fg, bg)
+                        cursor_mod = (
+                            (S.cursoralt if alt else S.cursor) if focused else 0
+                        )
+                        stdscr.addstr(chunk, cattr | cursor_mod)
                 roomw -= cw
                 ti = te
+                if kind in (K.charwrap, K.NL, K.end):
+                    break
 
             # DEBUG: log.info(f"{focused=} | {l=}")
             # if newl := l.endswith(os.linesep):
@@ -260,24 +346,20 @@ class ItemWidget:
             if roomw < 0:
                 raise RuntimeError(roomw)
 
-            # HACK: skip upper lines of half-shown item
-            # BET?(don't draw numcol at all): if i < offy: continue
-            if i < 0:
-                continue
-
-            if focused and roomw:
+            if i >= 0 and focused and roomw:
                 # HACK: make cursor span to full viewport width (minus decortail),
                 #   colored same as the last chunk
                 stdscr.addstr(" " * roomw, cattr | S.cursor)
 
             # NICE: don't override decortail, to indicate if line was wrapping or not
-            if kind != K.end:
+            if i >= 0 and kind != K.end:
+                # CHG: directly compare K/kind inside
                 P.render_decortail(
                     stdscr,
                     # FIXME! lastline of half-visible bot item needs decortail=wrap,newl
                     lastline=i == last,
-                    cropped=ti < len(text),  # CHG:SEE:NEED:(K.cropped)
-                    newl=kind == K.NL,
+                    cropped=(i == last and te < len(text)),  # CHG:SEE:NEED:(K.cropped)
+                    newl=kind is K.NL,
                     focused=focused,
                 )
 
@@ -304,7 +386,7 @@ class ItemWidget:
                 mx = rect.xw - 1 - mn  # OR=rect.x + rect.w // 2
                 stdscr.addstr(rect.y + i, mx, ms, S.empty)
 
-            if i == 0:
+            if i == -offy and offy == 0:
                 if meta:
                     if not focused and roomw:
                         stdscr.addstr(" " * roomw, cattr)

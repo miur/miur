@@ -21,12 +21,16 @@ class SatelliteViewport_DataProtocol(Protocol):
     _cursor_item_lstindex: int
     _item_maxheight_hint: int
 
-    @lru_cache
+    # FAIL: moving item browse<->prevloci will resize it and will keep new size
+    # @lru_cache
     def _fih(self, i: int) -> int:
         # IDEA:OPT: scale maxlines with viewport height, i.e. use smaller preview for smaller windows
         # BAD: should account for indents inside viewport {wrapw = vw - 2 - indent; assert iw > 4}
         wrapw = self._viewport_width_columns
-        maxln = self._item_maxheight_hint
-        lines = self._lst[i].struct(wrapwidth=wrapw, maxlines=maxln)
-        assert lines
-        return len(lines)
+        hhint = self._item_maxheight_hint
+        # lines = self._lst[i].struct(wrapwidth=wrapw, maxlines=lnumhint)
+        # assert lines
+        # return len(lines)
+        nr = self._lst[i].numlines(maxw=wrapw, hhint=hhint)
+        assert nr > 0
+        return nr

@@ -7,10 +7,10 @@ from unicodedata import east_asian_width
 
 import _curses as C
 
-from ..curses_ext import g_style as S
-from ..curses_ext import termcolor2
 from ..util.exchook import log_exc
 from ..util.logger import log
+from .colorscheme import g_style as S
+from .colorscheme import termcolor2
 from .entity_base import Golden
 from .entries import FSEntry
 

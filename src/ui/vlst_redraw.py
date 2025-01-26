@@ -1,8 +1,9 @@
 import _curses as C
 
-from ..curses_ext import g_style as S
 from ..util.logger import log
-from .entity_base import Golden
+from .colorscheme import g_style as S
+
+# from .entity_base import Golden
 from .entries import ErrorEntry
 from .rect import Rect
 from .vlst_base import SatelliteViewport_DataProtocol
@@ -74,7 +75,10 @@ class SatelliteViewport_RedrawMixin:
             # BAD: desynchronized from default item.height due to ext-supplied "maxlines"
             #   MAYBE: totally eliminate item.height usage -- jump step_by() bw internal structures
             # CHG? return actually drawn height from item.render_curses()
+            #   BET: pre-render into markup structure, which can be either drawn or evaluated
             h_item = self._fih(i)
+            if i == ci:
+                log.warning(h_item)
 
             # SEE:ARCH: !urwid for inspiration on `Rect and `TextBox
             rect = Rect(

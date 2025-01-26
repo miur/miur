@@ -1,9 +1,9 @@
 # RENAME?(itemparts.py): -> item_elements.py , item_pieces.py , ./item/*.py
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Iterable
 
 import _curses as C
 
-from ..curses_ext import g_style as S
+from .colorscheme import g_style as S
 
 # from ..util.logger import log
 from .entity_base import Golden
@@ -19,9 +19,9 @@ if TYPE_CHECKING:
 #   * [rel]viewpos
 #   * [rel]itemidx
 #   * combined=itemidx+[rel]viewpos
-def render_itemnum_prefix(
-    stdscr: C.window, ent: Golden, boxw: int, **infoctx: int | None
-) -> int:
+def pick_itemnum_prefix(
+    ent: Golden, boxw: int, **infoctx: int | None
+) -> Iterable[tuple[int, str]]:
     focused = infoctx.get("focusid") is not None
     combined = True  # OPT:TEMP: hardcode
     if combined:
@@ -38,23 +38,22 @@ def render_itemnum_prefix(
 
         if focused:
             if cpfx:
-                stdscr.addstr(f"{cpfx:>3s}> ", S.pfxrel | S.cursor)
+                yield (S.pfxrel, f"{cpfx:>3s}> ")
         else:
             if bpfx:
-                stdscr.addstr(f"{bpfx:>3s}: ", S.pfxidx)
+                yield (S.pfxidx, f"{bpfx:>3s}: ")
     else:
         # HACK: hide both numcol when viewport is too small
         if boxw > 25 and (vpidx := infoctx.get("vpidx")) is not None:
             pfxvp = f"{1+vpidx:02d}| "
-            stdscr.addstr(pfxvp, S.pfxrel)
+            yield (S.pfxrel, pfxvp)
         # TODO: for binary/hex show "file offset in hex" inof "item idx in _xfm_list"
         #   ALSO: start offsets from "0x0" inof "1"
         if boxw > 21 and (lstidx := infoctx.get("lstidx")) is not None:
             # IDEA: shorten long numbers >999 to ‥33 i.e. last digits significant for column
             #   (and only print cursor line with full index)
             pfxlst = f"{1+lstidx:03d}{">" if focused else ":"} "
-            stdscr.addstr(pfxlst, S.pfxidx | (S.cursor if focused else 0))
-    return stdscr.getyx()[1]  # ALT =len(pfxvp)+len(pfxlst) | =rect.w-lim()
+            yield (S.pfxidx, pfxlst)
 
 
 def render_ansi(
@@ -100,6 +99,7 @@ def render_decortail(stdscr: C.window, **infoctx: bool) -> None:
         #   orse if item doesn't fit into navi viewport -- it should always use "‥"
         # SUM: using "‥" at the end of each linepart, which longer than viewport
         #   [_] OR:DEV: smart-compress with "‥" in the middle each part of .name bw newlines
+        # XP~MAYBE: put combined "⬎ and …" if newl -- to indicate cropping by maxh (inof only maxw)
         tail = "…" if lastline else "‥"
     else:
         # MAYBE: print wraps over columns-spacer too (FIXED: tail^=" "*(avail-1))
@@ -107,6 +107,7 @@ def render_decortail(stdscr: C.window, **infoctx: bool) -> None:
         tail = "" if lastline else "⬎" if infoctx.get("newl") else "↩"
     if tail:
         ## BAD? cursor-highlight over column-spacer is very distracting
+        #    TRY: recombine decortail fg with cursor rev/bg to blend colors
         cattr = S.iteminfo  # | (S.cursor if infoctx.get("focused") else 0)
         stdscr.addstr(tail, cattr)
 

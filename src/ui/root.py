@@ -1,11 +1,10 @@
 import _curses as C
 
-from ..curses_ext import g_style as S
+from .colorscheme import g_style as S
 
 # from ..util.logger import log
 from .entity_base import Golden
 from .navi import NaviWidget
-from .navihistory import HistoryCursor
 
 
 class RootWidget:

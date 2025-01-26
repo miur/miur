@@ -186,7 +186,7 @@ class SatelliteViewport(
         focused = self._lst[pidx] if getattr(self, "_lst", None) else None
         # BAD: can't drop individual items REF⌇⡧⡺⣽⡠
         #   https://stackoverflow.com/questions/56413413/lru-cache-is-it-possible-to-clear-only-a-specific-call-from-the-cache
-        self._fih.cache_clear()
+        # self._fih.cache_clear()
         # WARN: whole function should be atomic
         #   i.e. "cursor,canvas" should always be in boundaries of "lst"
         # TODO: pre-load only visible part fitting into viewport

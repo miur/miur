@@ -34,11 +34,11 @@ def cellwidth(text: str) -> int:
 
 # HACK: categorize how dif. chunks should be displayed dif.ly
 class ChunkKind(enum.Enum):
-    NL = "\n"  # os.linesep
-    NUL = "\0"
-    TAB = "\t"
-    DEL = "\x7f"
-    ctrl = "^"  # chr<0x20
+    NL = ""  # OR="\n"/os.linesep
+    NUL = "␀"  # OR=^@
+    TAB = "▸ "  # OR="    "
+    DEL = "␡"  # OR=^?/^~ "\x7f" ALT=curses.KEY_*
+    ctrl = "^^"  # chr<0x20
     end = -1  # ATT: we still need to compare ti<len(text) outside
     ## FAIL: linepart may end in special char, so we need to combine it with wrap
     ##   ALT?IDEA: yield empty string after special char, with proper kind
@@ -51,29 +51,33 @@ class ChunkKind(enum.Enum):
 ##          for l in item.name.split("\n") for c in range((len(l) // iw) + 1) if c <= maxwrap ]
 # API:PERF: don't return (chunk, rest) as copying large strings is slow
 def cellchunk(text: str, maxcw: int, start: int = 0) -> tuple[ChunkKind, int, int]:
+    assert maxcw >= 0  # NOTE:(=0): allowed for newline and charwrap in-place processing
     ti = start
     ci = 0
     kind: ChunkKind | None = None
     while ti < len(text):
         wch = text[ti]
         wchi = ord(wch)
-        # FIXME?(Windows): should work for os.linesep="\r\n"
-        if wch == "\n":
-            return (ChunkKind.NL, ci, ti)
-        if wch == "\t":
-            # NOTE: yield pairs (cattr, chunk) to colorize unprintable symbols differently
-            kind = ChunkKind.TAB
-            cw = 2  # ="▸ "
-        elif wchi < 0x20:
-            kind = ChunkKind.ctrl
-            cw = 2
-        elif wchi == 0x7F:
-            kind = ChunkKind.DEL
-            cw = 1  # ="␡"
-        elif east_asian_width(wch) in "WF":
-            cw = 2
-        else:
+        if wchi > 0x7F:
+            cw = 2 if east_asian_width(wch) in "WF" else 1
+        elif wchi >= 0x20 and wchi != 0x7F:
             cw = 1
+        else:
+            if wch == "\n":  # FIXME?(Windows): should work for os.linesep="\r\n"
+                # BAD: currently it always yields .partial and then empty .NL
+                #   FIXME: yield linepart with .NL in one go
+                kind = ChunkKind.NL
+                cw = 0  # COS: we don't print it OR:THINK: we may reserve cw= for decortail?
+            elif wch == "\t":
+                # NOTE: yield pairs (cattr, chunk) to colorize unprintable symbols differently
+                kind = ChunkKind.TAB
+            elif wchi == 0:
+                kind = ChunkKind.NUL
+            elif wchi == 0x7F:
+                kind = ChunkKind.DEL
+            else:  # wchi < 0x20
+                kind = ChunkKind.ctrl
+            cw = len(kind.value)
 
         # WARN: we wrap last *widechar* if remaining space only =1  OR: drop/lose it
         # HACK: yield empty string imm after special char when no room is left (to signify wrapping)

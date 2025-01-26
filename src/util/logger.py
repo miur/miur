@@ -109,6 +109,13 @@ class Logger:  # pylint:disable=too-many-instance-attributes
 
     # @profileit  # BAD: ~1ms/call (mostly due to !curses.*)
     def _write(self, lvl: LogLevel, fmt: _Loggable, /, *, loci: str = "") -> None:
+        # IDEA:ALSO: enable debug and below based on "modnm" -- to focus on feature debugging
+        #   BET: enable set of logs along SEQ by its "feature name"
+        #     * feature/SEQ = set(*names of logged keypoints*) -> add to log.enabled
+        #     * USE: if "<keypt_nm>" in log.allowed: log.debug(...)
+        #       BAD: hard to auto-gather all allowed keypt names to verify feature set after renames
+        #       BET: hide it inside log.debug() itself : pass kw-only "q=" (or "pt/at/seq/fea/loc")
+        #         BUT:PERF: how to dynamically patch such code by No-Op when keypt is disabled ?
         if lvl < self.minlevel:
             return
 
@@ -211,8 +218,16 @@ class Logger:  # pylint:disable=too-many-instance-attributes
         ## EXPL: assignment is only feasible for several first lines (and outliers)
         ##   >> majority of times access to the VAR is solely read-only
         # pylint:disable=consider-using-max-builtin
-        if len(loci) > self._fnmlen:
-            self._fnmlen = len(loci)
+        if (lelo := len(loci)) > self._fnmlen:
+            self._fnmlen = lelo
+
+        ## CHECK:HACK: de-indent lines by sliding window of size=30
+        # if lelo > self._accfnmlen:
+        #     self._accfnmlen = lelo
+        #     self._accfnmlennr += 1
+        # if self._accfnmlennr > 30:
+        #     self._fnmlen = self._accfnmlennr
+        #     self._accfnmlennr = 0
 
         if self.termcolor:
             _c = TERMSTYLE[lvl]

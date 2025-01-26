@@ -3,8 +3,8 @@ from typing import Iterable, Iterator, Self, override
 import _curses as C
 
 from ..alg.flowratio import flowratio_to_abs
-from ..curses_ext import g_style as S
 from ..util.logger import log
+from .colorscheme import g_style as S
 from .entity_base import Golden
 from .entries import ErrorEntry, RootNode
 from .navihistory import EntityViewCachePool, HistoryCursor
@@ -276,8 +276,9 @@ class NaviWidget:
     def redraw(self, stdscr: C.window) -> tuple[int, int]:
         # pylint:disable=protected-access
         if plocs := self._layout["prevloci"]:
-            for i, _ in enumerate(plocs, start=-len(plocs)):
+            for i, p in enumerate(plocs, start=-len(plocs)):
                 if prev := self._hist.get_relative(i):
+                    log.trace(p.name)
                     prev._wdg.redraw(stdscr, numcol=False)
 
         if pvs := self._layout["preview"]:
@@ -289,12 +290,14 @@ class NaviWidget:
                 if not peek:
                     break  # COS: consequent previews are depending on previous ones
                 wdg = peek._wdg
+                log.trace(p.name)
                 wdg.redraw(stdscr, numcol=False)
 
         # NOTE: draw main Browse column very last to always be on top
         curyx = (0, 0)
         if browse := self._layout["browse"]:
-            for _ in browse:
+            for p in browse:
+                log.trace(p.name)
                 curyx = self._view._wdg.redraw(stdscr, numcol=True)
 
         # NOTE: spacer definitely belongs to `Navi, as it's in-between vlst`s
