@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING, Callable, Sequence
 
+from ..entity.base import Golden
 from ..util.logger import log
-from .entity_base import Golden
 from .item import ItemWidget
 from .vlst_base import SatelliteViewport_DataProtocol
 from .vlst_redraw import SatelliteViewport_RedrawMixin

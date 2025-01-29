@@ -2,8 +2,8 @@ import os
 import os.path as fs
 from typing import Callable, Sequence, override
 
-from .entity_base import Golden
-from .entries import FSEntry
+from ..entity.base import Golden
+from ..entity.fsentry import FSEntry
 from .vlst import SatelliteViewport
 
 # T = TypeVar("T")

@@ -39,8 +39,8 @@ def miur_main(g: AppGlobals) -> None:
         # raise RuntimeError()
 
         from . import keymap as KM
+        from .entity.fsentry import FSEntry
         from .integ.aura import keytable_insert_aura_pathes
-        from .ui.entries import FSEntry
         from .ui.root import RootWidget
 
         crashsafe = True

@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, override
 
 from . import _pkg
 from .app import AppOptions, g_app
-from .ui.entity_base import g_entries_cls
+from .entity.base.golden import g_entries_cls
 from .util.logger import LogLevel, log
 
 if TYPE_CHECKING:
@@ -66,6 +66,29 @@ class EntryCvt(Action):
         setattr(ns, self.dest, cls)
 
 
+def _register_entity_catalogue() -> None:
+    import importlib
+    import os
+    import os.path as fs
+
+    # BAD: it's "src" inof "miur"
+    log.info(f"{__package__=}")
+    entpkg = importlib.import_module(".entity", __package__)
+    assert entpkg.__file__
+
+    ## FAIL: you need to export all modnms into __all__ first
+    # import inspect
+    # for nm, val in inspect.getmembers_static(entpkg, inspect.ismodule):
+    #     log.info((nm, val))
+
+    # WARN:RQ: import/declare all classess -- to register them
+    for fnm in os.listdir(fs.dirname(entpkg.__file__)):
+        if fnm == "__init__.py" or fnm[-3:] != ".py":
+            continue
+        # log.info(("." + fnm[:-3], entpkg.__package__))
+        _ = importlib.import_module("." + fnm[:-3], entpkg.__package__)
+
+
 def cli_spec(parser: ArgumentParser, *, dfl: AppOptions) -> ArgumentParser:
     o = parser.add_argument
     o("xpath", nargs="?")
@@ -74,13 +97,15 @@ def cli_spec(parser: ArgumentParser, *, dfl: AppOptions) -> ArgumentParser:
     o("-s", "--signal", choices=_sigset, action=SigAction)
     o("-a", "--asyncio", dest="bare", default=dfl.bare, action="store_false")
     o("-b", "--bare", default=dfl.bare, action="store_true")
-    # WARN:RQ: import/declare all classess -- to register them
-    from .ui import entries  # pylint:disable=unused-import
 
-    _entrycls = (
+    # WARN:RQ: import/declare all classess -- to register them
+    _register_entity_catalogue()
+    log.info(f"VIZ: {{{" ".join(x.__name__ for x in g_entries_cls)}}}")
+    _entrycls = [
         *(x.altname or x.__name__.removesuffix("Entry").lower() for x in g_entries_cls),
         *(x.__name__ for x in g_entries_cls),
-    )
+    ]
+
     o("-i", "--stdinfmt", default=None, choices=_entrycls, action=EntryCvt)
     o("-D", "--devinstall", action="store_true")
     o("-K", "--ipykernel", default=False, action="store_true")

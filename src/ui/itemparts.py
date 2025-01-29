@@ -3,11 +3,11 @@ from typing import TYPE_CHECKING, Any, Iterable
 
 import _curses as C
 
-from .colorscheme import g_style as S
-
 # from ..util.logger import log
-from .entity_base import Golden
-from .entries import ErrorEntry, TextEntry
+from ..entity.base import Golden
+from ..entity.error import ErrorEntry
+from ..entity.text import TextEntry
+from .colorscheme import g_style as S
 from .itemcolor import colored_ansi_or_schema
 
 if TYPE_CHECKING:

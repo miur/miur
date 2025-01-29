@@ -1,10 +1,9 @@
 import _curses as C
 
+# from ..entity.base import Golden
+from ..entity.error import ErrorEntry
 from ..util.logger import log
 from .colorscheme import g_style as S
-
-# from .entity_base import Golden
-from .entries import ErrorEntry
 from .rect import Rect
 from .vlst_base import SatelliteViewport_DataProtocol
 

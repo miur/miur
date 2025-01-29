@@ -3,73 +3,9 @@ import os.path as fs
 from typing import Iterable, override
 
 # from ..util.logger import log
-from .entity_base import Golden
-
-
-# class ErrorEntry(HaltEntry(Atomic))
-class ErrorEntry(Golden):
-    def __init__(self, msg: str, loci: tuple[str, ...] | None = None) -> None:
-        self._msg = msg
-        self._orig = loci
-
-    @override
-    @property
-    def name(self) -> str:
-        return self._msg
-
-    @override
-    @property
-    def loci(self) -> str:
-        return "".join(self._orig) if self._orig else "∅ " + repr(self)
-
-    @override
-    def explore(self) -> Iterable[Golden]:
-        raise NotImplementedError(self._msg)
-
-
-class TextEntry(Golden):
-    __slots__ = ()  # "name", "loci", "explore")
-
-    def __init__(self, text: str, loci: tuple[str, ...] | None = None) -> None:
-        self._x = text
-        self._at = loci  # = (path,lnum,[col,[boff,...]])
-
-    @override
-    @property
-    def name(self) -> str:
-        return self._x
-
-    @override
-    @property
-    def loci(self) -> str:
-        return "".join(self._at) if self._at else "∅ " + repr(self)
-
-    @override
-    def explore(self) -> Iterable[Golden]:
-        from re import finditer
-
-        cls = type(self)
-        words = [
-            cls(
-                m.group(0),
-                loci=(
-                    (
-                        ## DISABLED: interferes with !nvim jumping to line under cursor
-                        # self._at[0],
-                        # f":{m.start()}+{m.end() - m.start()}",
-                        # self._at[-1],
-                        *self._at,
-                        f":{m.start()+1}",
-                    )
-                    if self._at
-                    else ("∅", f":{m.start()}+{m.end() - m.start()}")
-                ),
-            )
-            for m in finditer(r"\S+", self._x)
-        ]
-        if len(words) == 1:
-            return [ErrorEntry("INDIVISIBLE WORD", loci=self._at)]
-        return words
+from .base import Golden
+from .error import ErrorEntry
+from .text import TextEntry
 
 
 class FSEntry(Golden):
@@ -186,26 +122,3 @@ class FSEntry(Golden):
                     hexlst if hexlst else [ErrorEntry("UnicodeDecodeError / NoAccess")]
                 )
         raise NotImplementedError(p)
-
-
-# RENAME?~ {Root,Central,Menu}Entry
-#   BET? rename all top-lvl providers to `*Node ex~: 'FSEntry("/")' -> "FSNode"
-class RootNode(Golden):
-    def __init__(self) -> None:
-        pass
-
-    @override
-    @property
-    def name(self) -> str:
-        return ""
-
-    @override
-    @property
-    def loci(self) -> str:
-        return ""  # NOTE:(""): it's sole non-ambiguous loci for central menu
-
-    @override
-    def explore(self) -> Iterable[Golden]:
-        # OR: do we really need "file://" ?
-        #   isn't it prolifiration from "http://" ? -- which is wrong and should had been "http:"
-        return [FSEntry("/", nm="file:")]

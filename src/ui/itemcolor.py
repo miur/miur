@@ -7,12 +7,12 @@ from unicodedata import east_asian_width
 
 import _curses as C
 
+from ..entity.base import Golden
+from ..entity.fsentry import FSEntry
 from ..util.exchook import log_exc
 from ..util.logger import log
 from .colorscheme import g_style as S
 from .colorscheme import termcolor2
-from .entity_base import Golden
-from .entries import FSEntry
 
 
 @cache

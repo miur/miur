@@ -7,7 +7,7 @@ if globals().get("TYPE_CHECKING"):
 
     import _curses as C
 
-    from .ui.entity_base import Golden
+    from .entity.base import Golden
     from .ui.root import RootWidget
 
 

@@ -1,9 +1,8 @@
 import _curses as C
 
-from .colorscheme import g_style as S
-
 # from ..util.logger import log
-from .entity_base import Golden
+from ..entity.base import Golden
+from .colorscheme import g_style as S
 from .navi import NaviWidget
 
 

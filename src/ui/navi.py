@@ -3,10 +3,11 @@ from typing import Iterable, Iterator, Self, override
 import _curses as C
 
 from ..alg.flowratio import flowratio_to_abs
+from ..entity.base import Golden
+from ..entity.error import ErrorEntry
+from ..entity.rootnode import RootNode
 from ..util.logger import log
 from .colorscheme import g_style as S
-from .entity_base import Golden
-from .entries import ErrorEntry, RootNode
 from .navihistory import EntityViewCachePool, HistoryCursor
 from .rect import Rect
 from .view import EntityView

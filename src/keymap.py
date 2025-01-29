@@ -1,3 +1,4 @@
+from functools import cache
 from types import ModuleType
 from typing import Optional
 
@@ -8,6 +9,7 @@ from .app import AppGlobals, KeyTable, g_app
 from .util.logger import log
 
 
+@cache
 def M(mod: str) -> ModuleType:
     import importlib
 

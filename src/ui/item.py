@@ -3,13 +3,13 @@ from typing import TYPE_CHECKING, Final
 
 import _curses as C
 
+from ..entity.base import Golden
 from ..util.logger import log
 from ..util.termansi import ChunkKind as K
 from ..util.termansi import cellchunk, cellwidth, num_lo, num_up
 from . import itemparts as P
 from .colorscheme import g_style as S
 from .colorscheme import termcolor2
-from .entity_base import Golden
 from .itemcolor import resolve_colorscheme
 from .rect import Rect
 
