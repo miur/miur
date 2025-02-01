@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, override
 
 from . import _pkg
 from .app import AppOptions, g_app
-from .entity.base.golden import g_entries_cls
+from .entity.base import autodiscover as AD
 from .util.logger import LogLevel, log
 
 if TYPE_CHECKING:
@@ -55,14 +55,8 @@ class LogLevelCvt(Action):
 class EntryCvt(Action):
     @override
     def __call__(self, _ap, ns, s, s_opt=None):  # type:ignore[no-untyped-def]
-        if s.islower():
-            cls = next(
-                x
-                for x in g_entries_cls
-                if s == x.altname or s == x.__name__.removesuffix("Entry").lower()
-            )
-        else:
-            cls = next(x for x in g_entries_cls if s == x.__name__)
+        fn = AD.entry_cls_aliases if s.islower() else AD.entry_cls_names
+        cls = fn()[s]
         setattr(ns, self.dest, cls)
 
 
@@ -100,11 +94,8 @@ def cli_spec(parser: ArgumentParser, *, dfl: AppOptions) -> ArgumentParser:
 
     # WARN:RQ: import/declare all classess -- to register them
     _register_entity_catalogue()
-    log.info(f"VIZ: {{{" ".join(x.__name__ for x in g_entries_cls)}}}")
-    _entrycls = [
-        *(x.altname or x.__name__.removesuffix("Entry").lower() for x in g_entries_cls),
-        *(x.__name__ for x in g_entries_cls),
-    ]
+    log.info(f"VIZ: {{{" ".join(AD.entry_cls_names())}}}")
+    _entrycls = [*(AD.entry_cls_aliases()), *(AD.entry_cls_names())]
 
     o("-i", "--stdinfmt", default=None, choices=_entrycls, action=EntryCvt)
     o("-D", "--devinstall", action="store_true")

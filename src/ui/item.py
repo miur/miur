@@ -373,14 +373,14 @@ class ItemWidget:
             ## XP~ALT: put hasmore into "meta" inof doing overlay
             ##   OR put new "element" bw meta and smchar, and reflow bodyw
             if moreup and i == 0:
-                ms = "△" + num_up(moreup)  # ALT="△⁽¹²³⁾"
+                ms = "△" + num_up(moreup)  # ALT="▵⁽¹²³⁾"
                 mn = cellwidth(ms)
                 ms = ms if boxw > hint_mintext_len + mn else ms[0]
                 mx = rect.xw - 1 - mn  # OR=rect.x + rect.w // 2
                 stdscr.addstr(rect.y + i, mx, ms, S.empty)
             elif moredown and i == last:
                 assert not moreup or last > 0, "FIX: print both up/dn on same line"
-                ms = "▽" + num_lo(moredown)  # ALT="▽₍₁₂₃₎"
+                ms = "▽" + num_lo(moredown)  # ALT="▿₍₁₂₃₎"
                 mn = cellwidth(ms)
                 ms = ms if boxw > hint_mintext_len + mn else ms[0]
                 mx = rect.xw - 1 - mn  # OR=rect.x + rect.w // 2

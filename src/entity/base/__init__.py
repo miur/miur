@@ -1,1 +1,1 @@
-from .golden import Golden
+from .golden import Golden as Golden

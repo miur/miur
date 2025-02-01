@@ -30,7 +30,7 @@ class EntityView:
         self,
         ent: Golden,
         wdgfactory: Callable[[], SatelliteViewport],
-        # originator: Self | None = None,
+        # originator: Self | None = None,  ## ALT: parent's `EntityView == self._ent.pv
     ) -> None:
         self._ent = ent
         self._wdgfactory = wdgfactory
