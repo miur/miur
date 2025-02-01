@@ -108,6 +108,7 @@ def miur_main(g: AppGlobals) -> None:
             # g.keytableroot["s"] = _shell_out
             raise NotImplementedError("FIXME: should properly replace underlying shell")
 
+            log.state("loop=selectors")
             return mainloop_selectors(g)
 
         from .loop_asyncio import mainloop_asyncio, my_asyncio_loop
@@ -123,6 +124,7 @@ def miur_main(g: AppGlobals) -> None:
 
         import asyncio
 
+        log.state("loop=asyncio")
         return asyncio.run(mainloop_asyncio(g), loop_factory=lambda: myloop)
 
 

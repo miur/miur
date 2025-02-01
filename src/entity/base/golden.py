@@ -8,7 +8,7 @@ if TYPE_CHECKING:
 
 
 # RENAME? `Entity `Node
-# TEMP: to focus_on(match-case Golden())
+# ALT:(Protocol):NEED:BAD:PERF:(@runtime_checkable):COS:TEMP: to focus_on(match-case Golden())
 class Golden(Standart, AutoRegistered):
     def __init__(self, pview: "EntityView") -> None:
         self._pv = pview

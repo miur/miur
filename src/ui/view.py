@@ -1,8 +1,9 @@
+import inspect
 import os
 import os.path as fs
-from typing import Callable, Sequence, override
+from typing import Callable, Iterable, Sequence, override
 
-from ..entity.base import Golden
+from ..entity.base import Action, Golden
 from ..entity.fsentry import FSEntry
 from .vlst import SatelliteViewport
 
@@ -14,7 +15,8 @@ from .vlst import SatelliteViewport
 # ALT:SPLIT: make an `EntityContext for serialization/restoration on restart
 class EntityView:
     _wdg: SatelliteViewport
-    _act: Callable[[], Sequence[Golden]]
+    # NOTE:(_act): keep =sfn to be able to refresh() the list (when externally changed)
+    _act: Callable[[], Iterable[Golden]]
     # _lstpxy: ListCachingProxy[Golden]
     _orig_lst: Sequence[Golden]
     _xfm_lst: list[Golden]
@@ -49,19 +51,26 @@ class EntityView:
         return f"V({ent},{len(xlst)}/{len(olst)})"
 
     def fetch(self) -> None:
-        # ALT:PERF(slow): @runtime_checkable : isinstance(ent, Explorable)
-        #   https://mypy.readthedocs.io/en/latest/protocols.html#using-isinstance-with-protocols
-        if sfn := getattr(self._ent, "explore", None):  # and callable(sfn):
-            self._act = sfn  # NOTE: keep sfn to be able to refresh() the list (when externally changed)
-            self._orig_lst = self._act()
-            self._transform()
-            assert getattr(self, "_xfm_lst", None) is not None
-            if not getattr(self, "_wdg", None):
-                self._wdg = self._wdgfactory()
-            self._wdg.assign(self._xfm_lst)
-            self._visited = False
+        if isinstance(self._ent, Action):
+            self._act = self._ent.explore  # CHG=_default()
         else:
-            raise NotImplementedError()
+            # ALT:PERF(slow): @runtime_checkable : isinstance(ent, Explorable)
+            #   https://mypy.readthedocs.io/en/latest/protocols.html#using-isinstance-with-protocols
+            methods = inspect.getmembers(self._ent, inspect.ismethod)
+            lst = [
+                Action(name=f".{k}()", pview=self, sfn=v)
+                for k, v in methods
+                if not k.startswith("_")
+            ]
+            assert lst, methods
+            self._act = lambda: lst
+        self._orig_lst = list(self._act())
+        self._transform()
+        assert getattr(self, "_xfm_lst", None) is not None
+        if not getattr(self, "_wdg", None):
+            self._wdg = self._wdgfactory()
+        self._wdg.assign(self._xfm_lst)
+        self._visited = False
 
     # VIZ: sort, reverse, filter, groupby, aug/highlight/mark/tag
     def _transform(self) -> None:

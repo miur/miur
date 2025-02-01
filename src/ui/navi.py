@@ -146,7 +146,9 @@ class NaviWidget:
         self._pool = EntityViewCachePool()
         rootnode = ent if isinstance(ent, RootNode) else RootNode()
         self._hist = HistoryCursor(rootnode, self._pool)
-        self._hist.jump_to(ent, intermediates=True)
+        self._hist.jump_to(self._view._wdg.focused_item._ent)
+        # self._hist.jump_to(rootnode._vlst[0])
+        # self._hist.jump_to(ent, intermediates=True)
         self._layout = Panel()
         self._colsep = ""  # "│"  # OR=█|┃│ OR=<Space>
 

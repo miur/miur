@@ -176,6 +176,17 @@ def dump_logbuf_to_tty(g: "AppGlobals") -> None:
             alt.truncate(0)
 
 
+def on_exit(g: "AppGlobals") -> None:
+    dump_logbuf_to_tty(g)
+    from .util.logger import log
+
+    # TEMP: ending statement
+    tout = g.io.ttyout or sys.stderr
+    log.write = tout.write
+    log.state("exit()")
+    tout.flush()
+
+
 class stdlog_redir:
     def __init__(self, g: "AppGlobals") -> None:
         self._g = g
@@ -186,7 +197,7 @@ class stdlog_redir:
 
         # WARN: not called when app is killed by a signal not handled by Python
         #   ALT:BET?TRY: use try-catchall-finally over main()
-        atexit.register(dump_logbuf_to_tty, self._g)
+        atexit.register(on_exit, self._g)
 
     def __exit__(self, _et, _exc, _tb):  # type:ignore[no-untyped-def]
         pass

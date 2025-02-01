@@ -7,7 +7,7 @@ from unicodedata import east_asian_width
 
 import _curses as C
 
-from ..entity.base import Golden
+from ..entity.base import Action, Golden
 from ..entity.fsentry import FSEntry
 from ..util.exchook import log_exc
 from ..util.logger import log
@@ -29,8 +29,9 @@ def ranger_ansi() -> ModuleType | None:
 
 
 def resolve_colorscheme(ent: Golden) -> int:
-    attr = S.item
-    if isinstance(ent, FSEntry):
+    if isinstance(ent, Action):
+        return cast(int, S.action)
+    elif isinstance(ent, FSEntry):
         path = ent.loci
         if not fs.exists(path):
             attr = S.error
@@ -48,7 +49,8 @@ def resolve_colorscheme(ent: Golden) -> int:
                 attr = S.fslink | C.A_ITALIC | C.A_BOLD
             elif os.access(path, os.X_OK):
                 attr = S.fsexe | C.A_BOLD
-    return cast(int, attr)
+        return cast(int, attr)
+    return cast(int, S.item)
 
 
 def colored_ansi_or_schema(

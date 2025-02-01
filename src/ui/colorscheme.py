@@ -8,6 +8,19 @@ import _curses as C
 # SEE: https://bugs.python.org/issue40284
 # CHECK: it seems "S.<Tab>" completion doesn't work
 # BAD: not typed at all. BET: generate @dataclass or IntEnum inside function ?
+# TALK: Typing rules for SimpleNamespace - Typing - Discussions on Python.org ⌇⡧⢞⠇⠼
+#   https://discuss.python.org/t/typing-rules-for-simplenamespace/60906
+# class AttrDict(dict[str, int]):
+#     def __init__(self) -> None:
+#         super().__init__()
+#         self.__dict__ = self
+## OR:SRC: http://code.activestate.com/recipes/473786-dictionary-with-attribute-style-access/
+# class ReadonlyAttrDict(dict[str, int]):
+#   def __getitem__(self, key):
+#     value = dict.__getitem__(self, key)
+#     return ReadonlyAttrDict(value) if isinstance(value, dict) else value
+#   __getattr__ = __getitem__
+# g_style = AttrDict()
 g_style = SimpleNamespace()
 _registered_color_pairs: dict[tuple[int, int], int] = {}
 
@@ -34,6 +47,7 @@ def init_colorscheme(stdscr: C.window) -> None:
     C.use_default_colors()
 
     S = g_style
+    # pylint:disable=attribute-defined-outside-init
     S.hardcoded = termcolor2(C.COLOR_WHITE, C.COLOR_BLACK)  # C.color_pair(0)
 
     S.default = termcolor2(-1, -1)  # DFL: gray text on transparent bkgr
@@ -45,13 +59,14 @@ def init_colorscheme(stdscr: C.window) -> None:
     S.pfxidx = S.iteminfo
     S.cursor = C.A_REVERSE | C.A_BOLD  # OR: termcolor2(8, 4)
     S.cursoralt = S.cursor | C.A_DIM  # FAIL: DIM is ignored when together with REVERSE
-    S.mark = termcolor2(61, -1)  # 13/purple
-    S.footer = termcolor2(217, 17)
-    S.error = termcolor2(160, -1)  # 1
+    S.mark = termcolor2(61, -1)  # 13=PURP
+    S.footer = termcolor2(217, 17)  # 5=PINK
+    S.error = termcolor2(160, -1)  # 1=RED
     S.empty = S.error
-    S.fsdir = termcolor2(33, -1)  # 4
-    S.fslink = termcolor2(37, -1)  # 6
-    S.fsexe = termcolor2(64, -1)  # 2
+    S.fsdir = termcolor2(33, -1)  # 4=BLUE
+    S.fslink = termcolor2(37, -1)  # 6=CYAN
+    S.fsexe = termcolor2(64, -1)  # 2=GREN
+    S.action = termcolor2(29, -1)  # 2=GREN
 
     # pvis = C.curs_set(visibility=0)
     stdscr.attron(S.default)

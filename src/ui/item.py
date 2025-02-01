@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Final
 
 import _curses as C
 
-from ..entity.base import Golden
+from ..entity.base import Action, Golden
 from ..util.logger import log
 from ..util.termansi import ChunkKind as K
 from ..util.termansi import cellchunk, cellwidth, num_lo, num_up
@@ -128,7 +128,9 @@ class ItemWidget:
             5 if maxw > 10 else 2
         )
         maxln = min(hhint, reflow_hint)
-        text = self._ent.name.replace("o", "o\n")
+        text = self._ent.name
+        if not isinstance(self._ent, Action):  # <TEMP:DEBUG: multiline
+            text = text.replace("o", "o\n")
         n = 0
         kind, cw, ti = K.partial, 0, 0
         boxw = maxw - 1  # =len(smchar)
@@ -175,7 +177,9 @@ class ItemWidget:
         cursorx = rect.x
 
         ent = self._ent
-        text = ent.name.replace("o", "o\n")
+        text = ent.name
+        if not isinstance(ent, Action):  # <TEMP:DEBUG: multiline
+            text = text.replace("o", "o\n")
         kind, cw, ti = K.partial, 0, 0
 
         debug_log = False
