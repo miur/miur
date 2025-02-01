@@ -40,6 +40,11 @@ package() {
   # FIXME: copy by guidelines
   ln -svfT "$d_src" "$site/$pkgname"
 
+  install -d "$datadir/$pkgname"
+  for integ in "$d_pj"/integ/*; do
+    install -Dm644 -t "$datadir/$pkgname" -- "$integ"
+  done
+
   for lic in "${license[@]}"; do
     install -Dm644 -t "$datadir/licenses/$pkgname" -- "$d_pj/LICENSES/${lic}.txt"
   done

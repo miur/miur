@@ -14,9 +14,13 @@
 # %USAGE: $ mi || miur || . =mi
 """":
 if (return 0 2>/dev/null); then
-    app=$(realpath -e "${BASH_SOURCE[0]:-$0}")
-    source "${app%/*/*}/pkg/aliases.sh" "$app" "$@"
-    unset app
+    _app=$(realpath -e "${BASH_SOURCE[0]:-$0}")
+    if [[ ${_app#/usr/} != ${_app} ]]
+    then _als="${_app%/*/*}/share/miur/integ/miur-shell-aliases.sh"
+    else _als="${_app%/*/*}/integ/miur-shell-aliases.sh"
+    fi
+    source "$_als" "$_app" "$@"
+    unset _app _als
     return 0
 fi
 echo "ERR: '$0' is not supposed to be run by $SHELL"

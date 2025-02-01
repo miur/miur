@@ -1,0 +1,5 @@
+# vim:ft=nou
+
+&why: we will have have top-level :/integ/ dir to embed into 3rd-party apps
+
+integ/ -> embed/  use/  delegate/  tools/
