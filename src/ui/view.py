@@ -58,7 +58,7 @@ class EntityView:
             #   https://mypy.readthedocs.io/en/latest/protocols.html#using-isinstance-with-protocols
             methods = inspect.getmembers(self._ent, inspect.ismethod)
             lst = [
-                Action(name=f".{k}()", pview=self, sfn=v)
+                Action(name=f".{k}()", pview=self, sfn=v)  # OR=f"{k.capitalize()}:"
                 for k, v in methods
                 if not k.startswith("_")
             ]

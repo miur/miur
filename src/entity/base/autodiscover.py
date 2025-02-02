@@ -1,4 +1,4 @@
-from typing import Any, Protocol, Type, override
+from typing import Any, Type, override
 
 g_entries_cls: "list[Type[AutoRegistered]]" = []
 
@@ -13,7 +13,8 @@ def entry_cls_aliases() -> "dict[str, Type[AutoRegistered]]":
     }
 
 
-class AutoRegistered(Protocol):
+# RENAME? `Discoverable
+class AutoRegistered:
     altname: str | None = None
 
     ## [_] FUT: track all *instances* (not classes) and do explicit memory-bound gc-collecting

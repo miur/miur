@@ -32,6 +32,7 @@ if [[ -n ${MIUR_LEVEL-} ]]; then
 else # if [[ -n ${MIUR_LEVEL-} ]]
 
   # TODO:OPT:(flag): store both file:// "cwd" and miur:// "cwdurl"
+  #   f21 [_] DEV miur --remember-url=./cwdurl --choosedir=./cwd
   miur(){ local d f=${XDG_RUNTIME_DIR:?}/miur/cwd integ=${${(%):-%x}:a:h}
     [[ -d ${f%/*} ]] || mkdir -m700 -p "${f%/*}"
     # NOTE: source all aliases on first run in shell session

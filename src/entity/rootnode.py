@@ -8,12 +8,12 @@ from .fsentry import FSEntry
 #   BET? rename all top-lvl providers to `*Node ex~: 'FSEntry("/")' -> "FSNode"
 class RootNode(Golden):
     def __init__(self) -> None:
-        pass
-
-    @override
-    @property
-    def name(self) -> str:
-        return ""
+        # NICE: makes distinct prefix before adding "/" of "file:"
+        # BAD: takes premium space ALT:USE: 'name=""'
+        # IDEA: show this name-prefix only when navigating to `RootNode,
+        #   orse hide it and start from chosen protocol onwards
+        # BET:CHG:(pview)=self=_pool[RootNode] -> EntityView
+        super().__init__("miur://", pview=None)
 
     @override
     @property

@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Iterable, Protocol, Self
+from typing import TYPE_CHECKING, Iterable, Protocol
 
 if TYPE_CHECKING:
     from ...ui.view import EntityView
@@ -10,9 +10,9 @@ class Representable(Protocol):
     @property
     def name(self) -> str: ...
 
-    # MOVE? "Sortable" ?
-    def __lt__(self, other: "Self") -> bool:
-        return self.name < other.name
+
+class Sortable(Protocol):
+    def __lt__(self, other: "Golden") -> bool: ...
 
 
 class Addressable(Protocol):
@@ -56,6 +56,6 @@ class Atomic(Addressable, Representable, Protocol):
     explore: str = "NOT EXPLORABLE (YET)"
 
 
-# RENAME? `Derivable `Composite
-class Standart(Explorable, Locatable, Addressable, Representable, Protocol):
+# RENAME? `Derivable `Composite (in contrast to `Atomic)
+class Standart(Explorable, Locatable, Addressable, Sortable, Representable, Protocol):
     pass

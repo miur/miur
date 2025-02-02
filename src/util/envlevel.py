@@ -26,6 +26,11 @@ def save_choosedir(path: str) -> Iterator[None]:
     finally:
         from ..app import g_app
 
+        ## TODO: discard non-FS nodes from miur://URI
+        #   --choosedir simplify path to at most dir
+        #   --choosefile should only allow filenames at the end, but not dirs
+        #   --choosefileline should allow "file:33:12" suffix from lines navigation
+        #   --chooseany/--chooseitem should allow any format flexibly by whatever under cursor
         loci = g_app.root_wdg._navi._view._ent.loci
         log.state(f"cwd={loci}")
         with open(path, "w", encoding="utf-8") as f:

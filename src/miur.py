@@ -66,6 +66,7 @@ def miur_main(g: AppGlobals) -> None:
         g.curses_ui = ui
         g.keytableroot = keytable_insert_aura_pathes(KM.g_modal_default)
         KM.modal_switch_to(None)
+        # f21 [_] DEV miur --remember-url=./cwdurl vs --choosedir=./cwd
         xpath = getattr(g.opts, "xpath", None)
         if xpath is None:
             import os

@@ -6,7 +6,12 @@ if TYPE_CHECKING:
     from ...ui.view import EntityView
 
 
-# RENAME? `Entity `Node
+# ENH? inherit variety of `*Action and apply different color to each
+#   * ActionItemMethod/Introspection
+#   * ActionItemMROMethods/Inherited
+#   * ActionItemGenerics/Aux/StandaloneAugmented/Registered/Annotated
+#   * ActionVlst/ViewportListTransformations
+#   * ActionKeys (or annotate above actions by binded keys)
 class Action(Golden):
     def __init__(
         self,
@@ -14,20 +19,14 @@ class Action(Golden):
         pview: "EntityView",
         sfn: Callable[[], Sequence[Golden]],
     ) -> None:
-        self._name = name
+        super().__init__(name, pview)
         self._sfn = sfn
-        super().__init__(pview)
-
-    @override
-    @property
-    def name(self) -> str:
-        return self._name
 
     # TEMP:FIXED:ERR: Cannot instantiate abstract class "Action" with abstract attribute "loci"
-    @override
-    @property
-    def loci(self) -> str:
-        return self._name
+    # @override
+    # @property
+    # def loci(self) -> str:
+    #     return self._name
 
     @override
     def explore(self) -> Iterable[Golden]:
