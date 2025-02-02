@@ -1,8 +1,8 @@
-from typing import TYPE_CHECKING, Iterable, Protocol
+from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
     from ...ui.view import EntityView
-    from .golden import Golden
+    from .golden import Entities, Entity
 
 
 # RENAME? `Named (to keep Representable for __repr__)
@@ -12,7 +12,7 @@ class Representable(Protocol):
 
 
 class Sortable(Protocol):
-    def __lt__(self, other: "Golden") -> bool: ...
+    def __lt__(self, other: "Entity") -> bool: ...
 
 
 class Addressable(Protocol):
@@ -45,7 +45,7 @@ class Locatable(Protocol):
 #    ALT:BET? remove the method itself and use getattr() to verify its presence
 class Explorable(Protocol):
     # RENAME? .browse()
-    def explore(self) -> "Iterable[Golden]": ...
+    def explore(self) -> "Entities": ...
 
 
 # REMOVE?

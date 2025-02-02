@@ -36,7 +36,7 @@ def cellwidth(text: str) -> int:
 class ChunkKind(enum.Enum):
     NL = ""  # OR="\n"/os.linesep
     NUL = "␀"  # OR=^@
-    TAB = "▸ "  # OR="    "
+    TAB = "▸ "  # OR="    "  BET?=str.expandtab(4)
     DEL = "␡"  # OR=^?/^~ "\x7f" ALT=curses.KEY_*
     ctrl = "^^"  # chr<0x20
     end = -1  # ATT: we still need to compare ti<len(text) outside

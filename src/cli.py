@@ -102,10 +102,11 @@ def cli_spec(parser: ArgumentParser, *, dfl: AppOptions) -> ArgumentParser:
     o("-K", "--ipykernel", default=False, action="store_true")
     o("-I", "--ipyconsole", default=None, action="store_false")
     o("-X", "--ipyquit", dest="ipyconsole", action="store_true")
-    o("--choosedir", help="write cwd on exit")
+    # fmt:off
+    o("--remember_url", default="", help="save miur xpath on exit and restore on startup")
+    o("--choosedir", default="", help="write filesystem cwd on exit (understood by other apps)")
     o("--logredir", help="redir to fd or path")
     # pylint:disable=line-too-long
-    # fmt:off
     o("-k", "--kill", dest="signal", action="store_const", const=__import__("signal").SIGTERM)
     o("-C", "--color", default=SwitchEnum.default.value, choices=SwitchEnum.__members__, action=SwitchAction)
     # fmt:on

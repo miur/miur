@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Final
 import _curses as C
 
 from ..entity.base import Action, Golden
+from ..entity.fsentry import FSEntry
 from ..util.logger import log
 from ..util.termansi import ChunkKind as K
 from ..util.termansi import cellchunk, cellwidth, num_lo, num_up
@@ -129,7 +130,8 @@ class ItemWidget:
         )
         maxln = min(hhint, reflow_hint)
         text = self._ent.name
-        if not isinstance(self._ent, Action):  # <TEMP:DEBUG: multiline
+        assert text, self._ent
+        if isinstance(self._ent, FSEntry):  # <TEMP:DEBUG: multiline
             text = text.replace("o", "o\n")
         n = 0
         kind, cw, ti = K.partial, 0, 0
@@ -150,6 +152,7 @@ class ItemWidget:
                 n += 1
                 if n >= maxln:
                     break
+        assert n
         return n
 
     # DECI: pass XY to redraw/render ? OR store as .origin ?
@@ -178,7 +181,7 @@ class ItemWidget:
 
         ent = self._ent
         text = ent.name
-        if not isinstance(ent, Action):  # <TEMP:DEBUG: multiline
+        if isinstance(ent, FSEntry):  # <TEMP:DEBUG: multiline
             text = text.replace("o", "o\n")
         kind, cw, ti = K.partial, 0, 0
 

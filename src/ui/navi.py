@@ -144,7 +144,7 @@ def pick_adaptive_layout_cfg(rect: Rect, old: Panel, sepw: int) -> Panel:
 class NaviWidget:
     def __init__(self, ent: Golden) -> None:
         self._pool = EntityViewCachePool()
-        rootnode = ent if isinstance(ent, RootNode) else RootNode()
+        rootnode = ent if isinstance(ent, RootNode) else RootNode(pview=None)
         self._hist = HistoryCursor(rootnode, self._pool)
         self._hist.jump_to(self._view._wdg.focused_item._ent)
         # self._hist.jump_to(rootnode._vlst[0])

@@ -4,7 +4,8 @@ import os.path as fs
 from typing import Callable, Iterable, Sequence, override
 
 from ..entity.base import Action, Golden
-from ..entity.fsentry import FSEntry
+from ..entity.error import ErrorEntry
+from ..entity.fsentry import FSDir
 from .vlst import SatelliteViewport
 
 # T = TypeVar("T")
@@ -58,13 +59,27 @@ class EntityView:
             #   https://mypy.readthedocs.io/en/latest/protocols.html#using-isinstance-with-protocols
             methods = inspect.getmembers(self._ent, inspect.ismethod)
             lst = [
+                # IDEA: rename {.explore==.default} to show only "L" as 1st `Action in list
                 Action(name=f".{k}()", pview=self, sfn=v)  # OR=f"{k.capitalize()}:"
                 for k, v in methods
+                ## WARN: we also may need to exclude methods which aren't applicable to particular file
+                #   ~ no reason to text_lines -- if it's a binary file
+                #   ~ no reason to code_syntax_lines -- if syntax isn't supported
+                #   ~ no reason to .explore(empty_file) -- unless you trying to insert some new lines
+                ## TODO: filter by return type "-> Iterable[Golden]" (or at least "-> Golden" for `Dashboard)
+                ##   OR: `Interpret any non-explore as generic TextEntry(str(...))
                 if not k.startswith("_")
             ]
             assert lst, methods
             self._act = lambda: lst
-        self._orig_lst = list(self._act())
+        try:
+            self._orig_lst = list(self._act())
+        # FIXME:ALSO: replace per-item issues with in-list `ErrorEntry
+        #   &why to hi-RED files which had disappeared during listing e.g. short-lived prs in /proc/*
+        #   &why to show at least partially loaded file from e.g. network
+        except Exception as exc:
+            self._orig_lst = [ErrorEntry(pview=self, exc=exc)]
+
         self._transform()
         assert getattr(self, "_xfm_lst", None) is not None
         if not getattr(self, "_wdg", None):
@@ -79,11 +94,12 @@ class EntityView:
 
     def _apply_default_policy(self) -> None:
         # pylint:disable=protected-access
-        if isinstance(self._ent, FSEntry) and fs.isdir(p := self._ent.loci):
+        if isinstance(self._ent, FSDir):
+            p = self._ent._x.handle
             if os.access(p, os.R_OK):
                 os.chdir(p)
-            if not fs.islink(p) or self._ent._alt is True:
-                # TODO: sort folders before files
-                # TODO: sort ignorecase
-                # TODO: sort by tuple of keys (filetype, name/case, ...)
-                self._xfm_lst.sort()
+            # if not fs.islink(p) or self._ent._alt is True:
+            # TODO: sort folders before files
+            # TODO: sort ignorecase
+            # TODO: sort by tuple of keys (filetype, name/case, ...)
+            self._xfm_lst.sort()

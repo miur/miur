@@ -129,6 +129,9 @@ def pick_spacermark(v: "EntityView | None") -> tuple[int, str]:
         return (S.default, "")  # OR=﹖?⹔⸮՞¿
     if not v._orig_lst:  # = if dir/file is truly empty
         return (S.empty, "∅")  # OR=○◌
+    # TODO:OR: self._ent.atomic() | isinstance(self._ent, ErrorEntry) and self._ent.atomic()
+    # if isinstance(self._ent.exc, StopIterationError):
+    #     return (S.error, "✗")
     if any(isinstance(x._ent, ErrorEntry) for x in v._wdg._lst):
         return (S.error, "‼")  # OR=⁈ ❕❗
     ## BET: modify color of visited mark, COS: it overlaps with all other marks

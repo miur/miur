@@ -20,7 +20,7 @@ def increment_envlevel(varname: str) -> Iterator[int]:
 
 
 @contextmanager
-def save_choosedir(path: str) -> Iterator[None]:
+def save_choosedir(turl: str, tcwd: str) -> Iterator[None]:
     try:
         yield
     finally:
@@ -31,7 +31,13 @@ def save_choosedir(path: str) -> Iterator[None]:
         #   --choosefile should only allow filenames at the end, but not dirs
         #   --choosefileline should allow "file:33:12" suffix from lines navigation
         #   --chooseany/--chooseitem should allow any format flexibly by whatever under cursor
-        loci = g_app.root_wdg._navi._view._ent.loci
-        log.state(f"cwd={loci}")
-        with open(path, "w", encoding="utf-8") as f:
-            f.write(loci)
+        if turl:
+            url = g_app.root_wdg._navi._view._ent.loci
+            log.state(f"url={url}")
+            with open(turl, "w", encoding="utf-8") as f:
+                f.write(url)
+        if tcwd:
+            cwd = os.getcwd()
+            log.state(f"cwd={cwd}")
+            with open(tcwd, "w", encoding="utf-8") as f:
+                f.write(cwd)

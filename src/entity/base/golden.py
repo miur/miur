@@ -1,5 +1,5 @@
 from functools import cached_property
-from typing import TYPE_CHECKING, Iterable, Protocol, override
+from typing import TYPE_CHECKING, Any, Iterable, Protocol, override
 
 from .autodiscover import AutoRegistered
 
@@ -7,11 +7,20 @@ if TYPE_CHECKING:
     from ...ui.view import EntityView
 
 
+# RENAME? Indivisible AtomicError HaltExploration Leaf SolidBox
+class StopExploration(Exception):
+    pass
+
+
 # [SystemObject]Accessor/Proxy = .handle(AddressOfStorage) + BackendDataProviderSystem
 #   ++ (LineBasedInterpreter+Selector) + StrTypeConverter
 #   * UpdateProtocol | .update/invalidate function | event stream
 #   * allows e.g. all FS ops
 class Accessor(Protocol):
+    # BAD: we can't pass "x:str" anymore
+    # @property
+    # def handle(self) -> Any: ...
+
     # RENAME? .get() or .read() | .getdata .readstr .get(type(str))
     @override
     def __str__(self) -> str: ...
@@ -19,23 +28,33 @@ class Accessor(Protocol):
 
 # RENAME? `Entity `Node `Discoverable
 # ALT:(Protocol):NEED:BAD:PERF:(@runtime_checkable):COS:TEMP: to focus_on(match-case Golden())
-class Golden(AutoRegistered):
-    __slots__ = ()
+class Golden[T](AutoRegistered):
+    # __slots__ = ()
 
-    def __init__(self, x: Accessor, pview: "EntityView") -> None:
+    # ERR:(pylint=3.3.1):TRY: upgrade?
+    # pylint:disable=undefined-variable
+    def __init__(self, x: T, pview: "EntityView") -> None:
         self._x = x
         self._pv = pview
 
+    # NICE: as we have a separate .name field, we can *dynamically* augment regular filenames
+    # ex~:
+    #   ~ skip date-prefix (to sort by body)
+    #   ~ substitute my xts3 to isodate
+    #   ~ insert full path into name -- for flattened folders
+    #   ~ smart-compress long textlines to use them everywhere as unique names
+    # ALT:BET? do it inside "item visualization", which would be both more logical and practical
+    #   i.e. we may visualize both augmented and shadowed original names at the same time
     @property
     def name(self) -> str:
         # FUT:PERF:CMP: use @cached_property vs @property+@lru_cache(1) vs .update(self._name) method
         return str(self._x)
 
-    def explore(self) -> "Iterable[Golden]":
+    def explore(self) -> "Entities":
         # NOTE: it's reasonable to raise inof using @abc.abstractmethod
         #   * rarely we may have atomic leafs, but for most it's "NOT YET IMPLEMENTED"
         #   * we will use try-catch around .explore() anyway -- to catch errors
-        raise NotImplementedError("Atomic?")
+        raise NotImplementedError("TBD: not yet implemented")
 
     @property
     def pv(self) -> "EntityView":
@@ -49,7 +68,7 @@ class Golden(AutoRegistered):
         # FAIL:TEMP: "self.name" -> "self._x.selector_for_interpreter"
         return parent + "/" + self.name
 
-    def __lt__(self, other: "Golden") -> bool:
+    def __lt__(self, other: "Golden[Any]") -> bool:
         return self.name < other.name
 
     @override
@@ -60,6 +79,10 @@ class Golden(AutoRegistered):
         if loci.startswith("/"):
             return f"`{loci}"
         return f"{type(self).__name__}({loci})"
+
+
+Entity = Golden[Any]
+type Entities = Iterable[Golden[Any]]
 
 
 ## FIXED:ERR: `FSEntry [too-many-ancestors] Too many ancestors (8/7)

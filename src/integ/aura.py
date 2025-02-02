@@ -19,7 +19,7 @@ def keytable_insert_aura_pathes(keytable: KeyTable) -> KeyTable:
 
     import os.path as fs
 
-    from ..entity.fsentry import FSEntry
+    from ..entity.fsentry import FSAuto
 
     # FIXME: allow ".#"
     entries = [l.partition("#")[0].strip().split(None, 1) for l in lst]
@@ -57,5 +57,5 @@ def keytable_insert_aura_pathes(keytable: KeyTable) -> KeyTable:
         # log.info(keytable["."])
         if keys[-1] in t:
             raise ValueError("Conflicting keybind")
-        t[keys[-1]] = lambda g, v=path: g.root_wdg._navi.view_jump_to(FSEntry(v))
+        t[keys[-1]] = lambda g, v=path: g.root_wdg._navi.view_jump_to(FSAuto(v, None))
     return keytable

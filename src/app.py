@@ -34,7 +34,8 @@ class AppOptions:
     stdinfmt: "Optional[Golden]"
     ####
     signal: int | None
-    choosedir: str | None = None
+    remember_url: str = None
+    choosedir: str = None
 
 
 # ATT: use these FD explicitly: don't ever use "sys.std{in,out,err}"

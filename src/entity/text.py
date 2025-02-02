@@ -1,49 +1,48 @@
-from typing import Iterable, override
+from typing import TYPE_CHECKING, override
 
-from .base import Golden
-from .error import ErrorEntry
+from .base.golden import Entities, Golden, StopExploration
+
+if TYPE_CHECKING:
+    from ...ui.view import EntityView
 
 
-class TextEntry(Golden):
+class TextEntry(Golden[str]):
     __slots__ = ()  # "name", "loci", "explore")
 
-    def __init__(self, text: str, loci: tuple[str, ...] | None = None) -> None:
-        self._x = text
-        self._at = loci  # = (path,lnum,[col,[boff,...]])
+    # def __init__(self, text: str, loci: tuple[str, ...] | None = None) -> None:
+    def __init__(self, text: str, pview: "EntityView|None" = None) -> None:
+        super().__init__(text, pview)
+        # self._at = loci  # = (path,lnum,[col,[boff,...]])
+
+    # @override
+    # @property
+    # def loci(self) -> str:
+    #     return "".join(self._at) if self._at else "∅ " + repr(self)
 
     @override
-    @property
-    def name(self) -> str:
-        return self._x
-
-    @override
-    @property
-    def loci(self) -> str:
-        return "".join(self._at) if self._at else "∅ " + repr(self)
-
-    @override
-    def explore(self) -> Iterable[Golden]:
+    def explore(self) -> Entities:
         from re import finditer
 
         cls = type(self)
         words = [
             cls(
                 m.group(0),
-                loci=(
-                    (
-                        ## DISABLED: interferes with !nvim jumping to line under cursor
-                        # self._at[0],
-                        # f":{m.start()}+{m.end() - m.start()}",
-                        # self._at[-1],
-                        *self._at,
-                        f":{m.start()+1}",
-                    )
-                    if self._at
-                    else ("∅", f":{m.start()}+{m.end() - m.start()}")
-                ),
+                # loci=(
+                #     (
+                #         ## DISABLED: interferes with !nvim jumping to line under cursor
+                #         # self._at[0],
+                #         # f":{m.start()}+{m.end() - m.start()}",
+                #         # self._at[-1],
+                #         *self._at,
+                #         f":{m.start()+1}",
+                #     )
+                #     if self._at
+                #     else ("∅", f":{m.start()}+{m.end() - m.start()}")
+                # ),
             )
             for m in finditer(r"\S+", self._x)
         ]
         if len(words) == 1:
-            return [ErrorEntry("INDIVISIBLE WORD", loci=self._at)]
+            raise StopExploration()
+            # return [ErrorEntry("INDIVISIBLE WORD", loci=self._at)]
         return words

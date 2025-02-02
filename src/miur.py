@@ -39,7 +39,8 @@ def miur_main(g: AppGlobals) -> None:
         # raise RuntimeError()
 
         from . import keymap as KM
-        from .entity.fsentry import FSEntry
+        from .entity.fsentry import FSAuto
+        from .entity.rootnode import RootNode
         from .integ.aura import keytable_insert_aura_pathes
         from .ui.root import RootWidget
 
@@ -71,16 +72,20 @@ def miur_main(g: AppGlobals) -> None:
         if xpath is None:
             import os
 
-            xpath = os.getenv("PWD", "") or os.getcwd()
+            ent = FSAuto(os.getenv("PWD", "") or os.getcwd(), pview=None)
         elif xpath == "":
-            xpath = "/d/airy"
+            # MAYBE: make tight coupling bw `EntityView -> `Entity(pview=self)
+            #   i.e. immeditely make it exist for each item
+            ent = RootNode(pview=None)
+        else:
+            ent = FSAuto(xpath, pview=None)
         log.state(xpath)
-        g.root_wdg = RootWidget(FSEntry(xpath))
+        g.root_wdg = RootWidget(ent)
         # g.root_wdg.set_entity(FSEntry("/etc/udev"))
 
         # TEMP:HACK: directly append stdin to current node
         if f := g.io.pipein:
-            cls = g.opts.stdinfmt or FSEntry
+            cls = g.opts.stdinfmt or FSAuto
             lst = []
             i = 1
             # WARN: offset is in chars/codepoints inof bytes (same with .read(size=chars))
@@ -89,14 +94,16 @@ def miur_main(g: AppGlobals) -> None:
                 # TODO: allow re-interpreting arbitrary words/lines as paths and vice versa
                 # RND:(xpath): use "cwd" as .loci for euphemeral entries
                 # FIXME: put into independent linked node, inof extending baselist
-                lst.append(cls(line.removesuffix("\n"), loci=(xpath, f":{i}")))
+                lst.append(
+                    cls(line.removesuffix("\n"), pview=None)
+                )  # , loci=(xpath, f":{i}")))
                 i += 1
                 cpoff += len(line)
             v = g.root_wdg._navi._view
             v._wdg.assign(v._xfm_lst + lst)
 
-        if tmp := g.opts.choosedir:
-            do(save_choosedir(tmp))
+        if (turl := g.opts.remember_url) or (tcwd := g.opts.choosedir):
+            do(save_choosedir(turl, tcwd))
 
         if g.opts.bare:  # NOTE: much faster startup w/o asyncio machinery
             from .loop_selectors import mainloop_selectors
