@@ -1,6 +1,6 @@
-from typing import TYPE_CHECKING, Callable, Iterable, Sequence, override
+from typing import TYPE_CHECKING, Callable, override
 
-from .golden import Golden
+from .golden import Entities, Golden
 
 if TYPE_CHECKING:
     from ...ui.view import EntityView
@@ -12,12 +12,12 @@ if TYPE_CHECKING:
 #   * ActionItemGenerics/Aux/StandaloneAugmented/Registered/Annotated
 #   * ActionVlst/ViewportListTransformations
 #   * ActionKeys (or annotate above actions by binded keys)
-class Action(Golden):
+class Action(Golden[str]):
     def __init__(
         self,
         name: str,
         pview: "EntityView",
-        sfn: Callable[[], Sequence[Golden]],
+        sfn: Callable[[], Entities],
     ) -> None:
         super().__init__(name, pview)
         self._sfn = sfn
@@ -29,5 +29,5 @@ class Action(Golden):
     #     return self._name
 
     @override
-    def explore(self) -> Iterable[Golden]:
+    def explore(self) -> Entities:
         return self._sfn()

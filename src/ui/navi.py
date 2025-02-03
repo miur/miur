@@ -3,7 +3,7 @@ from typing import Iterable, Iterator, Self, override
 import _curses as C
 
 from ..alg.flowratio import flowratio_to_abs
-from ..entity.base import Golden
+from ..entity.base import Entity
 from ..entity.error import ErrorEntry
 from ..entity.rootnode import RootNode
 from ..util.logger import log
@@ -142,7 +142,7 @@ def pick_adaptive_layout_cfg(rect: Rect, old: Panel, sepw: int) -> Panel:
 
 # SPLIT:(`NaviLayout): to cvt {(ww,wh) -> [panel].rect}, adapt based on size and toggle visibility
 class NaviWidget:
-    def __init__(self, ent: Golden) -> None:
+    def __init__(self, ent: Entity) -> None:
         self._pool = EntityViewCachePool()
         rootnode = ent if isinstance(ent, RootNode) else RootNode(pview=None)
         self._hist = HistoryCursor(rootnode, self._pool)
@@ -191,7 +191,7 @@ class NaviWidget:
             return
         self.view_jump_to(pwdg.focused_item._ent)
 
-    def view_jump_to(self, nent: Golden) -> None:
+    def view_jump_to(self, nent: Entity) -> None:
         self._hist.jump_to(nent)
         self._update_preview()
         self._resize_cached_preview()

@@ -102,7 +102,9 @@ def miur_main(g: AppGlobals) -> None:
             v = g.root_wdg._navi._view
             v._wdg.assign(v._xfm_lst + lst)
 
-        if (turl := g.opts.remember_url) or (tcwd := g.opts.choosedir):
+        turl = g.opts.remember_url
+        tcwd = g.opts.choosedir
+        if turl or tcwd:
             do(save_choosedir(turl, tcwd))
 
         if g.opts.bare:  # NOTE: much faster startup w/o asyncio machinery

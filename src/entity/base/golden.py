@@ -76,8 +76,8 @@ class Golden[T](AutoRegistered):
         loci = self.loci
         if not loci.endswith(nm := self.name):
             loci = nm + loci
-        if loci.startswith("/"):
-            return f"`{loci}"
+        # if loci.startswith("/"):
+        #     return f"`{loci}"
         return f"{type(self).__name__}({loci})"
 
 

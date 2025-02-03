@@ -7,9 +7,6 @@ from .app import AppOptions, g_app
 from .entity.base import autodiscover as AD
 from .util.logger import LogLevel, log
 
-if TYPE_CHECKING:
-    from just.use.iji.main import Context
-
 
 # FIXME? only allow 3 values to prevent options sprawling ?
 class SwitchEnum(Enum):
@@ -103,7 +100,7 @@ def cli_spec(parser: ArgumentParser, *, dfl: AppOptions) -> ArgumentParser:
     o("-I", "--ipyconsole", default=None, action="store_false")
     o("-X", "--ipyquit", dest="ipyconsole", action="store_true")
     # fmt:off
-    o("--remember_url", default="", help="save miur xpath on exit and restore on startup")
+    o("--remember-url", default="", help="save miur xpath on exit and restore on startup")
     o("--choosedir", default="", help="write filesystem cwd on exit (understood by other apps)")
     o("--logredir", help="redir to fd or path")
     # pylint:disable=line-too-long
@@ -155,5 +152,12 @@ def miur_argparse(argv: list[str]) -> None:
     return miur_frontend(g_app)
 
 
-def miur_ctx(ctx: "Context") -> None:
-    return miur_argparse(ctx.args)
+try:
+    if TYPE_CHECKING:
+        from just.use.iji.main import Context
+except ImportError:  # ModuleNotFoundError
+    pass
+else:
+
+    def miur_ctx(ctx: "Context") -> None:
+        return miur_argparse(ctx.args)
