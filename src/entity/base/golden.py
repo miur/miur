@@ -56,6 +56,10 @@ class Golden[T](AutoRegistered):
         #   * we will use try-catch around .explore() anyway -- to catch errors
         raise NotImplementedError("TBD: not yet implemented")
 
+    # BET? directly point to `Entity which introspected it or `Action which produced it
+    #   => and then you can access cached _vlst and _wdg only through _pool
+    #   i.e. individual `Entity will lose the ability to directly access associated _wdg
+    #     BUT: we won't need to eventually use "weak_ref" here to release pool memory
     @property
     def pv(self) -> "EntityView":
         return self._pv

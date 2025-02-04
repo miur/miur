@@ -27,4 +27,6 @@ class RootNode(Entity):
     def explore(self) -> Entities:
         # OR: do we really need "file://" ?
         #   isn't it prolifiration from "http://" ? -- which is wrong and should had been "http:"
+        # [_] FIXME! here pview=Action(lambda: explore())
+        #   => USE:CASE: able to jump to unrelated node, press <Back> and get to actions which produced it
         return [FSDir("/", pview=self._pv)]  # , nm="file:"

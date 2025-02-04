@@ -88,7 +88,7 @@ def ensure_venv(devroot: str) -> None:
 
         cmd = get_py_args()
         if vexe == cmd[0]:
-            exc = RuntimeError(f"ERR: endless loop in exec(.venv)")
+            exc = RuntimeError("ERR: endless loop in exec(.venv)")
             exc.add_note(" * manually REMOVE '-S' from python interp args")
             exc.add_note(f" * {cmd}")
             raise exc

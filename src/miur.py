@@ -39,6 +39,7 @@ def miur_main(g: AppGlobals) -> None:
         # raise RuntimeError()
 
         from . import keymap as KM
+        from .entity.base import Entity
         from .entity.fsentry import FSAuto
         from .entity.rootnode import RootNode
         from .integ.aura import keytable_insert_aura_pathes
@@ -69,6 +70,7 @@ def miur_main(g: AppGlobals) -> None:
         KM.modal_switch_to(None)
         # f21 [_] DEV miur --remember-url=./cwdurl vs --choosedir=./cwd
         xpath = getattr(g.opts, "xpath", None)
+        ent: Entity
         if xpath is None:
             import os
 

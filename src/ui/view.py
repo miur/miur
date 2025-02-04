@@ -33,11 +33,11 @@ def cvt_to_ents(x: Any, pview: "EntityView", lvl: str = "") -> Entities:
     elif isinstance(x, tuple):
         for a in x:
             for v in cvt_to_ents(a, pview, lvl):
-                yield TextEntry(f" ⸱\t{v}")
+                yield TextEntry(f" ⸱\t{v}", pview)
     elif isinstance(x, (str, int)):
-        yield TextEntry(str(x))
+        yield TextEntry(str(x), pview)
     elif isinstance(x, float):
-        yield TextEntry(f"{x:.6f}")
+        yield TextEntry(f"{x:.6f}", pview)
     # if isinstance(x, Path):
     #     return repr(str(x))
     # if isinstance(x, (DT, TM, DD)):
@@ -49,12 +49,12 @@ def cvt_to_ents(x: Any, pview: "EntityView", lvl: str = "") -> Entities:
             it = iter(x)
         except TypeError:
             for ms, mf in inspect.getmembers(x):
-                yield TextEntry(f"{lvl}{ms}: {mf}")
+                yield TextEntry(f"{lvl}{ms}: {mf}", pview)
         else:
             lvl += " "
             for i, a in enumerate(it, start=1):
                 for v in cvt_to_ents(a, pview, lvl):
-                    yield TextEntry(f"{lvl}{num_lo(i):>2s} {v}")
+                    yield TextEntry(f"{lvl}{num_lo(i):>2s} {v}", pview)
 
 
 # ALT:SPLIT: make an `EntityContext for serialization/restoration on restart
@@ -103,9 +103,13 @@ class EntityView:
             #   https://mypy.readthedocs.io/en/latest/protocols.html#using-isinstance-with-protocols
             methods = inspect.getmembers(self._ent, inspect.ismethod)
 
+            # MOVE> globals
             def wrapent(v: Callable[[], Any]) -> Callable[[], Entities]:
                 r = inspect.signature(v).return_annotation
                 # assert 0, type(r)
+                # BET? don't even expect to ever return `Entity
+                #   i.e. use Path inof FSEntry (with all its API) and simply cvt returned paths by FSAuto here
+                #   BAD: we need a way to limit all possible Path API to reasonably useful list
                 if r in (Entities, Iterable[Entity], Iterable[Golden[Any]]):
                     return v
                 if r in (Entity, Golden[Any]):

@@ -2,8 +2,6 @@ import os
 import selectors
 import signal
 
-import _curses as C
-
 from . import iomgr
 from .app import AppGlobals
 from .util.logger import log

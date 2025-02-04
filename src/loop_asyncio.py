@@ -137,7 +137,7 @@ def asyncio_primary_out(
             loop = asyncio.get_running_loop()
             loop.add_signal_handler(signal.SIGWINCH, g.curses_ui.resize)
             loop.add_reader(iomgr.CURSES_STDIN_FD, g.curses_ui.handle_input)
-            global _primary
+            global _primary  # pylint:disable=global-statement
             _primary = None
         # HACK: chain callback() hook/stmt after successfully executed task
         if success and cb:

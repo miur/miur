@@ -1,4 +1,5 @@
 # vim:ft=dosini:cms=#\ %s
+#%USAGE: $ pylint --output-format=colorized .
 #%NEW: $ pylint --generate-rcfile > .pylintrc
 # REF: http://pylint.pycqa.org/en/latest/technical_reference/features.html#format-checker-options
 [MASTER]
@@ -10,7 +11,8 @@ load-plugins=
 # ALSO:
 # python - Ignore by directory using Pylint - Stack Overflow ⌇⡡⡚⣅⡆
 #   https://stackoverflow.com/questions/2503717/ignore-by-directory-using-pylint/52123522#52123522
-ignore=_try
+# ignore=_try
+ignore-paths = ^\.(git|reuse|venv)(/|$)|^(pkg|_try)(/|$)|(^|/)(t|alt|doc|[_#&][^/]*)$
 
 
 [MESSAGES CONTROL]

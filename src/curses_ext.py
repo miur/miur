@@ -148,14 +148,15 @@ def shell_out(
         #     pssmem = sum(int(l.split()[1]) for l in f.readlines() if l.startswith("Pss:"))
         #     print(pssmem)
         # NOTE: we shouldn't crash on ZSH (or whatever) returning "exitcode=1"
-        # [_] TODO: ..., stdin=g_app.io.ttyin, stdout=g_app.io.ttyout, stderr=(g_app.io.pipeerr or g_app.io.ttyalt))
+        # [_] TODO: ..., stdin=g_app.io.ttyin, stdout=g_app.io.ttyout,
+        #                stderr=(g_app.io.pipeerr or g_app.io.ttyalt))
         return run(cmdv, env=envp, check=False, text=True)
 
 
 async def shell_async(
     stdscr: C.window,
     cmdv: Sequence[str] = (),
-    input: str | None = None,
+    input: str | None = None,  # pylint:disable=redefined-builtin
     interactive: bool = False,
     env: Mapping[str, str] | None = None,
 ) -> int:
@@ -191,7 +192,9 @@ async def shell_async(
             # Python asyncio subprocess write stdin and read stdout/stderr continuously - Stack Overflow ⌇⡧⡁⡩⠠
             #   https://stackoverflow.com/questions/57730010/python-asyncio-subprocess-write-stdin-and-read-stdout-stderr-continuously
             (_out, _err) = await proc.communicate(input=input.encode("utf-8"))
-            rc = proc.returncode
+            rc_ = proc.returncode
+            assert rc_ is not None
+            rc = rc_
             # ALT:(manually): only for single pipe, otherwise deadblocks
             # try:
             #     proc.stdin.write(input.encode("utf-8"))
@@ -225,7 +228,9 @@ def ipython_out(stdscr: C.window, user_ns: dict[str, Any] | None = None) -> None
     c.TerminalIPythonApp.display_banner = False
 
     with curses_altscreen(stdscr):
-        IPython.start_ipython(argv=[], config=c, user_ns=user_ns)
+        IPython.start_ipython(
+            argv=[], config=c, user_ns=user_ns
+        )  # type:ignore[no-untyped-call]
         ## ATT: It's not what I want
         # NameError in list comprehension when using embed · Issue #8918 · ipython/ipython ⌇⡦⠿⢘⢵
         #   https://github.com/ipython/ipython/issues/8918#issuecomment-149898784

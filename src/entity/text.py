@@ -10,7 +10,7 @@ class TextEntry(Golden[str]):
     __slots__ = ()  # "name", "loci", "explore")
 
     # def __init__(self, text: str, loci: tuple[str, ...] | None = None) -> None:
-    def __init__(self, text: str, pview: "EntityView|None" = None) -> None:
+    def __init__(self, text: str, pview: "EntityView" = None) -> None:
         super().__init__(text, pview)
         # self._at = loci  # = (path,lnum,[col,[boff,...]])
 
