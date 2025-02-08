@@ -2,21 +2,110 @@
 #%USAGE: $ pylint --output-format=colorized .
 #%NEW: $ pylint --generate-rcfile > .pylintrc
 # REF: http://pylint.pycqa.org/en/latest/technical_reference/features.html#format-checker-options
-[MASTER]
+[MAIN]
 
-# extension-pkg-allow-list=curses
+# A comma-separated list of package or module names from where C extensions may
+# be loaded. Extensions are loading into the active Python interpreter and may
+# run arbitrary code.
+extension-pkg-allow-list=
+
+# Files or directories to be skipped. They should be base names, not paths.
+ignore=CVS,t,alt,doc,&,#,pkg,_try,.git,.reuse,.venv
+
+# Add files or directories matching the regular expressions patterns to the
+# ignore-list. The regex matches against paths and can be in Posix or Windows
+# format. Because '\\' represents the directory delimiter on Windows systems,
+# it can't be used as an escape character.
+ignore-paths=
+# SRC: https://stackoverflow.com/questions/2503717/ignore-by-directory-using-pylint/52123522#52123522
+# ignore-paths = ^\.(git|reuse|venv)(/|$)|^([&]|pkg|_try)(/|$)|(^|/)(t|alt|doc|[_#&][^/]*)$
+
+# Files or directories matching the regular expression patterns are skipped.
+# The regex matches against base names, not paths. The default value ignores
+# Emacs file locks
+# @me DFL: ignore-patterns=^\.#
+ignore-patterns=^[_#&].*
+
+
+# Python code to execute, usually for sys.path manipulation such as
+# pygtk.require().
+# @me SRC: https://jdhao.github.io/2023/07/22/neovim-pylsp-setup/#make-pylsp-work-inside-a-virtual-env
+init-hook ="""
+try:
+  import pylint_venv
+except ImportError:
+  pass
+else:
+  pylint_venv.inithook()
+"""
+
+# Use multiple processes to speed up Pylint. Specifying 0 will auto-detect the
+# number of processors available to use, and will cap the count on Windows to
+# avoid hangs.
 jobs=0
-load-plugins=
 
-# ALSO:
-# python - Ignore by directory using Pylint - Stack Overflow ⌇⡡⡚⣅⡆
-#   https://stackoverflow.com/questions/2503717/ignore-by-directory-using-pylint/52123522#52123522
-# ignore=_try
-ignore-paths = ^\.(git|reuse|venv)(/|$)|^(pkg|_try)(/|$)|(^|/)(t|alt|doc|[_#&][^/]*)$
+
+
+[BASIC]
+
+# Good variable names regexes, separated by a comma. If names match any regex,
+# they will always be accepted
+## @me USE: inof C0103
+# good-names=i,j,k,ex,Run,_,pk,x,y
+# good-names-rgxs = ^[_a-z][_a-z0-9]?$
+good-names-rgxs = ^[a-z][a-z0-9]?$
+
+
+[CLASSES]
+
+# List of member names, which should be excluded from the protected access
+# warning.
+# exclude-protected=_asdict,_fields,_replace,_source,_make,os._exit
+
+
+[DESIGN]
+
+# Maximum number of arguments for function / method.
+# max-args=5
+
+
+[FORMAT]
+
+# Expected format of line ending, e.g. empty (any line ending), LF or CRLF.
+# @me
+expected-line-ending-format=LF
+
+# Regexp for a line that is allowed to be longer than the limit.
+# @me SEE: https://github.com/PyCQA/pylint/issues/2178
+ignore-long-lines=^\s*(#.*\s+)?https?://\S+$
+
+# Maximum number of characters on a single line.
+# @me NOTE: "!black" needs 88, but we want to allow long comments
+max-line-length = 112
 
 
 [MESSAGES CONTROL]
-# OR= C0103,C0111,W0511
+
+# Disable the message, report, category or checker with the given id(s). You
+# can either give multiple identifiers separated by comma (,) or put this
+# option multiple times (only on the command line, not in the configuration
+# file where it should appear only once). You can also use "--disable=all" to
+# disable everything first and then re-enable specific checks. For example, if
+# you want to run only the similarities checker, you can use "--disable=all
+# --enable=similarities". If you want to run only the classes checker, but have
+# no Warning level messages displayed, use "--disable=all --enable=classes
+# --disable=W".
+# disable=raw-checker-failed,
+#         bad-inline-option,
+#         locally-disabled,
+#         file-ignored,
+#         suppressed-message,
+#         useless-suppression,
+#         deprecated-pragma,
+#         use-implicit-booleaness-not-comparison-to-string,
+#         use-implicit-booleaness-not-comparison-to-zero,
+#         use-symbolic-message-instead
+# @me OR= C0103,C0111,W0511
 disable=consider-using-f-string,
         missing-module-docstring,
         missing-class-docstring,
@@ -25,36 +114,34 @@ disable=consider-using-f-string,
         too-few-public-methods,
         invalid-name,
         broad-exception-caught,
-        # wrong-spelling-in-comment
+#       wrong-spelling-in-comment
 
-
-[FORMAT]
-
-expected-line-ending-format=LF
-
-# Regexp for a line that is allowed to be longer than the limit.
-# SEE: https://github.com/PyCQA/pylint/issues/2178
-ignore-long-lines = ^\s*(#.*\s+)?https?://\S+$
-
-# NOTE: "!black" needs 88, but we want to allow long comments
-max-line-length = 112
-
-## USE: inof C0103
-# good-names=i,j,k,ex,Run,_,pk,x,y
-# good-names-rgxs = ^[_a-z][_a-z0-9]?$
-good-names-rgxs = ^[a-z][a-z0-9]?$
+# Enable the message, report, category or checker with the given id(s). You can
+# either give multiple identifier separated by comma (,) or put this option
+# multiple time (only on the command line, not in the configuration file where
+# it should appear only once). See also the "--disable" option for examples.
+enable=
 
 
 [MISCELLANEOUS]
+
+# List of note tags to take in consideration, separated by a comma.
 ## USE: inof W0511
-# NOTE: enable only during clean-up, LSP being very intrusive and distracting
+# @me NOTE: enable only during clean-up, LSP being very intrusive and distracting
 # notes=FIX,BAD,TODO
 # notes=WTF:,BUG:,REGR:,FAIL:,ERR:,FIXME:,CHECK:,&next,[_]
 notes = [_],[!]
 
+# Regular expression of note tags to take in consideration.
+notes-rgx=
 
-# [SPELLING]
-# SRC: https://stackoverflow.com/questions/27162315/automated-docstring-and-comments-spell-check
+
+[SPELLING]
+
+# Spelling dictionary name. No available dictionaries : You need to install
+# both the python package and the system dependency for enchant to work.
+spelling-dict=
+# @me SRC: https://stackoverflow.com/questions/27162315/automated-docstring-and-comments-spell-check
 # DEP: 'python-pyenchant'
 # spelling-dict = en_US
 
@@ -70,9 +157,3 @@ notes = [_],[!]
 
 # OLD: generated-members = '(unyt|U)\..+'
 # ignored-modules = unyt
-
-
-[DESIGN]
-
-# Maximum number of arguments for function / method.
-# max-args=6
