@@ -1,22 +1,19 @@
-from typing import TYPE_CHECKING, override
+from typing import override
 
-from .base.golden import Entities, Entity
+from .base.golden import Entities, Golden
 from .fsentry import FSDir
-
-if TYPE_CHECKING:
-    from ...ui.view import EntityView
 
 
 # RENAME?~ {Root,Central,Menu}Entry
 #   BET? rename all top-lvl providers to `*Node ex~: 'FSEntry("/")' -> "FSNode"
-class RootNode(Entity):
-    def __init__(self, pview: "EntityView") -> None:
+class RootNode(Golden[str]):
+    def __init__(self) -> None:
         # NICE: makes distinct prefix before adding "/" of "file:"
         # BAD: takes premium space ALT:USE: 'name=""'
         # IDEA: show this name-prefix only when navigating to `RootNode,
         #   orse hide it and start from chosen protocol onwards
         # BET:CHG:(pview)=self=_pool[RootNode] -> EntityView
-        super().__init__("miur://", pview)
+        super().__init__("miur://", self)
 
     @override
     @property
@@ -27,6 +24,4 @@ class RootNode(Entity):
     def explore(self) -> Entities:
         # OR: do we really need "file://" ?
         #   isn't it prolifiration from "http://" ? -- which is wrong and should had been "http:"
-        # [_] FIXME! here pview=Action(lambda: explore())
-        #   => USE:CASE: able to jump to unrelated node, press <Back> and get to actions which produced it
-        return [FSDir("/", pview=self._pv)]  # , nm="file:"
+        return [FSDir("/", self)]  # , nm="file:"

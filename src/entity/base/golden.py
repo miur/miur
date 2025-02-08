@@ -3,8 +3,8 @@ from typing import TYPE_CHECKING, Any, Iterable, Protocol, override
 
 from .autodiscover import AutoRegistered
 
-if TYPE_CHECKING:
-    from ...ui.view import EntityView
+type Entity = "Golden[Any]"
+type Entities = Iterable[Entity]
 
 
 # RENAME? Indivisible AtomicError HaltExploration Leaf SolidBox
@@ -29,13 +29,13 @@ class Accessor(Protocol):
 # RENAME? `Entity `Node `Discoverable
 # ALT:(Protocol):NEED:BAD:PERF:(@runtime_checkable):COS:TEMP: to focus_on(match-case Golden())
 class Golden[T](AutoRegistered):
-    # __slots__ = ()
+    __slots__ = ()
 
     # ERR:(pylint=3.3.1):TRY: upgrade?
     # pylint:disable=undefined-variable
-    def __init__(self, x: T, pview: "EntityView") -> None:
+    def __init__(self, x: T, parent: Entity, /) -> None:
         self._x = x
-        self._pv = pview
+        self._parent = parent
 
     # NICE: as we have a separate .name field, we can *dynamically* augment regular filenames
     # ex~:
@@ -50,29 +50,36 @@ class Golden[T](AutoRegistered):
         # FUT:PERF:CMP: use @cached_property vs @property+@lru_cache(1) vs .update(self._name) method
         return str(self._x)
 
-    def explore(self) -> "Entities":
+    def explore(self) -> Entities:
         # NOTE: it's reasonable to raise inof using @abc.abstractmethod
         #   * rarely we may have atomic leafs, but for most it's "NOT YET IMPLEMENTED"
         #   * we will use try-catch around .explore() anyway -- to catch errors
         raise NotImplementedError("TBD: not yet implemented")
 
-    # BET? directly point to `Entity which introspected it or `Action which produced it
-    #   => and then you can access cached _vlst and _wdg only through _pool
+    # NOTE: directly point to `Entity which introspected it or `Action which produced it
+    #   => and then you can access cached EntityView._vlst and _wdg only through _pool
     #   i.e. individual `Entity will lose the ability to directly access associated _wdg
-    #     BUT: we won't need to eventually use "weak_ref" here to release pool memory
+    #     BUT: we won't need to eventually use "weak_ref" for _pv to release pool memory
+    #  ALT: MAYBE: make tight coupling bw `EntityView -> `Entity(pview=self)
+    #    i.e. immeditely make it exist for each item like {EntityView(): RootNode(self)}
+    # WARN! here parent=Action(lambda: explore()) inof prev `Entity
+    #   => USE:CASE: able to jump to unrelated node, press <Back> and get to actions which produced it
+    #   [_] FAIL: we can't link `Entity to its `Action, so we lose "actions" in `Loci URL
+    #     orse we would need: Action.explore() { Entity.explore(parent=self) }
     @property
-    def pv(self) -> "EntityView":
-        return self._pv
+    def parent(self) -> Entity:
+        # assert self._parent != self
+        return self._parent
 
     # REMOVE? -> construct `Loci on demand through external means
     @cached_property
     def loci(self) -> str:
+        assert self._parent != self
         # BAD:PERF: recursive
-        parent = "" if self._pv is None else self._pv._ent.loci
         # FAIL:TEMP: "self.name" -> "self._x.selector_for_interpreter"
-        return parent + "/" + self.name
+        return self._parent.loci + "/" + self.name
 
-    def __lt__(self, other: "Golden[Any]") -> bool:
+    def __lt__(self, other: Entity) -> bool:
         return self.name < other.name
 
     @override
@@ -85,10 +92,6 @@ class Golden[T](AutoRegistered):
         return f"{type(self).__name__}({loci})"
 
 
-Entity = Golden[Any]
-type Entities = Iterable[Golden[Any]]
-
-
 ## FIXED:ERR: `FSEntry [too-many-ancestors] Too many ancestors (8/7)
 # REF: Is there a way to tell mypy to check a class implements a Protocol without inheriting from it? ⌇⡧⢟⠦⡴
 #   https://github.com/python/mypy/issues/8235
@@ -96,4 +99,4 @@ if TYPE_CHECKING:  # WARN: we rely on !mypy to verify this (inof runtime checks)
     from . import traits as TR
 
     # OR:(check for instantiation): _: Standart = Golden()
-    _: type[TR.Standart] = Golden
+    _: type[TR.Standart] = Golden[Any]

@@ -1,14 +1,11 @@
 import os
 import os.path as fs
 from functools import lru_cache
-from typing import TYPE_CHECKING, Any, Iterable, override
+from typing import Iterable, override
 
 # from ..util.logger import log
-from .base.golden import Accessor, Entities, Golden
+from .base.golden import Accessor, Entities, Entity, Golden
 from .text import TextEntry
-
-if TYPE_CHECKING:
-    from ...ui.view import EntityView
 
 
 class FSAccessor(Accessor):
@@ -32,10 +29,10 @@ class FSEntry(Golden[FSAccessor]):
     __slots__ = ()
 
     # def __init__(self, path: str, nm: bool | str = True, alt: bool = False) -> None:
-    def __init__(self, path: str, pview: "EntityView") -> None:
+    def __init__(self, path: str, parent: Entity) -> None:
         # self._alt = alt
         # _nm = fs.basename(path) if nm is True else path if nm is False else nm
-        super().__init__(FSAccessor(path), pview)
+        super().__init__(FSAccessor(path), parent)
 
     # @override
     # @property
@@ -57,7 +54,7 @@ class FSEntry(Golden[FSAccessor]):
             yield path[:k]
 
 
-def FSAuto(x: os.DirEntry[str] | str, pview: "EntityView") -> FSEntry:
+def FSAuto(x: os.DirEntry[str] | str, parent: Entity) -> FSEntry:
     cls: type[FSEntry]
     if isinstance(x, os.DirEntry):
         if x.is_symlink():
@@ -68,7 +65,7 @@ def FSAuto(x: os.DirEntry[str] | str, pview: "EntityView") -> FSEntry:
             cls = FSFile
         else:
             cls = FSEntry
-        return cls(x.path, pview=pview)
+        return cls(x.path, parent)
 
     if isinstance(x, str):
         if fs.islink(x):
@@ -79,7 +76,7 @@ def FSAuto(x: os.DirEntry[str] | str, pview: "EntityView") -> FSEntry:
             cls = FSFile
         else:
             cls = FSEntry
-        return cls(x, pview=pview)
+        return cls(x, parent)
 
     return NotImplementedError(x)
 
@@ -91,7 +88,7 @@ class FSDir(FSEntry):
         assert fs.isdir(h) and not fs.islink(h)  # MOVE: to ctor()
         with os.scandir(h) as it:
             for e in it:
-                yield FSAuto(e, pview=self._pv)
+                yield FSAuto(e, self)
 
 
 # ALT? replace by [FSDir|FSFile](..., link=True)
@@ -118,7 +115,7 @@ class FSLink(FSEntry):
         assert fs.islink(h)
         cls = FSDir if fs.isdir(h) else FSFile if fs.isfile(h) else FSEntry
         return [
-            cls(fs.realpath(h), pview=self._pv),
+            cls(fs.realpath(h), self),
             TextEntry(self.readlink()),
             # cls(p, nm=False, alt=True),
             # cls(os.readlink(p), nm=False),

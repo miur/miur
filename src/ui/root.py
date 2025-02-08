@@ -1,7 +1,8 @@
 import _curses as C
 
+from ..entity.base import Entity
+
 # from ..util.logger import log
-from ..entity.base import Golden
 from .colorscheme import g_style as S
 from .navi import NaviWidget
 
@@ -11,10 +12,10 @@ class RootWidget:
     _ww: int
 
     # USE? {RootWidget(HaltEntry("NOTHING"))} for a "default" ctor
-    def __init__(self, ent: Golden) -> None:
+    def __init__(self, ent: Entity) -> None:
         self.set_entity(ent)
 
-    def set_entity(self, ent: Golden) -> None:
+    def set_entity(self, ent: Entity) -> None:
         # FUT: may create different widgets based on `Entity and `Policy
         self._navi = NaviWidget(ent)
 

@@ -31,7 +31,7 @@ class Locatable(Protocol):
     # RENAME? .pv=[parent|prev]view .parent .orig[inator] .back .up .off .prod[ucer]
     # NOTE: we use short ".pv" for more succint usage in code (orse use ".originator")
     @property
-    def pv(self) -> "EntityView": ...
+    def parent(self) -> "Entity": ...
 
 
 ## ARCH:

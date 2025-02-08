@@ -1,21 +1,18 @@
 from typing import TYPE_CHECKING, override
 
-from .base.golden import Entities, Golden, StopExploration
+from .base.golden import Entities, Entity, Golden, StopExploration
 from .text import TextEntry
-
-if TYPE_CHECKING:
-    from ...ui.view import EntityView
 
 
 # class ErrorEntry(HaltEntry(Atomic))
 class ErrorEntry(Golden[str]):
     # def __init__(self, msg: str, loci: tuple[str, ...] | None = None) -> None:
     def __init__(
-        self, pview: "EntityView", name: str | None = None, exc: Exception | None = None
+        self, parent: Entity, name: str | None = None, exc: Exception | None = None
     ) -> None:
         nm = name if name else str(exc) if exc else "ERROR"
         self._exc = exc
-        super().__init__(nm, pview)
+        super().__init__(nm, parent)
         # self._orig = loci
 
     # @override
@@ -38,4 +35,4 @@ class ErrorEntry(Golden[str]):
 
         from traceback import format_exception
 
-        return [TextEntry(x) for x in format_exception(self._exc, chain=True)]
+        return [TextEntry(x, self) for x in format_exception(self._exc, chain=True)]

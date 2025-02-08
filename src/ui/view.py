@@ -21,23 +21,23 @@ from .vlst import SatelliteViewport
 #     from just.ext.print import cvt_one
 # except ImportError:  # ModuleNotFoundError
 #     cvt_one = repr
-def cvt_to_ents(x: Any, pview: "EntityView", lvl: str = "") -> Entities:
+def cvt_to_ents(x: Any, parent: Entity, lvl: str = "") -> Entities:
     if x is None:
         # MAYBE: test if {fun.type_annotations == "-> None"} and don't print anything
-        yield ErrorEntry(pview=pview, name="None ∅")
+        yield ErrorEntry(parent, name="None ∅")
     elif isinstance(x, dict):  # FIXME: or Mapping
         lvl += " "
         for i, k in enumerate(sorted(x), start=1):
-            for v in cvt_to_ents(x[k], pview, lvl):
-                yield TextEntry(f"{lvl}{num_up(i):>2s} {k}: {v}")
+            for v in cvt_to_ents(x[k], parent, lvl):
+                yield TextEntry(f"{lvl}{num_up(i):>2s} {k}: {v}", parent)
     elif isinstance(x, tuple):
         for a in x:
-            for v in cvt_to_ents(a, pview, lvl):
-                yield TextEntry(f" ⸱\t{v}", pview)
+            for v in cvt_to_ents(a, parent, lvl):
+                yield TextEntry(f" ⸱\t{v}", parent)
     elif isinstance(x, (str, int)):
-        yield TextEntry(str(x), pview)
+        yield TextEntry(str(x), parent)
     elif isinstance(x, float):
-        yield TextEntry(f"{x:.6f}", pview)
+        yield TextEntry(f"{x:.6f}", parent)
     # if isinstance(x, Path):
     #     return repr(str(x))
     # if isinstance(x, (DT, TM, DD)):
@@ -49,12 +49,12 @@ def cvt_to_ents(x: Any, pview: "EntityView", lvl: str = "") -> Entities:
             it = iter(x)
         except TypeError:
             for ms, mf in inspect.getmembers(x):
-                yield TextEntry(f"{lvl}{ms}: {mf}", pview)
+                yield TextEntry(f"{lvl}{ms}: {mf}", parent)
         else:
             lvl += " "
             for i, a in enumerate(it, start=1):
-                for v in cvt_to_ents(a, pview, lvl):
-                    yield TextEntry(f"{lvl}{num_lo(i):>2s} {v}", pview)
+                for v in cvt_to_ents(a, parent, lvl):
+                    yield TextEntry(f"{lvl}{num_lo(i):>2s} {v}", parent)
 
 
 # ALT:SPLIT: make an `EntityContext for serialization/restoration on restart
@@ -115,12 +115,15 @@ class EntityView:
                 if r in (Entity, Golden[Any]):
                     return lambda: [v()]
                 # ALT? return ErrorEntry, meaning "you need to generalize your API"
-                return lambda: cvt_to_ents(v(), pview=self)
+                return lambda: cvt_to_ents(v(), parent=self._ent)
 
+            # ALT:XP~: directly produce this list by Golden.explore(), accessed only as:
+            #   Action.explore(): super(self, Golden).explore() to introspect itself
+            #   [_] ALT:BET? per-Entity introspection :DEV: .actions() -> Actions
             lst = [
                 # IDEA: rename {.explore==.default} to show only "L" as 1st `Action in list
                 Action(
-                    name=f".{k}()", pview=self, sfn=wrapent(v)
+                    name=f".{k}()", parent=self._ent, sfn=wrapent(v)
                 )  # OR=f"{k.capitalize()}:"
                 for k, v in methods
                 ## WARN: we also may need to exclude methods which aren't applicable to particular file
@@ -139,9 +142,9 @@ class EntityView:
         #   &why to hi-RED files which had disappeared during listing e.g. short-lived prs in /proc/*
         #   &why to show at least partially loaded file from e.g. network
         except StopExploration:
-            self._orig_lst = [ErrorEntry(pview=self, name="Atomic(N/A)")]
+            self._orig_lst = [ErrorEntry(self._ent, name="Atomic(N/A)")]
         except Exception as exc:
-            self._orig_lst = [ErrorEntry(pview=self, exc=exc)]
+            self._orig_lst = [ErrorEntry(self._ent, exc=exc)]
             # raise  # <DEBUG
 
         self._transform()
@@ -158,8 +161,8 @@ class EntityView:
 
     def _apply_default_policy(self) -> None:
         # pylint:disable=protected-access
-        if (pv := self._ent.pv) and isinstance(pv._ent, FSDir):
-            p = pv._ent._x.handle
+        if isinstance((pent := self._ent.parent), FSDir):
+            p = pent._x.handle
             if os.access(p, os.R_OK):
                 os.chdir(p)
             # if not fs.islink(p) or self._ent._alt is True:

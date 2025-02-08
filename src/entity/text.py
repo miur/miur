@@ -1,17 +1,14 @@
-from typing import TYPE_CHECKING, override
+from typing import override
 
-from .base.golden import Entities, Golden, StopExploration
-
-if TYPE_CHECKING:
-    from ...ui.view import EntityView
+from .base.golden import Entities, Entity, Golden, StopExploration
 
 
 class TextEntry(Golden[str]):
     __slots__ = ()  # "name", "loci", "explore")
 
     # def __init__(self, text: str, loci: tuple[str, ...] | None = None) -> None:
-    def __init__(self, text: str, pview: "EntityView" = None) -> None:
-        super().__init__(text, pview)
+    def __init__(self, text: str, parent: Entity) -> None:
+        super().__init__(text, parent)
         # self._at = loci  # = (path,lnum,[col,[boff,...]])
 
     # @override

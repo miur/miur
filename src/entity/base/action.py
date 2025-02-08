@@ -1,9 +1,6 @@
-from typing import TYPE_CHECKING, Callable, override
+from typing import Callable, override
 
-from .golden import Entities, Golden
-
-if TYPE_CHECKING:
-    from ...ui.view import EntityView
+from .golden import Entities, Entity, Golden
 
 
 # ENH? inherit variety of `*Action and apply different color to each
@@ -16,10 +13,10 @@ class Action(Golden[str]):
     def __init__(
         self,
         name: str,
-        pview: "EntityView",
+        parent: Entity,
         sfn: Callable[[], Entities],
     ) -> None:
-        super().__init__(name, pview)
+        super().__init__(name, parent)
         self._sfn = sfn
 
     # TEMP:FIXED:ERR: Cannot instantiate abstract class "Action" with abstract attribute "loci"

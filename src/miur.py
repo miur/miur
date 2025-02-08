@@ -74,19 +74,20 @@ def miur_main(g: AppGlobals) -> None:
         if xpath is None:
             import os
 
-            ent = FSAuto(os.getenv("PWD", "") or os.getcwd(), pview=None)
+            # [_] FIXME: should generate whole chain of entities starting from RootNode
+            #   BAD: they should be cached in _vlst, and we should get the same node when _vlst is re-generated
+            ent = FSAuto(os.getenv("PWD", "") or os.getcwd(), None)
         elif xpath == "":
-            # MAYBE: make tight coupling bw `EntityView -> `Entity(pview=self)
-            #   i.e. immeditely make it exist for each item
-            ent = RootNode(pview=None)
+            ent = RootNode()
         else:
-            ent = FSAuto(xpath, pview=None)
+            ent = FSAuto(xpath, None)
         log.state(xpath)
         g.root_wdg = RootWidget(ent)
         # g.root_wdg.set_entity(FSEntry("/etc/udev"))
 
         # TEMP:HACK: directly append stdin to current node
         if f := g.io.pipein:
+            v = g.root_wdg._navi._view
             cls = g.opts.stdinfmt or FSAuto
             lst = []
             i = 1
@@ -97,11 +98,10 @@ def miur_main(g: AppGlobals) -> None:
                 # RND:(xpath): use "cwd" as .loci for euphemeral entries
                 # FIXME: put into independent linked node, inof extending baselist
                 lst.append(
-                    cls(line.removesuffix("\n"), pview=None)
+                    cls(line.removesuffix("\n"), parent=v._ent)
                 )  # , loci=(xpath, f":{i}")))
                 i += 1
                 cpoff += len(line)
-            v = g.root_wdg._navi._view
             v._wdg.assign(v._xfm_lst + lst)
 
         turl = g.opts.remember_url
