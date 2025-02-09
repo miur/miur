@@ -1,4 +1,6 @@
+import atexit
 from functools import cache
+from multiprocessing import Process
 from types import ModuleType
 from typing import Optional
 
@@ -24,6 +26,47 @@ def _dir() -> str:
 def _loci() -> str:
     # pylint:disable=protected-access
     return g_app.root_wdg._navi._view._wdg.focused_item._ent.loci
+
+
+# WARN: don't use Thread as GUI thread should be never destroyed! (even after app.quit())
+g_render: dict[str, Process] = {}
+
+
+def spawn_render(nm: str) -> None:
+    log.info(nm)
+    if nm in g_render:
+        if g_render[nm].is_alive():
+            log.warning(f"render={nm} is already running! ignored")
+            return
+        # log.error(f"Err: render={nm} GUI thread should be never destroyed!")
+        # return
+        atexit.unregister(g_render[nm].join)
+        g_render[nm].join()
+
+    def _gui_fork() -> None:
+        # TEMP:HACK: exit running miur copy
+        # OR: import asyncio; asyncio.get_running_loop().close()
+        g_app.doexit()
+
+        # NOTE: import render in new process/thread
+        #   COS Qt registers MainThread on import
+        mod = M(".ui.render." + nm)
+        log.warning(f"forked={mod.__file__}")
+        mod.main()
+
+        # [_] FAIL: no exception from here when "sys" wasn't imported
+        #   FIND: how to process errors from multiprocessing
+        # sys.exit(M(".ui.render." + nm).main())
+
+        ## MAYBE: clean start with same .py interpreter/flags
+        # cmd = [.util.devenv.get_py_args()[0], mod.__file__]
+        # os.execv(cmd[0], cmd)
+
+    # [_] BUG: when closing QApp, it spawns AGAIN due to asyncio/etc.
+    g_render[nm] = Process(target=_gui_fork)
+    # g_render[nm].daemon = True
+    g_render[nm].start()
+    atexit.register(g_render[nm].join)
 
 
 # ALT:BET: allow direct access to contained _objects methods ?
@@ -88,9 +131,20 @@ _modal_comma: KeyTable = {
     "m": lambda g: M(".integ.shell").shell_out(_loci()),
 }
 
+_modal_spawn: KeyTable = {
+    "f": lambda g: spawn_render("glfw_imgui"),
+    "g": lambda g: spawn_render("qt6gl"),
+    "m": lambda g: spawn_render("qt6qml"),
+    "s": lambda g: spawn_render("sdl3gl_imgui"),
+    "w": lambda g: spawn_render("qt6wg"),
+}
+
 g_modal_default: KeyTable = _modal_generic | {
     "y": _modal_yank,
     ",": _modal_comma,
+    # BUG: some CTRL-keys are printed as hex i.e. '\x14' inof '^T'
+    # "^T": _modal_spawn,
+    "^O": _modal_spawn,
 }
 
 

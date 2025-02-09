@@ -1,2 +1,10 @@
 pygments
 ranger-fm
+pysdl3
+imgui-bundle
+glfw
+# moderngl
+# moderngl-window
+pyqt6
+# qtinter
+# mpv

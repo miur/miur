@@ -1,0 +1,2 @@
+MAYBE: move to top-level :/clients/*/*Widget.py,
+  keeping in :/src only headless daemon backend

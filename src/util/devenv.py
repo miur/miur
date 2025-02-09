@@ -50,7 +50,10 @@ def install_venv_deps(devroot: str | None = None, dev: bool = False) -> None:
     ## DISABLED:BAD: changes "hash" in reqs_all.txt after each install()
     # vpip("install", "--editable", devroot)
 
-    ##%ONELINE: pip freeze > requirements_all.txt
+    ##%ONELINE: pip freeze > requirements_frozen.txt
+    # %USAGE:(cleanup after experimental deps):
+    # %  $ ./.venv/bin/python -m pip uninstall -y -r =(./.venv/bin/python -m pip freeze | grep -vxFf ./pkg/requirements_frozen.txt)
+    # %ALSO:(kill unnecessary instances of tools): $ pkill -f pylint
     with open(reqpfx + "_frozen.txt", "w", encoding="utf-8") as f:
         f.write(vpip("freeze", output=True))
 
