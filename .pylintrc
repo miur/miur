@@ -10,7 +10,7 @@
 extension-pkg-allow-list=
 
 # Files or directories to be skipped. They should be base names, not paths.
-ignore=CVS,t,alt,doc,&,#,pkg,_try,.git,.reuse,.venv
+ignore=t,alt,doc,&,#,pkg,_try,.git,.reuse,.venv
 
 # Add files or directories matching the regular expressions patterns to the
 # ignore-list. The regex matches against paths and can be in Posix or Windows
@@ -30,14 +30,15 @@ ignore-patterns=^[_#&].*
 # Python code to execute, usually for sys.path manipulation such as
 # pygtk.require().
 # @me SRC: https://jdhao.github.io/2023/07/22/neovim-pylsp-setup/#make-pylsp-work-inside-a-virtual-env
-init-hook ="""
-try:
-  import pylint_venv
-except ImportError:
-  pass
-else:
-  pylint_venv.inithook()
-"""
+## DISABLED:FAIL: crashes "pylsp/plugins/pylint_lint.py"
+# init-hook ="""
+# try:
+#   import pylint_venv
+# except ImportError:
+#   pass
+# else:
+#   pylint_venv.inithook()
+# """
 
 # Use multiple processes to speed up Pylint. Specifying 0 will auto-detect the
 # number of processors available to use, and will cap the count on Windows to

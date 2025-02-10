@@ -121,9 +121,9 @@ class HistoryCursor:
     # BET?RENAME?(jump_to): restore_or_load(ent)
     # RENAME?(:intermediates): {remember,cache,traverse}_parents
     def jump_to(self, nent: Golden, intermediates: bool = False) -> None:
-        if isinstance(nent, ErrorEntry):
-            log.trace(nent.name)
-            return  # FUT: make errors also :Explorable
+        # if isinstance(nent, ErrorEntry):
+        #     log.trace(nent.name)
+        #     return  # FUT: make errors also :Explorable
 
         # pylint:disable=protected-access
         # if self.focused_view._ent == nent:

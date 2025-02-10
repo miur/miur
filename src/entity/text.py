@@ -24,6 +24,8 @@ class TextEntry(Golden[str]):
         words = [
             cls(
                 m.group(0),
+                # BAD: it should an action based on .explore
+                parent=self,
                 # loci=(
                 #     (
                 #         ## DISABLED: interferes with !nvim jumping to line under cursor

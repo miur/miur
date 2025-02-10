@@ -66,6 +66,7 @@ def init_colorscheme(stdscr: C.window) -> None:
     S.fsdir = termcolor2(33, -1)  # 4=BLUE
     S.fslink = termcolor2(37, -1)  # 6=CYAN
     S.fsexe = termcolor2(64, -1)  # 2=GREN
+    S.fsmnt = termcolor2(63, -1)  # 5=PURP/PINK
     S.action = termcolor2(29, -1)  # 2=GREN
 
     # pvis = C.curs_set(visibility=0)

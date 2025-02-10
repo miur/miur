@@ -43,6 +43,18 @@ class FSEntry(Golden[FSAccessor]):
     def explore(self) -> Entities:
         raise NotImplementedError(f"TBD: `{self.__class__.__name__}")
 
+    def open_by(self) -> Entities:
+        from ..integ.any_exe import run_bg_wait
+        from .objaction import ObjAction
+
+        return [
+            ObjAction(
+                name="xdg",
+                parent=self,
+                fn=lambda: run_bg_wait(["xdg-open", self._x.handle]),
+            )
+        ]
+
     ## FAIL: `Entry.parent() is not generalizable ※⡧⢃⠬⢖
     def parents_loci(self) -> Iterable[str]:
         assert fs.isabs(self._x.handle)
@@ -52,6 +64,12 @@ class FSEntry(Golden[FSAccessor]):
         k = 0
         while (k := path.find(fs.sep, k + 1)) > 0:
             yield path[:k]
+
+    def stat(self) -> Iterable[str]:
+        h = self._x.handle
+        st = os.lstat(h)
+        # TODO: time.strftime(format, unixts) if nm.endswith("time")
+        return [f"{nm}: {getattr(st, nm)}" for nm in dir(st) if nm.startswith("st_")]
 
 
 def FSAuto(x: os.DirEntry[str] | str, parent: Entity) -> FSEntry:
@@ -116,7 +134,7 @@ class FSLink(FSEntry):
         cls = FSDir if fs.isdir(h) else FSFile if fs.isfile(h) else FSEntry
         return [
             cls(fs.realpath(h), self),
-            TextEntry(self.readlink()),
+            TextEntry(self.readlink(), self),
             # cls(p, nm=False, alt=True),
             # cls(os.readlink(p), nm=False),
             # cls(fs.realpath(p), nm=False),
@@ -125,6 +143,12 @@ class FSLink(FSEntry):
 
     def readlink(self) -> str:
         return os.readlink(self._x.handle)
+
+    def realpath(self) -> str:
+        return fs.realpath(self._x.handle)
+
+    def relpath(self) -> str:
+        return fs.relpath(self._x.handle)
 
 
 class FSFile(FSEntry):

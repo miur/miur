@@ -9,3 +9,4 @@ pyqt6
 # qtinter
 # mpv
 pyqtgraph
+python-mpd2

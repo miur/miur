@@ -68,7 +68,7 @@ def select_entrypoint(devroot: str):  # type:ignore[no-untyped-def]
         # MAYBE: make a frontend to miur (like "fleur/ctl" did)
         #   >> move all dev-helpers there and access miur only through it
         #   &why keep only essential features in primary codebase
-        ensure_venv(devroot)
+        ensure_venv(devroot, dev=devroot == "/d/miur")
 
     # PERF: faster startup w/o importing ArgumentParser (128ms vs 115ms)
     if len(argv) == 1 or (len(argv) > 1 and argv[1] == "--"):

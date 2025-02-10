@@ -35,6 +35,8 @@ def resolve_colorscheme(ent: Golden) -> Any:
         case FSDir():
             if not fs.exists(ent._x.handle):
                 return S.error
+            if fs.ismount(ent._x.handle):
+                return S.fsmnt
             return S.fsdir
         case FSFile():
             path = ent._x.handle

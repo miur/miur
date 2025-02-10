@@ -1,7 +1,7 @@
+import os
 from typing import override
 
 from .base.golden import Entities, Golden
-from .fsentry import FSDir
 
 
 # RENAME?~ {Root,Central,Menu}Entry
@@ -22,6 +22,20 @@ class RootNode(Golden[str]):
 
     @override
     def explore(self) -> Entities:
+        from ..app import g_app
+        from .fsentry import FSDir
+        from .mpdnode import MPDProto
+        from .objaction import ObjAction
+        from .psnode import PSProto
+
         # OR: do we really need "file://" ?
         #   isn't it prolifiration from "http://" ? -- which is wrong and should had been "http:"
-        return [FSDir("/", self)]  # , nm="file:"
+        # ALT: nm="file:"
+        return [
+            FSDir("/", self),
+            ObjAction(name="@env", parent=self, fn=lambda: os.environ),
+            ObjAction(name="@g_app", parent=self, fn=lambda: vars(g_app)),
+            ObjAction(name="@keybindings", parent=self, fn=lambda: g_app.keytableroot),
+            MPDProto("&mpd", self),
+            PSProto("&ps", self),
+        ]

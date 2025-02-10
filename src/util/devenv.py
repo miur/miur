@@ -37,10 +37,10 @@ def install_venv_deps(devroot: str | None = None, dev: bool = False) -> None:
     reqs = [(reqpfx + sfx + ".txt") for sfx in ("", "_dev")]
 
     # EXPL: don't upgrade .venv if all requirements.txt haven't changed
-    if not dev and fs.exists(venvstamp):
+    if fs.exists(venvstamp):
         last = os.stat(venvstamp).st_mtime
         if os.stat(reqs[0]).st_mtime < last:
-            if not dev or os.stat(reqs[1]).st_mtime < last:
+            if os.stat(reqs[1]).st_mtime < last:  # if not dev or ...
                 return
 
     vpip("install", "--upgrade", "pip")
@@ -73,7 +73,7 @@ def get_py_args(appargs: bool = True) -> list[str]:
     return [argv[i] for i in range(num)]
 
 
-def ensure_venv(devroot: str) -> None:
+def ensure_venv(devroot: str, dev: bool = False) -> None:
     if sys.prefix == sys.base_prefix:
         import venv
 
@@ -106,4 +106,4 @@ def ensure_venv(devroot: str) -> None:
 
         os.execv(cmd[0], cmd)
     else:
-        install_venv_deps(devroot, dev=False)
+        install_venv_deps(devroot, dev=dev)

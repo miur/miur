@@ -8,7 +8,7 @@ from .text import TextEntry
 class ErrorEntry(Golden[str]):
     # def __init__(self, msg: str, loci: tuple[str, ...] | None = None) -> None:
     def __init__(
-        self, parent: Entity, name: str | None = None, exc: Exception | None = None
+        self, *, parent: Entity, name: str | None = None, exc: Exception | None = None
     ) -> None:
         nm = name if name else str(exc) if exc else "ERROR"
         self._exc = exc
@@ -35,4 +35,7 @@ class ErrorEntry(Golden[str]):
 
         from traceback import format_exception
 
-        return [TextEntry(x, self) for x in format_exception(self._exc, chain=True)]
+        return [
+            TextEntry(l.rstrip("\n"), self)
+            for l in format_exception(self._exc, chain=True)
+        ]
