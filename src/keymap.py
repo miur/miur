@@ -135,6 +135,7 @@ _modal_spawn: KeyTable = {
     "f": lambda g: spawn_render("glfw_imgui"),
     "g": lambda g: spawn_render("qt6gl"),
     "m": lambda g: spawn_render("qt6qml"),
+    "n": lambda g: spawn_render("pyqtgr_numpy"),
     "s": lambda g: spawn_render("sdl3gl_imgui"),
     "w": lambda g: spawn_render("qt6wg"),
 }

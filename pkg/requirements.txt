@@ -8,3 +8,4 @@ glfw
 pyqt6
 # qtinter
 # mpv
+pyqtgraph

@@ -76,8 +76,9 @@ class SatelliteViewport_RedrawMixin:
             # CHG? return actually drawn height from item.render_curses()
             #   BET: pre-render into markup structure, which can be either drawn or evaluated
             h_item = self._fih(i)
-            if i == ci:
-                log.warning(h_item)
+            ## DEBUG:
+            # if i == ci:
+            #     log.warning(h_item)
 
             # SEE:ARCH: !urwid for inspiration on `Rect and `TextBox
             rect = Rect(
