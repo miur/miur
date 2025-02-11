@@ -1,6 +1,6 @@
 from typing import Iterator, override
 
-from ..entity.base import Golden
+from ..entity.base import Entity
 from ..entity.error import ErrorEntry
 from ..entity.fsentry import FSEntry
 from ..util.logger import log
@@ -10,16 +10,16 @@ from .vlst import SatelliteViewport
 
 class EntityViewCachePool:
     def __init__(self) -> None:
-        self._d: dict[Golden, EntityView] = {}
+        self._d: dict[Entity, EntityView] = {}
 
     def __iter__(self) -> Iterator[EntityView]:
         return iter(self._d.values())
 
-    def get(self, ent: Golden) -> EntityView | None:
+    def get(self, ent: Entity) -> EntityView | None:
         return self._d.get(ent, None)
 
     # TODO: discard by frecency when we try to allocate more
-    def add(self, ent: Golden) -> EntityView:
+    def add(self, ent: Entity) -> EntityView:
         # MAYBE:BET? reuse existing _wdg (from outside `*Layout) inof creating it per each entity
         #   OR:(vice versa): pass whole _view to any existing _wdg to display _lst
         view = EntityView(ent, wdgfactory=lambda: SatelliteViewport(self))
@@ -40,7 +40,7 @@ class EntityViewCachePool:
 # SEP? "load_all_parents_until" vs "history_switch_focus/trim"
 # RENAME? {Navi,Loci}HistoryCursor
 class HistoryCursor:
-    def __init__(self, rootent: Golden, pool: EntityViewCachePool) -> None:
+    def __init__(self, rootent: Entity, pool: EntityViewCachePool) -> None:
         ## NOTE: history is always prepopulated by known state (at least a RootNode)
         #   MAYBE: make RootNode into singleton ?
         #     ~~ BUT: I may need different "wf-restricted/focused" alt-views for RootNode
@@ -82,7 +82,7 @@ class HistoryCursor:
         self.focused_view._visited = True
 
     # BAD:ARCH:(part of distributed FSM): hard to track index permutations
-    def _advance_or_retrieve_or_emplace(self, nent: Golden) -> int:
+    def _advance_or_retrieve_or_emplace(self, nent: Entity) -> int:
         # log.trace(f"{nent.loci=} | {self.pos}")  # <DEBUG
         log.info(f"{id(nent):x} {nent}")  # <DEBUG
         # NOTE: don't discard hist Entry on .go_back() to be able to return and see same EntityView
@@ -120,10 +120,10 @@ class HistoryCursor:
     #   BAD!※⡧⢄⠋⡎ "jump_to(unrelated path)" is discarded from history after back-n-forth
     # BET?RENAME?(jump_to): restore_or_load(ent)
     # RENAME?(:intermediates): {remember,cache,traverse}_parents
-    def jump_to(self, nent: Golden, intermediates: bool = False) -> None:
-        # if isinstance(nent, ErrorEntry):
-        #     log.trace(nent.name)
-        #     return  # FUT: make errors also :Explorable
+    def jump_to(self, nent: Entity, intermediates: bool = False) -> None:
+        # TEMP:CHG: use true NonExplorableAtomic() to prevent recursive exploration
+        if isinstance(nent, ErrorEntry) and nent.name == "Atomic(N/A)":
+            return
 
         # pylint:disable=protected-access
         # if self.focused_view._ent == nent:

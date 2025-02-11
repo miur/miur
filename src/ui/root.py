@@ -97,7 +97,8 @@ class RootWidget:
         sortrev = False
         footer = f"--- {ci:2d}/{sz} | by={sortby}"  # {"￪" if sortrev else "￬"}"
         ## DEBUG:NEED:(__main__.py): -X tracemalloc
-        # footer += f"  --- {{RAM={__import__("tracemalloc").get_traced_memory()[0]//1024:,}kB}}"
+        if (TM := __import__("tracemalloc")).is_tracing():
+            footer += f"  --- {{RAM={TM.get_traced_memory()[0]//1024:,}kB}}"
 
         from ..app import g_app
 

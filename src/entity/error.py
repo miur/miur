@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, override
+from typing import override
 
 from .base.golden import Entities, Entity, Golden, StopExploration
 from .text import TextEntry
@@ -10,7 +10,7 @@ class ErrorEntry(Golden[str]):
     def __init__(
         self, *, parent: Entity, name: str | None = None, exc: Exception | None = None
     ) -> None:
-        nm = name if name else str(exc) if exc else "ERROR"
+        nm = name if name else exc.__class__.__name__ if exc else "ERROR"
         self._exc = exc
         super().__init__(nm, parent)
         # self._orig = loci

@@ -1,5 +1,7 @@
 pygments
 ranger-fm
+
+## Graphics
 pysdl3
 imgui-bundle
 glfw
@@ -9,4 +11,12 @@ pyqt6
 # qtinter
 # mpv
 pyqtgraph
+
+## Protocols
 python-mpd2
+
+## WEB
+requests
+beautifulsoup4
+lxml
+# html5lib

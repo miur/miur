@@ -63,9 +63,10 @@ class EntityView:
         #   &why to hi-RED files which had disappeared during listing e.g. short-lived prs in /proc/*
         #   &why to show at least partially loaded file from e.g. network
         except StopExploration:
+            # FIXME: yield true NonExplorableAtomic() to prevent recursive expansion here
             self._orig_lst = [ErrorEntry(parent=self._ent, name="Atomic(N/A)")]
         except Exception as exc:
-            self._orig_lst = [ErrorEntry(parent=self._ent, name="Exception", exc=exc)]
+            self._orig_lst = [ErrorEntry(parent=self._ent, exc=exc)]
             # from traceback import format_exception
             # for l in format_exception(exc, chain=True):
             #     log.error(l)
