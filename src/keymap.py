@@ -1,8 +1,6 @@
-import atexit
 from functools import cache
 from multiprocessing import Process
-from types import ModuleType
-from typing import Optional
+from typing import TYPE_CHECKING, Callable, Optional
 
 import _curses as C
 
@@ -10,22 +8,38 @@ from . import curses_ext as CE
 from .app import AppGlobals, KeyTable, g_app
 from .util.logger import log
 
+if TYPE_CHECKING:
+    from types import ModuleType
+
+    from .ui.navi import NaviWidget
+    from .ui.view import EntityView
+
 
 @cache
-def M(mod: str) -> ModuleType:
+def M(mod: str) -> "ModuleType":
     import importlib
 
     return importlib.import_module(mod, __package__)
 
 
+def _navi() -> "NaviWidget":
+    # pylint:disable=protected-access
+    return g_app.root_wdg._navi
+
+
+def _view() -> "EntityView":
+    # pylint:disable=protected-access
+    return _navi()._view
+
+
 def _dir() -> str:
     # pylint:disable=protected-access
-    return g_app.root_wdg._navi._view._ent.loci
+    return _view()._ent.loci
 
 
 def _loci() -> str:
     # pylint:disable=protected-access
-    return g_app.root_wdg._navi._view._wdg.focused_item._ent.loci
+    return _view()._wdg.focused_item._ent.loci
 
 
 # WARN: don't use Thread as GUI thread should be never destroyed! (even after app.quit())
@@ -33,6 +47,8 @@ g_render: dict[str, Process] = {}
 
 
 def spawn_render(nm: str) -> None:
+    import atexit
+
     log.info(nm)
     if nm in g_render:
         if g_render[nm].is_alive():
@@ -91,7 +107,7 @@ _modal_generic: KeyTable = {
     "E": lambda g: M(".integ.nvim").run_quickfix(),
     "e": lambda g: M(".integ.nvim").run_editor(["--", _loci()]),
     "r": lambda g: M(".integ.ranger").run_ranger(_loci()),
-    # "R": lambda g: run_ranger(g, g.root_wdg._navi._view._ent.loci),
+    # "R": lambda g: run_ranger(g, _view()._ent.loci),
     "K": lambda g: M(".integ.jupyter").ipykernel_start(),
     "L": lambda g: M(".integ.jupyter").redirect_logs(),
     "I": lambda g: M(".integ.jupyter").ipyconsole_out(),
@@ -99,23 +115,23 @@ _modal_generic: KeyTable = {
     # "^J": execute_abyss,  # <CR>
     "^L": lambda g: CE.resize(),  # <C-l> manually trigger redraw
     # pylint:disable=protected-access
-    "^R": lambda g: g.root_wdg._navi._view.fetch(),  # <C-r> refresh cached list
-    "j": lambda g: g.root_wdg._navi.cursor_step_by(1),
-    "k": lambda g: g.root_wdg._navi.cursor_step_by(-1),
-    "g": lambda g: g.root_wdg._navi.cursor_jump_to(0),
-    "G": lambda g: g.root_wdg._navi.cursor_jump_to(-1),
+    "^R": lambda g: _view().fetch(),  # <C-r> refresh cached list
+    "j": lambda g: _navi().cursor_step_by(1),
+    "k": lambda g: _navi().cursor_step_by(-1),
+    "g": lambda g: _navi().cursor_jump_to(0),
+    "G": lambda g: _navi().cursor_jump_to(-1),
     "h": lambda g: g.root_wdg.view_go_back(),
     "l": lambda g: g.root_wdg.view_go_into(),
-    C.KEY_HOME: lambda g: g.root_wdg._navi.cursor_jump_to(0),
-    C.KEY_END: lambda g: g.root_wdg._navi.cursor_jump_to(-1),
-    C.KEY_PPAGE: lambda g: g.root_wdg._navi.cursor_step_by(
-        -g.root_wdg._navi._view._wdg._viewport_height_lines // 2
+    C.KEY_HOME: lambda g: _navi().cursor_jump_to(0),
+    C.KEY_END: lambda g: _navi().cursor_jump_to(-1),
+    C.KEY_PPAGE: lambda g: _navi().cursor_step_by(
+        -_view()._wdg._viewport_height_lines // 2
     ),
-    C.KEY_NPAGE: lambda g: g.root_wdg._navi.cursor_step_by(
-        g.root_wdg._navi._view._wdg._viewport_height_lines // 2
+    C.KEY_NPAGE: lambda g: _navi().cursor_step_by(
+        _view()._wdg._viewport_height_lines // 2
     ),
-    C.KEY_DOWN: lambda g: g.root_wdg._navi.cursor_step_by(1),
-    C.KEY_UP: lambda g: g.root_wdg._navi.cursor_step_by(-1),
+    C.KEY_DOWN: lambda g: _navi().cursor_step_by(1),
+    C.KEY_UP: lambda g: _navi().cursor_step_by(-1),
     C.KEY_LEFT: lambda g: g.root_wdg.view_go_back(),
     C.KEY_RIGHT: lambda g: g.root_wdg.view_go_into(),
     # ",": lambda g: modal_switch_to(","),
@@ -140,7 +156,83 @@ _modal_spawn: KeyTable = {
     "w": lambda g: spawn_render("qt6wg"),
 }
 
+
+# MOVE: into EmbeddableInputWidget
+#   => which can be embedded either into _footer or as 1st item in _vlst.filter_by(?).{input;@history}
+# g_inputfield: str = ""  OR g.inputfield
+def _start_input(g: AppGlobals) -> None:
+    g.inputfield = _view()._filterby
+    g.inputpos = len(g.inputfield)  # <RND
+    # FIXME: switch to "prev" modal
+    # [_] IMPL: allow directly applying some disjoint keymap
+    #   BAD:ARCH: we lose ability to introspect/navigate whole keytree
+    modal_switch_to(_modal_input)
+
+
+def _add_input(g: AppGlobals, wch: str) -> None:
+    assert g.inputpos >= 0
+    # FAIL:(str is readonly): g.inputfield[g.inputpos : g.inputpos] = wch
+    i = g.inputpos
+    a = list(g.inputfield)
+    a[i:i] = wch
+    g.inputfield = "".join(a)
+    g.inputpos = i + len(wch)
+    ## ALT: contiguous memory
+    # a = bytearray(g.inputfield, 'utf-32');
+    # a[i:i] = bytearray(wch, 'utf-32')
+    # ginp = a.decode('utf-32')
+    _view().filter_by(g.inputfield)
+
+
+def _stop_input(g: AppGlobals) -> None:
+    # do_action() -> go up/dn, execute/apply, etc.
+    # save_input_to_history()
+    g.inputfield = ""
+    g.inputpos = -1
+    # FIXME: switch to "prev" modal
+    modal_switch_to(None)
+
+
+class NaviMod:
+    # pylint:disable=unnecessary-lambda-assignment
+    move_line_beg = staticmethod(lambda i, s: (0, s))
+    move_line_end = staticmethod(lambda i, s: (len(s), s))
+    kill_line_after = staticmethod(lambda i, s: (i, s[:i]))
+    kill_line_before = staticmethod(lambda i, s: (0, s[i:]))
+    kill_char_left = staticmethod(lambda i, s: ((k := max(0, i - 1)), s[:k] + s[i:]))
+
+
+def _navimod_input(g: AppGlobals, fmod: Callable[[int, str], tuple[int, str]]) -> None:
+    i, s = fmod(g.inputpos, g.inputfield)
+    redraw = g.inputfield != s
+    g.inputfield = s
+    g.inputpos = i
+    if redraw:
+        _view().filter_by(s)
+
+
+_modal_input: KeyTable = {
+    "": _add_input,  # DFL="" -- catch all keypresses
+    "^R": lambda g: _view().sort_by("~"),
+    "^A": lambda g: _navimod_input(g, NaviMod.move_line_beg),
+    "^E": lambda g: _navimod_input(g, NaviMod.move_line_end),
+    "^K": lambda g: _navimod_input(g, NaviMod.kill_line_after),
+    "^U": lambda g: _navimod_input(g, NaviMod.kill_line_before),
+    C.KEY_BACKSPACE: lambda g: _navimod_input(g, NaviMod.kill_char_left),
+    # C.KEY_DEL:  lambda g: _navimod_input(g, NaviMod.kill_char_right),
+    # NOTE: cancel input
+    "^M": _stop_input,
+    "^G": _stop_input,
+    "^C": _stop_input,
+    "^[": _stop_input,
+    C.KEY_ENTER: _stop_input,
+    C.KEY_UP: _stop_input,
+    C.KEY_DOWN: _stop_input,
+}
+
+
 g_modal_default: KeyTable = _modal_generic | {
+    "f": _start_input,
     "y": _modal_yank,
     ",": _modal_comma,
     # BUG: some CTRL-keys are printed as hex i.e. '\x14' inof '^T'
@@ -180,6 +272,13 @@ def handle_input(g: AppGlobals) -> None:
     #  C.nocbreak() ... C.cbreak()
     loci_override = ""
     cmd = g_app.keytable.get(wch, None)
+    # NOTE: use ("": ...) as a "catch_all" (inof DFL: dropping/pass-through to root table)
+    if not cmd and (cmd_ := g_app.keytable.get("", None)):
+        cmd = cmd_
+        catch_all = True
+    else:
+        catch_all = False
+
     if cmd:
         if (nm := getattr(cmd, "__name__", "")) == "<lambda>":
             lns, lnum = __import__("inspect").getsourcelines(cmd)
@@ -197,7 +296,8 @@ def handle_input(g: AppGlobals) -> None:
     log.at(log.W, repr(wch) + comment, loci=loci_override)
     # print(repr(wch))
     # import sys; sys.stdout.write(repr(wch))
-    if not cmd:
+    # RND: keep current modal if "catch_all"
+    if not cmd and not catch_all:
         if g_app.keytable is not g_app.keytableroot:
             modal_switch_to(None)
             g.root_wdg.redraw(g.stdscr)
@@ -212,8 +312,13 @@ def handle_input(g: AppGlobals) -> None:
         g.root_wdg.redraw(g.stdscr)
         g.stdscr.refresh()
     elif callable(cmd):
-        modal_switch_to(None)
-        cmd(g)  # WARN: should be last stmt in loop COS: may raise SystemExit
+        if catch_all:
+            # NOTE: supply current key as 2nd arg for "catch_all"
+            #   BAD: different fn_type for this call than in KeyTable
+            cmd(g, wch)
+        else:
+            modal_switch_to(None)
+            cmd(g)  # WARN: should be last stmt in loop COS: may raise SystemExit
         ## NOTE: don't redraw on .doexit() for PERF: faster exit
         #   (unless exit is blocked by slow bkgr cleanup -- then redraw only spinner OR manually)
         if not g.exiting:

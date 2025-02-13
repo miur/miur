@@ -2,7 +2,7 @@ import inspect
 import os
 from typing import Any, Callable, Iterable, Sequence, override
 
-from ..entity.base import Action, Entities, Entity, Golden, StopExploration
+from ..entity.base import Action, Entities, Entity, StopExploration
 from ..entity.error import ErrorEntry
 from ..entity.fsentry import FSDir
 from ..entity.objaction import pyobj_to_actions
@@ -20,8 +20,8 @@ class EntityView:
     # NOTE:(_act): keep =sfn to be able to refresh() the list (when externally changed)
     _act: Callable[[], Entities]
     # _lstpxy: ListCachingProxy[Golden]
-    _orig_lst: Sequence[Golden[Any]]
-    _xfm_lst: list[Golden[Any]]
+    _orig_lst: Sequence[Entity]
+    _xfm_lst: list[Entity]
     _visited: bool | None
     # TBD: _overlay/_aug_lst -- to inject on-the-fly or from db
     #   NICE:IDEA: show those entries as expanded subtree on node parent level
@@ -40,6 +40,8 @@ class EntityView:
         self._wdgfactory = wdgfactory
         # NOTE: remember which `View have created this one -- tba to return back
         # self._originator = originator
+        self._filterby = ""
+        self._sortby = ""
         self.fetch()
         # ALG: re-assign to None on ctor, and then to False each update by .fetch()
         self._visited = None
@@ -71,17 +73,13 @@ class EntityView:
             # for l in format_exception(exc, chain=True):
             #     log.error(l)
 
+        self._apply_default_policy()
         self._transform()
         assert getattr(self, "_xfm_lst", None) is not None
         if not getattr(self, "_wdg", None):
             self._wdg = self._wdgfactory()
         self._wdg.assign(self._xfm_lst)
         self._visited = False
-
-    # VIZ: sort, reverse, filter, groupby, aug/highlight/mark/tag
-    def _transform(self) -> None:
-        self._xfm_lst = list(self._orig_lst)
-        self._apply_default_policy()
 
     def _apply_default_policy(self) -> None:
         # pylint:disable=protected-access
@@ -90,7 +88,59 @@ class EntityView:
             if os.access(p, os.R_OK):
                 os.chdir(p)
             # if not fs.islink(p) or self._ent._alt is True:
-            # TODO: sort folders before files
-            # TODO: sort ignorecase
-            # TODO: sort by tuple of keys (filetype, name/case, ...)
-            self._xfm_lst.sort()
+            self._sortby = "name+"
+
+    # TODO: rgx,glob,patt,stem,substr,words,fuzzy,...
+    def filter_by(self, needle: str) -> None:
+        if needle == self._filterby:
+            return
+        self._filterby = needle
+        # BAD:PERF: i.e. when we add letter to patt(non-rgx) -- number of results
+        #   will be *less* and never *more* (BUT: for look-ahead rgx it may be different)
+        self._transform()
+        self._wdg.assign(self._xfm_lst)
+
+    # ARCH:THINK: pass tuple of strategies inof combined str
+    # TODO: sort folders before files
+    # TODO: sort by tuple of keys (filetype, name/case, ...)
+    def sort_by(self, strategy: str) -> None:
+        # VIZ: asc, desc, toggle/flip
+        #   ADD: ignorecase/smartcase/unicode_normalize/skipdelim("_-")/skipspace
+        if strategy in ("+", "-", "~"):
+            strategy = self._sortby.rstrip("-+~") + strategy
+        if strategy == self._sortby:
+            return
+        self._sortby = strategy
+        self._transform()
+        self._wdg.assign(self._xfm_lst)
+
+    # [_] SEE: how I did in previous incarnations of !miur/!pa3arch/etc
+    # VIZ: sort, reverse, filter, groupby, aug/highlight/mark/tag
+    def _transform(self) -> None:
+        lst = self._orig_lst
+        if not isinstance(lst, list):
+            lst = list(lst)
+
+        if substr := self._filterby:
+            lst = [e for e in lst if substr in e.name]
+
+        # ALT: use SortStrategyEnum to detect errors (inof str)?
+        if ss := self._sortby:
+            if ss.endswith("-"):
+                rev = True
+                ss = ss[:-1]
+            elif ss.endswith("+"):
+                rev = False
+                ss = ss[:-1]
+            else:
+                rev = False
+
+            # ALT:RENAME: "default" meaning DFL for generic `Entities
+            if ss.startswith("name"):
+                lst.sort(reverse=rev)
+            # elif ss == "size":
+            #     lst.sort(key=lambda e: len(self._pool[e]._vlst). reverse=rev)
+            else:
+                raise NotImplementedError
+
+        self._xfm_lst = lst

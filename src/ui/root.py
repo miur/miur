@@ -102,6 +102,17 @@ class RootWidget:
 
         from ..app import g_app
 
+        if (ipos := g_app.inputpos) >= 0:
+            footer += " /"
+            cy = self._wh - 1
+            cx = len(footer) + ipos
+            footer += g_app.inputfield
+            footer += "/ "
+            _pvis = C.curs_set(1)
+        else:
+            # FUT:FIX: remember and restore _pvis after input
+            C.curs_set(0)
+
         modal = "[" + g_app.keytablename + "]"
 
         # HACK:PERF: skip the check if you haven't even loaded jupyter plugin into !miur

@@ -80,6 +80,8 @@ class AppGlobals:
     #   - reduce bkgr tasks timeout to close faster
     #   - don't refresh screen beside spinner area
     exiting: bool = False
+    inputfield: str = ""
+    inputpos: int = -1
 
 
 g_app = AppGlobals()
