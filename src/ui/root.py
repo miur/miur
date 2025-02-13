@@ -109,6 +109,9 @@ class RootWidget:
             footer += g_app.inputfield
             footer += "/ "
             _pvis = C.curs_set(1)
+        elif ibox := g_app.inputfield:
+            footer += " /{ibox}/ "
+            C.curs_set(0)
         else:
             # FUT:FIX: remember and restore _pvis after input
             C.curs_set(0)

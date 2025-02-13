@@ -1,7 +1,7 @@
 import os
 
 # if globals().get("TYPE_CHECKING"):
-from typing import Callable, Mapping, Sequence, Union
+from typing import Callable, Literal, Mapping, Sequence, Union, overload
 
 type ArgType = Union[str, int, Sequence[str | int], Mapping[str, str | int]]
 
@@ -80,6 +80,31 @@ def to_env(
         for k, v in a.items():
             base[k] = v if isinstance(v, str) else str(v)
     return base
+
+
+@overload
+def run_bg_wait(
+    cmdv: Sequence[str], /, *, split: Literal[None] = None, **kw: Unpack[ExeKWArgs]
+) -> None: ...
+
+
+# FIXME:ERR: Overloaded function signatures 2 and 3 overlap with incompatible return types
+# Unexpected Overloading overlap if String Literal is used within Sequence/Iterable/Collection · Issue #15035 · python/mypy ⌇⡧⢮⡡⡶
+#   https://github.com/python/mypy/issues/15035
+@overload
+def run_bg_wait(
+    cmdv: Sequence[str],
+    /,
+    *,
+    split: Literal[False] | Literal[""],
+    **kw: Unpack[ExeKWArgs],
+) -> str: ...
+
+
+@overload
+def run_bg_wait(
+    cmdv: Sequence[str], /, *, split: Literal[True] | str, **kw: Unpack[ExeKWArgs]
+) -> list[str]: ...
 
 
 def run_bg_wait(

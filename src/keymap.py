@@ -42,6 +42,11 @@ def _loci() -> str:
     return _view()._wdg.focused_item._ent.loci
 
 
+def _scrollby(ratio: float) -> Callable[[AppGlobals], None]:
+    vnl = lambda r: int(_view()._wdg._viewport_height_lines * r)
+    return lambda g: _navi().cursor_step_by(vnl(ratio))
+
+
 # WARN: don't use Thread as GUI thread should be never destroyed! (even after app.quit())
 g_render: dict[str, Process] = {}
 
@@ -98,7 +103,7 @@ def spawn_render(nm: str) -> None:
 #   NEED: central node with list of all possible initial nodes
 _modal_generic: KeyTable = {
     # C.KEY_RESIZE: resize,
-    "^[": lambda g: g.doexit(),  # <Esc>
+    # "^[": lambda g: g.doexit(),  # <Esc>
     "q": lambda g: g.doexit(),
     "s": lambda g: M(".integ.shell").shell_out(_loci()),
     "a": lambda g: M(".integ.shell").shell_out_prompt(_loci()),
@@ -124,12 +129,8 @@ _modal_generic: KeyTable = {
     "l": lambda g: g.root_wdg.view_go_into(),
     C.KEY_HOME: lambda g: _navi().cursor_jump_to(0),
     C.KEY_END: lambda g: _navi().cursor_jump_to(-1),
-    C.KEY_PPAGE: lambda g: _navi().cursor_step_by(
-        -_view()._wdg._viewport_height_lines // 2
-    ),
-    C.KEY_NPAGE: lambda g: _navi().cursor_step_by(
-        _view()._wdg._viewport_height_lines // 2
-    ),
+    C.KEY_PPAGE: _scrollby(-0.5),
+    C.KEY_NPAGE: _scrollby(+0.5),
     C.KEY_DOWN: lambda g: _navi().cursor_step_by(1),
     C.KEY_UP: lambda g: _navi().cursor_step_by(-1),
     C.KEY_LEFT: lambda g: g.root_wdg.view_go_back(),
@@ -166,7 +167,7 @@ def _start_input(g: AppGlobals) -> None:
     # FIXME: switch to "prev" modal
     # [_] IMPL: allow directly applying some disjoint keymap
     #   BAD:ARCH: we lose ability to introspect/navigate whole keytree
-    modal_switch_to(_modal_input)
+    modal_switch_to(_modal_input, "Input")
 
 
 def _add_input(g: AppGlobals, wch: str) -> None:
@@ -195,39 +196,82 @@ def _stop_input(g: AppGlobals) -> None:
 
 class NaviMod:
     # pylint:disable=unnecessary-lambda-assignment
-    move_line_beg = staticmethod(lambda i, s: (0, s))
-    move_line_end = staticmethod(lambda i, s: (len(s), s))
-    kill_line_after = staticmethod(lambda i, s: (i, s[:i]))
-    kill_line_before = staticmethod(lambda i, s: (0, s[i:]))
-    kill_char_left = staticmethod(lambda i, s: ((k := max(0, i - 1)), s[:k] + s[i:]))
+    movebkw_linebeg = staticmethod(lambda i, s: (0, s))
+    movefwd_lineend = staticmethod(lambda i, s: (len(s), s))
+    movebkw_charprev = staticmethod(lambda i, s: (max(0, i - 1), s))
+    movefwd_charnext = staticmethod(lambda i, s: (min(len(s), i + 1), s))
+    killbkw_linebeg = staticmethod(lambda i, s: (0, s[i:]))
+    killfwd_lineend = staticmethod(lambda i, s: (i, s[:i]))
+    killbkw_charprev = staticmethod(lambda i, s: ((k := max(0, i - 1)), s[:k] + s[i:]))
+    killfwd_charcurs = staticmethod(lambda i, s: (i, s[:i] + s[i + 1 :]))
+    # ^T/^Q: movefwd/bkw_wordbeg/end[_space] =
+    # ^G/^W: killfwd/bkw_wordbeg/end[_space] =
+    # ^Z/^_: undo/redo
 
 
-def _navimod_input(g: AppGlobals, fmod: Callable[[int, str], tuple[int, str]]) -> None:
-    i, s = fmod(g.inputpos, g.inputfield)
-    redraw = g.inputfield != s
-    g.inputfield = s
-    g.inputpos = i
-    if redraw:
-        _view().filter_by(s)
+def _navimod_input(
+    fmod: Callable[[int, str], tuple[int, str]]
+) -> Callable[[AppGlobals], None]:
+    # [_] BAD: we are losing preview in logs "fmod name in use"
+    #   MAYBE: use lambda as before in table?
+    def _edit_input(g: AppGlobals) -> None:
+        i, s = fmod(g.inputpos, g.inputfield)
+        redraw = g.inputfield != s
+        g.inputfield = s
+        g.inputpos = i
+        if redraw:
+            _view().filter_by(s)
+
+    return _edit_input
 
 
 _modal_input: KeyTable = {
+    # ALT:(type ERR): provide g.keytablesink = f(g,wch), which is assigned to DFL="cancel_to_rootkeytable()"
     "": _add_input,  # DFL="" -- catch all keypresses
-    "^R": lambda g: _view().sort_by("~"),
-    "^A": lambda g: _navimod_input(g, NaviMod.move_line_beg),
-    "^E": lambda g: _navimod_input(g, NaviMod.move_line_end),
-    "^K": lambda g: _navimod_input(g, NaviMod.kill_line_after),
-    "^U": lambda g: _navimod_input(g, NaviMod.kill_line_before),
-    C.KEY_BACKSPACE: lambda g: _navimod_input(g, NaviMod.kill_char_left),
-    # C.KEY_DEL:  lambda g: _navimod_input(g, NaviMod.kill_char_right),
-    # NOTE: cancel input
-    "^M": _stop_input,
+    # REF: /usr/include/curses.h
+    # NOTE: emacs-style readline
+    "^A": _navimod_input(NaviMod.movebkw_linebeg),
+    "^E": _navimod_input(NaviMod.movefwd_lineend),
+    "^B": _navimod_input(NaviMod.movebkw_charprev),
+    "^F": _navimod_input(NaviMod.movefwd_charnext),
+    "^U": _navimod_input(NaviMod.killbkw_linebeg),
+    "^K": _navimod_input(NaviMod.killfwd_lineend),
+    "^H": _navimod_input(NaviMod.killbkw_charprev),
+    "^?": _navimod_input(NaviMod.killbkw_charprev),
+    "^D": _navimod_input(NaviMod.killfwd_charcurs),
+    "^J": _stop_input,
+    "^M": _stop_input,  # WTF: why ^M==^J==CR ?
+    # NOTE: windows-style readline
+    C.KEY_HOME: _navimod_input(NaviMod.movebkw_linebeg),
+    C.KEY_END: _navimod_input(NaviMod.movefwd_lineend),
+    C.KEY_LEFT: _navimod_input(NaviMod.movebkw_charprev),
+    C.KEY_RIGHT: _navimod_input(NaviMod.movefwd_charnext),
+    C.KEY_DL: _navimod_input(NaviMod.killbkw_linebeg),
+    C.KEY_EOL: _navimod_input(NaviMod.killfwd_lineend),
+    C.KEY_SHOME: _navimod_input(NaviMod.killbkw_linebeg),
+    C.KEY_SEND: _navimod_input(NaviMod.killfwd_lineend),
+    C.KEY_BACKSPACE: _navimod_input(NaviMod.killbkw_charprev),  # =263:
+    C.KEY_DC: _navimod_input(NaviMod.killfwd_charcurs),  # =330: <Delete>
+    C.KEY_ENTER: _stop_input,
+    # C.KEY_IC: _navimod_input(NaviMod.insertoverwrite_toggle),
+    # NOTE: additional actions, which also save/cancel input
     "^G": _stop_input,
     "^C": _stop_input,
     "^[": _stop_input,
-    C.KEY_ENTER: _stop_input,
     C.KEY_UP: _stop_input,
     C.KEY_DOWN: _stop_input,
+    # '\C-x\C-e' edit-command-line
+    # SUM: additional controls for current list preview
+    "^R": lambda g: _view().sort_by("~"),
+    C.KEY_SR: _scrollby(-0.5),
+    C.KEY_SF: _scrollby(+0.5),
+    C.KEY_PPAGE: _scrollby(-0.5),
+    C.KEY_NPAGE: _scrollby(+0.5),
+    # "^Y": _yank_inputfield,
+    # "^^": _past_inputfield,
+    # "^O": _yank_vlstnames,
+    # '^I'/TAB: wordexpand-or-complete
+    # "^S"/"^T"/"M-f": _navimod_input(NaviMod.findfwd/bkw_char),
 }
 
 
@@ -265,7 +309,7 @@ def modal_switch_to(m: str | Optional[KeyTable], nm: str = "") -> None:
 
 def handle_input(g: AppGlobals) -> None:
     wch = g.stdscr.get_wch()
-    if isinstance(wch, str) and ord(wch) < 20:
+    if isinstance(wch, str):  # and ord(wch) < 0x20:
         wch = C.unctrl(wch).decode("utf-8")
 
     # IDEA: partially restore TTY to preserve NLs in unexpected exc/backtrace
@@ -273,11 +317,9 @@ def handle_input(g: AppGlobals) -> None:
     loci_override = ""
     cmd = g_app.keytable.get(wch, None)
     # NOTE: use ("": ...) as a "catch_all" (inof DFL: dropping/pass-through to root table)
-    if not cmd and (cmd_ := g_app.keytable.get("", None)):
-        cmd = cmd_
-        catch_all = True
-    else:
-        catch_all = False
+    catch_all = g_app.keytable.get("", None)
+    if not cmd and catch_all:
+        cmd = catch_all
 
     if cmd:
         if (nm := getattr(cmd, "__name__", "")) == "<lambda>":
@@ -296,13 +338,14 @@ def handle_input(g: AppGlobals) -> None:
     log.at(log.W, repr(wch) + comment, loci=loci_override)
     # print(repr(wch))
     # import sys; sys.stdout.write(repr(wch))
-    # RND: keep current modal if "catch_all"
-    if not cmd and not catch_all:
+    # RND: keep current modal when "cmd=catch_all"
+    if not cmd:
         if g_app.keytable is not g_app.keytableroot:
             modal_switch_to(None)
             g.root_wdg.redraw(g.stdscr)
             g.stdscr.refresh()
     elif isinstance(cmd, dict):
+        assert False
         # modal_switch_to(wch)
         if g_app.keytable == g_app.keytableroot:
             g_app.keytablename = str(wch)
@@ -312,12 +355,13 @@ def handle_input(g: AppGlobals) -> None:
         g.root_wdg.redraw(g.stdscr)
         g.stdscr.refresh()
     elif callable(cmd):
-        if catch_all:
+        if cmd is catch_all:
             # NOTE: supply current key as 2nd arg for "catch_all"
             #   BAD: different fn_type for this call than in KeyTable
             cmd(g, wch)
         else:
-            modal_switch_to(None)
+            if not catch_all:
+                modal_switch_to(None)
             cmd(g)  # WARN: should be last stmt in loop COS: may raise SystemExit
         ## NOTE: don't redraw on .doexit() for PERF: faster exit
         #   (unless exit is blocked by slow bkgr cleanup -- then redraw only spinner OR manually)

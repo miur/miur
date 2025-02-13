@@ -30,7 +30,9 @@ def curses_stdscr() -> Iterator[C.window]:
     try:
         stdscr = C.initscr()
         C.noecho()  # echoing of keys = off
-        C.cbreak()  # buffering on keyboard input = off
+        ## DISABLED:(cbreak->raw): we free up [^Z,^C,^\,^S,^Q] but lose interrup/quit/suspend/flow-ctrl
+        # C.cbreak()  # buffering on keyboard input = off
+        C.raw()
         stdscr.keypad(True)  # sup special escape seq for e.g. curses.KEY_LEFT
         pvis = C.curs_set(0)
         C.start_color()  # WAIT: which exception does it throw? TRY: TERM=dummy
@@ -57,7 +59,8 @@ def curses_stdscr() -> Iterator[C.window]:
             # del stdscr  # TRY? ALT:BAD: not ported :: delscreen(stdscr)
             C.echo()
             # BAD: both nocbreak and endwin may return _curses.error/ERR
-            C.nocbreak()
+            # C.nocbreak()
+            C.noraw()
             C.endwin()  # CHECK: is it safe to deinit libncurses multiple times in Jupyter?
         # except Exception as exc:
         #     log.error("E2: " + "".join(TR.format_exception(exc, chain=True)))
@@ -114,6 +117,7 @@ def resize() -> None:
     ##   >> make curses to calc sizes by itself (as it does on each .refresh)
     # HACK: force size reinit (as ncurses only does it in .iniscr())
     # SRC:OLD: https://post.bytes.com/forum/topic/python/541442-curses-and-resizing-windows
+    # ALT:TRY: C.update_lines_cols()
     C.def_prog_mode()
     C.endwin()
     g.stdscr.refresh()

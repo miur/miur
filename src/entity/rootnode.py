@@ -11,11 +11,13 @@ class LocalHostNode(Golden[str]):
     @override
     def explore(self) -> Entities:
         from .fsentry import FSDir
+        from .pacmannode import PacmanProto
         from .psnode import PSProto
 
         return [
             FSDir("/", self),
             PSProto("&ps", self),
+            PacmanProto("&pacman", self),
             # ADD: LsPci/LsUsb/journalctl/pacman
         ]
 

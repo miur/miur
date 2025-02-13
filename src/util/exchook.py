@@ -133,7 +133,7 @@ def log_exc(value: "BaseException") -> "Any":
                             for k, v in sorted(ctx.items())
                         )
                 # NOTE: use unstripped srcline
-                l = t._original_line  # pylint:disable=protected-access
+                l = t._original_lines  # pylint:disable=protected-access
                 l = "<NOT SRC>" if l is None else l.rstrip()
                 indent = l[: len(l) - len(l.lstrip())]
                 code = (
