@@ -47,6 +47,13 @@ def _scrollby(ratio: float) -> Callable[[AppGlobals], None]:
     return lambda g: _navi().cursor_step_by(vnl(ratio))
 
 
+# FIXME:BET: do it as one operation w/o screen blinking
+def _parentby(g: AppGlobals, steps: int) -> None:
+    g.root_wdg.view_go_back()
+    _navi().cursor_step_by(steps)
+    g.root_wdg.view_go_into()
+
+
 # WARN: don't use Thread as GUI thread should be never destroyed! (even after app.quit())
 g_render: dict[str, Process] = {}
 
@@ -113,7 +120,7 @@ _modal_generic: KeyTable = {
     "e": lambda g: M(".integ.nvim").run_editor(["--", _loci()]),
     "r": lambda g: M(".integ.ranger").run_ranger(_loci()),
     # "R": lambda g: run_ranger(g, _view()._ent.loci),
-    "K": lambda g: M(".integ.jupyter").ipykernel_start(),
+    "^P": lambda g: M(".integ.jupyter").ipykernel_start(),
     "L": lambda g: M(".integ.jupyter").redirect_logs(),
     "I": lambda g: M(".integ.jupyter").ipyconsole_out(),
     "^I": lambda g: CE.ipython_out(g.stdscr),  # <Tab>
@@ -127,6 +134,8 @@ _modal_generic: KeyTable = {
     "G": lambda g: _navi().cursor_jump_to(-1),
     "h": lambda g: g.root_wdg.view_go_back(),
     "l": lambda g: g.root_wdg.view_go_into(),
+    "K": lambda g: _parentby(g, -1),
+    "J": lambda g: _parentby(g, +1),
     C.KEY_HOME: lambda g: _navi().cursor_jump_to(0),
     C.KEY_END: lambda g: _navi().cursor_jump_to(-1),
     C.KEY_PPAGE: _scrollby(-0.5),
@@ -194,6 +203,13 @@ def _stop_input(g: AppGlobals) -> None:
     modal_switch_to(None)
 
 
+def _clear_input(g: AppGlobals) -> None:
+    g.inputfield = ""
+    g.inputpos = -1
+    modal_switch_to(None)
+    _view().filter_by(g.inputfield)
+
+
 class NaviMod:
     # pylint:disable=unnecessary-lambda-assignment
     movebkw_linebeg = staticmethod(lambda i, s: (0, s))
@@ -210,7 +226,7 @@ class NaviMod:
 
 
 def _navimod_input(
-    fmod: Callable[[int, str], tuple[int, str]]
+    fmod: Callable[[int, str], tuple[int, str]],
 ) -> Callable[[AppGlobals], None]:
     # [_] BAD: we are losing preview in logs "fmod name in use"
     #   MAYBE: use lambda as before in table?
@@ -277,6 +293,7 @@ _modal_input: KeyTable = {
 
 g_modal_default: KeyTable = _modal_generic | {
     "f": _start_input,
+    "F": _clear_input,
     "y": _modal_yank,
     ",": _modal_comma,
     # BUG: some CTRL-keys are printed as hex i.e. '\x14' inof '^T'

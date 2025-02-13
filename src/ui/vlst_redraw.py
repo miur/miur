@@ -21,8 +21,18 @@ class SatelliteViewport_RedrawMixin:
     #     s += str(v) if isinstance((v := self._valpxy.get()), int) else repr(v)
     #     return s
 
+    # if crashsafe = True
+    def redraw(self, stdscr: C.window, *, numcol: bool = False) -> tuple[int, int]:
+        try:
+            return self._redraw(stdscr, numcol=numcol)
+        except Exception as exc:
+            from ..util.exchook import log_exc
+
+            log_exc(exc)
+            return (0, 0)
+
     # pylint:disable=too-many-statements,too-many-branches,too-many-locals
-    def redraw(
+    def _redraw(
         self: SatelliteViewport_DataProtocol,
         stdscr: C.window,
         *,
@@ -71,11 +81,25 @@ class SatelliteViewport_RedrawMixin:
             item = self._lst[i]
             ent = item._ent
 
-            # BAD: desynchronized from default item.height due to ext-supplied "maxlines"
-            #   MAYBE: totally eliminate item.height usage -- jump step_by() bw internal structures
-            # CHG? return actually drawn height from item.render_curses()
-            #   BET: pre-render into markup structure, which can be either drawn or evaluated
-            h_item = self._fih(i)
+            try:
+                # BAD: desynchronized from default item.height due to ext-supplied "maxlines"
+                #   MAYBE: totally eliminate item.height usage -- jump step_by() bw internal structures
+                # CHG? return actually drawn height from item.render_curses()
+                #   BET: pre-render into markup structure, which can be either drawn or evaluated
+                h_item = self._fih(i)
+            except Exception as exc:
+                from ..util.exchook import log_exc
+
+                log_exc(exc)
+
+                ## RND: show empty space where item should be
+                ## ALT:BET: generate ErrorEntry in-place
+                stdscr.addnstr(vy + max(0, y), vx, "<<H=0>>", vw, S.empty | S.cursor)
+
+                i += 1
+                y += 1
+                continue
+
             ## DEBUG:
             # if i == ci:
             #     log.warning(h_item)

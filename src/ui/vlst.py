@@ -192,6 +192,7 @@ class SatelliteViewport(
         # TODO: pre-load only visible part fitting into viewport
         #   WARN: on first assign(), viewport height may still be =0, due to -resize() being called later
         # FUT:PERF: don't instantiate all `ItemWidgets for _lst at once ※⡧⡺⣩⠺
+        # TRY?PERF: don't copy the list into widget -- use wrapped one directly from EntityView
         self._lst = [ItemWidget(x) for x in lst]
         newidx = self._reindex(pidx, focused)
         self._viewport_followeditem_lstindex = self._cursor_item_lstindex = newidx

@@ -14,7 +14,7 @@ class PackageEntry(Golden[str]):
         cmdv = [*cmdline.split(), self.name]
         nl = run_bg_wait(cmdv, split=True)
         assert nl
-        return (TextEntry(l, self) for l in nl)
+        return (TextEntry(l, self) for l in nl if l)
 
     @override
     def explore(self) -> Entities:

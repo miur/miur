@@ -134,10 +134,15 @@ def resize() -> None:
     #   2024-05-11 BUT it works if get_wch() used directly
     # REGR: redraw() during KEY_RESIZE results in ncurses crash
     #   THINK: how to prevent/block redraw in that case?
-    g.stdscr.clear()  # CHECK:NEED:OR:NOT? e.g. to clear bkgr (which earlier wasn't redrawn on resize)
-    g.root_wdg.resize(*g.stdscr.getmaxyx())
-    g.root_wdg.redraw(g.stdscr)
-    g.stdscr.refresh()
+    try:
+        g.stdscr.clear()  # CHECK:NEED:OR:NOT? e.g. to clear bkgr (which earlier wasn't redrawn on resize)
+        g.root_wdg.resize(*g.stdscr.getmaxyx())
+        g.root_wdg.redraw(g.stdscr)
+        g.stdscr.refresh()
+    except Exception as exc:
+        from ..util.exchook import log_exc
+
+        log_exc(exc)
 
 
 def shell_out(

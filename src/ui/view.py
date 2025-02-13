@@ -72,13 +72,11 @@ class EntityView:
             # from traceback import format_exception
             # for l in format_exception(exc, chain=True):
             #     log.error(l)
-
         self._apply_default_policy()
-        self._transform()
-        assert getattr(self, "_xfm_lst", None) is not None
+
         if not getattr(self, "_wdg", None):
             self._wdg = self._wdgfactory()
-        self._wdg.assign(self._xfm_lst)
+        self._transform()
         self._visited = False
 
     def _apply_default_policy(self) -> None:
@@ -98,7 +96,6 @@ class EntityView:
         # BAD:PERF: i.e. when we add letter to patt(non-rgx) -- number of results
         #   will be *less* and never *more* (BUT: for look-ahead rgx it may be different)
         self._transform()
-        self._wdg.assign(self._xfm_lst)
 
     # ARCH:THINK: pass tuple of strategies inof combined str
     # TODO: sort folders before files
@@ -112,7 +109,6 @@ class EntityView:
             return
         self._sortby = strategy
         self._transform()
-        self._wdg.assign(self._xfm_lst)
 
     # [_] SEE: how I did in previous incarnations of !miur/!pa3arch/etc
     # VIZ: sort, reverse, filter, groupby, aug/highlight/mark/tag
@@ -144,3 +140,4 @@ class EntityView:
                 raise NotImplementedError
 
         self._xfm_lst = lst
+        self._wdg.assign(self._xfm_lst)
