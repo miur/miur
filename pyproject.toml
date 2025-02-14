@@ -1,23 +1,48 @@
+#%OFF:REF: https://packaging.python.org/en/latest/tutorials/packaging-projects/
+#%DEPs: $ /d/miur/.venv/bin/python -m pip install --upgrade pip build twine
+#%USAGE: $ /d/miur/.venv/bin/python -m build
+#%CHECK: $ /d/miur/.venv/bin/python -m twine check dist/*
+#%CHECK: $ /d/miur/.venv/bin/python -m twine upload -r testpypi dist/*
+#%CHECK: $ /d/miur/.venv/bin/python -m pip install -i https://test.pypi.org/simple/ miur
+#%PUB: $ /d/miur/.venv/bin/python -m twine upload dist/*
 [project]
 name = "miur"
 version = "0.400.20250214"
-requires-python = ">=3.12"
 description = "Modern Interface for Uniform Reconnaissance"
-readme = "README.rst"
 authors = [{ name="Dmytro Kolomoiets", email="amerlyq+code@gmail.com" }]
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
     "Operating System :: POSIX :: Linux",
 ]
+requires-python = ">=3.12"
+dynamic = ["dependencies"]
+readme = {file = "README.rst", content-type = "text/x-rst"}
+
+
+# [project.optional-dependencies]
+# dev = ["black", "bumpver", "isort", "pip-tools", "pytest"]
 
 [project.urls]
 Homepage = "https://github.com/miur/miur"
 Issues = "https://github.com/miur/miur/issues"
 
+# [project.scripts]
+# realpython = "src.__main__:main"
+
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-requirements-txt"]
 build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.sdist]
+only-include = ["src", "integ", "LICENSES"]
+exclude = ["_*/"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src"]
+
+[tool.hatch.metadata.hooks.requirements_txt]
+files = ["pkg/requirements.txt"]
+
+# [tool.hatch.metadata.hooks.requirements_txt.optional-dependencies]
+# dev = ["pkg/requirements-dev.txt"]

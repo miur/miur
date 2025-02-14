@@ -1,4 +1,4 @@
-.. SPDX-FileCopyrightText: 2024 Dmytro Kolomoiets <amerlyq+code@gmail.com>
+.. SPDX-FileCopyrightText: 2025 Dmytro Kolomoiets <amerlyq+code@gmail.com>
 
 .. SPDX-License-Identifier: CC-BY-SA-4.0
 
@@ -29,12 +29,39 @@ Modern/Modal Interface for Uniform Reconnaissance.
    It's hilarious, but you can treat any folder of files as a *Lisp* program.
    If you name folders/files after some AST -- you can execute the dir as an app! (homoiconicity)
    By using scripts as function names and symlinks to other files as args,
-     you should be able to compose an adhoc application -- something worthy to explore.
+   you should be able to compose an adhoc application -- something worthy to explore.
    Writing code solely by moving files around -- who would even dare to call it programming? :)
 
 
 CHANGELOG
 =========
+
+TBD
+
+- homoiconic Entity/Action data interpretation
+- subscribe/publish change propagation channels
+- new miur-relevant argparse
+
+
+2025-02-14
+----------
+
+DONE
+
+- interlace objects (Entitis) and methods (Actions) during navigation
+- auto-convert any python object to explorable entity
+- preview nodes under cursor and previous history
+- inputfield/editbox for FilterBy() with readline/emacs bindings
+- draft localhost rootnodes for FS, /proc, pacman
+- draft internal rootnodes for env, keybind, demos
+- draft protocol rootnodes for web, mpd
+- draft dataset rootnode for unicode symbols
+- add demos for future UI clients in qt6/qml/sdl3/glfw/imgui/pyqtgraph
+- provide ZSH integration and shell aliases
+- add clipboard / copy to xclip
+- adaptive layout for navi
+- list UI got itemwrap, colsep, spacemark, linenum, decortail
+
 
 2024-12-01
 ----------
@@ -47,7 +74,10 @@ DONE
 - PoC file system navigation
 - PoC highlighting file by type
 - PoC pygmentized in curses
+- PoC selectors mainloop (w/o asyncio)
+- separate FDs for jupyter, tty, stdin/stdout and logs
 - FIXED: no curses resize on SIGWINCH
+
 
 2024-06-01
 ----------
@@ -63,19 +93,3 @@ DONE
 - print to terminal altscreen
 - new lightweight logger
 - global app singleton
-
-
-
-ONGOING
-
-- separate FDs for jupyter, tty, stdin/stdout and logs
-- terminal resize
-- selectors mainloop (w/o asyncio)
-
-
-TBD
-
-- re-IMPL curses ListWidget MVP
-- homoiconic Entity/Action data interpretation
-- subscribe/publish change propagation channels
-- new miur-relevant argparse
