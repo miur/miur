@@ -1,4 +1,4 @@
-# vim:ft=zsh
+#!zsh
 # USAGE:CFG:(~/.zshrc):ADD: snippet to make integration/aliases work for !miur in !shell
 #   _m=${${:-miur}:c:A:h:h}
 #   [[ $_m == /usr/* ]] && _m="$_m/share/miur"

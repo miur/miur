@@ -1,7 +1,7 @@
 #!/usr/bin/env -S makepkg --cleanbuild --syncdeps --noextract --force --install --clean PKGDEST=/t BUILDDIR=/t -p
 # vim:ft=sh
 #
-# SPDX-FileCopyrightText: 2024 Dmytro Kolomoiets <amerlyq+code@gmail.com>
+# SPDX-FileCopyrightText: 2025 Dmytro Kolomoiets <amerlyq+code@gmail.com>
 #
 # SPDX-License-Identifier: MIT
 #

@@ -1,0 +1,35 @@
+# REF:FMT: https://spec.editorconfig.org/
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+# spelling_language = "en_US"
+
+
+[*.py]
+indent_size = tab
+indent_style = space
+# NOTE: matters for comments=112, as code will wrap on black=88
+max_line_length = 112
+# max_line_length = unset
+tab_width = 4
+
+
+# [*.{js,py}]
+# [lib/**.py]
+[{README.rst}]
+indent_size = 3
+indent_style = space
+
+
+## NEED:(for extra options to work):
+# require('editorconfig').properties.foo = function(bufnr, val, opts)
+#   if opts.charset and opts.charset ~= "utf-8" then
+#     error("foo can only be set when charset is utf-8", 0)
+#   end
+#   vim.b[bufnr].foo = val
+# end
+foo = 1
