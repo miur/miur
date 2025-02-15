@@ -110,9 +110,11 @@ class ObjAction(Action):
         name: str,
         parent: Entity,
         fn: Callable[[], Any],
+        allowpreview: bool = True,
     ) -> None:
         sfn = lambda: cvt_to_ents(fn(), parent=self)
         super().__init__(name, parent, sfn)
+        self.allowpreview = allowpreview
 
 
 # ALT:XP~: directly produce this list by Golden.explore(), accessed only as:

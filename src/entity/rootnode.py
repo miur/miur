@@ -46,7 +46,12 @@ class MiurAppNode(Golden[str]):
                 name="@demo/render",
                 parent=self,
                 fn=lambda: [
-                    ObjAction(name=nm, parent=self, fn=lambda nm=nm: spawn_render(nm))
+                    ObjAction(
+                        name=nm,
+                        parent=self,
+                        allowpreview=False,
+                        fn=lambda nm=nm: spawn_render(nm),
+                    )
                     for nm in [
                         "glfw_imgui",
                         "qt6gl",

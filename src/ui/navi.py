@@ -221,6 +221,9 @@ class NaviWidget:
             #   &why to avoid constantly rewriting history on each cursor move up/down
             peek = self._pool.get(cent)
             if not peek:
+                # HACK: prevent auto-launching of @demo apps by preview (press <L>)
+                if not getattr(cent, "allowpreview", True):
+                    break
                 peek = self._pool.add(cent)
             wdg = peek._wdg
 
