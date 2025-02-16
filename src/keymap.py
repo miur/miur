@@ -255,15 +255,23 @@ _modal_input: KeyTable = {
     # "^S"/"^T"/"M-f": _navimod_input(NaviMod.findfwd/bkw_char),
 }
 
+_modal_viewlayout: KeyTable = {
+    "a": lambda g: _navi().set_layout("adaptive"),
+    "h": lambda g: _navi().set_layout("hist2"),
+    "l": lambda g: _navi().set_layout("vlst"),
+    "p": lambda g: _navi().set_layout("pv0"),
+    "o": lambda g: _navi().set_layout("miller0"),
+    "i": lambda g: _navi().set_layout("miller1"),
+    "m": lambda g: _navi().set_layout("miller2"),
+}
 
 g_modal_default: KeyTable = _modal_generic | {
     "f": _start_input,
     "F": _clear_input,
     "y": _modal_yank,
     ",": _modal_comma,
-    # BUG: some CTRL-keys are printed as hex i.e. '\x14' inof '^T'
-    # "^T": _modal_spawn,
     "^O": _modal_spawn,
+    "^T": _modal_viewlayout,
 }
 
 

@@ -9,138 +9,12 @@ from ..entity.rootnode import RootNode
 from ..util.logger import log
 from .colorscheme import g_style as S
 from .navihistory import EntityViewCachePool, HistoryCursor
+from .panel import Panel
+from .panelcfg import PanelCfg
 from .rect import Rect
 from .view import EntityView
 
 
-class Panel:
-    _rect: Rect
-
-    # RENAME?(space_alloci):COS:BAD:(ratio): contains fixed/flexed panel size, inof rational fraction
-    def __init__(
-        self,
-        name: str = "",
-        split: list[Self] | None = None,
-        *,
-        w: int | float = 0,
-        h: int | float = 0,
-        sepw: int = 0,
-        # visible: bool = True,
-    ) -> None:
-        self.name = name
-        self._hint_wh = (w, h)
-        # self.size = size
-        self._split = split if split is not None else []
-        # self._visible = visible  # RENAME? enabled,present
-        self._sepw = sepw
-
-    @property
-    def rect(self) -> Rect:
-        return self._rect
-
-    @override
-    def __repr__(self) -> str:
-        return f"{self.name}{self._rect}:({", ".join(map(repr,self._split))})"
-
-    def __len__(self) -> int:
-        return len(self._split)
-
-    def __iter__(self) -> Iterator[Self]:
-        return iter(self._split)
-
-    def __getitem__(self, nm: str) -> Self | None:
-        if nm == self.name:
-            return self
-        return next((p for p in self._split if p[nm] is not None), None)
-
-    # def __contains__(self, nm: str) -> bool:
-    #     if nm == self.name:
-    #         return True
-    #     return any(nm in p for p in self._split)
-
-    def named_rects(self) -> Iterable[tuple[str, Rect]]:
-        for p in self._split:
-            if nm := p.name:
-                yield (nm, p._rect)
-            yield from p.named_rects()
-
-    def sep_rects(self) -> Iterable[tuple[str, Rect]]:
-        assert hasattr(self, "_rect"), "Err: call .resize() beforehand"
-        pr: Rect | None = None
-        for p in self._split:
-            # NOTE: go from left to right
-            yield from p.sep_rects()
-            r = p.rect
-            if pr:
-                yield (p.name, Rect(w=r.x - pr.xw, h=pr.h, x=pr.xw, y=pr.y))
-            pr = r
-
-    def resize(self, maxrect: Rect) -> None:
-        # NOTE: _hint_wh is only used by its parent and otherwise ignored
-        self._rect = maxrect
-        if not self._split:
-            return
-        # TODO? incorporate .visible=0/1 to affect flexed area
-        # RND:TEMP: hardcoded=VSplit; keep vh=0 to stretch to full Rect.height
-        assert all(x._hint_wh[1] == 0 for x in self._split)
-        ratio = [x._hint_wh[0] for x in self._split]
-        allsepw = self._sepw * (len(ratio) - 1)
-        ws = flowratio_to_abs(ratio, maxrect.w - allsepw)
-        vx = maxrect.x
-        for p, w in zip(self._split, ws):
-            p.resize(Rect(w, maxrect.h, x=vx, y=maxrect.y))
-            # INFO: we don't need spacer column after rightmost vlst
-            #   >> it should be a .frame or a .margin
-            vx += w + self._sepw
-
-
-# NOTE:(`AdaptiveLayout): change/hide based on total window size
-#   DFL:(prio): browser:0 -> preview:1 -> parent:2 [-> pparent:3]
-# TODO: toggle/limit linewrap + content-awareness
-# TODO: header/footer hide/xfm
-def pick_adaptive_layout_cfg(rect: Rect, old: Panel, sepw: int) -> Panel:
-    if rect.w < 30:
-        if old.name == "navi_vlst":
-            return old
-        browse = Panel("browse", [Panel("tab0")])
-        return Panel("navi_vlst", [browse])
-
-    if rect.w < 45:
-        if old.name == "navi_pv0":
-            return old
-        browse = Panel("browse", [Panel("tab0")])
-        preview = Panel("preview", [Panel("pv0")], w=12)
-        return Panel("navi_pv0", [browse, preview])
-
-    if rect.w < 60:
-        if old.name == "navi_miller0":
-            return old
-        prevloci = Panel("prevloci", [Panel("prev")], w=8)
-        browse = Panel("browse", [Panel("tab0")])
-        preview = Panel("preview", [Panel("pv0")], w=12)
-        return Panel("navi_miller0", [prevloci, browse, preview], sepw=sepw)
-
-    if rect.w < 70:
-        if old.name == "navi_miller1":
-            return old
-        prevloci = Panel("prevloci", [Panel("prev")], w=16, sepw=sepw)
-        browse = Panel("browse", [Panel("tab0")], w=0.5, sepw=sepw)
-        preview = Panel("preview", [Panel("pv0")], sepw=sepw)
-        return Panel("navi_miller1", [prevloci, browse, preview], sepw=sepw)
-
-    if old.name == "navi_miller2":
-        return old
-    prevloci = Panel(
-        "prevloci", [Panel("pprev", w=0.4), Panel("prev")], w=22, sepw=sepw
-    )
-    browse = Panel("browse", [Panel("tab0")], w=0.5, sepw=sepw)
-    # interp = PanelView(ratio=(0,))
-    preview = Panel("preview", [Panel("pv0", w=0.7), Panel("pv1")], sepw=sepw)
-    # TODO:ALSO: return linewrap/header/footer cfg overrides
-    return Panel("navi_miller2", [prevloci, browse, preview], sepw=sepw)
-
-
-# SPLIT:(`NaviLayout): to cvt {(ww,wh) -> [panel].rect}, adapt based on size and toggle visibility
 class NaviWidget:
     def __init__(self, ent: Entity) -> None:
         self._pool = EntityViewCachePool()
@@ -151,6 +25,28 @@ class NaviWidget:
         # self._hist.jump_to(ent, intermediates=True)
         self._layout = Panel()
         self._colsep = ""  # "│"  # OR=█|┃│ OR=<Space>
+        self._layoutstrategy = "adaptive"
+
+    # SPLIT:(`NaviLayout): to cvt {(ww,wh) -> [panel].rect}, adapt based on size and toggle visibility
+    def set_layout(self, strategy: str, rect: Rect | None = None) -> None:
+        if rect is None:
+            rect = self._layout.rect
+        # TODO: toggle/limit linewrap + content-awareness
+        # TODO: header/footer hide/xfm
+        pcfg = PanelCfg(sepw=len(self._colsep))  # FIXME: len() -> cellwidth()
+        mk = getattr(pcfg, "navi_" + strategy)
+        if mk.__name__.endswith("adaptive"):
+            self._layout = mk(rect, old=self._layout)
+        else:
+            self._layout = mk()
+        self._layoutstrategy = strategy
+        self._layout.resize(rect)
+        log.debug(f"{strategy}: {self._layout=}")  # <TEMP:DEBUG
+
+        # WHY: adaptive layout on bigger window may need more preview nodes
+        self._update_preview()
+        self._resize_cached_preview()
+        self._resize_cached_hist_browse()
 
     # PERF?IDEA: use @cached and reset by "del self._view" in "view_go_*()"
     # RENAME:(view) make it publicly accessible from keymap:lambda
@@ -161,17 +57,7 @@ class NaviWidget:
     ## ALT:(rect/origin): do C.move(y,x) b4 .redraw(), and remember getyx() inside each .redraw()
     def resize(self, vh: int, vw: int, orig_yx: tuple[int, int] = (0, 0)) -> None:
         rect = Rect(vw, vh, x=orig_yx[1], y=orig_yx[0])
-        self._layout = pick_adaptive_layout_cfg(
-            rect,
-            old=self._layout,
-            sepw=len(self._colsep),  # FIXME: len() -> cellwidth()
-        )
-        self._layout.resize(rect)
-        log.debug(f"{self._layout=}")  # <TEMP:DEBUG
-        # WHY: adaptive layout on bigger window may need more preview nodes
-        self._update_preview()
-        self._resize_cached_preview()
-        self._resize_cached_hist_browse()
+        self.set_layout(self._layoutstrategy, rect)
 
     def cursor_jump_to(self, idx: int) -> None:
         self._view._wdg.focus_on(idx)  # pylint:disable=protected-access
