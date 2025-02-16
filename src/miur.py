@@ -32,6 +32,10 @@ def miur_main(g: AppGlobals) -> None:
         do(iomgr.stdlog_redir(g))
         log.sep()
 
+        from .integ.any_spawn import mp_join_children
+
+        do(mp_join_children())
+
         from . import curses_ext as CE
 
         g.stdscr = do(CE.curses_stdscr())

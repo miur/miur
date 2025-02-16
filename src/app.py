@@ -2,6 +2,7 @@
 #   NOTE: native "from io import TextIOWrapper" is much faster
 if globals().get("TYPE_CHECKING"):
     from io import StringIO
+    from multiprocessing import Process
     from types import ModuleType
     from typing import Callable, Optional, TextIO, Union
 
@@ -47,6 +48,8 @@ class AppIO:
     ttyout: "Optional[TextIO]" = None  # !fd=1
     ttyalt: "Optional[StringIO]" = None  # -> ttyout
     logsout: "Optional[Union[StringIO,TextIO]]" = None  # -> ttyalt | pipeerr
+    logfdchild: int  # back from child processes to miur (parent)
+    logfdparent: int  # TEMP: pass to asyncio to listen for logs
 
 
 # class AppState:
@@ -82,6 +85,7 @@ class AppGlobals:
     exiting: bool = False
     inputfield: str = ""
     inputpos: int = -1
+    mp_children: "dict[str, Process]" = {}
 
 
 g_app = AppGlobals()

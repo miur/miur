@@ -32,8 +32,16 @@ class MiurAppNode(Golden[str]):
         import os
 
         from ..app import g_app
-        from ..keymap import spawn_render
         from .objaction import ObjAction
+
+        # FIXME:BET: inof "None" return RemoteException to explore (or at least errcode)
+        def _spawn_render(nm: str) -> None:
+            import importlib
+
+            from ..integ.any_spawn import spawn_py
+
+            mod = importlib.import_module(".ui.render." + nm, __package__)
+            return spawn_py(mod.main, nm)
 
         return [
             # NICE:IDEA: inof exposing each subsystem of !miur one-by-one,
@@ -50,7 +58,7 @@ class MiurAppNode(Golden[str]):
                         name=nm,
                         parent=self,
                         allowpreview=False,
-                        fn=lambda nm=nm: spawn_render(nm),
+                        fn=lambda nm=nm: _spawn_render(nm),
                     )
                     for nm in [
                         "glfw_imgui",

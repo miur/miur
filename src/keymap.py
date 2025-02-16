@@ -1,5 +1,4 @@
 from functools import cache
-from multiprocessing import Process
 from typing import TYPE_CHECKING, Callable, Optional
 
 import _curses as C
@@ -15,6 +14,7 @@ if TYPE_CHECKING:
     from .ui.view import EntityView
 
 
+# ALT:MOVE: into __main__ to import from everywhere?
 @cache
 def M(mod: str) -> "ModuleType":
     import importlib
@@ -52,49 +52,6 @@ def _parentby(g: AppGlobals, steps: int) -> None:
     g.root_wdg.view_go_back()
     _navi().cursor_step_by(steps)
     g.root_wdg.view_go_into()
-
-
-# WARN: don't use Thread as GUI thread should be never destroyed! (even after app.quit())
-g_render: dict[str, Process] = {}
-
-
-def spawn_render(nm: str) -> None:
-    import atexit
-
-    log.info(nm)
-    if nm in g_render:
-        if g_render[nm].is_alive():
-            log.warning(f"render={nm} is already running! ignored")
-            return
-        # log.error(f"Err: render={nm} GUI thread should be never destroyed!")
-        # return
-        atexit.unregister(g_render[nm].join)
-        g_render[nm].join()
-
-    def _gui_fork() -> None:
-        # TEMP:HACK: exit running miur copy
-        # OR: import asyncio; asyncio.get_running_loop().close()
-        g_app.doexit()
-
-        # NOTE: import render in new process/thread
-        #   COS Qt registers MainThread on import
-        mod = M(".ui.render." + nm)
-        log.warning(f"forked={mod.__file__}")
-        mod.main()
-
-        # [_] FAIL: no exception from here when "sys" wasn't imported
-        #   FIND: how to process errors from multiprocessing
-        # sys.exit(M(".ui.render." + nm).main())
-
-        ## MAYBE: clean start with same .py interpreter/flags
-        # cmd = [.util.devenv.get_py_args()[0], mod.__file__]
-        # os.execv(cmd[0], cmd)
-
-    # [_] BUG: when closing QApp, it spawns AGAIN due to asyncio/etc.
-    g_render[nm] = Process(target=_gui_fork)
-    # g_render[nm].daemon = True
-    g_render[nm].start()
-    atexit.register(g_render[nm].join)
 
 
 # ALT:BET: allow direct access to contained _objects methods ?
@@ -157,13 +114,20 @@ _modal_comma: KeyTable = {
     "m": lambda g: M(".integ.shell").shell_out(_loci()),
 }
 
+
+def _spawn_render(nm: str) -> Callable[[AppGlobals], None]:
+    # NOTE: importing Qt should also be in lambda of new process/thread
+    #   COS Qt registers MainThread on import
+    return lambda g: M(".integ.any_spawn").spawn_py(M(".ui.render." + nm).main, nm)
+
+
 _modal_spawn: KeyTable = {
-    "f": lambda g: spawn_render("glfw_imgui"),
-    "g": lambda g: spawn_render("qt6gl"),
-    "m": lambda g: spawn_render("qt6qml"),
-    "n": lambda g: spawn_render("pyqtgr_numpy"),
-    "s": lambda g: spawn_render("sdl3gl_imgui"),
-    "w": lambda g: spawn_render("qt6wg"),
+    "f": _spawn_render("glfw_imgui"),
+    "g": _spawn_render("qt6gl"),
+    "m": _spawn_render("qt6qml"),
+    "n": _spawn_render("pyqtgr_numpy"),
+    "s": _spawn_render("sdl3gl_imgui"),
+    "w": _spawn_render("qt6wg"),
 }
 
 
@@ -362,7 +326,6 @@ def handle_input(g: AppGlobals) -> None:
             g.root_wdg.redraw(g.stdscr)
             g.stdscr.refresh()
     elif isinstance(cmd, dict):
-        assert False
         # modal_switch_to(wch)
         if g_app.keytable == g_app.keytableroot:
             g_app.keytablename = str(wch)

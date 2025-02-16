@@ -1,3 +1,4 @@
+# SUM: mod is named after "generic functions applicable for any exe/execution process"
 import os
 
 # if globals().get("TYPE_CHECKING"):

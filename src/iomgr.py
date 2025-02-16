@@ -56,6 +56,16 @@ def tty_open_onto_fd(fd: int) -> "TextIO":
 def init_explicit_io(g: "AppGlobals") -> None:
     io = g.io
 
+    def _scope_logsink() -> None:
+        rfd, wfd = os.pipe()
+        os.set_inheritable(rfd, False)
+        os.set_blocking(rfd, False)
+        io.logfdparent = rfd
+
+        os.set_inheritable(wfd, True)
+        os.set_blocking(wfd, False)
+        io.logfdchild = wfd
+
     # TBD? only reassing .pipein/out FD if using curses (or interactive TTY cli)
     # DFL?(no-redir): .pipein=None .pipeout/err=altscreen|ringbuffer ?
     #   TODO:OPT: explicit choice for FD dst
@@ -75,9 +85,13 @@ def init_explicit_io(g: "AppGlobals") -> None:
             io.pipeout = None
             ## DISABLED: nice PERF but "sys.stdout" should be disallowed
             # io.ttyout = cout
+            ## ATT: after also closing "cerr" any sys.stdout.write() will raise
+            ##   -> ValueError: I/O operation on closed file.
             cout.close()
         else:
             io.pipeout = dup_and_close_stdio(cout)
+        # [_] BAD: all spawned (inof forked) processes will inherit fd1==tty,
+        #   therefore all of them will mess up TTY inof using ttyalt
         io.ttyout = tty_open_onto_fd(fd1)
 
     def _scope_err(cerr: "TextIO", fd2: int) -> None:
@@ -85,41 +99,63 @@ def init_explicit_io(g: "AppGlobals") -> None:
         if cerr.isatty():
             io.pipeerr = None
             cerr.close()
-            ## BUG: after closing "cerr" we lose proper BT from here
-            ## raise RuntimeError()  # <DEBUG
-            # FIXME? open os.pipe to cvt libc.stderr into py.log inof spitting over TTY
+            ## BUG~ after closing "cerr" we lose proper BT from here
+            # raise RuntimeError()  # <DEBUG
+            ## FIXED? open os.pipe to cvt libc.stderr into py.log inof spitting over TTY
             #   FAIL: !deadlock! if underlying native C code fills os.pipe internal buffers
-            io.ttyalt = __import__("io").StringIO()
+            #   ALT? make write() non-blocking -- so sys.write will error-out after filling buffers
+            os.dup2(io.logfdchild, fd2, inheritable=True)
+            os.set_inheritable(fd2, True)
+            os.set_blocking(fd2, False)
+            # [_] CHECK: get backtrace in case of closed sys.stdout.write()
+            #   -> ValueError: I/O operation on closed file.
         else:
             io.pipeerr = dup_and_close_stdio(cerr)
-            io.ttyalt = None
-        # TEMP: get backtrace in case of sys.stdout.write() -> ValueError: I/O operation on closed file.
-        # TBD: g.opts.redirerr
-        sys.stderr = io.ttyalt  # sys.__stderr__ =
-        sys.stdout = io.ttyalt  # sys.__stdout__ =
+        # RND: postpone the decision to create StringIO until OPT redir
+        io.ttyalt = None
 
     from .util.logger import log
 
     # NOTE: print before redirect to notify user where to search for logs
     log.state(f"log={"(buf)" if (o := g.opts.logredir) is None else o}")
 
+    _scope_logsink()
     _scope_in(sys.stdin, CURSES_STDIN_FD)
     _scope_out(sys.stdout, CURSES_STDOUT_FD)
     _scope_err(sys.stderr, CURSES_STDERR_FD)
 
+    ## RND: redir all errors into logsink (either ttyalt ringbuffer or logredir)
+    # TBD: g.opts.redirerr
+    # FAIL:(buffering=0): ValueError: can't have unbuffered text I/O
+    #   BUG: silently exits from here
+    sys.stderr = os.fdopen(io.logfdchild, "w", encoding="utf-8", buffering=1)
+    sys.stderr.reconfigure(write_through=True)
+    # sys.__stderr__ =
+
+    ## WKRND: we always need a valid sys.stdout, or we will lose some backtraces!
+    ##   e.g. multiprocessing.BaseProcess._bootstrap uses "traceback.print_exc()"
+    ## ATT: some logs may be printed to TTY even after sys.stdout.close()
+    ##   e.g. "traceback.print_exc()" has a fallback to "sys.stderr"
+    ## DISABLED:(unacceptable!): writes will be silently ignored inof raising exceptions
+    # sys.stdout = None
+    # TBD: g.opts.redirerr
+    ## ALT:RND: don't reassign and keep it closed to disallow any print()/stdout.write()
+    #   >> USAGE: directly pass fd1=io.pipeout into spawned processes
+    # sys.stdout = io.ttyalt
+    # sys.stdout = sys.stderr
+    # sys.__stdout__ =
+
+    ## [_] FAIL: silently dies
     # print("aaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
     # print("aaaaaaaaaaaaaaaaaaaaaaaaaaaaa", file=sys.stderr)
     # sys.stdout.write("aaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n")
-
-    ## WARN: logs in ringbuffer should be kept as-is (as `Events)
-    ##   >> they shouldn't be rasterized until you know if DST is plain text, or json, or whatever
 
     # TBD! only go through ttyalt if using curses (or interactive TTY cli)
     #   THINK:MAYBE: write W/E into stderr if it's redirected ? OR: all logs there ?
     if o := g.opts.logredir:
         # TBD? close on exit to avoid `ResourceWarning
         if isinstance(o, int):
-            io.logsout = os.fdopen(o, "w", encoding="locale")
+            io.logsout = os.fdopen(o, "w", encoding="locale", buffering=1)
         elif isinstance(o, str):
             # raise RuntimeError(o)  # BUG: !miur silently exists here w/o backtrace
             # ALSO:DEV: generic support for other redir schemas
@@ -127,23 +163,24 @@ def init_explicit_io(g: "AppGlobals") -> None:
             #   DFL=ringbuf
             #   ALSO: null / disable -- optimize code
             # pylint:disable=consider-using-with
-            io.logsout = open(o, "w", encoding="locale")
+            io.logsout = open(o, "w", encoding="locale", buffering=1)
         else:
             raise NotImplementedError
-
-        def _logwrite(s: str) -> None:
-            io.logsout.write(s)
-            # NOTE: immediate buffering after each log line
-            io.logsout.flush()
-
+        ## DISABLED:(flush): we already have line-buffered(=1) fds
+        # def _logwrite(s: str) -> None:
+        #     io.logsout.write(s)
+        #     # NOTE: immediate buffering after each log line
+        #     io.logsout.flush()
+        # log.write = _logwrite
     else:
-        if io.ttyalt is None:
-            io.ttyalt = __import__("io").StringIO()
+        assert io.ttyalt is None
+        ## WARN:FUT:RFC: logs in ttyalt ringbuffer should be kept as-is (as `Events)
+        ##   >> they shouldn't be rasterized until you know if DST is plain text, or json, or whatever
+        io.ttyalt = __import__("io").StringIO()
         io.logsout = io.ttyalt  # BAD: possible double-close for same FD
-        _logwrite = io.logsout.write
 
-    # [_] CHECK:WTF:BUG: why logs are printed on TTY even after previous sys.stdout.close()
-    log.write = _logwrite  # TBD? restore back on scope ?
+    # TBD? restore back on scope ?
+    log.write = io.logsout.write
 
     # [_] FIXME: add hooks individually
     # BAD: { mi | cat } won't enable altscreen, and !cat will spit all over TTY

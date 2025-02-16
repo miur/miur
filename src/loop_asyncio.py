@@ -1,4 +1,5 @@
 import asyncio
+import os
 import signal
 from contextlib import contextmanager
 from typing import Any, Callable, Iterator, cast
@@ -74,6 +75,13 @@ async def mainloop_asyncio(g: AppGlobals) -> None:
     # FIND:MAYBE: don't process in handler directly, and only schedule callback ?
     loop.add_signal_handler(signal.SIGWINCH, g.curses_ui.resize)
     loop.add_reader(iomgr.CURSES_STDIN_FD, g.curses_ui.handle_input)
+    # BET?TRY: use multiprocess.Queue
+    #   BUT: we will still need low-level fd for stderr of child processes
+    # FAIL:(buffering=0): ValueError: can't have unbuffered text I/O
+    logsink = os.fdopen(g.io.logfdparent, "r", encoding="utf-8")  # , buffering=1)
+    logsink.reconfigure(line_buffering=False, write_through=True)
+    ## WARN: use "read()" inof "readline()" to avoid buffering of "traceback.print_exc()"
+    loop.add_reader(logsink.fileno(), lambda: log.write(logsink.read()))
     try:
         log.kpi("serving asyncio")
         if __debug__ and g.opts.PROFILE_STARTUP:
@@ -88,6 +96,7 @@ async def mainloop_asyncio(g: AppGlobals) -> None:
         pass
     finally:
         log.trace("removing... fds/signals")
+        loop.remove_reader(fd=logsink.fileno())
         loop.remove_reader(fd=iomgr.CURSES_STDIN_FD)
         loop.remove_signal_handler(signal.SIGWINCH)
         loop.remove_signal_handler(signal.SIGINT)
