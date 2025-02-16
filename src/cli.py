@@ -141,8 +141,14 @@ def miur_argparse(argv: list[str]) -> None:
             log.warning(f"skipping type check for option '{k}'")
         elif not isinstance(v, anno[k]):  # if type(v) is not type(getattr(opts, k)):
             raise ValueError(f"{v}!=.{anno[k]}. wrong type_anno for value in {loci}")
+        # HACK: don't override default "True" with "None"
+        #   ALT? simply use "default=dfl.color" in cli definition
+        #   THINK: what approach better?
+        if k in ("color",):
+            continue
         setattr(o, k, v)
     log.minlevel = LogLevel(o.loglevel)
+    log.termcolor = getattr(o, "color", None)
 
     if o.PROFILE_STARTUP:
         # TODO: disable for integ-tests e.g. "colored output to ttyalt despite stdout redir"

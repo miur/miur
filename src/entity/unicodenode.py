@@ -28,6 +28,6 @@ class UnicodeNode(Golden[str]):
             #     continue
             try:
                 name = unicodedata.name(c)
-                yield TextEntry(f"U+{ci:04X}: {c} - {name}", self)
+                yield TextEntry(f"U+{ci:04X}│ {c} - {name}", self)
             except ValueError:
                 pass

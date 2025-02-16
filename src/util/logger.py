@@ -90,20 +90,28 @@ class Logger:  # pylint:disable=too-many-instance-attributes
         self.at = self._lazy_init
 
     def _lazy_init(self, lvl: LogLevel, fmt: _Loggable, /, *, loci: str = "") -> None:
-        # NOTE: update to redirected FD
+        # RND:: you should update it to redirected FD
         if not hasattr(self, "write"):
-            self.write = sys.stdout.write
+            self.write = sys.stdout.write if sys.stdout else sys.stderr.write
 
-        from ..app import g_app
-
-        # ATT: don't reassing cmdline opts -- treat them as Final, and SEP from "state"
-        self.termcolor = getattr(g_app.opts, "color", None)
-        # TODO: make it a part of supplied .write()
+        # OLD~ATT: don't reassing cmdline opts -- treat them as Final, and SEP from "state"
+        # from ..app import g_app
+        # self.termcolor = getattr(g_app.opts, "color", None)
+        # OLD~TODO: make it a part of supplied .write()
         if self.termcolor is None:
+            ## RND: questionable fallback for auto-colors
+            #  BET: always be explicit during mainapp init
+            #    COS: only mainapp knows how it will be consuming the logs
+            #      BET? postpone coloring until mainapp actually write() to file/pipe/etc,
+            #        as only end-consumer on the other side of pipe/file knows that it needs
             # FIXME: check actual fd *after* all redirection OPT
             #   ~~ it means we should avoid using logger until all redirs were applied
             #   IDEA: accumulate early logs in the buffer, and then dump all of them at once
-            self.termcolor = sys.stdout.isatty()
+            self.termcolor = (
+                sys.stdout.isatty()
+                if sys.stdout
+                else sys.stderr.isatty() if sys.stderr else None
+            )
         self.at = self._write
         self.at(lvl, fmt, loci=loci)
 

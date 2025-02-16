@@ -26,7 +26,7 @@ class AppOptions:
     ipykernel: bool = False
     ipyconsole: bool | None = None
     ####
-    color: bool | None
+    color: bool | None = True
     # VIZ(logredir): altscreen | fd=3 | ./log | file:///path/to/log:buffering=1 | (fifo|socket)://...
     logredir: int | str | None = None
     loglevel: int
