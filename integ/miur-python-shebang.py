@@ -2,7 +2,7 @@
 # %WARN!. zcompile will error-out on this multi-shebang!
 # %SUMMARY: frontend for both .py and .sh
 # %USAGE: $ mi || miur || . =mi
-"""":
+""":"
 if (return 0 2>/dev/null); then
     _app=$(realpath -e "${BASH_SOURCE[0]:-$0}")
     _app=${_app%/*/*}/src/__main__.py  # <TEMP

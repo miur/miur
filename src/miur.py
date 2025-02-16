@@ -72,22 +72,35 @@ def miur_main(g: AppGlobals) -> None:
         g.curses_ui = ui
         g.keytableroot = keytable_insert_aura_pathes(KM.g_modal_default)
         KM.modal_switch_to(None)
+
         # f21 [_] DEV miur --remember-url=./cwdurl vs --choosedir=./cwd
+        rootnode = RootNode()
+        g.root_wdg = RootWidget(rootnode)
+        # g.root_wdg.set_entity(FSEntry("/etc/udev"))
+
+        import os
+
+        if (rhist := g.opts.remember_hist) and os.access(rhist, os.R_OK):
+            with open(rhist, "r", encoding="utf-8") as f:
+                if text := f.read():
+                    g.root_wdg._navi._hist.load(text)
+
         xpath = getattr(g.opts, "xpath", None)
         ent: Entity
         if xpath is None:
-            import os
-
-            # [_] FIXME: should generate whole chain of entities starting from RootNode
-            #   BAD: they should be cached in _vlst, and we should get the same node when _vlst is re-generated
-            ent = FSAuto(os.getenv("PWD", "") or os.getcwd(), None)
+            ent = FSAuto(os.getenv("PWD", "") or os.getcwd(), rootnode)
         elif xpath == "":
-            ent = RootNode()
+            ent = rootnode
         else:
-            ent = FSAuto(xpath, None)
-        log.state(xpath)
-        g.root_wdg = RootWidget(ent)
-        # g.root_wdg.set_entity(FSEntry("/etc/udev"))
+            ent = FSAuto(xpath, rootnode)
+        log.state(f"{xpath=} -> {ent=}")
+        ## [_] FIXME: make "xpath" usable again TEMP: use rhist to restore states
+        #   * should generate whole chain of entities starting from RootNode
+        #     ATT: they should be cached in _vlst, and we should get the same node when _vlst is re-generated
+        #   * should be applied *after* loading rhist, and simply jumped to preloaded node (if present)
+        #   * can be either unix=$CWD or file:// or schema=miur:// (or miur:hist-stack://) or arbitrary web URL
+        # g.root_wdg.jump_to(ent)
+        # g.root_wdg.set_entity(ent)  # <RENAME? "set_rootentity(ent)" to emphasize its isolation
 
         # TEMP:HACK: directly append stdin to current node
         if f := g.io.pipein:
@@ -108,10 +121,10 @@ def miur_main(g: AppGlobals) -> None:
                 cpoff += len(line)
             v._wdg.assign(v._xfm_lst + lst)
 
-        turl = g.opts.remember_url
-        tcwd = g.opts.choosedir
-        if turl or tcwd:
-            do(save_choosedir(turl, tcwd))
+        rurl = g.opts.remember_url
+        rcwd = g.opts.choosedir
+        if rhist or rurl or rcwd:
+            do(save_choosedir(rhist, rurl, rcwd))
 
         if g.opts.bare:  # NOTE: much faster startup w/o asyncio machinery
             from .loop_selectors import mainloop_selectors

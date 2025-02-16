@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING, Callable, Sequence
 
-from ..entity.base import Golden
+from ..entity.base import Entity, Golden
 from ..util.logger import log
 from .item import ItemWidget
 from .vlst_base import SatelliteViewport_DataProtocol
@@ -98,7 +98,7 @@ class SatelliteViewport(
     #   ALSO:(key=vpidx): focus on item visible at viewport fraction or at Nth position
     def focus_on(
         self,
-        key: int | float | ItemWidget | Golden | str | Callable[[ItemWidget], bool],
+        key: str | int | float | Entity | ItemWidget | Callable[[ItemWidget], bool],
         # HACK:(vh_fallback): is needed by history.jump_to() before .resize() call
         #   BET:(init): call .resize() and then explicitly .jump_to(intermediates=True)
         #   ALT:API: pos_hint=
@@ -119,6 +119,11 @@ class SatelliteViewport(
 
         idx: int | None
         match key:
+            case str():
+                # pylint:disable=protected-access
+                # TEMP:BAD: it's a mess to cmp either .name or .loci (NEED: strict FMT)
+                #   [_] BET:TODO: use "str" solely for .name and use custom `Loci() for composite .loci ※⡧⢈⢲⠜
+                idx = _match(lambda w: w._ent.name == key)
             case int():
                 # ALSO:(key=vpidx): focus on Nth item visible in viewport
                 idx = key
@@ -127,19 +132,14 @@ class SatelliteViewport(
                 # idx = round(vh * key)
                 assert 0.0 <= key <= 1.0
                 idx = round(len(self._lst) * key)
+            case Golden():
+                # pylint:disable=protected-access
+                idx = _match(lambda w: w._ent == key)
             case ItemWidget():
                 try:
                     idx = self._lst.index(key)
                 except ValueError:
                     idx = None
-            case Golden():
-                # pylint:disable=protected-access
-                idx = _match(lambda w: w._ent == key)
-            case str():
-                # pylint:disable=protected-access
-                # TEMP:BAD: it's a mess to cmp either .name or .loci (NEED: strict FMT)
-                #   [_] BET:TODO: use "str" solely for .name and use custom `Loci() for composite .loci ※⡧⢈⢲⠜
-                idx = _match(lambda w: w._ent.loci == key)
             case cond if callable(cond):
                 idx = _match(cond)
             case _:
@@ -181,7 +181,7 @@ class SatelliteViewport(
         self._viewport_followeditem_linesfromtop = pos
 
     # CASE:(lightweight): to be able to re-assign ~same list after external xfm, e.g. after "order-by"
-    def assign(self, lst: Sequence[Golden], hint_idx: int | None = None) -> None:
+    def assign(self, lst: Sequence[Entity], hint_idx: int | None = None) -> None:
         pidx = self._cursor_item_lstindex if hint_idx is None else hint_idx
         focused = self._lst[pidx] if getattr(self, "_lst", None) else None
         # BAD: can't drop individual items REF⌇⡧⡺⣽⡠

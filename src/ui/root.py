@@ -55,10 +55,8 @@ class RootWidget:
         wdg = self._navi._view._wdg
 
         # pylint:disable=protected-access
-        # ALT:([]): use ⸤⸣ OR ⸢⸥
-        hidx, hlen = self._navi._hist.pos
-        header = f"[{hidx}/{hlen-1}] "  # NOTE:FMT: "0/0" means we are at RootNode with no history
-        stdscr.addstr(0, 0, header, S.auxinfo)
+        # NOTE:FMT: "[0/0]" means we are at RootNode with no history
+        stdscr.addstr(0, 0, str(self._navi._hist) + " ", S.auxinfo)
         xpath = (
             wdg.focused_item._ent.loci if wdg._lst else self._navi._view._ent.loci + "/"
         )

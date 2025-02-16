@@ -35,6 +35,7 @@ class AppOptions:
     stdinfmt: "Optional[Golden]"
     ####
     signal: int | None
+    remember_hist: str = None
     remember_url: str = None
     choosedir: str = None
 

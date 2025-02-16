@@ -12,7 +12,7 @@
 #     /d/coastline/fleur/cfg/gdb-jupyter.py
 # %SUMMARY: frontend
 # %USAGE: $ mi || miur || . =mi
-"""":
+""":"
 if (return 0 2>/dev/null); then
     _app=$(realpath -e "${BASH_SOURCE[0]:-$0}")
     if [[ ${_app#/usr/} != ${_app} ]]

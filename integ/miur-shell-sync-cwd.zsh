@@ -31,18 +31,28 @@ if [[ -n ${MIUR_LEVEL-} ]]; then
 
 else # if [[ -n ${MIUR_LEVEL-} ]]
 
-  miur(){ local d f=${XDG_RUNTIME_DIR:?}/miur/cwd integ=${${(%):-%x}:a:h}
-    [[ -d ${f%/*} ]] || mkdir -m700 -p "${f%/*}"
-    # NOTE: source all aliases on first run in shell session
+  miur(){
+    ## NOTE: source all aliases on first run in shell session
+    #   WARN: do it before everything else to avoid overriding local vars
+    #   WARN: sourcing inside function may not work in some shells
+    local integ=${${(%):-%x}:a:h}
     [[ $(alias m) == "m=miur" ]] || source "$integ/miur-shell-aliases.sh" =miur "verbose"
+
+    local d=${XDG_RUNTIME_DIR:?}/miur
+    local f=${d:?}/cwd
+    [[ -d $d ]] || mkdir -m700 -p "$d"
     [[ -n ${MIUR_LEVEL-} ]] && exit  # NOTE: exit miur-nested shell
     # NOTE: load !miur back at whatever folder it was in previous session
-    [[ -s $f ]] && d=$(<"$f") && [[ $d != $PWD ]] && [[ -e $d ]] && set -- "$d" "$@" && unset d
+    [[ -s ${f:?} ]] && local c=$(<"$f") && [[ $c != $PWD ]] && [[ -e $c ]] && set -- "$c" "$@" && unset c
     # NOTE:OPT:(--remember-url): store both file:// "cwd" and miur:// "url"
-    command miur --remember-url="${f%/*}/url" --choosedir="$f" "$@"
+    command miur \
+      --remember-hist="$d/hist" \
+      --remember-url="$d/url" \
+      --choosedir="$f" \
+      "$@"
     # NOTE: change shell $PWD to the last viewed directory
-    [[ -s $f ]] && d=$(<"$f") && while [[ $d != ${d%/*} ]]; do [[ -d $d ]] && break || d=${d%/*}; done
-    if [[ -d ${d-} && $d != $PWD ]]; then builtin cd -- "$d" || return; fi
+    [[ -s ${f:?} ]] && local c=$(<"$f") && while [[ $c != ${c%/*} ]]; do [[ -d $c ]] && break || c=${c%/*}; done
+    if [[ -d ${c-} && $c != $PWD ]]; then builtin cd -- "$c" || return; fi
   }
 
 fi # if [[ -n ${MIUR_LEVEL-} ]]

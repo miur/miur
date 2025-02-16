@@ -16,13 +16,16 @@ from .view import EntityView
 
 
 class NaviWidget:
-    def __init__(self, ent: Entity) -> None:
+    def __init__(self, rootnode: Entity) -> None:
         self._pool = EntityViewCachePool()
-        rootnode = ent if isinstance(ent, RootNode) else RootNode()
-        self._hist = HistoryCursor(rootnode, self._pool)
-        self._hist.jump_to(self._view._wdg.focused_item._ent)
-        # self._hist.jump_to(rootnode._vlst[0])
+        ## RND:CHG:DONE: instead of building path "root..ent" we make "ent" a new "[fake]root"
+        #   and isolate navi to be inside it OR reroot/reroute to parents only by ".."
+        # rootnode = ent if isinstance(ent, RootNode) else RootNode()
+        # ...
         # self._hist.jump_to(ent, intermediates=True)
+        self._hist = HistoryCursor(rootnode, self._pool)
+        # TEMP:RND: imm jump to contents of RootNode.explore()
+        self._hist.jump_to(self._view._wdg.focused_item._ent)
         self._layout = Panel()
         self._colsep = ""  # "│"  # OR=█|┃│ OR=<Space>
         self._layoutstrategy = "adaptive"

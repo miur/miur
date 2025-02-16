@@ -1,4 +1,4 @@
-from typing import Iterator, override
+from typing import Iterable, Iterator, override
 
 from ..entity.base import Entity
 from ..entity.error import ErrorEntry
@@ -58,6 +58,13 @@ class HistoryCursor:
     @property
     def pos(self) -> tuple[int, int]:
         return self._cursor_idx, len(self._view_stack)
+
+    @override
+    def __str__(self) -> str:
+        # NOTE:FMT: "0/0" means we are at RootNode with no history
+        # ALT:([]): use ⸤⸣ OR ⸢⸥
+        hidx, hlen = self.pos
+        return f"[{hidx}/{hlen-1}]"
 
     # FAIL: when split(horz) we will have *two* "current view" for same history
     #   MAYBE: store only "previous items" for history? but how to be with fwd-history ?
@@ -146,14 +153,16 @@ class HistoryCursor:
                 #   !! should fixup existing entities in history._stack too
                 # BAD:PERF: we are forced to traverse each intermediate entity
                 #   to use the *same* instances of FSEntry as returned by .explore()
-                if wi := self.focused_view._wdg.focus_on(ploci):
+                if wi := self.focused_view._wdg.focus_on(
+                    lambda w, plo=ploci: w._ent.loci == plo
+                ):
                     self._cursor_idx = self._advance_or_retrieve_or_emplace(wi._ent)
                 else:
-                    raise ValueError("WTF: node doens't exist: loci=" + ploci)
+                    raise ValueError(f"WTF: intermediate node doesn't exist: {ploci=}")
 
-        if not (wi := self.focused_view._wdg.focus_on(nent.loci)):
+        if not (wi := self.focused_view._wdg.focus_on(nent.name)):
             raise ValueError(
-                f"TEMP:DECI: current view={self.focused_view} doesn't have: loci={nent.loci}"
+                f"TEMP:DECI: current view={self.focused_view} has no nm={nent.name}"
             )
         # WARN: {id(wi._ent) != id(nent)}
         #  COS: "nent" is an arbitrary `Entity, and "wi._ent" is from a contiguous graph
@@ -193,3 +202,35 @@ class HistoryCursor:
     #                 break
     #         if self._view._wdg._cursor_item_lstindex != i:
     #             log.error("WTF: pview not found")
+
+    def dump(self) -> str:
+        # NOTE: also preserve/restore current cursor
+        cursnm = self.focused_view._wdg.focused_item._ent.name
+        hidx = str(self._cursor_idx)
+        entnms = (v._ent.name for v in self._view_stack)
+        return "".join(f"\0{s}\n" for s in [cursnm, hidx, *entnms])
+
+    def load(self, text: str) -> None:
+        it = iter(("\n" + text + "\0").split("\n\0"))
+        empty = next(it)
+        assert empty == ""
+        cursnm = next(it)
+        hidx = int(next(it))
+        self._cursor_idx = 0
+        rootnm = next(it)
+        assert rootnm == self.focused_view._ent.name
+        for nm in it:
+            if not nm:
+                continue
+            # BET? store both "idx" and "nm" to have fallback for focus_on() ?
+            if not (wi := self.focused_view._wdg.focus_on(nm)):
+                # ALG: load as much as possible, and only ntf/log the error
+                #   COS: old directory may disappear OR explored error may become fixed
+                msg = f"{self!s} not found {nm=} under view={self.focused_view}"
+                log.error(msg)
+                # raise ValueError(msg)
+                return  # <COS: hidx/cursnm lost their meaning
+            self._cursor_idx = self._advance_or_retrieve_or_emplace(wi._ent)
+        self._cursor_idx = hidx
+        self.focused_view._visited = True
+        self.focused_view._wdg.focus_on(cursnm)

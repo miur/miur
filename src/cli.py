@@ -100,6 +100,7 @@ def cli_spec(parser: ArgumentParser, *, dfl: AppOptions) -> ArgumentParser:
     o("-I", "--ipyconsole", default=None, action="store_false")
     o("-X", "--ipyquit", dest="ipyconsole", action="store_true")
     # fmt:off
+    o("--remember-hist", default="", help="save miur HistoryCursor on exit and restore on startup")
     o("--remember-url", default="", help="save miur xpath on exit and restore on startup")
     o("--choosedir", default="", help="write filesystem cwd on exit (understood by other apps)")
     o("--logredir", help="redir to fd or path")
