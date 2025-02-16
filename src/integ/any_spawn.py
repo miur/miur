@@ -7,14 +7,14 @@ class mp_join_children:
         import multiprocessing as MP
 
         # # NOTE:(startup guard):OR: if __name__ == '__main__':
-        # if MP.get_start_method(allow_none=True) != "spawn":
-        #     # MP.freeze_support()
-        #     # ARCH:DECI:WHY:(spawn):
-        #     #   - we need a clean pyenv for each frwk/client, w/o prior #miur settings
-        #     #   - #miur is expected to use threads for some ops, which make 'fork' faulty
-        #     #   - all closable fildes should be closed, so we do proper exec
-        #     ## WARN: should be called only once (during startup)
-        #     MP.set_start_method("spawn")
+        if MP.get_start_method(allow_none=True) != "spawn":
+            # MP.freeze_support()
+            # ARCH:DECI:WHY:(spawn):
+            #   - we need a clean pyenv for each frwk/client, w/o prior #miur settings
+            #   - #miur is expected to use threads for some ops, which make 'fork' faulty
+            #   - all closable fildes should be closed, so we do proper exec
+            ## WARN: should be called only once (during startup)
+            MP.set_start_method("spawn")
 
     def __exit__(self, _et, _exc, _tb):  # type:ignore[no-untyped-def]
         from ..app import g_app
@@ -49,7 +49,15 @@ def _child_exec(tgt: "Callable[[], None|int]", /) -> None:
     # ALT: ifx = "*"
     p = MP.current_process()
     ifx = f" [{p.name}@{p.pid}]"
+    logwrite = sys.stderr.write
 
+    # BET?MOVE:(robust): insert child pid inside parent process when it receives the msg
+    #   BAD: impossible to know PID of who wrote to the pipe just now
+    #     WKRND:BAD:PERF: https://unix.stackexchange.com/questions/619150/get-pid-of-sending-pipe-process
+    #       $ find /proc -lname 'pipe:\[20043922]' 2>/dev/null
+    #       ALSO: https://www.thecodingforums.com/threads/attach-to-process-by-pid.744820/
+    #   ALT? open individual FD per each child to definitely know
+    #     NICE: we will be able to annotate by child PID any arbitrary stdout/stderr writes too!
     def _child_log_send(s: str) -> None:
         pos = s.find("]")
         if pos != -1:
@@ -69,19 +77,36 @@ def _child_exec(tgt: "Callable[[], None|int]", /) -> None:
         # logback = os.fdopen(g_app.io.logfdchild, "w", encoding="utf-8", buffering=1)
         # logback.write(s)
         # logback.flush()
-        sys.stderr.write(s)
+        ## NICE:HACK: reuse reopened "stderr" inof g_app.io.logfdchild "pipe",
+        ##   as for MP."spawn" g_app was never initialized and doesn't know FD
+        # DECI:MAYBE: make "stderr" into DFL for my logger
+        #   + conceptually logs in stderr are fine
+        #   + no need to reinit .write here
+        #   + auto-redir logs from children
+        #   + easier to redir logs together with all apps stderr on cmdline
+        #     (especially if I will reframe all writes to original stderr)
+        logwrite(s)
         # sys.stderr.flush()
 
     from ..util.logger import log
 
-    log.write = _child_log_send
+    # NOTE: children should re-init log instance
+    log.config(write=_child_log_send, termcolor=True)
 
     # log.warning(f"forked={sys.modules[tgt.__module__].__file__}")
     log.warning(f"forked={tgt.__module__}.{tgt.__name__}()")
 
     # HACK:FIXED: allow "print()" for 3rd-party code in children processes
-    # [_] BUG? it's too late to do this, if 3rd-party code has print() in module scope
-    sys.stdout = sys.stderr
+    if sys.stdout is None:
+        import os
+
+        stdout_fd = 1
+        os.dup2(sys.stderr.fileno(), stdout_fd, inheritable=True)
+        os.set_blocking(stdout_fd, False)
+        sys.stdout = os.fdopen(stdout_fd, "w", encoding="utf-8", buffering=1)
+        sys.stdout.reconfigure(write_through=True)
+
+    # print("hi", flush=True)  # <DEBUG
 
     ## FAIL:COS: "Process" has its own try-catch in BaseProcess._bootstrap,
     #   and sidesteps sys.excepthook by doing hard os._exit(1)
@@ -109,6 +134,8 @@ def _child_exec(tgt: "Callable[[], None|int]", /) -> None:
 #   COS Qt registers MainThread on import
 def spawn_py(tgt: "Callable[[], None|int]", /, nm: str) -> None:
     import multiprocessing as MP
+    import os.path as fs
+    import sys
 
     from ..app import g_app
     from ..util.logger import log
@@ -125,6 +152,11 @@ def spawn_py(tgt: "Callable[[], None|int]", /, nm: str) -> None:
         del g_app.mp_children[nm]
         p = None
 
+    # FIXED~BAD: ModuleNotFoundError: No module named "src"
+    entry = getattr(sys.modules["__main__"], "__file__", "")
+    pjroot = fs.dirname(fs.dirname(fs.realpath(entry)))
+    sys.path.insert(0, pjroot)
+    log.error(sys.path)
     try:
         p = MP.Process(name=nm, target=_child_exec, args=(tgt,))
         g_app.mp_children[nm] = p
@@ -132,3 +164,4 @@ def spawn_py(tgt: "Callable[[], None|int]", /, nm: str) -> None:
     finally:
         endmsg = "ed" if p else "ing new child process..."
         log.info(f"{nm}: {MP.get_start_method()}{endmsg}")
+        del sys.path[0]

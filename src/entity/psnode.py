@@ -10,6 +10,8 @@ class PSProto(Golden[str]):
         super().__init__(text, parent)
 
     def unknown(self) -> Entities:
+        if __import__("sys").flags.isolated:
+            __import__("site").main()
         # USAGE: $ ln -svt /d/miur/.venv/lib/python3.12/site-packages -- /d/just
         from just.tools.proc.ps import only_unknown
 

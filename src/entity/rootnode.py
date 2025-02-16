@@ -40,7 +40,7 @@ class MiurAppNode(Golden[str]):
 
             from ..integ.any_spawn import spawn_py
 
-            mod = importlib.import_module(".ui.render." + nm, __package__)
+            mod = importlib.import_module("..ui.render." + nm, __package__)
             return spawn_py(mod.main, nm)
 
         return [

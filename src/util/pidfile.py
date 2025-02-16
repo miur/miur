@@ -20,6 +20,10 @@ def temp_pidfile(pidfile: str) -> Iterator[int]:
     try:
         yield pid
     finally:
+        # [_] BUG: when launching multiple instances they will interfere
+        #   >> first which exits will delete this file (and overwrite {cwd,hist})
+        #   IDEA: store "XDG/miur/pid.1255" or even "XDG/miur.1255/pid"
+        #     >> USAGE: send kill() to most recent PID-file in dir
         os.remove(pidfile)
 
 

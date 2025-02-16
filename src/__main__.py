@@ -113,4 +113,6 @@ def as_pkg_or_exe(mkrun):  # type:ignore[no-untyped-def]
         sys.path.remove(parent)
 
 
-sys.exit(as_pkg_or_exe(select_entrypoint)())  # type:ignore[no-untyped-call]
+# CHECK: will this guard work with mp=spawn ?
+if __name__ == "__main__":
+    sys.exit(as_pkg_or_exe(select_entrypoint)())  # type:ignore[no-untyped-call]

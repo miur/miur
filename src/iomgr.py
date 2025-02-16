@@ -44,118 +44,89 @@ def tty_open_onto_fd(fd: int) -> "TextIO":
     # OR: libc = ctypes.CDLL(None); c_stdio = ctypes.c_void_p.in_dll(libc, nm); libc.fflush(c_stdio)
     # ATT:DISABLED:COS: fd-owning stdio should be flushed and closed at this point
     # os.fsync(fd)
-    # RQ:(inheritable=True): we need FD bound to TTY for shell_out() to work
-    #   BET: do shell_out() with explicit FD
-    os.dup2(ttyio.fileno(), fd, inheritable=True)
+    ## DISABLED:(inheritable=False): we should prevent child/mp processes accessing TTY at all
+    ##   OLD:RQ:(inheritable=True): we need FD bound to TTY for shell_out() to work
+    ##   DONE:BET: do shell_out() with explicit FD
+    os.dup2(ttyio.fileno(), fd, inheritable=False)
     return ttyio
 
 
-# WARN: all default "sys.stdin/out/err" will become *disfunctional* after this call
-#   e.g. set ".quiet=1" to prevent Jupyter::kernel.outstream_class(echo=sys.stdout)
-# ATT: no sense to *restore* FD schema on exit -- it's a global property of App itself
-def init_explicit_io(g: "AppGlobals") -> None:
-    io = g.io
+def _scope_logsink(g: "AppGlobals") -> None:
+    rfd, wfd = os.pipe()
+    os.set_inheritable(rfd, False)
+    os.set_blocking(rfd, False)
+    g.io.logfdparent = rfd
 
-    def _scope_logsink() -> None:
-        rfd, wfd = os.pipe()
-        os.set_inheritable(rfd, False)
-        os.set_blocking(rfd, False)
-        io.logfdparent = rfd
+    os.set_inheritable(wfd, True)
+    os.set_blocking(wfd, False)
+    g.io.logfdchild = wfd
 
-        os.set_inheritable(wfd, True)
-        os.set_blocking(wfd, False)
-        io.logfdchild = wfd
 
-    # TBD? only reassing .pipein/out FD if using curses (or interactive TTY cli)
-    # DFL?(no-redir): .pipein=None .pipeout/err=altscreen|ringbuffer ?
-    #   TODO:OPT: explicit choice for FD dst
+# TBD? only reassing .pipein/out FD if using curses (or interactive TTY cli)
+# DFL?(no-redir): .pipein=None .pipeout/err=altscreen|ringbuffer ?
+#   TODO:OPT: explicit choice for FD dst
 
-    def _scope_in(cin: "TextIO", fd0: int) -> None:
-        assert cin.fileno() == fd0, "Sanity check"
-        if cin.isatty():
-            io.pipein = None
-            cin.close()
-        else:
-            io.pipein = dup_and_close_stdio(cin)
-        io.ttyin = tty_open_onto_fd(fd0)
 
-    def _scope_out(cout: "TextIO", fd1: int) -> None:
-        assert cout.fileno() == fd1, "Sanity check"
-        if cout.isatty():
-            io.pipeout = None
-            ## DISABLED: nice PERF but "sys.stdout" should be disallowed
-            # io.ttyout = cout
-            ## ATT: after also closing "cerr" any sys.stdout.write() will raise
-            ##   -> ValueError: I/O operation on closed file.
-            cout.close()
-        else:
-            io.pipeout = dup_and_close_stdio(cout)
-        # [_] BAD: all spawned (inof forked) processes will inherit fd1==tty,
-        #   therefore all of them will mess up TTY inof using ttyalt
-        io.ttyout = tty_open_onto_fd(fd1)
+def _scope_in(g: "AppGlobals", cin: "TextIO", fd0: int) -> None:
+    assert cin.fileno() == fd0, "Sanity check"
+    if cin.isatty():
+        g.io.pipein = None
+        cin.close()
+    else:
+        g.io.pipein = dup_and_close_stdio(cin)
+    g.io.ttyin = tty_open_onto_fd(fd0)
 
-    def _scope_err(cerr: "TextIO", fd2: int) -> None:
-        assert cerr.fileno() == fd2, "Sanity check"
-        if cerr.isatty():
-            io.pipeerr = None
-            cerr.close()
-            ## BUG~ after closing "cerr" we lose proper BT from here
-            # raise RuntimeError()  # <DEBUG
-            ## FIXED? open os.pipe to cvt libc.stderr into py.log inof spitting over TTY
-            #   FAIL: !deadlock! if underlying native C code fills os.pipe internal buffers
-            #   ALT? make write() non-blocking -- so sys.write will error-out after filling buffers
-            os.dup2(io.logfdchild, fd2, inheritable=True)
-            os.set_inheritable(fd2, True)
-            os.set_blocking(fd2, False)
-            # [_] CHECK: get backtrace in case of closed sys.stdout.write()
-            #   -> ValueError: I/O operation on closed file.
-        else:
-            io.pipeerr = dup_and_close_stdio(cerr)
-        # RND: postpone the decision to create StringIO until OPT redir
-        io.ttyalt = None
 
-    from .util.logger import log
+def _scope_out(g: "AppGlobals", cout: "TextIO", fd1: int) -> None:
+    assert cout.fileno() == fd1, "Sanity check"
+    if cout.isatty():
+        g.io.pipeout = None
+        ## DISABLED: nice PERF but "sys.stdout" should be disallowed
+        # io.ttyout = cout
+        ## ATT: after also closing "cerr" any sys.stdout.write() will raise
+        ##   -> ValueError: I/O operation on closed file.
+        cout.close()
+    else:
+        g.io.pipeout = dup_and_close_stdio(cout)
+    # [_] BAD: all spawned (inof forked) processes will inherit fd1==tty,
+    #   therefore all of them will mess up TTY inof using ttyalt
+    g.io.ttyout = tty_open_onto_fd(fd1)
 
-    # NOTE: print before redirect to notify user where to search for logs
-    log.state(f"log={"(buf)" if (o := g.opts.logredir) is None else o}")
 
-    _scope_logsink()
-    _scope_in(sys.stdin, CURSES_STDIN_FD)
-    _scope_out(sys.stdout, CURSES_STDOUT_FD)
-    _scope_err(sys.stderr, CURSES_STDERR_FD)
+def _scope_err(g: "AppGlobals", cerr: "TextIO", fd2: int) -> None:
+    assert cerr.fileno() == fd2, "Sanity check"
+    if cerr.isatty():
+        g.io.pipeerr = None
+        cerr.close()
+        ## BUG~ after closing "cerr" we lose proper BT from here
+        # raise RuntimeError()  # <DEBUG
+    else:
+        g.io.pipeerr = dup_and_close_stdio(cerr)
+    # RND: postpone the decision to create StringIO until OPT redir
+    g.io.ttyalt = None
 
-    ## RND: redir all errors into logsink (either ttyalt ringbuffer or logredir)
-    # TBD: g.opts.redirerr
-    # FAIL:(buffering=0): ValueError: can't have unbuffered text I/O
-    #   BUG: silently exits from here
-    sys.stderr = os.fdopen(io.logfdchild, "w", encoding="utf-8", buffering=1)
-    sys.stderr.reconfigure(write_through=True)
-    # sys.__stderr__ =
+    ## FIXED? open os.pipe to cvt libc.stderr into py.log inof spitting over TTY
+    #   FAIL: !deadlock! if underlying native C code fills os.pipe internal buffers
+    #   ALT? make write() non-blocking -- so sys.write will error-out after filling buffers
+    #   [_] TODO: use different FD specifically for children stderr/stdout
+    #     - don't mix with logsink I use in MP. to propagate logs back to parent
+    #     - wrap each stderr from children into Error (or parse as Exception) and print into logs
+    #       = to preserve my logs fmt (instead of mixing children stderr with parent logs)
+    #     - raise ntf in parent each time children write into stderr -- to alert user attention
+    os.dup2(g.io.logfdchild, fd2, inheritable=True)
+    os.set_inheritable(fd2, True)
+    os.set_blocking(fd2, False)
+    # [_] CHECK: get backtrace in case of closed sys.stdout.write()
+    #   -> ValueError: I/O operation on closed file.
 
-    ## WKRND: we always need a valid sys.stdout, or we will lose some backtraces!
-    ##   e.g. multiprocessing.BaseProcess._bootstrap uses "traceback.print_exc()"
-    ## ATT: some logs may be printed to TTY even after sys.stdout.close()
-    ##   e.g. "traceback.print_exc()" has a fallback to "sys.stderr"
-    ## DISABLED:(unacceptable!): writes will be silently ignored inof raising exceptions
-    # sys.stdout = None
-    # TBD: g.opts.redirerr
-    ## ALT:RND: don't reassign and keep it closed to disallow any print()/stdout.write()
-    #   >> USAGE: directly pass fd1=io.pipeout into spawned processes
-    # sys.stdout = io.ttyalt
-    # sys.stdout = sys.stderr
-    # sys.__stdout__ =
 
-    ## [_] FAIL: silently dies
-    # print("aaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
-    # print("aaaaaaaaaaaaaaaaaaaaaaaaaaaaa", file=sys.stderr)
-    # sys.stdout.write("aaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n")
-
+def _scope_redir(g: "AppGlobals") -> None:
     # TBD! only go through ttyalt if using curses (or interactive TTY cli)
     #   THINK:MAYBE: write W/E into stderr if it's redirected ? OR: all logs there ?
     if o := g.opts.logredir:
         # TBD? close on exit to avoid `ResourceWarning
         if isinstance(o, int):
-            io.logsout = os.fdopen(o, "w", encoding="locale", buffering=1)
+            g.io.logsout = os.fdopen(o, "w", encoding="locale", buffering=1)
         elif isinstance(o, str):
             # raise RuntimeError(o)  # BUG: !miur silently exists here w/o backtrace
             # ALSO:DEV: generic support for other redir schemas
@@ -163,7 +134,7 @@ def init_explicit_io(g: "AppGlobals") -> None:
             #   DFL=ringbuf
             #   ALSO: null / disable -- optimize code
             # pylint:disable=consider-using-with
-            io.logsout = open(o, "w", encoding="locale", buffering=1)
+            g.io.logsout = open(o, "w", encoding="locale", buffering=1)
         else:
             raise NotImplementedError
         ## DISABLED:(flush): we already have line-buffered(=1) fds
@@ -173,14 +144,57 @@ def init_explicit_io(g: "AppGlobals") -> None:
         #     io.logsout.flush()
         # log.write = _logwrite
     else:
-        assert io.ttyalt is None
+        assert g.io.ttyalt is None
         ## WARN:FUT:RFC: logs in ttyalt ringbuffer should be kept as-is (as `Events)
         ##   >> they shouldn't be rasterized until you know if DST is plain text, or json, or whatever
-        io.ttyalt = __import__("io").StringIO()
-        io.logsout = io.ttyalt  # BAD: possible double-close for same FD
+        g.io.ttyalt = __import__("io").StringIO()
+        g.io.logsout = g.io.ttyalt  # BAD: possible double-close for same FD
 
+
+# WARN: all default "sys.stdin/out/err" will become *disfunctional* after this call
+#   e.g. set ".quiet=1" to prevent Jupyter::kernel.outstream_class(echo=sys.stdout)
+# ATT: no sense to *restore* FD schema on exit -- it's a global property of App itself
+def init_explicit_io(g: "AppGlobals") -> None:
+    from .util.logger import log
+
+    # NOTE: print before redirect to notify user where to search for logs
+    log.state(f"log={"(buf)" if (o := g.opts.logredir) is None else o}")
+
+    _scope_logsink(g)
+    _scope_in(g, sys.stdin, CURSES_STDIN_FD)
+    _scope_out(g, sys.stdout, CURSES_STDOUT_FD)
+    _scope_err(g, sys.stderr, CURSES_STDERR_FD)
+
+    ## RND: redir all errors into logsink (either ttyalt ringbuffer or logredir)
+    # TBD: g.opts.redirerr
+    # FAIL:(buffering=0): ValueError: can't have unbuffered text I/O
+    #   BUG: silently exits from here
+    sys.stderr = os.fdopen(CURSES_STDERR_FD, "w", encoding="utf-8", buffering=1)
+    sys.stderr.reconfigure(write_through=True)
+    # sys.__stderr__ =
+
+    # TBD: g.opts.redirerr
+    ## WKRND: we always need a valid sys.stdout, or we will lose some backtraces!
+    ##   e.g. multiprocessing.BaseProcess._bootstrap uses "traceback.print_exc()"
+    ## ATT: some logs may be printed to TTY even after sys.stdout.close()
+    ##   e.g. "traceback.print_exc()" has a fallback to "sys.stderr"
+    ## FAIL:(sys.stdout = None): unacceptable! writes will be silently ignored (inof raising exc)
+    ## ALT:RND: don't reassign and keep it closed to disallow any print()/stdout.write()
+    #   >> USAGE: directly pass fd1=io.pipeout into spawned processes
+    #   BET? allow it, but properly reframe each "print" into logsink messages ?
+    # BAD: objects aren't inherited by MP."spawn" -> NEED: dup2(err,out) in children
+    sys.stdout = sys.stderr
+    # sys.stdout = io.ttyalt
+    # sys.__stdout__ =
+
+    ## [_] FAIL: silently dies
+    # print("aaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+    # print("aaaaaaaaaaaaaaaaaaaaaaaaaaaaa", file=sys.stderr)
+    # sys.stdout.write("aaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n")
+
+    _scope_redir(g)
     # TBD? restore back on scope ?
-    log.write = io.logsout.write
+    log.write = g.io.logsout.write
 
     # [_] FIXME: add hooks individually
     # BAD: { mi | cat } won't enable altscreen, and !cat will spit all over TTY

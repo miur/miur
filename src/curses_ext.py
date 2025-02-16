@@ -140,7 +140,7 @@ def resize() -> None:
         g.root_wdg.redraw(g.stdscr)
         g.stdscr.refresh()
     except Exception as exc:
-        from ..util.exchook import log_exc
+        from .util.exchook import log_exc
 
         log_exc(exc)
 
