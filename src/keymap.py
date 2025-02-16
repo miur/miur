@@ -128,6 +128,7 @@ _modal_spawn: KeyTable = {
     "n": _spawn_render("pyqtgr_numpy"),
     "s": _spawn_render("sdl3gl_imgui"),
     "w": _spawn_render("qt6wg"),
+    "v": _spawn_render("vispy2d"),
 }
 
 

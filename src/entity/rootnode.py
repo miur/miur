@@ -67,6 +67,7 @@ class MiurAppNode(Golden[str]):
                         "pyqtgr_numpy",
                         "sdl3gl_imgui",
                         "qt6wg",
+                        "vispy2d",
                     ]
                 ],
             ),

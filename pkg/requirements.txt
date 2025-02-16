@@ -11,6 +11,7 @@ pyqt6
 # qtinter
 # mpv
 pyqtgraph
+vispy
 
 ## Protocols
 python-mpd2
