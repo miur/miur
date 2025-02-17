@@ -38,6 +38,7 @@ def install_venv_deps(devroot: str | None = None, dev: bool = False) -> None:
 
     # EXPL: don't upgrade .venv if all requirements.txt haven't changed
     if fs.exists(venvstamp):
+        # ALT:BET? calc and cmp SHA over sorted pkglist w/o comments
         last = os.stat(venvstamp).st_mtime
         if os.stat(reqs[0]).st_mtime < last:
             if os.stat(reqs[1]).st_mtime < last:  # if not dev or ...

@@ -50,6 +50,7 @@ munch==4.0.0
 mypy==1.15.0
 mypy-extensions==1.0.0
 nest-asyncio==1.6.0
+networkx==3.4.2
 nh3==0.2.20
 numpy==2.2.3
 packaging==24.2
@@ -75,7 +76,7 @@ PyQt6==6.8.1
 PyQt6-Qt6==6.8.2
 PyQt6_sip==13.10.0
 pyqtgraph==0.13.7
-PySDL3==0.9.4b3
+PySDL3==0.9.4b4
 python-dateutil==2.9.0.post0
 python-mpd2==3.1.1
 pyzmq==26.2.1
@@ -85,6 +86,7 @@ requests==2.32.3
 requests-toolbelt==1.0.0
 rfc3986==2.0.0
 rich==13.9.4
+scipy==1.15.2
 SecretStorage==3.3.3
 six==1.17.0
 soupsieve==2.6
