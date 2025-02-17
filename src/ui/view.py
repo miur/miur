@@ -41,7 +41,8 @@ class EntityView:
         # NOTE: remember which `View have created this one -- tba to return back
         # self._originator = originator
         self._filterby = ""
-        self._sortby = ""
+        self._sortby = "unchanged"
+        self._sortrev = False
         self.fetch()
         # ALG: re-assign to None on ctor, and then to False each update by .fetch()
         self._visited = None
@@ -97,47 +98,58 @@ class EntityView:
         #   will be *less* and never *more* (BUT: for look-ahead rgx it may be different)
         self._transform()
 
-    # ARCH:THINK: pass tuple of strategies inof combined str
-    # TODO: sort folders before files
-    # TODO: sort by tuple of keys (filetype, name/case, ...)
-    def sort_by(self, strategy: str) -> None:
-        # VIZ: asc, desc, toggle/flip
-        #   ADD: ignorecase/smartcase/unicode_normalize/skipdelim("_-")/skipspace
-        if strategy in ("+", "-", "~"):
-            strategy = self._sortby.rstrip("-+~") + strategy
-        if strategy == self._sortby:
+    ## RND:ARCH:BET: pass tuple of strategies inof some combined str syntax
+    #   TODO:(strategy): allow sorting by tuple of keys/fns (filetype, name/case, ...)
+    #   TODO: add strategy to sort folders before files
+    #   ADD: ignorecase/smartcase/unicode_normalize/skipdelim("_-")/skipspace
+    def order_by(self, strategy: str) -> None:
+        if self._sortby == strategy:
             return
         self._sortby = strategy
+        self._transform()
+
+    # RENAME? asc, desc, toggle/flip
+    def order_rev(self, rev: bool | None = None, /) -> None:
+        if rev is None:
+            self._sortrev = not self._sortrev
+        elif self._sortrev != rev:
+            self._sortrev = rev
+        else:
+            return
         self._transform()
 
     # [_] SEE: how I did in previous incarnations of !miur/!pa3arch/etc
     # VIZ: sort, reverse, filter, groupby, aug/highlight/mark/tag
     def _transform(self) -> None:
-        lst = self._orig_lst
-        if not isinstance(lst, list):
-            lst = list(lst)
+        # NOTE: avoid printing status from ctor(), but print on each change
+        if hasattr(self, "_xfm_lst"):
+            log.info(f"orderby{self._sortby}{"-" if self._sortrev else "+"}")
+        lst = list(self._orig_lst)
+        ## DISABLED: we should allways preserve orig list order (to be able to restore it)
+        ##   NICE: when toggling reverse, we don't need to track the _orig_lst current rev state
+        # if not isinstance(lst, list):
+        #     lst = list(lst)
 
         if substr := self._filterby:
             lst = [e for e in lst if substr in e.name]
+        else:
+            # RND: to eliminate printing unnecessary local var during exception
+            del substr
 
-        # ALT: use SortStrategyEnum to detect errors (inof str)?
-        if ss := self._sortby:
-            if ss.endswith("-"):
-                rev = True
-                ss = ss[:-1]
-            elif ss.endswith("+"):
-                rev = False
-                ss = ss[:-1]
-            else:
-                rev = False
-
-            # ALT:RENAME: "default" meaning DFL for generic `Entities
-            if ss.startswith("name"):
-                lst.sort(reverse=rev)
-            # elif ss == "size":
-            #     lst.sort(key=lambda e: len(self._pool[e]._vlst). reverse=rev)
-            else:
-                raise NotImplementedError
+        # BET? use SortStrategyEnum to detect errors (inof str)?
+        #   BAD: we will need to import that `Enum
+        ss = self._sortby
+        # ALT:RENAME? {"name" -> "default"} -- meaning DFL for generic `Entities
+        if ss == "name":
+            lst.sort(reverse=self._sortrev)
+        elif ss == "unchanged":
+            if self._sortrev:
+                lst.reverse()
+            log.info(lst[0])
+        # elif ss == "size":
+        #     lst.sort(key=lambda e: len(self._pool[e]._vlst). reverse=rev)
+        else:
+            raise NotImplementedError
 
         self._xfm_lst = lst
         self._wdg.assign(self._xfm_lst)

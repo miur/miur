@@ -243,7 +243,9 @@ _modal_input: KeyTable = {
     C.KEY_DOWN: _stop_input,
     # '\C-x\C-e' edit-command-line
     # SUM: additional controls for current list preview
-    "^R": lambda g: _view().sort_by("~"),
+    "^R": lambda g: _view().order_rev(),
+    # "^S": lambda g: _view().order_case(switch=True),
+    # "^O": lambda g: _view().order_by(next=True),
     C.KEY_SR: _scrollby(-0.5),
     C.KEY_SF: _scrollby(+0.5),
     C.KEY_PPAGE: _scrollby(-0.5),
