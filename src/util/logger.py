@@ -6,10 +6,12 @@
 import enum
 import sys
 import time
-from typing import Any, Callable, Final, TypedDict, Unpack
 
-_LAMBDA: Final = lambda: ""  # pylint:disable=unnecessary-lambda-assignment
-type _Loggable = str | Callable[[], str] | Any
+if globals().get("TYPE_CHECKING"):
+    from typing import Any, Callable, Final  # , TypedDict, Unpack
+
+_LAMBDA: "Final" = lambda: ""  # pylint:disable=unnecessary-lambda-assignment
+type _Loggable = "str | Callable[[], str] | Any"
 
 
 @enum.unique
@@ -31,7 +33,7 @@ class LogLevel(enum.IntEnum):
 
 
 # TODO: make it a part of supplied .write(sys.stdout/stderr)
-TERMSTYLE: Final = {
+TERMSTYLE: "Final" = {
     # LogLevel.CRITICAL: "\033[1;37m;41m",  # bold-white-on-red
     LogLevel.ERROR: "\033[31m",  # regul-red-on-dfl
     # LogLevel.ALERT: "\033[91m",  # regul-orange-on-dfl
@@ -50,19 +52,20 @@ TERMSTYLE: Final = {
 }
 
 
+### DISABLED:PERF: import logger faster
 ## HACK: convert @dataclass to TypedDict -- to inherit baseclass from it
 # ERR: TypedDict() expects a dictionary literal as the second argument
 #   OFF: https://github.com/python/mypy/issues/4128
 # _LoggerOpts = TypedDict('_LoggerOpts', {x.name: x.type for x in fields(LoggerState)}, total=False)
-class _LoggerOpts(TypedDict, total=False):
-    minlevel: LogLevel
-    write: Callable[[str], None | int]
-    termcolor: bool
-    stackframe: int
+# class _LoggerOpts(TypedDict, total=False):
+#     minlevel: LogLevel
+#     write: Callable[[str], None | int]
+#     termcolor: bool
+#     stackframe: int
 
 
 class Logger:  # pylint:disable=too-many-instance-attributes
-    __slots__ = """minlevel stackframe termcolor write at
+    __slots__ = """minlevel stackframe termcolor _write _early at
         _initts _pts _counter _pms _fnmlen _pcpu at""".split()
 
     ## RND:HACK: reassign levels to class itself to avoid importing unnecessary keyword
@@ -71,8 +74,9 @@ class Logger:  # pylint:disable=too-many-instance-attributes
     # USAGE: log.at(log.E, ...)
     # BUG:(log.W): [no-member] Instance of 'Logger' has no 'W' member; maybe 'l'?
     #   FAIL: adding to __slots__ doesn't help
-    for l in LogLevel:
-        vars()[l.name[0]] = l
+    # for l in LogLevel:
+    #     vars()[l.name[0]] = l
+    #     vars()[l.name.lower()] = lambda self, fmt, l=l: self.at(l, fmt)
 
     def __init__(self) -> None:
         # HACK: approximate ps creation time (w/o IO delays)
@@ -86,13 +90,16 @@ class Logger:  # pylint:disable=too-many-instance-attributes
         self.minlevel = LogLevel.ANYTHING
         self.stackframe = 1
         self.termcolor: bool | None = None
-        self.write: Callable[[str], None | int]
+        self._write: Callable[[str], None | int]
+        self._early: list[str]
         self.at = self._lazy_init
 
     def _lazy_init(self, lvl: LogLevel, fmt: _Loggable, /, *, loci: str = "") -> None:
         # RND:: you should update it to redirected FD
-        if not hasattr(self, "write"):
-            self.write = sys.stdout.write if sys.stdout else sys.stderr.write
+        if not hasattr(self, "_write"):
+            # OLD: self._write = sys.stdout.write if sys.stdout else sys.stderr.write
+            self._early = []
+            self._write = self._early.append
 
         # OLD~ATT: don't reassing cmdline opts -- treat them as Final, and SEP from "state"
         # from ..app import g_app
@@ -112,11 +119,11 @@ class Logger:  # pylint:disable=too-many-instance-attributes
                 if sys.stdout
                 else sys.stderr.isatty() if sys.stderr else None
             )
-        self.at = self._write
+        self.at = self._condwrite
         self.at(lvl, fmt, loci=loci)
 
     # @profileit  # BAD: ~1ms/call (mostly due to !curses.*)
-    def _write(self, lvl: LogLevel, fmt: _Loggable, /, *, loci: str = "") -> None:
+    def _condwrite(self, lvl: LogLevel, fmt: _Loggable, /, *, loci: str = "") -> None:
         # IDEA:ALSO: enable debug and below based on "modnm" -- to focus on feature debugging
         #   BET: enable set of logs along SEQ by its "feature name"
         #     * feature/SEQ = set(*names of logged keypoints*) -> add to log.enabled
@@ -144,19 +151,42 @@ class Logger:  # pylint:disable=too-many-instance-attributes
             lnum = fr.f_lineno
             loci = f"{modnm}:{lnum}"
 
-        self.write(self._format(lvl, fmt, loci))
+        self._write(self._format(lvl, fmt, loci))
         # MAYBE:ALSO: unified logging for lttng
         # if lvl == LogLevel.TRACE: sys.audit('log.trace', body)
 
-    def config(self, /, **kw: Unpack[_LoggerOpts]) -> None:
-        for k, v in kw.items():
-            # if type(getattr(self, k)) is not type(v):
-            #     raise TypeError(type(getattr(self, k)))
-            if not hasattr(self, k) and k not in ("write"):
-                raise KeyError(k)
-            # if k == 'termcolor' and v is None:
-            #     v = self.write.__self__.isatty()
-            setattr(self, k, v)
+    ## DISABLED:PERF: import logger faster
+    # def config(self, /, **kw: Unpack[_LoggerOpts]) -> None:
+    #     for k, v in kw.items():
+    #         # if type(getattr(self, k)) is not type(v):
+    #         #     raise TypeError(type(getattr(self, k)))
+    #         if not hasattr(self, k) and k not in ("write"):
+    #             raise KeyError(k)
+    #         # if k == 'termcolor' and v is None:
+    #         #     v = self.write.__self__.isatty()
+    #         setattr(self, k, v)
+
+    ## REF: https://stackoverflow.com/questions/17576009/python-class-property-use-setter-but-evade-getter
+    # BAD: requires @override, meaning improting whole "typing"
+    # def __setattr__(self, name: str, value: "Any"):
+    #     if name == "write":
+    #         # TODO: dump accumulated early logs
+    #         pass
+    #     super().__setattr__(name, value)
+    # ALT:(inline):OR our own @setter wrapper
+    def _write_setter(self, fn: "Callable[[str], None | int]") -> None:
+        # EARLYLOG: if fn == 0: (delattr(self, "_write"), delattr(self, "_early"))
+        # DEVNULL: if fn == None: self._write = lambda s: None
+        self._write = fn
+        if hasattr(self, "_early"):
+            for s in self._early:
+                fn(s)
+            delattr(self, "_early")
+
+    ## TEMP:FIXED: log.write is used by : loop.add_reader(logsink.fileno(), lambda: log.write(logsink.read()))
+    #   write = property(None, _write_setter)
+    #   ALT:TRY: directly return self.write as a value e.g. by using __setattr__
+    write = property((lambda self: self._write), _write_setter)
 
     def error(self, fmt: _Loggable, /) -> None:
         self.at(LogLevel.ERROR, fmt)

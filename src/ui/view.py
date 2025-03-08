@@ -87,7 +87,8 @@ class EntityView:
             if os.access(p, os.R_OK):
                 os.chdir(p)
             # if not fs.islink(p) or self._ent._alt is True:
-            self._sortby = "name+"
+            self._sortby = "name"
+            self._sortrev = False
 
     # TODO: rgx,glob,patt,stem,substr,words,fuzzy,...
     def filter_by(self, needle: str) -> None:

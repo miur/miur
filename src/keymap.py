@@ -5,7 +5,7 @@ import _curses as C
 
 from . import curses_ext as CE
 from .app import AppGlobals, KeyTable, g_app
-from .util.logger import log
+from .util.logger import LogLevel, log
 
 if TYPE_CHECKING:
     from types import ModuleType
@@ -327,7 +327,7 @@ def handle_input(g: AppGlobals) -> None:
             comment = f" ({nm})"
     else:
         comment = ""
-    log.at(log.W, repr(wch) + comment, loci=loci_override)
+    log.at(LogLevel.WARNING, repr(wch) + comment, loci=loci_override)
     # print(repr(wch))
     # import sys; sys.stdout.write(repr(wch))
     # RND: keep current modal when "cmd=catch_all"

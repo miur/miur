@@ -4,14 +4,13 @@ from ..app import KeyTable
 
 
 # TODO: lazy_load
-def keytable_insert_aura_pathes(keytable: KeyTable) -> KeyTable:
+def keytable_insert_aura_pathes(keytable: KeyTable, fpathes: str) -> KeyTable:
     ## Generate key bindings for fast directory jumping
-    fpathes = "/d/airy/airy/pathes"
     lst = []
     try:
         with open(fpathes, "r", encoding="utf-8") as f:
             lst = f.readlines()
-    except IOError as exc:
+    except (FileNotFoundError, IOError) as exc:
         from ..util.exchook import log_exc
 
         log_exc(exc)

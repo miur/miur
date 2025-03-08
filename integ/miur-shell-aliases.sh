@@ -3,7 +3,7 @@
 #%USAGE: zsh$ . =miur
 if ! (return 0 2>/dev/null); then
   # set -o errexit -o errtrace -o noclobber -o noglob -o nounset -o pipefail
-  echo "ERR: '$0' is not supposed to be run by $SHELL"
+  echo "ERR: '$0' should be sourced, not executed by $SHELL"
   exit -2
 fi
 
@@ -26,7 +26,12 @@ if [[ ${2-} == verbose ]]; then
 fi
 
 
-alias miur.pkg="$pj/pkg/PKGBUILD.dev"
+# set -o allexport
+# : "${BUILD_DIR=build}"
+# set +o allexport
+
+##: WF=dev
+# alias miur.pkg="$pj/pkg/archlinux/PKGBUILD.dev"
 alias miur.impt="python -SIB -Ximporttime -- '$app'"
 alias miur.prof="python -SIB -m cProfile -s cumulative -- '$app'"
 

@@ -233,8 +233,8 @@ def on_exit(g: "AppGlobals") -> None:
 
     # TEMP: ending statement
     tout = g.io.ttyout or sys.stderr
-    log.write = tout.write
     log.state("exit()")
+    log.write = tout.write
     tout.flush()
 
 

@@ -91,7 +91,9 @@ def _child_exec(tgt: "Callable[[], None|int]", /) -> None:
     from ..util.logger import log
 
     # NOTE: children should re-init log instance
-    log.config(write=_child_log_send, termcolor=True)
+    # log.config(write=_child_log_send, termcolor=True)
+    log.write = _child_log_send
+    log.termcolor = True
 
     # log.warning(f"forked={sys.modules[tgt.__module__].__file__}")
     log.warning(f"forked={tgt.__module__}.{tgt.__name__}()")

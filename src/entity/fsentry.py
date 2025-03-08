@@ -185,7 +185,7 @@ class FSFile(FSEntry):
         result = highlight(code, lexer, fmtr)
         # DEBUG: log.trace(result)
         # os.environ["CODE"] = result
-        return [TextEntry(x) for x in result.split(os.linesep)]
+        return [TextEntry(x, self) for x in result.split(os.linesep)]
 
     # MOVE:(body): to `Interpret[File|Buffer]AsPlainText/Lines
     def plaintext_lines(self) -> Entities:
@@ -195,7 +195,9 @@ class FSFile(FSEntry):
             while (boff := f.tell()) < 4096 and (line := f.readline(4096)):
                 assert line.endswith(os.linesep), "DECI: line is longer than 4096"
                 # DISABLED(, f"  `{boff}"): interferes with !nvim jumping to line under cursor
-                yield TextEntry(line.removesuffix(os.linesep))  # , loci=(h, f":{i}"))
+                yield TextEntry(
+                    line.removesuffix(os.linesep), self
+                )  # , loci=(h, f":{i}"))
                 i += 1
 
     # MOVE:(body): to `Interpret[File|Buffer]AsHexDump/Lines
@@ -204,7 +206,9 @@ class FSFile(FSEntry):
         with open(self._x.handle, "rb") as blob:
             i = 1
             while (boff := blob.tell()) < 1024 and (data := blob.read(16)):
-                yield TextEntry(data.hex(" "))  # , loci=(h, f" `0x{boff:x}  #{i}"))
+                yield TextEntry(
+                    data.hex(" "), self
+                )  # , loci=(h, f" `0x{boff:x}  #{i}"))
                 i += 1
 
     @override

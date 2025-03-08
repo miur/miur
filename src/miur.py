@@ -30,7 +30,6 @@ def miur_main(g: AppGlobals) -> None:
 
         # MOVE? as early as possible
         do(iomgr.stdlog_redir(g))
-        log.sep()
 
         from .integ.any_spawn import mp_join_children
 
@@ -70,7 +69,8 @@ def miur_main(g: AppGlobals) -> None:
         ui.resize = CE.resize
         ui.handle_input = handle_input_safe if crashsafe else lambda: KM.handle_input(g)
         g.curses_ui = ui
-        g.keytableroot = keytable_insert_aura_pathes(KM.g_modal_default)
+        fpathes = "/d/airy/airy/pathes"
+        g.keytableroot = keytable_insert_aura_pathes(KM.g_modal_default, fpathes)
         KM.modal_switch_to(None)
 
         # f21 [_] DEV miur --remember-url=./cwdurl vs --choosedir=./cwd
