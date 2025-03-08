@@ -1,3 +1,4 @@
+#!/usr/bin/env -S pip install '.[web]'
 #%OFF:REF: https://packaging.python.org/en/latest/tutorials/packaging-projects/
 #%DEPs: $ /d/miur/.venv/bin/python -m pip install --upgrade pip build twine
 #%USAGE: $ /d/miur/.venv/bin/python -m build
@@ -7,42 +8,171 @@
 #%PUB: $ /d/miur/.venv/bin/python -m twine upload dist/*
 [project]
 name = "miur"
-version = "0.400.20250214"
 description = "Modern Interface for Uniform Reconnaissance"
 authors = [{ name="Dmytro Kolomoiets", email="amerlyq+code@gmail.com" }]
 classifiers = [
-    "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
-    "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+  "Operating System :: POSIX :: Linux",  # "Operating System :: OS Independent",
+  # "Development Status :: 5 - Production/Stable",
+  # "Intended Audience :: Developers",
+  "Typing :: Typed",
+
 ]
+license = "GPL-3.0-only"
+# license = {file = "LICENSES/GPL-3.0-only.txt"}
+license-files = ["LICENSES"]
 requires-python = ">=3.12"
-dynamic = ["dependencies"]
+dynamic = ["version"]  # "dependencies"
 readme = {file = "README.rst", content-type = "text/x-rst"}
+# SPLIT:: XP=pygments ; TEMP=ranger-fm ; OPT=mpd2,
+# WARN: app deps were actually tested only agains *some* versions (stored in requirements.txt in repo)
+#   e.g. even if SPEC mentions lxml>=5.1, it may had been tested only against lxml>=5.3
+dependencies = [
+  "pygments",     # <WiP
+  "ranger-fm",    # <TEMP
+  "python-mpd2",  # <OPT: protocols
+]
 
 
-# [project.optional-dependencies]
-# dev = ["black", "bumpver", "isort", "pip-tools", "pytest"]
+# USAGE:
+#  [pypi]  $ pip install "miur[default]"
+#  [local] $ pip install -e ".[all,dev]"
+# OR: [tool.flit.metadata.requires-extra]
+[project.optional-dependencies]
+# SPLIT? devpkg(pip-tools,bumpver)+devcode(black,isort)+devqa(mypy,pylint,...)+devlive(jupyter-*)
+#   XP~ADD? "bumpver", "pytest"
+dev = ["pip-tools", "black", "isort", "mypy", "pylint", "pylint_venv", "jupyter-console"]
+## ALSO: moderngl, moderngl-window, qtinter, mpv
+# SPLIT? demogui + demotry
+## WARN:DISABLED:(vispy): when inside "python" docker
+#   ERROR: command 'gcc' failed: No such file or directory
+demo = ["pyqt6", "pysdl3", "imgui-bundle", "glfw", "pyqtgraph", "vispy"]
+web = ["requests", "beautifulsoup4", "lxml"]  # html5lib
+# HACK: recursive deps resolution + aliasing REF https://github.com/pypa/pip/issues/10393
+# MAYBE? alldev = ["miur[all,dev]"]
+all = ["miur[web,demo]"]
+default = ["miur[web]"]
+# try = ["scipy", "imageio", "networkx"]
+
+# OFF:REF: https://packaging.python.org/en/latest/specifications/dependency-groups/
+# WAIT:f4u:(!pip=25.1): https://github.com/pypa/pip/pull/13065
+# USAGE: $ python -m pip install --group '[./project/subproject/pyproject.toml:]test'
+# [dependency-groups]
+# coverage = ["coverage[toml]"]
+# test = ["pytest>7", {include-group = "coverage"}]
 
 [project.urls]
+# REF: https://packaging.python.org/en/latest/specifications/well-known-project-urls/#well-known-labels
+# REF: https://docs.pypi.org/project_metadata/#project-urls
 Homepage = "https://github.com/miur/miur"
+GitHub = "https://github.com/miur/miur"
+Source = "https://github.com/miur/miur"
 Issues = "https://github.com/miur/miur/issues"
+# TODO: replace by readthedocs OR render HTML
+Documentation = "https://github.com/miur/miur/wiki"
+Changelog = "https://github.com/miur/miur/blob/main/README.rst"
+# TODO: replace by IRC/discord
+Chat = "https://github.com/miur/miur/discussions"
+ReleaseNotes = "https://github.com/miur/miur/releases"
+Download = "https://github.com/miur/miur/releases"
+PyPI = "https://pypi.org/project/miur/"
+# Docker = ...
+
 
 # [project.scripts]
 # realpython = "src.__main__:main"
 
 [build-system]
-requires = ["hatchling", "hatch-requirements-txt"]
+# INFO: build-time deps
+requires = ["hatchling"]  # "hatch-requirements-txt"
 build-backend = "hatchling.build"
+# requires = ["setuptools"]
+# build-backend = "setuptools.build_meta"
+
+[tool.hatch.version]
+# pattern = "BUILD = 'b(?P<version>[^']+)'"
+path = "src/_pkg.py"
+
+[tool.hatch.build]
+# FAIL: doesn't work
+#   ALT: /d/miur/.venv/bin/python -m build --output ./_build
+directory = "./_build"
+dev-mode-dirs = ["src"]
+skip-excluded-dirs = true
 
 [tool.hatch.build.targets.sdist]
-only-include = ["src", "integ", "LICENSES"]
+# , "LICENSES"]
+only-include = ["src", "integ"]
 exclude = ["_*/"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src"]
+# # EXPL: same as "only-include" but uses only "<path>:tail" part
+# packages = ["miur"]
+only-include = ["src", "integ"]
+exclude = ["_*/"]
+# sources = ["src"]
 
-[tool.hatch.metadata.hooks.requirements_txt]
-files = ["pkg/requirements.txt"]
+# FAIL: this "force-include" prevents editable install
+#   $ /d/miur/.venv/bin/python -m pip install -e .
+# [tool.hatch.build.targets.wheel.force-include]
+# "src" = "miur"
+## REF: https://hatch.pypa.io/latest/config/build/#rewriting-paths
+[tool.hatch.build.targets.wheel.sources]
+"src" = "miur"
+# OR:(remove prefix): sources = ["src"]
+# OR:(add prefix): "" = "foo"
+
+# [tool.hatch.metadata.hooks.requirements_txt]
+# files = ["pkg/pypi/requirements.txt"]
 
 # [tool.hatch.metadata.hooks.requirements_txt.optional-dependencies]
-# dev = ["pkg/requirements-dev.txt"]
+# dev = ["pkg/pypi/dev-requirements.txt"]
+#
+
+# [tool.pytest.ini_options]
+# addopts = ["--import-mode=importlib"]
+
+[tool.black]
+line-length = 88
+
+[tool.isort]
+profile = "black"
+# line_length = 88
+# multi_line_output = 3
+# include_trailing_comma = true
+# force_grid_wrap = 0
+# use_parentheses = true
+
+[tool.pylsp-mypy]
+enabled = true
+live_mode = false
+dmypy = false
+strict = true
+
+# [tool.coverage.run]
+# branch = true
+
+
+#%USAGE:DFL:WF:REF: https://github.com/jazzband/pip-tools
+# ALT: $ pip install -r requirements.in --dry-run --ignore-installed --quiet --report - | jq -r '(.environment | to_entries[] | "# \(.key): \(.value)"), (.install[] | "\(.metadata.name)==\(.metadata.version)")' > requirements.txt
+#  $ /d/miur/.venv/bin/pip-compile [--output-file=requirements.txt] [pyproject.toml]
+#  $ /d/miur/.venv/bin/pip-compile --constraint=pkg/pypi/dev-requirements.txt --extra=default --output-file=pkg/pypi/requirements.txt --strip-extras [--upgrade-package NAME]
+#  $ /d/miur/.venv/bin/pip-compile --all-build-deps --constraint=pkg/pypi/dev-requirements.txt --extra=all --extra=dev --output-file=pkg/pypi/dev-requirements.txt --strip-extras [--upgrade]
+#  $ /d/miur/.venv/bin/pip freeze > venv_frozen.txt
+#  $ /d/miur/.venv/bin/pip-sync dev-requirements.txt requirements.txt
+[tool.pip-tools]
+# BET: $ ln -svfT pip ~/.cache/pip-tools
+# cache-dir = "~/.cache/pip"
+verbose = true
+emit-index-url = true
+emit-options = true
+## DISABLED: total reqs.txt filesize is ~97kB (due to too many wheels variants each with its own SHA)
+# generate-hashes = true
+# reuse-hashes = true
+## ALT: it's worthless to hash-pin only primary deps
+# all-build-deps = true
+# all-extras = true
+# strip-extras = true
+# extra = ["web"]
+# output-file = "constraints.txt"
