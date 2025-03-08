@@ -1,7 +1,0 @@
--r requirements.txt
-jupyter-console
-black
-isort
-pylint
-mypy
-pylint_venv
