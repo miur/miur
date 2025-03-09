@@ -1,0 +1,7 @@
+# DEBUG: rg -uuu --ignore-file .dockerignore --files --sort path .
+*
+!integ/
+!pkg/pypi/requirements.txt
+!src/
+!pyproject.toml
+!README.rst

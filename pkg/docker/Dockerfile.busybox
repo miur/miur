@@ -1,0 +1,368 @@
+#!/usr/bin/env -S sudo docker buildx build --tag=miur --force-rm=true .. --file
+#%USAGE:
+#    [build] $ docker buildx build --tag=miur --force-rm=true --build-context pjroot=../ . --file ./Dockerfile
+#  [cleanup] $ sudo docker builder prune -a
+# [!rebuild] $ ... build --no-cache ... || ... build --no-cache-filter base,pkgs ...
+# [+caching] $ docker buildx build --cache-from=type=registry,ref=local/miur:buildcache \
+#                --cache-to=type=registry,ref=local/miur:buildcache,mode=max .
+#            ALT:TRY: --cache-from=type=local,src=path/to/dir
+# [rootless] $ export DOCKER_HOST=unix://$XDG_RUNTIME_DIR/docker.sock && docker ...
+#%USAGE: $ docker run --name=miur --rm -ti --network=host --mount="type=bind,src=.,dst=/mnt,ro=true" -- miur
+
+ARG myuser=user
+ARG myuid=1000
+ARG mygid=1000
+# ALT:BET? ARG myvenv=/usr/local
+ARG myvenv=/opt/venv
+# ARG mycmpts=all,dev
+ARG mycmpts=default
+ARG LIB=/usr/lib/x86_64-linux-gnu
+
+######################################################################
+FROM python:3.13-slim AS pybase
+
+RUN --network=none <<"EOF"
+  find /usr/local -type d -name "__pycache__" -exec rm -rf {} +
+
+  (cd /usr/local && rm -rf -- \
+    include \
+    lib/pkgconfig \
+    bin/idle* \
+  )
+
+  (cd /usr/local/lib/python3.13 && rm -rf -- \
+    lib-dynload/_codecs_*.so \
+    config-3* \
+    idlelib \
+    tkinter lib-dynload/_tkinter* \
+    turtle* \
+    unittest doctest.py lib-dynload/*test*.so \
+  )
+EOF
+
+######################################################################
+FROM pybase AS baseuser
+
+## DEBUG: confirm that context is empty (comment out rest of the file)
+# COPY . /tmp/build
+# RUN find /tmp/build/
+
+# BET: use dir!=/mnt to prevent hiding all accidentally created files by later bind-mount
+# BAD: don't use /home as it will be overshadowed on pip-install step
+# ALT: /build /miur /mnt /boot /root /srv /opt /var/opt /var/tmp
+WORKDIR /mnt
+SHELL ["/usr/bin/bash", "-euo", "pipefail", "-c"]
+
+ENV LANG="en_US.UTF-8" \
+    LC_ALL="C"
+
+# DEBUG:(!bmon): confirm there is no traffic on 2nd run with cache ※⡧⢵⠕⠄
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+<<"EOF"
+  export DEBIAN_FRONTEND=noninteractive
+  echo "debconf debconf/frontend select Noninteractive" | debconf-set-selections
+  # ALT: apt-get --no-install-recommends install -y gcc ...
+  printf '%s\n' 'APT::Install-Recommends "0";' 'APT::Install-Suggests "0";' >> /etc/apt/apt.conf
+  apt-get update && apt-get -yq install locales tzdata ca-certificates
+  # TEMP:DISABLED: sudo, systemd-timesyncd
+  # CHECK: [remove?] ntp ntpdate
+EOF
+
+
+RUN --network=none <<"EOF"
+  # NOTE:ALT: "ENV SHELL=/bin/bash" is not enough for scripts with /bin/sh shebang
+  ln -svfT bash /usr/bin/sh
+  echo "${LANG:?} UTF-8" >> /etc/locale.gen
+  export DEBIAN_FRONTEND=noninteractive
+  dpkg-reconfigure locales
+  update-locale "LANG=${LANG}"
+  # NOTE: docker uses host native clock so you don't need !ntpd
+  ln -sf /usr/share/zoneinfo/UTC /etc/localtime
+  dpkg-reconfigure tzdata
+  update-ca-certificates
+EOF
+
+
+# WARN:INFO:(ARG): all following RUN instructions use the ARG variable implicitly
+#   (as an environment variable), thus can cause a cache miss.
+ARG myuser
+ARG myuid
+ARG mygid
+
+## SECU: using passwordless "sudo" because there is no TTY/input during "docker build"
+#   FIXME?BET? use "gosu" -- only to mk host UID/GID user from ENTRYPOINT
+#     ALT:OFF:SRC: https://github.com/tianon/gosu/blob/master/INSTALL.md
+#       >=debian:9(stretch) $ apt-get install -y gosu && gosu nobody true
+#       OR:: COPY --from=tianon/gosu /gosu /usr/local/bin/
+#       ALT: $ docker run -it --rm -v $PWD/gosu-amd64:/usr/local/bin/gosu:ro ubuntu:trusty gosu root ps aux
+#       ALT: !setpriv or !chroot from !gosu README.md
+#   TEMP: remove "sudo" altogether, until we really need it
+# MAYBE:USE: "useradd/groupadd --non-unique" -- allow uid/gid overlap with base container existing user
+RUN --network=none <<"EOF"
+  groupadd --gid "${mygid:?}" "${myuser:?}"
+  # grs=users,sudo
+  grs=users
+  useradd --create-home --shell /usr/bin/bash --groups "$grs" --no-log-init \
+    --uid "${myuid:?}" --gid "$myuser" --comment "user@miur" -- "$myuser"
+  # printf "%s\n" "$myuser:$myuser" | chpasswd
+  # printf "%s ALL=(ALL) NOPASSWD:SETENV: ALL\n" "$myuser" > "/etc/sudoers.d/$myuser"
+EOF
+
+######################################################################
+FROM baseuser AS pkgdeps
+
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+<<"EOF"
+  pkgs=(
+    # for terminfo ($TERM)
+    ncurses-base
+    # terminfo
+    # build-essential
+    # "cmake(>=3.24)"
+  )
+  # ALSO? command -v python || pkgs+=(python3.12 python3.12-dev python3.12-venv)
+  # REF: https://askubuntu.com/questions/1413251/how-does-the-apt-satisfy-work
+  # DISABLED:ERR: E: The update command takes no arguments
+  #   ${pkgs[@]:+apt-get update && apt-get -yq satisfy "${pkgs[@]}"}
+  if [[ ${pkgs[@]:+x} ]]; then apt-get update && apt-get -yq satisfy "${pkgs[@]}"; fi
+  # OR: apt-get update && apt-get -t experimental -yq install "${pkgs[@]:?}"
+  # OPT: apt clean && rm -rf /var/lib/apt/lists/
+  # DEBUG: dpkg -L ncurses-base && find /usr/share/terminfo && false
+EOF
+
+######################################################################
+FROM pkgdeps AS pipvenv
+
+## WTF: why we don't need this? (but OFF:REF insists?)
+# ARG myuser
+ARG myvenv
+
+RUN --network=none \
+  mkdir -p -- "${myvenv:?}" \
+  && chown "${myuser:?}:$myuser" -- "$myvenv"
+
+USER "${myuser:?}"
+
+# DFL: PIP_CACHE_DIR=$HOME/.pip/cache OR:BET? set whole XDG_CACHE_HOME
+ENV VIRTUAL_ENV="${myvenv:?}" \
+  PATH="${myvenv:?}/bin:/usr/local/bin:/usr/bin" \
+  PIP_REQUIRE_VIRTUALENV="true" \
+  PIP_CACHE_DIR="/opt/pipcache"
+
+
+# TRY:ALT:(3-in-1): $ pip -E ${VIRTUAL_ENV:?}" pip ...
+#   BAD: combining means slower rebuild time
+RUN --network=none python3 -m venv "${VIRTUAL_ENV:?}"
+
+# ADD --checksum=sha256:270d731bd08040c6a3228115de1f74b91cf441c584139ff8f8f6503447cebdbb \
+#     https://dotnetcli.azureedge.net/dotnet/Runtime/$DOTNET_VERSION/dotnet-runtime-$DOTNET_VERSION-linux-arm64.tar.gz /dotnet.tar.gz
+# COPY --chown="$myuser:$myuser" PKGBUILD "$mycwd/pkgbuild"
+# COPY src .
+
+## DISABLED:BAD:("COPY" cmd): uselessly includes all pj files into cache
+#    COPY --from=pjroot pkg/requirements.txt pkg/
+#    COPY --from=pjroot integ/ src/ pyproject.toml README.rst .
+## FAIL: during build mounting ~arbitrary~ host dir (outside build-ctx) is impossible
+## BAD:(from==bdctx_root): still transfers everything into daemon before mounting
+## CHECK: will bind-mount run once or on each build?
+#    RUN --mount=type=bind,target=. pip install --no-cache-dir -U .
+## DISABLED:FAIL: doesn't work when using empty build ctx (read from STDIN)
+#   CFG:[no-ctx] $ docker build - < Dockerfile || ... build -f - . <<EOF
+#    RUN --mount=type=bind,source=/requirements.txt,target=pkg/requirements.txt
+## DISABLED:(--no-cache-dir): now I use "--mount=type=cache" to reuse pip cache
+##  OLD: we prevented storing files in ~/.cache (to reduce final image size)
+
+## PERF:(staged layer caching): install only third-party DEPs first
+#   ATT! don't combine with pj install, orse all deps will be reinstalled each time!
+# INFO: stored in /var/lib/docker/buildkit/cache.db
+#   CFG:INFO:DEBUG:※⡧⢵⠖⠬ $ pip cache dir && pip cache info
+# ALT? use whole "/home" as cache volume
+# ALSO:INFO: offline batch-install from pre-downloaded archive ※⡧⢿⢳⣀
+#   https://pip.pypa.io/en/stable/topics/repeatable-installs/#using-a-wheelhouse-aka-installation-bundles
+# BET:SPLIT: {_core_base,_large_opt,_extra,_dev}.txt
+#   &why less rebuild/redld if only extra/dev change frequently
+# BAD: split pip-upgrade and reqs into two lines, orse you get nugged about pip own upgrade
+#   ATT: newer !pip may do things differently, so always upgrade first before installing!
+#   REGR: pre-installing "hatchling" pollutes my .venv with build-only-transient-deps
+#     && pip download --cache-dir "${PIP_CACHE_DIR:?}" hatchling \
+#     DEBUG: "pip cache list" -- hatchling should be in cache (for next step)!
+# ALT: && pip install --require-hashes -e ".[default]" && pip uninstall -y miur \
+#   [_] FIXME: should only install frozen/pylock files, inof latest RQs from pypj.toml
+#     WAIT:(※⡧⢻⢤⡱pylock.toml): https://github.com/pypa/pip/pull/13213
+# WAIT:(※⡧⢻⢣⠢--only-deps): https://github.com/pypa/pip/issues/11440
+# RUN --mount=type=bind,target=. \
+RUN --mount=type=bind,source=pkg/pypi/requirements.txt,target=requirements.txt \
+    --mount=type=cache,target=${PIP_CACHE_DIR:?},uid=${myuid:?},gid=${mygid:?} \
+  pip install --upgrade pip hatchling \
+  && pip check --disable-pip-version-check \
+  && pip install --no-deps --requirement requirements.txt \
+  && pip cache list \
+  ;
+
+
+## MAYBE? expose prebuilt venv to host and share it with other containers
+#   WHY:USAGE: run other python tools in host/docker using same env
+# VOLUME ["$VIRTUAL_ENV"]
+
+
+######################################################################
+# USAGE:(to rebuild from this stage onwards): $ docker build --no-cache-filter=devapp ...
+#   $ rm /d/miur/.git/_docker_stamp &&
+FROM pipvenv AS devapp
+
+## FAIL: label w/o value not allowed [even to force using cmdline flag]
+# LABEL version
+## INFO:(silently works):
+#  - adding to Dockerfile *new* ARG w/o value (OK)
+#  - adding to cmdline *new* key --build-arg key=val (=w/o defined ARG) (OK)
+#  - adding *new* additonal "--label ..." w/o defined LABEL (OK)
+## TRY:ADD: --annotation="[OCI-type:]key=value"
+## INFO:REF> multiple consequent labels should go to single layer
+LABEL org.opencontainers.image.title="miur + venv (self-contained)"
+# org.opencontainers.image.description
+LABEL org.opencontainers.image.url="https://github.com/miur/miur"
+LABEL org.opencontainers.image.documentation="https://github.com/miur/miur"
+LABEL org.opencontainers.image.source="https://github.com/miur/miur"
+LABEL org.opencontainers.image.authors="amerlyq plus miurdocker at gmail dot com"
+LABEL org.opencontainers.image.licenses="GPL-3.0-only"
+# org.opencontainers.image.ref.name
+
+
+# NOTE: install miur w/o demo deps by DFL (OPT: change ARG to install everything)
+ARG mycmpts
+
+## DISABLED:(-U|--upgrade): don't upgrade anything during local pj src installation
+#    RUN pip install -U --editable .
+## NOTE: install non-editable version of miur, assuming all deps were already installed
+# FAIL: hatchling is not found, despite being pre-installed into VENV (and we still need WWW here)
+#   ALT: use "setuptools" backend ※⡧⢵⠦⣉
+#   FIXED: --no-build-isolation
+#     ALT:FAIL: preliminary install and uninstall to keep pkg in PIP cache for later usage
+#   OR: allow network access -- for the sake of cleaner deps tree
+# RUN --network=none ...
+#   pip list && pip install --no-index --find-link=${VIRTUAL_ENV} .
+# WARN!(target=.): only works because of earlier "WORKDIR /mnt"
+#   orse ERROR: failed to solve: invalid mount target "/"
+# HACK: bind-mount on top of rw overlay to store build artfs (COS build-ctx is root-readonly)
+#   --mount=type=cache,target=.,uid=${myuid:?},gid=${mygid:?} \
+RUN --network=none \
+    --mount=type=bind,target=. \
+    --mount=type=cache,target=${PIP_CACHE_DIR:?},uid=${myuid:?},gid=${mygid:?} \
+  pip install --no-deps --no-build-isolation ".${mycmpts:+[$mycmpts]}"
+
+
+### ALT: remove "pip" from beginning, and use externally mounted !uv
+# FROM ghcr.io/astral-sh/uv:0.5.14 AS uv
+# COPY pyproject.toml uv.lock /
+# FROM python:3.12-musl
+# # https://docs.astral.sh/uv/concepts/python-versions/#disabling-automatic-python-downloads
+# ENV UV_PYTHON_DOWNLOADS=never
+# # (for uv sync) https://docs.astral.sh/uv/concepts/projects/config/#project-environment-path
+# ENV UV_PROJECT_ENVIRONMENT=/usr/local
+# USER root
+# RUN --mount=from=uv,source=/uv,target=/bin/uv \
+#     --mount=from=uv,source=/pyproject.toml,target=/pyproject.toml \
+#     --mount=from=uv,source=/uv.lock,target=/uv.lock \
+#   # Install dependencies from an existing uv.lock
+#   uv sync --frozen --no-cache --no-dev --no-install-project
+# USER app
+# COPY --chown=app:app ./application /application
+
+
+## OR:(change user back-n-forth): USER root
+# RUN --network=none <<"EOF"
+#   sudo pip uninstall -y pip || true
+#   (cd /usr/local/lib/python3.13 && sudo rm -rf -- \
+#     ensurepip
+#   )
+# EOF
+
+######################################################################
+FROM scratch AS minlayout
+
+COPY --from=devapp /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=devapp /usr/local /usr/local
+
+# REF: https://github.com/Winand/python-base-images
+ARG LIB
+# OR: COPY ["README.md", "gulpfile", "another_file", "/usr/lib"]
+COPY --from=devapp \
+  # miur
+  $LIB/libncursesw.so.6 \
+  # python deps
+  $LIB/libz.so.1 \
+  $LIB/libreadline.so.8 \
+  $LIB/libtinfo.so.6 \
+  # ssl
+  $LIB/libssl.so.3 \
+  $LIB/libcrypto.so.3 \
+  # numpy, pandas deps
+  $LIB/libffi.so.8 \
+  $LIB/libgcc_s.so.1 \
+  $LIB/libstdc++.so.6 \
+  # pyarrow deps
+  $LIB/libdl.so.2 \
+  $LIB/librt.so.1 \
+  # sqlite
+  $LIB/libsqlite3.so.0 \
+  # dest
+  /usr/lib/
+
+# COPY --from=devapp /usr/share/terminfo/ /usr/share/terminfo/
+COPY --from=devapp /lib/terminfo/ /lib/terminfo/
+
+ARG myvenv
+# ALT:BET? myvenv -> /usr/local
+COPY --from=devapp "${myvenv:?}" "${myvenv:?}"
+
+
+######################################################################
+# BAD! using busybox cripples !miur default capabilities, leaving only "core/entities"
+#   COS: !miur goal is to aug DEV:WF, so it should interact with many DEV tools,
+#     which may only be installed into properly configured full-fledged distributions
+# ALT:USE: FROM baseuser AS preview
+#   WHY: to reduce size -- build and copy .so pkgs (and /opt/prefix) from dif container
+#   MAYBE: cache artifacts in shared VOLUME ["/build"] inof .ccache
+FROM busybox:glibc AS preview
+
+# BET? mount-bind from=devapp and manually !cp files from there in single layer
+#   SEE:HACK:(scratch-preps): https://stackoverflow.com/questions/69010229/dockerfile-reduce-layers-by-copying-in-a-single-statement
+#     OR: https://superuser.com/questions/1400243/copy-several-assets-in-one-layer
+COPY --from=minlayout / /
+
+ARG myvenv
+ENV VIRTUAL_ENV="${myvenv:?}" \
+  PATH="${myvenv:?}/bin:/usr/local/bin:/usr/bin:/bin"
+
+
+ARG myuser
+ARG mygid
+ARG myuid
+RUN addgroup -g "${mygid:?}" "${myuser:?}" && \
+    adduser -D -s /usr/bin/bash -G "$myuser" -u "${myuid:?}" "$myuser"
+USER "${myuser:?}"
+
+## TODO: mount /home/hostuser/.ssh/*.pub key to access rmts from docker
+# RUN --mount=type=secret,id=mysecret cat /run/secrets/mysecret
+# RUN --mount=type=secret,id=mysecret,dst=/etc/ssh/ssh_host_rsa_key scp rmt:/some/file .
+
+# OR:BET? WORKDIR "${mycwd:?}"
+WORKDIR /mnt
+# CMD ["/usr/bin/bash"]
+# USAGE:(override): $ ./wf --entrypoint=/bin/bash [args]
+ENTRYPOINT ["python", "-m", "miur"]
+# CMD ["--remember-hist="/mnt/miur-hist"]
+CMD []
+# CMD ["/bin/sh"]
+
+## IDEA: same docker for all testing
+#  + run !mypy and !pylint/ruff to get all errors at once
+#  ? run !black to reformat enmass
+#  + pytest + coverage
+#  + smoke testing to either text render OR Xvfb for !st/TERM or pyqt (with img pixel cmp)
+
+## TRY? send heart-beat to the !miur RPC .sock
+# HEALTHCHECK CMD curl -sSLf http://localhost:8080/login >/dev/null || exit 1
+# HEALTHCHECK --interval=5m --timeout=3s CMD curl -f http://localhost/ || exit 1
