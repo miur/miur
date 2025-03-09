@@ -28,39 +28,68 @@ def touch(fname: str, dir_fd: int | None = None) -> None:
 #     (and continue using ".venv" for "requirements_dev.txt")
 #   COS: to verify we have all necessary parts present
 #     BAD: we load most of modules lazily, so you need actual integration tests
-def install_venv_deps(devroot: str | None = None, dev: bool = False) -> None:
-    if devroot is None:
-        # devroot = fs.dirname(fs.dirname(fs.realpath(sys.modules["__main__"].__file__)))
-        devroot = "/d/miur"
+def install_venv_deps(devroot: str, dev: bool = False) -> None:
     venvstamp = fs.join(devroot, ".venv/_updated")
     reqpfx = fs.join(devroot, "pkg/requirements")
-    reqs = [(reqpfx + sfx + ".txt") for sfx in ("", "_dev")]
+    usrtxt = reqpfx + ".txt"
+    devtxt = reqpfx + "_dev.txt"
 
     # EXPL: don't upgrade .venv if all requirements.txt haven't changed
     if fs.exists(venvstamp):
-        # ALT:BET? calc and cmp SHA over sorted pkglist w/o comments
-        last = os.stat(venvstamp).st_mtime
-        if os.stat(reqs[0]).st_mtime < last:
-            if os.stat(reqs[1]).st_mtime < last:  # if not dev or ...
-                return
+        import hashlib
 
-    vpip("install", "--upgrade", "pip")
-    vpip("install", "--upgrade", "-r", (reqs[1] if dev else reqs[0]))
+        with open(venvstamp, "r", encoding="utf-8") as f:
+            stamp = f.read()
+        datsz = int(nsz) if (nsz := stamp.partition(" ")[0]).isdigit() else -1
+
+        with open(usrtxt, "r", encoding="utf-8") as f:
+            # NOTE: calc and cmp SHA over sorted pkglist w/o comments
+            usrdat = "".join(
+                sorted(
+                    k + os.linesep
+                    for l in f
+                    if (k := l.strip()) and not k.startswith("#")
+                )
+            ).encode(f.encoding)
+
+        # NOTE: it's always calculated and compared when req.txt is the same,
+        #   >> no sense to hide it deeper under if-else for when req.txt had changed
+        usrhash = hashlib.sha256(usrdat).hexdigest()
+        usrstamp = f"{len(usrdat)} {usrhash}"
+        if datsz == len(usrdat):
+            # THINK: combine and hash together with usrtxt ?
+            # OPT: if not dev or ...
+            venvts = os.stat(venvstamp).st_mtime
+            devts = os.stat(devtxt).st_mtime
+            if devts <= venvts:
+                if stamp == usrstamp:
+                    return
+
+    # ALT: cat requirements.txt | /d/miur/.venv/bin/python -m pip install -r /dev/stdin
+    #   &why: I can combine "usr" and "dev" and feed it as a single list at once
+    #     NICE: able to remove "-r requirements.txt" from devtxt, and reuse it in pyproject.toml
+    vpip("install", "--upgrade", "pip", "-r", (devtxt if dev else usrtxt))
 
     ## NOTE: install !miur into venv site to be used as pkg by my other tools
     ## DISABLED:BAD: changes "hash" in reqs_all.txt after each install()
     # vpip("install", "--editable", devroot)
 
+    # ALT:MAYBE: use frozen reqs as a stamp file ?
+    #   BAD: on git-clone all files will have the same mtime
+    # touch(venvstamp)
+    with open(venvstamp, "w", encoding="utf-8") as f:
+        f.write(usrstamp)
+
     ##%ONELINE: pip freeze > requirements_frozen.txt
     # %USAGE:(cleanup after experimental deps):
     # %  $ ./.venv/bin/python -m pip uninstall -y -r =(./.venv/bin/python -m pip freeze | grep -vxFf ./pkg/requirements_frozen.txt)
     # %ALSO:(kill unnecessary instances of tools): $ pkill -f pylint
+    # RENAME? "requirements.lock"
+    # REMOVE? useless, as pip-sync should eliminate everything manually installed in .venv
     with open(reqpfx + "_frozen.txt", "w", encoding="utf-8") as f:
+        # OR: pip list --format=freeze
+        # MAYBE pip freeze --exclude-editable
         f.write(vpip("freeze", output=True))
-
-    # MAYBE: use frozen reqs as a stamp file ?
-    #   BAD: on git-clone all files will have the same mtime
-    touch(venvstamp)
 
 
 # FIND: is there any standard way in latest python>=3.12 ?
@@ -74,6 +103,7 @@ def get_py_args(appargs: bool = True) -> list[str]:
     return [argv[i] for i in range(num)]
 
 
+# TODO:CHG: "dev:bool" -> "optdeps:str=(dev,demo,opt)" (corresponding to pyproject.toml)
 def ensure_venv(devroot: str, dev: bool = False) -> None:
     if sys.prefix == sys.base_prefix:
         import venv
