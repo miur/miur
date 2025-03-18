@@ -43,10 +43,25 @@ TBD
 - new miur-relevant argparse
 
 
+2025-03-19 (0.571)
+------------------
+
+DONE: pre-alpha (distributable)
+
+- docker img
+- better venv mgmt and streamlined entrypoint
+- enhanced pyproject.toml and reqs.txt
+- automated dev-wf for updating gen-artfs
+- children logs redir + early pool
+- add listview orderby/reverse
+- add navi app hist save/restore
+- switch navi widget layout by keybind
+
+
 2025-02-14 (0.400)
 ------------------
 
-DONE
+DONE: pre-alpha
 
 - interlace objects (Entitis) and methods (Actions) during navigation
 - auto-convert any python object to explorable entity

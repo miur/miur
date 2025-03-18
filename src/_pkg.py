@@ -9,4 +9,4 @@ __appname__ = "miur"
 
 # ALT:BET? specify version only in pyproject.toml, and then access it by
 #   ver = importlib.metadata.version("miur")
-__version__ = "0.400.20250214"
+__version__ = "0.571.20250319"
