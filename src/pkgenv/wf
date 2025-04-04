@@ -1,0 +1,44 @@
+#!/usr/bin/env -S python -SIB -X faulthandler
+
+# MOVE? ./src/env/*.py
+#   MAYBE? generalize to "flower", as wf==buildsystem (=artf making order)
+
+import os
+import os.path as fs
+import sys
+
+# WKRND: discover files in this dir (BAD: and other stuff above)
+d_this = fs.dirname(fs.realpath(__file__))
+sys.path.insert(0, fs.dirname(d_this))
+__package__ = fs.basename(d_this)
+
+from .docker import docker
+from .pip import update_requirements
+from .venv import ensure_venv
+
+
+def make() -> None:
+    if sys.prefix == sys.base_prefix:  # <PEP-405
+        raise RuntimeError("FAIL: use should activate .venv before ./wf")
+    cwd = os.getcwd()
+    os.chdir("pkg/pypi")
+    try:
+        update_requirements()
+    finally:
+        os.chdir(cwd)
+
+
+def main() -> None:
+    # assert docker--version >= 23.0.0 (DFL=BuildKit + ADD=BuildCtx)
+    pjdir = fs.dirname(fs.dirname(fs.dirname(fs.realpath(__file__))))
+    os.chdir(pjdir)
+    argv = sys.argv[1:]
+
+    with ensure_venv(fs.join(pjdir, ".venv")):
+        # sha_req()
+        make()
+        docker(pjdir, argv)
+
+
+if __name__ == "__main__":
+    main()

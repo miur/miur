@@ -72,6 +72,7 @@ def guess_devroot() -> tuple[str, str]:
     return p, fs.basename(srcdir)
 
 
+# BAD: can't move to :/src/pkgenv/devroot.py COS relative import won't work w/o this cls
 class ensure_devsrc_has_package:
     def __init__(self) -> None:
         self._orig: str
