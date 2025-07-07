@@ -146,6 +146,8 @@ class was_changed:
         with open(self._dofile, "r", encoding=self._enc) as f:
             txt = f.read()
         dat = "".join(
+            # FAIL! sorting can be used for req.txt BUT in Dockerfile order matters!
+            #   ADD:OPT:DFL=(ignore_comments=True, ignore_reordering=False)
             sorted(
                 k + os.linesep
                 for l in txt.splitlines()

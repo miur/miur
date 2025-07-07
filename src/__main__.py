@@ -88,6 +88,9 @@ class ensure_devsrc_has_package:
         self._devroot, self._nm = guess_devroot()
         sys.path.insert(0, self._devroot)
         self._orig = __package__
+        # FIXME(python>=3.13): Setting __package__ on a module while failing to set __spec__.parent is deprecated.
+        #   In Python 3.15, __package__ will cease to be set or take into
+        #   consideration by the import system or standard library. (gh-97879)
         __package__ = self._nm
         return self._devroot
 

@@ -37,6 +37,8 @@ def main() -> None:
     with ensure_venv(fs.join(pjdir, ".venv")):
         # sha_req()
         make()
+        # TODO with ensure_dockerd()
+        #   => do start+stop (and do nothing if already running)
         docker(pjdir, argv)
 
 
