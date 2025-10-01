@@ -94,6 +94,7 @@ class SatelliteViewport_RedrawMixin:
 
                 ## RND: show empty space where item should be
                 ## ALT:BET: generate ErrorEntry in-place
+                ##   OR: allow <<H=0>> items as Atomic "placeholders/separators" w/o preview
                 stdscr.addnstr(vy + max(0, y), vx, "<<H=0>>", vw, S.empty | S.cursor)
 
                 i += 1

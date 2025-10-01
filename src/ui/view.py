@@ -59,6 +59,7 @@ class EntityView:
         if isinstance(self._ent, Action):
             self._act = self._ent.explore  # CHG=_default()
         else:
+            # THINK: how to "inject" Action(name=self._ent.annot()) to have imm preview for HelpAutoExplorer ?
             self._act = lambda: pyobj_to_actions(self._ent, parent=self._ent)
         try:
             self._orig_lst = list(self._act())
@@ -146,7 +147,12 @@ class EntityView:
         elif ss == "unchanged":
             if self._sortrev:
                 lst.reverse()
-            log.info(lst[0])
+            # DISABLED:BUG: can't use TextEntry(" ") as placeholder -- ERR on j/k
+            #   MAYBE: should print item under cursor inof "0"
+            #     FAIL: cursor only has sense in widget, and after sorting it should stay the same
+            #   BUT: this log isn't informative for me at all
+            #     SEE: git blame -- for which context/problem I even added it
+            # log.info(lst[0])
         # elif ss == "size":
         #     lst.sort(key=lambda e: len(self._pool[e]._vlst). reverse=rev)
         else:

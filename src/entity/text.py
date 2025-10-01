@@ -41,6 +41,7 @@ class TextEntry(Golden[str]):
             )
             for m in finditer(r"\S+", self._x)
         ]
+        # NOTE: <<Empty>> is handled elsewhere, so here we check only for `Atomic
         if len(words) == 1:
             raise StopExploration()
             # return [ErrorEntry("INDIVISIBLE WORD", loci=self._at)]

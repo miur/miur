@@ -131,6 +131,8 @@ class RootNode(Golden[str]):
 
     @override
     def explore(self) -> Entities:
+        from .dockernode import DockerNode
+        from .helpexplorer import ExperimentalHelpNode
 
         # OR: do we really need "file://" ?
         #   isn't it prolifiration from "http://" ? -- which is wrong and should had been "http:"
@@ -141,4 +143,6 @@ class RootNode(Golden[str]):
             ProtocolNode(self),
             WebNode(self),
             DatasetNode(self),
+            DockerNode(self),
+            ExperimentalHelpNode(self),
         ]
