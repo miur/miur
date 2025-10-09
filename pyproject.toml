@@ -149,6 +149,13 @@ enabled = true
 live_mode = false
 dmypy = false
 strict = true
+exclude = [".git", ".venv", "_try", "&", "pkg", "t"]
+# overrides = ["--python-executable", "/home/me/bin/python", True]
+# "mypy_command": ["poetry", "run", "mypy"]
+# "dmypy_command": ["/path/to/venv/bin/dmypy"]
+# "dmypy_status_file": ".custom_dmypy_status_file.json"
+# "report_progress": True
+# "config_sub_paths": [".config"]
 
 # [tool.coverage.run]
 # branch = true

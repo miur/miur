@@ -1,6 +1,6 @@
 #!/usr/bin/env -S python -SIB -X faulthandler
 #!/usr/bin/python -SIB
-#!/usr/bin/env -S python -SIB -Ximporttime
+#!/usr/bin/env -S python -SIB -Ximporttime=2
 #!/usr/bin/env -S python -SIB -m cProfile -s cumulative --
 ## BET? make a "dev-launcher/ctlpanel" for !miur with possible options mapped to flags
 ##   >> put it out of "src" folder and optionally distribute it as a separate pkgs
