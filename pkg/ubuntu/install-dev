@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+set -o errexit -o errtrace -o functrace -o noclobber -o noglob -o nounset -o pipefail
+
+this=$(realpath -e "${BASH_SOURCE[0]:-$0}")
+
+d_pj=${this%/*/*}
+ln -svfT "$d_pj/run" /b/miur
+ver=$(python -c 'import sys; print(f"{(ver:=sys.version_info)[0]}.{ver[1]}")')
+ln -svfT "$d_pj/src" ~/.local/lib/"python$ver"/site-packages/miur
+ln -svfT miur /b/mi
+
+exit
+
+startdir=${this%/*}
+source "$startdir/../archlinux/PKGBUILD.dev"
+
+if [[ ${1-} == "--direct" ]]; then
+  # pkgdir=/tmp/miur
+  pkgdir=""
+  package
+else
+  ver=$(sed -r '/^__version__\s*=\s*"([^"]+)"/s//\1/' "$startdir/../../src/_pkg.py")
+
+  # FAIL: "sudo checkinstall" on error or <C-c> nukes whole /lib on ubuntu>=20.04 due to its DFL="--fstrans=no",
+  #   including /lib/ld-linux-x86-64.so.2 which makes whole system disfunctional (not even /bin/ls works)
+  checkinstall -y --install=no --fstrans=yes --pkgname="$pkgname" --pkgversion="$ver" \
+    --provides="${pkgname%-dev}" --pkggroup=development --maintainer="${USER}@${HOST}" \
+      --nodoc "$this" "--direct"  # --requires="zlib1g"
+fi
