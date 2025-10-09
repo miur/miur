@@ -52,6 +52,7 @@ class FSEntry(Golden[FSAccessor]):
                 name="xdg",
                 parent=self,
                 fn=lambda: run_bg_wait(["xdg-open", self._x.handle]),
+                allowpreview=False,
             )
         ]
 
