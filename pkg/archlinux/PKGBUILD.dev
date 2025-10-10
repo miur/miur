@@ -21,6 +21,9 @@ provides=('miur')
 conflicts=('miur')
 
 depends=(
+  libxml2-dev libxslt-dev  # <CASE: lxml
+  libxrandr-dev libxinerama-dev libxcursor-dev # <CASE: imgui-bundle
+
   jupyter_console
   python-black
   python-isort

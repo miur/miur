@@ -42,6 +42,7 @@ dependencies = [
 [project.optional-dependencies]
 # SPLIT? devpkg(pip-tools,bumpver)+devcode(black,isort)+devqa(mypy,pylint,...)+devlive(jupyter-*)
 #   XP~ADD? "bumpver", "pytest"
+# BAD?(interference?): same devtools installed on host are newer because they aren't pinned
 dev = ["pip-tools", "black", "isort", "mypy", "pylint", "pylint_venv", "jupyter-console"]
 ## ALSO: moderngl, moderngl-window, qtinter, mpv
 # SPLIT? demogui + demotry
