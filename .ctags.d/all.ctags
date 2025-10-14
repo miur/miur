@@ -1,0 +1,18 @@
+# ALT:(hide dangling symlinks): $ find . -path "./&" -prune -o -print | ctags -L -
+# DEBUG: $ ctags --_echo ./.ctags.d/all.ctags
+--exclude=&*/
+--exclude=/.git/
+--exclude=.mypy_cache/
+--exclude=.venv*/
+--exclude=_try/
+--exclude=/LICENSES/
+--exclude=_obsolete
+--exclude=_unused
+
+# DISABLED:(broken): TOML,ReStructuredText
+--languages=-all,+Python,+Sh
+# --kinds-Python=+{local}{parameter}
+# --fields-Python=+{decorators}{nameref}
+
+# Use a specific output file name
+-f .tags

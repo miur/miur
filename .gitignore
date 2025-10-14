@@ -3,7 +3,7 @@
 /.venv/
 __pycache__/
 
-tags
+.tags
 
 # cached ZSH scripts
 *.zwc
