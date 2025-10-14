@@ -58,13 +58,15 @@ def pin_requirements(
     #     WTF: maybe os.environ["PATH"] is not inherited to override !python by venv ?
     #   TODO: disallow non-VENV calls by sys.prefix==sys.base_prefix ( like PIP_REQUIRE_VIRTUALENV)
     # [_] CHG: customize .venv to be allowed in /opt/venvmiur or /cache/venvmiur or :/_pfx/venv
-    exe = ("pip-compile",)
+    # exe = ("pip-compile",)
     ## FAIL:DISABLED: initial empty .venv don't have pip-tools installed
-    # if sys.prefix != sys.base_prefix:
-    #     exe = (sys.prefix + "/bin/python", "-m", "piptools", "compile")
-    # else:
-    #     # BAD: it's fine if pip-tools are installed into different python, only PATH matters
-    #     exe = (sys.executable, "-m", "piptools", "compile")
+    if sys.prefix != sys.base_prefix:
+        # exe = (sys.prefix + "/bin/python", "-m", "piptools", "compile")
+        exe = (sys.prefix + "/bin/pip-compile",)
+    else:
+        # BAD: it's fine if pip-tools are installed into different python, only PATH matters
+        # exe = (sys.executable, "-m", "piptools", "compile")
+        raise NotImplementedError("Unsupported")
     dld = get_pip_user_cache_dir()
     src = "../../pyproject.toml"
     # aux = "dev-requirements.txt"
@@ -140,13 +142,18 @@ def sync_venv_to_requirements() -> None:
     #   ::: FIXED: outside .venv use "pip-sync --user" or pip-sync --pip-args="--ignore-installed"
     #     [_] BUT: why I didn't need it earlier on ArchLinux ?
     # BET?(direct): from piptools.scripts import compile, sync; sync.cli(...)
-    exe = ("pip-sync", "--user")
+    # ERROR: Can not perform a '--user' install. User site-packages are not visible in this virtualenv.
+    #   >> WTF: on archlinux "--user" isn't needed at all, but why do I need it on ubuntu22 with python314 -- to not touch system packages ?
+    #     :: By default, virtual environments are isolated and do not have access to user site-packages.
+    # exe = ("pip-sync", "--user")
     ## FAIL:DISABLED: initial empty .venv don't have pip-tools installed
-    # if sys.prefix != sys.base_prefix:
-    #     exe = (sys.prefix + "/bin/python", "-m", "piptools", "sync", "--user")
-    # else:
-    #     # BAD: it's fine if pip-tools are installed into different python, only PATH matters
-    #     exe = (sys.executable, "-m", "piptools", "sync", "--user")
+    if sys.prefix != sys.base_prefix:
+        # exe = (sys.prefix + "/bin/python", "-m", "piptools", "sync", "--user")
+        exe = (sys.prefix + "/bin/pip-sync",)
+    else:
+        # BAD: it's fine if pip-tools are installed into different python, only PATH matters
+        # exe = (sys.executable, "-m", "piptools", "sync", "--user")
+        raise NotImplementedError("Unsupported")
     src = "dev-requirements.txt"
     # aux = "requirements.txt"
     tgt = fs.join(sys.prefix, "_stamp_pinned")
@@ -179,7 +186,7 @@ def update_requirements(args: list[str] | None = None) -> None:
         tgt="dev-requirements.txt",
         aux="dev-requirements.txt",
         extras="all,dev",
-        args=["--all-build-deps", *args],
+        args=["--all-build-deps", *(args or ())],
     )
     pin_requirements(
         tgt="requirements.txt",

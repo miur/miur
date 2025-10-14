@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+#!/usr/bin/env -S bash -c 'd="$(realpath "$0")"; "${d%/*/*}/.venv/bin/python "$0" "$@"'
 #!/usr/bin/env -S python -SIB -X faulthandler
 #!/usr/bin/python -SIB
 #!/usr/bin/env -S python -SIB -Ximporttime=2
@@ -18,19 +20,50 @@
 # %USAGE: $ mi || miur || . =mi && m
 """:"
 if (return 0 2>/dev/null); then
-    _app=$(realpath -e "${BASH_SOURCE[0]:-$0}")
-    if [[ ${_app#/usr/} != ${_app} ]]
-    then _als="${_app%/*/*}/share/miur/integ/miur-shell-aliases.sh"
-    else _als="${_app%/*/*}/integ/miur-shell-aliases.sh"
-    fi
-    source "$_als" "$_app" "$@"
-    unset _app _als
+    [[ -v __mi || -v _pfx ]] && return 2
+    __mi=$(realpath -e "${BASH_SOURCE[0]:-$0}")
+    [[ ${__mi#/usr/} == ${__mi} ]] && _pfx= || _pfx='share/miur'
+    _pfx="${__mi%/*/*}/$pfx/integ/miur-shell-"
+    builtin source "${pfx}complet.sh" "$__mi" "${__mi##*/}"
+    builtin source "${pfx}aliases.sh" "$__mi" "$@"
+    unset __mi _pfx
     return 0
 fi
-echo "ERR: '$0' is not supposed to be run by $SHELL"
-# exec "$0" "$@"
+set -o errexit -o noclobber -o noglob -o nounset -o pipefail
+py="$(command -v python)"
+# BAD: rather unreliable way to check if you "activated" your VENV
+#   - PATH could had been manually modified *after* you executed .venv/bin/python
+#   - user has custom symlink to similarly looking folder
+#   ALT:(robust but slow): $ if "$python" -c 'import sys; exit(0 if sys.prefix != sys.base_prefix else 1)'; then ...
+if [[ ! ${py%/bin/python} =~ venv$ ]]; then
+    __mi=$(realpath -e "${BASH_SOURCE[0]:-$0}")
+    venv="${__mi%/*/*}/.venv"
+    py="$venv/bin/python"
+    pip=("$py" -m pip --require-virtualenv --isolated)
+    if [[ ! -x $py ]]; then
+        python -m venv "$venv"
+        ## MAYBE:BET? make /usr/bin/miur-dev-selfinstall shell-wrapper and keep it there?
+        ##   MOVE: whole shebang into :/integ/miur-shell-aliases.sh
+        ##   WHY: when !miur is used as properly installed package or module -- it should't even attempt making .venv
+        "${pip[@]}" install --upgrade pip  # setuptools wheel
+        "${pip[@]}" check --disable-pip-version-check
+        # "${pip[@]}" install --requirement requirements.txt
+        # "${pip[@]}" cache list
+    fi
+    ## DISABLED:PERF:(BAD=660ms): "${pip[@]}" show pip-tools >/dev/null 2>&1 || ...
+    [[ -x ${py%/*}/pip-sync ]] || "${pip[@]}" install --upgrade pip-tools
+    ## WARN:BAD: if you manually activated incomplete .venv (interrupted or unsynced to latest requirements.txt changes)
+    ##   -- then pkg installation will be skipped >> you won't have access from python to any dependencies, tools, or even pip-sync
+    if [[ ! -s $venv/_stamp_pinned ]]; then
+        # WARN: we don't auto-recompile requirements (for now)
+        "${py%/*}/pip-sync" --no-config --verbose -- "${__mi%/*/*}/pkg/pypi/dev-requirements.txt"
+        "${pip[@]}" freeze >| "$venv/_stamp_pinned"
+    fi
+fi
+# echo "ERR: '$0' is not supposed to be run by $SHELL"
+exec "$py" "$0" "$@"
 exit -2
-"""
+:"""
 
 
 import sys
