@@ -36,6 +36,9 @@ depends=(
   # python-flake8-isort
   # python-flake8-typing-imports
   # python-pytest-flake8
+
+  ## DISABLED:WARN: *must be* installed into .venv (system-wide pip is not allowed on archlinux)
+  # pip-tools
 )
 
 optdepends=(

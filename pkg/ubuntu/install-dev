@@ -1,6 +1,18 @@
 #!/usr/bin/env bash
 set -o errexit -o errtrace -o functrace -o noclobber -o noglob -o nounset -o pipefail
 
+## NEED:(for ubuntu-22.04):
+# sudo add-apt-repository ppa:deadsnakes/ppa
+# sudo apt-get -yq satisfy python3.14{,-dev,-venv}
+# sudo update-alternatives --install /usr/bin/python python /usr/bin/python3.10 10
+# sudo update-alternatives --install /usr/bin/python python /usr/bin/python3.14 14
+# sudo update-alternatives --set python /usr/bin/python3.14
+# curl -LOJ https://bootstrap.pypa.io/get-pip.py
+# python get-pip.py
+# python -m pip --version
+# python -m pip install --upgrade pip  # setuptools packaging wheel pip-tools
+# python -m pip install --upgrade ipython jupyter_console black isort pylint mypy python-lsp-server python-lsp-black pylsp-mypy pyls-isort
+
 this=$(realpath -e "${BASH_SOURCE[0]:-$0}")
 
 d_pj=${this%/*/*}
