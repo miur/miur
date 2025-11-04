@@ -1,0 +1,125 @@
+
+HOST
+   0.066  D[__main__:260]
+   0.066  S[__main__:265] (.venv): /data/aura/miur/.venv
+   0.070  S[__main__:270] <$ /data/aura/miur/.venv/bin/python ./run
+   0.070  P[__main__:271] KPI[ms=70.269(+70.269) cpu=70.151(+4.685)] entrypoint
+   0.078  P[miur:13]      KPI[ms=77.541(+7.272) cpu=77.340(+7.189)] main
+   0.078  S[miur:26]      pid=30441
+   0.079  S[iomgr:161]    log=(buf)
+   0.114  W[vlst:156]     idx=0 <- .focus_on .explore()
+   0.114  I[navihistory:94] 7fe5a8e0fe00 ObjAction(/.explore())
+   0.116  S[miur:96]        xpath=None -> ent=FSDir(/miur)
+   0.163  S[miur:156]       loop=asyncio
+   0.165  I[curses_ext:128] resize: [36x124]
+   0.165  D[navi:47]        adaptive: self._layout=navi_miller2[124x34+0+1]:(prevloci[22x34+0+1]:(pprev[8x34+0+1]:(), prev[14x34+8+1]:()), browse[62x34+22+1]:(tab0[62x34+22+1]:()), preview[40x34+84+1]:(pv0[28x34+84+1]:(), pv1[12x34+112+1]:()))
+   0.170  P[loop_asyncio:86] KPI[ms=169.756(+92.215) cpu=168.105(+90.765)] serving asyncio
+   0.171  T[loop_asyncio:98] removing... fds/signals
+   0.173  T[loop_asyncio:51] setting... loop=None
+
+
+DOCK-BIND
+   0.299  D[__main__:260]
+   0.299  S[__main__:265] (.venv): /opt/venv ; /usr/local
+   0.324  S[__main__:270] <$ /opt/venv/bin/python ./run
+   0.324  P[__main__:271] KPI[ms=324.259(+324.259) cpu=321.262(+22.823)] entrypoint
+   0.400  P[miur:13]      KPI[ms=399.570(+75.310) cpu=394.188(+72.926)] main
+   0.413  S[miur:26]      pid=7
+   0.417  S[iomgr:161]    log=(buf)
+   0.650  W[vlst:156]     idx=0 <- .focus_on .explore()
+   0.650  I[navihistory:94] 7ff4b70b9d30 ObjAction(/.explore())
+   0.657  S[miur:96]        xpath=None -> ent=FSDir(/mnt)
+   1.015  S[miur:156]       loop=asyncio
+   1.017  I[curses_ext:128] resize: [36x124]
+   1.017  D[navi:47]        adaptive: self._layout=navi_miller2[124x34+0+1]:(prevloci[22x34+0+1]:(pprev[8x34+0+1]:(), prev[14x34+8+1]:()), browse[62x34+22+1]:(tab0[62x34+22+1]:()), preview[40x34+84+1]:(pv0[28x34+84+1]:(), pv1[12x34+112+1]:()))
+   1.037  P[loop_asyncio:86] KPI[ms=1036.912(+637.342) cpu=985.505(+591.317)] serving asyncio
+   1.038  T[loop_asyncio:98] removing... fds/signals
+   1.040  T[loop_asyncio:51] setting... loop=None
+
+
+DOCK-BIND # (after Dockerfile upgrade)
+   0.279  D[__main__:260]
+----- [20251104_003127] -----
+   0.279  S[__main__:265] (.venv): /opt/venv/miur ; /usr/local
+   0.297  S[__main__:270] <$ /opt/venv/miur/bin/python ./run
+   0.297  P[__main__:271] KPI[ms=297.345(+297.345) cpu=297.158(+18.532)] entrypoint
+   0.369  P[miur:13]      KPI[ms=369.187(+71.842) cpu=368.451(+71.294)] main
+   0.384  S[miur:26]      pid=15
+   0.387  S[iomgr:161]    log=(buf)
+   0.595  W[vlst:156]     idx=0 <- .focus_on .explore()
+   0.595  I[navihistory:94] 7ff36911da90 ObjAction(/.explore())
+   0.602  S[miur:96]        xpath=None -> ent=FSDir(/mnt)
+   0.922  S[miur:156]       loop=asyncio
+   0.924  I[curses_ext:128] resize: [36x124]
+   0.924  D[navi:47]        adaptive: self._layout=navi_miller2[124x34+0+1]:(prevloci[22x34+0+1]:(pprev[8x34+0+1]:(), prev[14x34+8+1]:()), browse[62x34+22+1]:(tab0[62x34+22+1]:()), preview[40x34+84+1]:(pv0[28x34+84+1]:(), pv1[12x34+112+1]:()))
+   0.943  P[loop_asyncio:86] KPI[ms=943.249(+574.062) cpu=936.205(+567.754)] serving asyncio
+   0.944  T[loop_asyncio:98] removing... fds/signals
+   0.946  T[loop_asyncio:51] setting... loop=None
+
+
+DOCK-NATIVE
+   0.266  S[miur:26] pid=1
+   0.266  S[iomgr:161] log=(buf)
+   0.610  W[vlst:156]  idx=0 <- .focus_on .explore()
+   0.610  I[navihistory:94] 7fc561691160 ObjAction(/.explore())
+   0.612  S[miur:96]        xpath=None -> ent=FSDir(/mnt)
+   0.962  S[miur:156]       loop=asyncio
+   0.964  I[curses_ext:128] resize: [36x124]
+   0.964  D[navi:47]        adaptive: self._layout=navi_miller2[124x34+0+1]:(prevloci[22x34+0+1]:(pprev[8x34+0+1]:(), prev[14x34+8+1]:()), browse[62x34+22+1]:(tab0[62x34+22+1]:()), preview[40x34+84+1]:(pv0[28x34+84+1]:(), pv1[12x34+112+1]:()))
+   0.982  P[loop_asyncio:86] KPI[ms=982.401(+982.401) cpu=929.600(+678.014)] serving asyncio
+   1.559  W[*keymap:71]      'q' : g.doexit()
+   1.560  T[loop_asyncio:98] removing... fds/signals
+   1.562  T[loop_asyncio:51] setting... loop=None
+
+
+FIXED: "wf" ~~ not best, but much better
+   0.102  P[miur:13] KPI[ms=101.818(+101.818) cpu=103.691(+1.058)] main
+   0.104  S[miur:26] pid=1
+   0.104  S[iomgr:161] log=(buf)
+   0.185  W[vlst:156]  idx=0 <- .focus_on .explore()
+   0.185  I[navihistory:94] 7f33dca678c0 ObjAction(/.explore())
+   0.187  S[miur:96]        xpath=None -> ent=FSDir(/mnt)
+   0.278  S[miur:156]       loop=asyncio
+   0.281  I[curses_ext:128] resize: [36x124]
+   0.281  D[navi:47]        adaptive: self._layout=navi_miller2[124x34+0+1]:(prevloci[22x34+0+1]:(pprev[8x34+0+1]:(), prev[14x34+8+1]:()), browse[62x34+22+1]:(tab0[62x34+22+1]:()), preview[40x34+84+1]:(pv0[28x34+84+1]:(), pv1[12x34+112+1]:()))
+   0.287  P[loop_asyncio:86] KPI[ms=287.002(+185.183) cpu=248.360(+144.669)] serving asyncio
+   0.289  T[loop_asyncio:98] removing... fds/signals
+   0.292  T[loop_asyncio:51] setting... loop=None
+
+
+BET: ./wf - -lc '/opt/venv/miur/bin/python -SIB ./run'
+   0.068  D[__main__:260]
+   0.068  S[__main__:265] (.venv): /opt/venv/miur ; /usr/local
+   0.076  S[__main__:270] <$ /opt/venv/miur/bin/python -SIB ./run
+   0.076  P[__main__:271] KPI[ms=75.856(+75.856) cpu=73.806(+5.577)] entrypoint
+   0.086  P[miur:13]      KPI[ms=86.067(+10.211) cpu=82.920(+9.114)] main
+   0.088  S[miur:26]      pid=7
+   0.088  S[iomgr:161]    log=(buf)
+   0.139  W[vlst:156]     idx=0 <- .focus_on .explore()
+   0.139  I[navihistory:94] 7f1cfbf53620 ObjAction(/.explore())
+   0.141  S[miur:96]        xpath=None -> ent=FSDir(/mnt)
+   0.233  S[miur:156]       loop=asyncio
+   0.236  I[curses_ext:128] resize: [36x124]
+   0.236  D[navi:47]        adaptive: self._layout=navi_miller2[124x34+0+1]:(prevloci[22x34+0+1]:(pprev[8x34+0+1]:(), prev[14x34+8+1]:()), browse[62x34+22+1]:(tab0[62x34+22+1]:()), preview[40x34+84+1]:(pv0[28x34+84+1]:(), pv1[12x34+112+1]:()))
+   0.242  P[loop_asyncio:86] KPI[ms=242.296(+156.229) cpu=206.134(+123.214)] serving asyncio
+   0.244  T[loop_asyncio:98] removing... fds/signals
+   0.248  T[loop_asyncio:51] setting... loop=None
+
+
+BEST: "./wf -" and then 2nd run of $ /opt/venv/miur/bin/python -SIB ./run
+   0.055  D[__main__:260]
+   0.055  S[__main__:265] (.venv): /opt/venv/miur ; /usr/local
+   0.060  S[__main__:270] <$ /opt/venv/miur/bin/python -SIB ./run
+   0.060  P[__main__:271] KPI[ms=59.789(+59.789) cpu=59.727(+4.592)] entrypoint
+   0.069  P[miur:13]      KPI[ms=68.888(+9.099) cpu=68.735(+9.008)] main
+   0.070  S[miur:26]      pid=11
+   0.071  S[iomgr:161]    log=(buf)
+   0.105  W[vlst:156]     idx=0 <- .focus_on .explore()
+   0.105  I[navihistory:94] 7f69992b7620 ObjAction(/.explore())
+   0.107  S[miur:96]        xpath=None -> ent=FSDir(/mnt)
+   0.169  S[miur:156]       loop=asyncio
+   0.171  I[curses_ext:128] resize: [36x124]
+   0.171  D[navi:47]        adaptive: self._layout=navi_miller2[124x34+0+1]:(prevloci[22x34+0+1]:(pprev[8x34+0+1]:(), prev[14x34+8+1]:()), browse[62x34+22+1]:(tab0[62x34+22+1]:()), preview[40x34+84+1]:(pv0[28x34+84+1]:(), pv1[12x34+112+1]:()))
+   0.176  P[loop_asyncio:86] KPI[ms=176.369(+107.481) cpu=174.817(+106.082)] serving asyncio
+   0.177  T[loop_asyncio:98] removing... fds/signals
+   0.180  T[loop_asyncio:51] setting... loop=None

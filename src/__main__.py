@@ -121,10 +121,61 @@ class ensure_devsrc_has_package:
         self._devroot, self._nm = guess_devroot()
         sys.path.insert(0, self._devroot)
         self._orig = __package__
-        # FIXME(python>=3.13): Setting __package__ on a module while failing to set __spec__.parent is deprecated.
+
+        # FIXME(python>=3.13):ERR: Setting __package__ on a module while failing to set __spec__.parent is deprecated.
         #   In Python 3.15, __package__ will cease to be set or take into
         #   consideration by the import system or standard library. (gh-97879)
         __package__ = self._nm
+
+        # FIXED: we are being executed as a file, not as a module
+        # global __spec__
+        # if __spec__ is None:
+        #     from importlib.util import spec_from_file_location
+        #     from pathlib import Path
+        #
+        #     p = Path(__file__).resolve()
+        #     # __spec__ = spec_from_file_location(f"{self._nm}.{__file__}", p)
+        #     __spec__ = spec_from_file_location(
+        #         self._nm, p, submodule_search_locations=[str(p.parent)]
+        #     )
+        #
+        #     pkg = importlib.util.module_from_spec(__spec__)
+        #     sys.modules[self._nm] = pkg
+        #     __spec__.loader.exec_module(pkg)
+        # # Now execute src/main.py *as part of that package*
+        # # runpy.run_module(f"{pkg_name}.main", run_name="__main__")
+
+        # __spec__ = _iu.spec_from_loader("__main__", loader=None)
+        # __spec__.parent = self._nm
+        # if globals().get("__spec__", None) is None or getattr(
+        #     __spec__, "parent", None
+        # ) in (None, ""):
+        #     # import importlib.util as _iu
+        #     from importlib.machinery import ModuleSpec
+        #
+        #     # ALT:(self._nm): use unique, stable-ish name tied to the directory path
+        #     #   NICE: avoids clashing with site packages
+        #     # _pkg_dir  = os.path.dirname(os.path.abspath(__file__))
+        #     # _pkg_name = "_selfpkg_" + format(abs(hash(_pkg_dir)), "x")
+        #     # _pkg_name = "_selfpkg_" + hashlib.blake2b(_root.encode(), digest_size=8).hexdigest()
+        #     nm = self._nm
+        #     mod = __import__("types").ModuleType(nm)
+        #     mod.__path__ = [self._devroot]  # allow submodule discovery under this dir
+        #     mod.__package__ = nm
+        #     # mod.__spec__ = _iu.spec_from_loader(nm, loader=None, is_package=True)
+        #     mod.__spec__ = ModuleSpec(name=nm, loader=None, is_package=True)
+        #     mod.__spec__.submodule_search_locations = [self._devroot]
+        #
+        #     sys.modules[nm] = mod  # register parent package
+        #     _main_spec = ModuleSpec(name=f"{nm}.__main__", loader=None)
+        #     _main_spec.origin = __file__
+        #     _main_spec.has_location = True
+        #
+        #     __package__ = nm  # mark this file as inside that package
+        #     __spec__ = _main_spec
+        #     # __spec__.parent = nm
+        #     sys.modules[f"{nm}.__main__"] = sys.modules["__main__"]
+
         return self._devroot
 
     def __exit__(self, _et, _exc, _tb):  # type:ignore[no-untyped-def]
@@ -172,7 +223,48 @@ def miur_autoselect(argv: list[str] = sys.argv) -> None:
                 # CASE:(dev): gitclone as user (reqs.txt) vs gitclone as developer (+reqs_dev.txt)
                 ensure_venv(devroot, dev=True)
 
+            import inspect
+
             from .util.logger import log
+
+            def custom_trace(frame, event, arg):
+                # Only trace 'line' events to get execution flow line by line
+                if event == "line":
+                    # Get frame information
+                    filename = frame.f_code.co_filename
+                    lineno = frame.f_lineno
+                    log.comment(f"{filename}:{lineno}")
+
+                    ## DISABLED:PERF: too slow
+                    ## Use the inspect module to get the actual source line
+                    # try:
+                    #     # inspect.getsourcelines returns a list of lines and a starting line number.
+                    #     # We need to find the specific line corresponding to the current lineno.
+                    #     lines, start_lineno = inspect.getsourcelines(frame.f_code)
+                    #     line_index = lineno - start_lineno
+                    #     if 0 <= line_index < len(lines):
+                    #         line_content = lines[line_index].strip()
+                    #     else:
+                    #         line_content = "<source code not found>"
+                    # except (IOError, OSError):
+                    #     line_content = "<source code not available>"
+                    # log.comment(f"File: {filename}:{lineno} | Code: {line_content}")
+
+                    ## BET?
+                    # if event == "line" and frame.f_code.co_filename == "/usr/lib/python3.14/netrc.py":
+                    #     print(f"{frame.f_code.co_filename}:{frame.f_lineno}: {frame.f_code.co_name}")
+                    #     for k, v in frame.f_locals.items():
+                    #         try:
+                    #           print(f"    {k} = {v!r}")
+                    #         except:
+                    #           pass
+
+                # Return the trace function itself to continue tracing in subsequent calls
+                return custom_trace
+
+            ## DEBUG: enable line-by-line tracing
+            # sys.settrace(custom_trace)
+            # sys.settrace(None)
 
             log.sep()
             # BAD: log is too early to be redirected by stdlog_redir()

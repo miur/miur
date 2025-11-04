@@ -210,6 +210,9 @@ class Logger:  # pylint:disable=too-many-instance-attributes
     def trace(self, fmt: _Loggable, /) -> None:
         self.at(LogLevel.TRACE, fmt)
 
+    def comment(self, fmt: _Loggable, /) -> None:
+        self.at(LogLevel.COMMENT, fmt)
+
     def sep(self, fmt: _Loggable | None = None, /) -> None:
         """Separator with timestamps -- useful as 1st line in _live() Jupyter sessions"""
         line = "\n----- " + time.strftime("[%Y%m%d_%H%M%S] -----", time.localtime())

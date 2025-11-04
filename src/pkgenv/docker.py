@@ -72,8 +72,12 @@ def docker_run(tag: str, argv: list[str]) -> None:
     if argv and argv[0] == "-":
         argv.pop(0)
         ## DISABLED: doesn't exist for "busybox" img
-        # entry = "/usr/bin/bash"
-        entry = "/bin/sh"
+        entry = "/usr/bin/bash"
+        # entry = "/bin/sh"
+
+        ## FAIL: requires "/d/plugins/" being installed
+        ## FAIL: requires "/d/audit/" being RW
+        # entry = "/usr/bin/zsh"
 
     wkdir = "/mnt"
     nm = re.sub(r"[^a-zA-Z0-9]", "_", tag[0]) + re.sub(r"[^a-zA-Z0-9_.-]", "_", tag[1:])
@@ -84,6 +88,7 @@ def docker_run(tag: str, argv: list[str]) -> None:
         "run",
         "--name=" + nm,  # OR=miurapp
         "--rm",
+        "--init",
         "--tty=true",
         "--interactive=true",
         "--read-only=true",  # <EXPL: prohibit any random writes (use host-binds and VOLUMEs)
@@ -196,6 +201,10 @@ def docker(pjdir: str, argv: list[str]) -> None:
     # TEMP:DISABLED:FIXME: use deps from frozen.txt OR pypj.toml
     # BAD:FIXME? should also re-install project each time any SRC changes
     #   ALT:BET? during DEV-WF use special docker with "-e" installation
+    #   IMPL: sha256(concat(p.read() for p in glob('src/*') if not *.pyc))
+    #     BUT: it will be annoying to rebuild whole docker each time I change SRC,
+    #       as I already use mount-bind to propagate latest SRC from current PWD
+    #     BET: special flag to toggle either recreation (for deploy) or reuse (for dev)
     with was_changed(stamp, dofile, force) as txt:
         if txt:
             docker_build(tag, dofile, force)

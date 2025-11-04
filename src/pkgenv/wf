@@ -38,10 +38,12 @@ def main() -> None:
 
     with ensure_venv(fs.join(pjdir, ".venv")):
         # sha_req()
-        make()
-        # TODO with ensure_dockerd()
+        ## USAGE: uncomment to recreate .venv
+        ## FAIL: adds "miur @ file:///d/miur" to reqs.txt
+        # make()
+        ## TODO with ensure_dockerd()
         #   => do start+stop (and do nothing if already running)
-        # docker(pjdir, argv)
+        docker(pjdir, argv)
 
 
 if __name__ == "__main__":
