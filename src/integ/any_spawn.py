@@ -160,6 +160,11 @@ def spawn_py(tgt: "Callable[[], None|int]", /, nm: str) -> None:
     sys.path.insert(0, pjroot)
     log.error(sys.path)
     try:
+        ## ALT:TRY? https://docs.python.org/3.14/whatsnew/3.14.html#whatsnew314-multiple-interpreters
+        # from concurrent import interpreters
+        # interp = interpreters.create(nm)
+        # res = interp.call(_child_exec, tgt)
+        # OR: t = interp.call_in_thread(_child_exec, tgt); t.join()
         p = MP.Process(name=nm, target=_child_exec, args=(tgt,))
         g_app.mp_children[nm] = p
         p.start()

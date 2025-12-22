@@ -21,11 +21,11 @@
 """:"
 if (return 0 2>/dev/null); then
     [[ -v __mi || -v _pfx ]] && return 2
-    __mi=$(realpath -e "${BASH_SOURCE[0]:-$0}")
+    __mi=$(realpath -e "${BASH_SOURCE[0]:-$0}") || return
     [[ ${__mi#/usr/} == ${__mi} ]] && _pfx= || _pfx='share/miur'
     _pfx="${__mi%/*/*}/$pfx/integ/miur-shell-"
-    builtin source "${pfx}complet.sh" "$__mi" "${__mi##*/}"
-    builtin source "${pfx}aliases.sh" "$__mi" "$@"
+    builtin source "${pfx}complet.sh" "$__mi" "${__mi##*/}" || return
+    builtin source "${pfx}aliases.sh" "$__mi" "$@" || return
     unset __mi _pfx
     return 0
 fi
