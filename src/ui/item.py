@@ -175,6 +175,7 @@ class ItemWidget:
         focused = infoctx.get("focusid") is not None
         moreup = infoctx.get("moreup")
         moredown = infoctx.get("moredown")
+        vpheight = infoctx.get("vh")
 
         maxlines = self.numlines(rect.w, min(rect.h, ih_hint))
         cursorx = rect.x
@@ -382,16 +383,36 @@ class ItemWidget:
             if moreup and i == 0:
                 ms = "△" + num_up(moreup)  # ALT="▵⁽¹²³⁾"
                 mn = cellwidth(ms)
-                ms = ms if boxw > hint_mintext_len + mn else ms[0]
-                mx = rect.xw - 1 - mn  # OR=rect.x + rect.w // 2
+                mn2 = 0
+                if mn >= boxw - hint_mintext_len:
+                    ms = ms[0]
+                    mn = cellwidth(ms)
+                elif (mpgs := moreup // vpheight) > 0:
+                    ms2 = num_up(f"({mpgs})")
+                    mn2 = cellwidth(ms2)
+                    if mn + mn2 >= boxw - hint_mintext_len:
+                        mn2 = 0
+                mx = rect.xw - 1 - mn - mn2  # OR=rect.x + rect.w // 2
                 stdscr.addstr(rect.y + i, mx, ms, S.empty)
+                if mn2:
+                    stdscr.addstr(rect.y + i, mx + mn, ms2, S.fsdir)  # or ORNG
             elif moredown and i == last:
                 assert not moreup or last > 0, "FIX: print both up/dn on same line"
                 ms = "▽" + num_lo(moredown)  # ALT="▿₍₁₂₃₎"
                 mn = cellwidth(ms)
-                ms = ms if boxw > hint_mintext_len + mn else ms[0]
-                mx = rect.xw - 1 - mn  # OR=rect.x + rect.w // 2
+                mn2 = 0
+                if mn >= boxw - hint_mintext_len:
+                    ms = ms[0]
+                    mn = cellwidth(ms)
+                elif (mpgs := moredown // vpheight) > 0:
+                    ms2 = num_lo(f"({mpgs})")
+                    mn2 = cellwidth(ms2)
+                    if mn + mn2 >= boxw - hint_mintext_len:
+                        mn2 = 0
+                mx = rect.xw - 1 - mn - mn2  # OR=rect.x + rect.w // 2
                 stdscr.addstr(rect.y + i, mx, ms, S.empty)
+                if mn2:
+                    stdscr.addstr(rect.y + i, mx + mn, ms2, S.fsdir)  # or ORNG
 
             if i == -offy and offy == 0:
                 if meta:

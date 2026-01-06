@@ -152,6 +152,7 @@ class SatelliteViewport_RedrawMixin:
                     # NOTE: single large multiline item may have both top+bot scroll markers
                     moreup=top_idx if i == top_idx else None,
                     moredown=last - i if y + h_item >= vh else None,
+                    vh=vh,
                 )
             except Exception as exc:  # pylint:disable=broad-exception-caught
                 from ..util.exchook import log_exc

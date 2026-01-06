@@ -1,8 +1,10 @@
 import enum
 from unicodedata import east_asian_width
 
-NUM_SUP = "⁰¹²³⁴⁵⁶⁷⁸⁹"  # ⁺⁻⁼⁽⁾ⁱⁿ
-NUM_sub = "₀₁₂₃₄₅₆₇₈₉"  # ₊₋₌₍₎ᵢⱼₖᵣₜᵥₓ
+# TODO
+NUM_SUP = "⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾ⁱ"  # ⁿ
+NUM_sub = "₀₁₂₃₄₅₆₇₈₉₊₋₌₍₎ᵢ"  # ⱼₖᵣₜᵥₓ
+NUM_idx = "0123456789+-=()i"
 
 
 def _num_map(x: int | str, c2u: str) -> str:
@@ -10,7 +12,8 @@ def _num_map(x: int | str, c2u: str) -> str:
         x = str(x)
     # else:
     #     assert x.isdigit()
-    return "".join(c2u[int(c)] if c.isdigit() else c for c in x)
+    # return "".join(c2u[int(c)] if c.isdigit() else c for c in x)
+    return "".join(c2u[i] if (i := NUM_idx.find(c)) != -1 else c for c in x)
 
 
 def num_lo(x: int | str) -> str:
