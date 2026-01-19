@@ -29,6 +29,7 @@ readme = {file = "README.rst", content-type = "text/x-rst"}
 # WARN: app deps were actually tested only agains *some* versions (stored in requirements.txt in repo)
 #   e.g. even if SPEC mentions lxml>=5.1, it may had been tested only against lxml>=5.3
 dependencies = [
+  "python-ripgrep", # <WiP
   "pygments",     # <WiP
   "ranger-fm",    # <TEMP
   "python-mpd2",  # <OPT: protocols
