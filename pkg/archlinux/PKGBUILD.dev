@@ -11,7 +11,7 @@
 #%
 # shellcheck shell=bash disable=SC2034,SC2154
 pkgname=miur-dev
-pkgver=0.400.20250214
+pkgver=0.570.20260113
 pkgrel=1
 pkgdesc='Modern Interface for Uniform Reconnaissance'
 url='https://github.com/miur/miur/'
@@ -21,10 +21,10 @@ provides=('miur')
 conflicts=('miur')
 
 depends=(
-  libxml2-dev libxslt-dev  # <CASE: lxml
-  libxrandr-dev libxinerama-dev libxcursor-dev # <CASE: imgui-bundle
+  # libxml2-dev libxslt-dev  # <CASE: lxml
+  # libxrandr-dev libxinerama-dev libxcursor-dev # <CASE: imgui-bundle
 
-  jupyter_console
+  jupyter-console
   python-black
   python-isort
   python-pylint
@@ -47,7 +47,7 @@ optdepends=(
 package() {
   local pkgname=${pkgname%-dev}
   local pkgabbr=${pkgname:0:2}
-  local d_pj=${startdir%/*}
+  local d_pj=${startdir%/*/*}
   local prefix=$pkgdir/usr/local
   local bindir=$prefix/bin
   local datadir=$prefix/share
