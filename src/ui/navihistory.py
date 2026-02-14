@@ -26,10 +26,11 @@ class EntityViewCachePool:
         self._d[ent] = view
         return view
 
+    ## DISABLED: interferes with WiP `PyMemNode
     # USAGE: sys.getsizeof()
-    @override
-    def __sizeof__(self) -> int:
-        raise NotImplementedError()
+    # @override
+    # def __sizeof__(self) -> int:
+    #     raise NotImplementedError()
 
 
 # CHG: store _view and _history in outside CacheDB and pass into NaviWidget only refs

@@ -33,6 +33,7 @@ class MiurAppNode(Golden[str]):
 
         from ..app import g_app
         from .objaction import ObjAction
+        from .pymemnode import PyMemRoot
 
         # FIXME:BET: inof "None" return RemoteException to explore (or at least errcode)
         def _spawn_render(nm: str) -> None:
@@ -50,6 +51,8 @@ class MiurAppNode(Golden[str]):
             ObjAction(name="@env", parent=self, fn=lambda: os.environ),
             ObjAction(name="@g_app", parent=self, fn=lambda: vars(g_app)),
             ObjAction(name="@keybindings", parent=self, fn=lambda: g_app.keytableroot),
+            # ObjAction(name="@pymem", parent=self, fn=lambda: [PyMemRoot(self)]),
+            ObjAction(name="@pymem", parent=self, fn=lambda: PyMemRoot.explore(self)),
             ObjAction(
                 name="@demo/render",
                 parent=self,
