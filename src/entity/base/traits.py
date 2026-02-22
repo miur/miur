@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Protocol, Self
 
 if TYPE_CHECKING:
     from ...ui.view import EntityView
@@ -48,6 +48,25 @@ class Explorable(Protocol):
     def explore(self) -> "Entities": ...
 
 
+class Interpretable(Protocol):
+    # RENAME? .can_interpret , .can_handle , .can_convert | .is_coercible | .suports , .accepts , .eligible
+    #   BET? .makeable_from | .constructible_from | .convertible_from | .derivable_from | .creatable_from
+    #   ALT: .can_be_made_from | .compatible_with | .understands/recognizes/resembles
+    # ex~: "if ELFFile.derivable_from(FSFile)"
+    @classmethod
+    def creatable_from(cls, ent: "Entity") -> bool | None: ...
+
+    # RENAME? .from_entity | .reinterpret | .convert | .derive | .make_from
+    #   WHY: to also allow .from_<non_entity>() kind of conversions
+    # ex~: "ent = ELFFile.create_from(FSFile)" | "ent = FSFile.convert_to(ELFFile)"
+    @classmethod
+    def create_from(cls, ent: "Entity") -> Self: ...
+
+    # RENAME? get_available_interpretations()
+    # MAYBE:BET? cvt ret-vals to Entities by external adapter-factory?
+    def interp_as(self) -> "Entities": ...
+
+
 # REMOVE?
 class Atomic(Addressable, Representable, Protocol):
     __slots__ = ()
@@ -57,5 +76,13 @@ class Atomic(Addressable, Representable, Protocol):
 
 
 # RENAME? `Derivable `Composite (in contrast to `Atomic)
-class Standart(Explorable, Locatable, Addressable, Sortable, Representable, Protocol):
+class Standart(
+    Interpretable,
+    Explorable,
+    Locatable,
+    Addressable,
+    Sortable,
+    Representable,
+    Protocol,
+):
     pass

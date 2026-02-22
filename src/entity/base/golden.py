@@ -1,7 +1,16 @@
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Iterable, Protocol, override
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Iterable,
+    Iterator,
+    Protocol,
+    Self,
+    override,
+)
 
 from .autodiscover import AutoRegistered
+from .interp import InterpretableMixin
 
 type Entity = "Golden[Any]"
 type Entities = Iterable[Entity]
@@ -28,7 +37,7 @@ class Accessor(Protocol):
 
 # RENAME? `Entity `Node `Discoverable
 # ALT:(Protocol):NEED:BAD:PERF:(@runtime_checkable):COS:TEMP: to focus_on(match-case Golden())
-class Golden[T](AutoRegistered):
+class Golden[T](InterpretableMixin, AutoRegistered):
     __slots__ = ()
 
     # ERR:(pylint=3.3.1):TRY: upgrade?
@@ -79,6 +88,7 @@ class Golden[T](AutoRegistered):
         # FAIL:TEMP: "self.name" -> "self._x.selector_for_interpreter"
         return self._parent.loci + "/" + self.name
 
+    # BAD: names can be non-unique; BET? disallow or keep by order added ?
     def __lt__(self, other: Entity) -> bool:
         return self.name < other.name
 

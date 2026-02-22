@@ -25,6 +25,7 @@ class FSAccessor(Accessor):
         return nm
 
 
+# OLD:ALT: FSEntity, FSEntityAdapter, Path2Entity, InterpretAsFSEntity
 class FSEntry(Golden[FSAccessor]):
     __slots__ = ()
 

@@ -1,0 +1,50 @@
+
+`Accessor - object access protocol adapter to subsystem api provider bound to handle (either direct system or caching proxy)
+
+`Entity - reasonable subset of obj ops with standardized represetable props and output, focused on exploration of internal structure
+
+ReprAs() :: RootWidget → … → ListItem.Entity
+  → NameReprFSFile(FSFile)
+  → NameAndShortPreviewReprFSFile(FSFile)
+  → NameRank_InFavorite_Hotkey_ReprOrderedChoices(Choices)
+  OR:BET: Entity(FSFile).repr_as() -> { NameRepr , NameAndShortPreviewRepr, ... }
+
+InterpAs(*) ⌇⡩⢚⡀⠥
+  ex~:
+    `UnixPath (Entity) -- virtual (only strpath-ops), no sense to have `FSPath (os.ops) unless it's bound to `HostFileSystem
+      → `FSDir
+        → `Listing * `FSPath
+      → `FSLink
+        → `FSPath -- is actually auto-InterpretAs() by UNIX STD, COS: same `FSLink ~Behavior~ as `FSFile (do I need `Behavior abstraction?)
+        → `LinkContent (as-is == readlink)
+      → `FSFile  (OR=`FSPathFile, as it isn't the file itself)
+        → `FileName
+        → `InodeStats
+        → `InodeXAttrs
+        → `BinaryData
+          → `DataBlob
+            → `Hex16
+            → `ELFFile
+              → `FileContents (in-mem) OR `FileBackedContent (for mmap)
+            → `SQLiteDBFile
+              BAD: we still need "path", but DataBlob doesn't have it?
+                [_] MAYBE cvt `FSFile directly and allow reduced set of ops on `ELFFileContent
+          → `Utf8/TextContent
+            → `PlainText
+              → `TextParagraphs
+              → `TextSentences
+              → `TextLines
+                → `Listing * `Text
+                  → `PatternsRecognition
+                    → words (to translate or google)
+                    → urls
+                    → path-like
+                      → `FSPath (Entity)
+                        NEED: inherit same `*FileSystem (Host/Remote) from backtracking to nearest one (or expand() and pick another)
+                    → tags
+                    → date-time/ts
+                    → xtrefs
+              → `TextIndentOutline
+              → `WordsStats
+            → `CSVTable
+            → `CodeSyntax
