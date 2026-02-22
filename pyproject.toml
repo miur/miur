@@ -33,6 +33,7 @@ dependencies = [
   "pygments",     # <WiP
   "ranger-fm",    # <TEMP
   "python-mpd2",  # <OPT: protocols
+  "python-pyelftools",  # <OPT: protocols
 ]
 
 
