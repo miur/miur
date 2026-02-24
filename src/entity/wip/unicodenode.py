@@ -1,8 +1,8 @@
 # %ONELINE: print(''.join([chr(i) for i in range(0x110000) if ord(chr(i)) < 0x10000]))
 from typing import override
 
-from .base.golden import Entities, Entity, Golden
-from .text import TextEntry
+from ..base.golden import Entities, Entity, Golden
+from ..core.text import TextEntry
 
 
 class UnicodeNode(Golden[str]):

@@ -1,6 +1,6 @@
+from ..entity.core.fsentry import FSEntry
 from ..util.exchook import log_exc
 from ..util.logger import log
-from .entries import FSEntry
 from .root import RootWidget
 
 # from . import widget as this  # pylint:disable=import-self

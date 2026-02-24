@@ -1,9 +1,9 @@
 import re
 from typing import override
 
-from ..integ.any_exe import run_bg_wait
-from .base.golden import Entities, Entity, Golden
-from .text import TextEntry
+from ...integ.any_exe import run_bg_wait
+from ..base.golden import Entities, Entity, Golden
+from ..core.text import TextEntry
 
 
 class HelpAutoExplorer(Golden[list[str]]):

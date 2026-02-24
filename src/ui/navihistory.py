@@ -1,8 +1,8 @@
 from typing import Iterable, Iterator, override
 
-from ..entity.base import Entity
-from ..entity.error import ErrorEntry
-from ..entity.fsentry import FSEntry
+from ..entity.base.golden import Entity
+from ..entity.core.error import ErrorEntry
+from ..entity.core.fsentry import FSEntry
 from ..util.logger import log
 from .view import EntityView
 from .vlst import SatelliteViewport

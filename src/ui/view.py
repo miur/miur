@@ -3,9 +3,9 @@ import os
 from typing import Any, Callable, Iterable, Sequence, override
 
 from ..entity.base import Action, Entities, Entity, StopExploration
-from ..entity.error import ErrorEntry
-from ..entity.fsentry import FSDir
-from ..entity.objaction import pyobj_to_actions
+from ..entity.core.error import ErrorEntry
+from ..entity.core.fsentry import FSDir
+from ..entity.core.objaction import pyobj_to_actions
 from ..util.logger import log
 from .vlst import SatelliteViewport
 

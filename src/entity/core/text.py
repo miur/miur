@@ -1,6 +1,6 @@
 from typing import override
 
-from .base.golden import Entities, Entity, Golden, StopExploration
+from ..base.golden import Entities, Entity, Golden, StopExploration
 
 
 class TextEntry(Golden[str]):

@@ -1,6 +1,6 @@
 from typing import override
 
-from .base.golden import Entities, Entity, Golden
+from ..base.golden import Entities, Entity, Golden
 
 
 # ADD: host/external (e.g. SSH)
@@ -10,9 +10,9 @@ class LocalHostNode(Golden[str]):
 
     @override
     def explore(self) -> Entities:
+        from ..wip.pacmannode import PacmanProto
+        from ..wip.psnode import PSProto
         from .fsentry import FSDir
-        from .pacmannode import PacmanProto
-        from .psnode import PSProto
 
         return [
             FSDir("/", self),
@@ -31,9 +31,9 @@ class MiurAppNode(Golden[str]):
     def explore(self) -> Entities:
         import os
 
-        from ..app import g_app
+        from ...app import g_app
+        from ..wip.ymemnode import PyMemRoot
         from .objaction import ObjAction
-        from .pymemnode import PyMemRoot
 
         # FIXME:BET: inof "None" return RemoteException to explore (or at least errcode)
         def _spawn_render(nm: str) -> None:

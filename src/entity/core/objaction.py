@@ -2,7 +2,7 @@ import inspect
 from typing import Any, Callable, Iterable, Mapping, Sequence, override
 
 # from ..util.termansi import num_lo, num_up
-from .base import Action, Entities, Entity, Golden
+from ..base import Action, Entities, Entity, Golden
 from .error import ErrorEntry
 from .fsentry import FSAuto
 from .text import TextEntry

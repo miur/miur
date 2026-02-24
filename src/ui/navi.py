@@ -3,9 +3,9 @@ from typing import Iterable, Iterator, Self, override
 import _curses as C
 
 from ..alg.flowratio import flowratio_to_abs
-from ..entity.base import Entity
-from ..entity.error import ErrorEntry
-from ..entity.rootnode import RootNode
+from ..entity.base.golden import Entity
+from ..entity.core.error import ErrorEntry
+from ..entity.core.rootnode import RootNode
 from ..util.logger import log
 from .colorscheme import g_style as S
 from .navihistory import EntityViewCachePool, HistoryCursor

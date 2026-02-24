@@ -1,7 +1,7 @@
 import _curses as C
 
 # from ..entity.base import Golden
-from ..entity.error import ErrorEntry
+from ..entity.core.error import ErrorEntry
 from ..util.logger import log
 from .colorscheme import g_style as S
 from .rect import Rect

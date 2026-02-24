@@ -2,9 +2,9 @@ from typing import Any, override
 
 from elftools.elf.elffile import ELFFile
 
-from .base.golden import Entities, Entity, Golden
-from .base.interp import Interp
-from .text import TextEntry
+from ..base.golden import Entities, Entity, Golden
+from ..base.interp import Interp
+from ..core.text import TextEntry
 
 
 class ELFInterp(Interp):

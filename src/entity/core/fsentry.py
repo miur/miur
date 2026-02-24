@@ -4,7 +4,7 @@ from functools import lru_cache
 from typing import Iterable, override
 
 # from ..util.logger import log
-from .base.golden import Accessor, Entities, Entity, Golden
+from ..base.golden import Accessor, Entities, Entity, Golden
 from .text import TextEntry
 
 

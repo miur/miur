@@ -3,8 +3,8 @@ from typing import TYPE_CHECKING, Final
 
 import _curses as C
 
-from ..entity.base import Action, Golden
-from ..entity.fsentry import FSEntry
+from ..entity.base.golden import Golden
+from ..entity.core.fsentry import FSEntry
 from ..util.logger import log
 from ..util.termansi import ChunkKind as K
 from ..util.termansi import cellchunk, cellwidth, num_lo, num_up

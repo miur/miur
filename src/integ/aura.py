@@ -18,7 +18,7 @@ def keytable_insert_aura_pathes(keytable: KeyTable, fpathes: str) -> KeyTable:
 
     import os.path as fs
 
-    from ..entity.fsentry import FSAuto
+    from ..entity.core.fsentry import FSAuto
 
     # FIXME: allow ".#"
     entries = [l.partition("#")[0].strip().split(None, 1) for l in lst]

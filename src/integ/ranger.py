@@ -32,7 +32,7 @@ def run_ranger(path: str, *args: str) -> None:
         if cwd != fs.dirname(path):  # OR: g.root_wdg._navi._view._ent.loci
             from ..app import g_app
             from ..curses_ext import resize
-            from ..entity.fsentry import FSAuto
+            from ..entity.core.fsentry import FSAuto
 
             # ALT: if os.exists(cwd) and cwd != os.getcwd(): os.chdir(cwd)
             g_app.root_wdg._navi.view_jump_to(FSAuto(cwd, None))

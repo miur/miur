@@ -4,8 +4,8 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import override
 
-from .base import Entities, Entity, Golden
-from .text import TextEntry
+from ..base.golden import Entities, Entity, Golden
+from ..core.text import TextEntry
 
 MAX_DEPTH = sys.getrecursionlimit() - 100
 LARGE_OBJECT_THRESHOLD = 1024 * 1024

@@ -5,9 +5,9 @@
 # import os.path as fs
 from typing import override
 
-from .base.golden import Entities, Entity, Golden
-from .fsentry import FSAuto
-from .text import TextEntry
+from ..base.golden import Entities, Entity, Golden
+from ..core.fsentry import FSAuto
+from ..core.text import TextEntry
 
 
 class MPDProto(Golden[str]):

@@ -1,8 +1,7 @@
 from typing import override
 
-from .base.golden import Entities, Entity, Golden
-from .fsentry import FSAuto
-from .text import TextEntry
+from ..base.golden import Entities, Entity, Golden
+from ..core.text import TextEntry
 
 
 class PSProto(Golden[str]):

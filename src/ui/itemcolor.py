@@ -8,7 +8,7 @@ from unicodedata import east_asian_width
 import _curses as C
 
 from ..entity.base import Action, Golden
-from ..entity.fsentry import FSDir, FSEntry, FSFile, FSLink
+from ..entity.core.fsentry import FSDir, FSEntry, FSFile, FSLink
 from ..util.exchook import log_exc
 from ..util.logger import log
 from .colorscheme import g_style as S

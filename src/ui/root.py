@@ -1,6 +1,6 @@
 import _curses as C
 
-from ..entity.base import Entity
+from ..entity.base.golden import Entity
 
 # from ..util.logger import log
 from .colorscheme import g_style as S

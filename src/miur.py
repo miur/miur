@@ -42,9 +42,9 @@ def miur_main(g: AppGlobals) -> None:
         # raise RuntimeError()
 
         from . import keymap as KM
-        from .entity.base import Entity
-        from .entity.fsentry import FSAuto
-        from .entity.rootnode import RootNode
+        from .entity.base.golden import Entity
+        from .entity.core.fsentry import FSAuto
+        from .entity.core.rootnode import RootNode
         from .integ.aura import keytable_insert_aura_pathes
         from .ui.root import RootWidget
 

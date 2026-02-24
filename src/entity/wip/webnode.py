@@ -1,7 +1,7 @@
 from typing import override
 
-from .base.golden import Entities, Entity, Golden
-from .text import TextEntry
+from ..base.golden import Entities, Entity, Golden
+from ..core.text import TextEntry
 
 
 # MAYBE:SPLIT: use UrlEntity.explore() -> HTMLEntity -> Blocks/Links

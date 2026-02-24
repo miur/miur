@@ -4,9 +4,9 @@ from typing import TYPE_CHECKING, Any, Iterable
 import _curses as C
 
 # from ..util.logger import log
-from ..entity.base import Golden
-from ..entity.error import ErrorEntry
-from ..entity.text import TextEntry
+from ..entity.base.golden import Golden
+from ..entity.core.error import ErrorEntry
+from ..entity.core.text import TextEntry
 from .colorscheme import g_style as S
 from .itemcolor import colored_ansi_or_schema
 
