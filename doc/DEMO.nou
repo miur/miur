@@ -1,0 +1,64 @@
+⌇⡩⢛⡴⣷
+
+DEMO:TUT: make !miur --demo|--tutorial flag
+  * make demo-mode also accessible from !miur itself at any moment
+    = either under "@root/miur/demo" to access demo folder to recap tutorial
+      OR in any current folder -- to walk you through all concepts, so you «felt comfortable» with navi
+    [_] ask user to star "⋆" the step he feels comfortable, to restart tutorial from there instead of from beginning,
+      each time user wants to refresh mental model -- to skip less steps each time
+      [_] NEED: give a horizontal progressbar to click to jump to later step in one go
+        [!] NEED: show list of steps under @demo node to pick step to start tutorial from
+          << NICE! it's basically a demo-engine embedded into miur all the time
+  * open in ./demo folder with prepared files
+  * launch in reduced and easy-to-relate one-panel mode first -- no metadata, no indicators, nothing to distract
+  * give subtitles in footnotes/overlays/hover-popups -- to explain current concept and its pros
+    = in youtube video -- voice-over these subtitles
+  * give suggestions which keys you can press to interact *now* (like game-tutorial)
+  * ask user to press "next" / "prev" when they are comfortable with current navi
+  * state «what you may want to do» and the problem of ui which prevents it
+    e.g. no preview → pick one-of preview → interpret → explore
+  * on "next" modify UI one step at a time, to gradually «ease user into new look-and-feel»
+    ~~ we may simply "enable" hidden widgets and unfilter hidden objactions
+    ~~ OR:BET? we can make simplified objactions specifically for DEMO under ./entity/demo.py
+      e.g. .preview_as_hex/text inof immediately forcing user into .interp_as(TextLines).explore()
+  * walk user through incremental steps
+
+
+STEPS
+  - one-panel plain list <j k>  # still highlight files/dirs differently
+  - two-panel preview folders and file content as hex <h l>
+  - header with $PWD  # to not lose yourself during navi
+  - three-panel Miller to <J K>  # for faster overview of parent folders
+  - notice, how user «makes a choice» when you pick which folder to open/preview
+  - ... make this choice explicit for picking possible preview too
+  - ... but now we have problem of having no "preview", only "choices" shown in 3rd panel
+  - 4-panel preview-choice for files .preview_hex/text
+  - ... extend by .stat/.xattrs
+  - ... STD:RENAME: to .preview_stat/xattrs and .preview_content_as_hex/text
+  - ... repeat for FSDir too, emerging .explore_content
+  - make preview explorable <h l>  # e.g. to select and copy text line
+  - ... STD:RENAME: to .explore_content_as_hex/text
+  - ... apply idea recursively
+  - 5-penta-panel for visual continuity  # i.e. show your choices bw parent and browse panels
+  - errors are explorable too e.g. "Permission access"
+  - make observation, that "explore*as" is an act of reinterpretation  # (tower or interpreters)
+  - ... introduce .interp_as() and list of choices
+  - collapse/expand default action/choice per type  # to make navigation easier (but keeping flexibility)
+  - ... introduce .explore() as default choice
+  - notice, that hotkeys are objactions -- and can be directly shown as «list»
+  - explore ELF, .py, .cpp, etc.
+  - explore Unicode, WEB, etc.
+  ...
+  - execute commands e.g. search -- get nodes for results or errors
+  - ... store history in parent node objactions
+  - notice, that you may need info from multiple interpretations being presented at once
+  - ... make .explore() to be a virtual dashboard
+  ...
+  ~ notice, that in general «workflows» (user interaction approaches) are «lists» too,
+  ~ ... introduce explicit concept of «workflow to enable» and «share with others»
+  ~ homoiconicity for nodes -- to reinterpret nodes as code and execute their virtual hierarchies as scripts
+  ...
+  - show «visions» for some FUT not-yet-implemented features
+    ~ give user a «taste» of what to look forward to
+    ~ give me myself actual sandbox to play with new concept workflows
+  ...
