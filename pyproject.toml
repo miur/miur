@@ -147,7 +147,8 @@ profile = "black"
 # force_grid_wrap = 0
 # use_parentheses = true
 
-[tool.pylsp-mypy]
+# [tool.pylsp.plugins.pylsp_mypy]
+[tool.mypy]
 enabled = true
 live_mode = false
 dmypy = false
