@@ -1,7 +1,6 @@
-from typing import TYPE_CHECKING, Protocol, Self
+from typing import TYPE_CHECKING, Any, Protocol, Self
 
 if TYPE_CHECKING:
-    from ...ui.view import EntityView
     from .golden import Entities, Entity
 
 
@@ -12,7 +11,7 @@ class Representable(Protocol):
 
 
 class Sortable(Protocol):
-    def __lt__(self, other: "Entity") -> bool: ...
+    def __lt__(self, other: Entity) -> bool: ...
 
 
 class Addressable(Protocol):
@@ -31,7 +30,7 @@ class Locatable(Protocol):
     # RENAME? .pv=[parent|prev]view .parent .orig[inator] .back .up .off .prod[ucer]
     # NOTE: we use short ".pv" for more succint usage in code (orse use ".originator")
     @property
-    def parent(self) -> "Entity": ...
+    def parent(self) -> Entity: ...
 
 
 ## ARCH:
@@ -45,7 +44,7 @@ class Locatable(Protocol):
 #    ALT:BET? remove the method itself and use getattr() to verify its presence
 class Explorable(Protocol):
     # RENAME? .browse()
-    def explore(self) -> "Entities": ...
+    def explore(self) -> Entities: ...
 
 
 class Interpretable(Protocol):
@@ -54,17 +53,17 @@ class Interpretable(Protocol):
     #   ALT: .can_be_made_from | .compatible_with | .understands/recognizes/resembles
     # ex~: "if ELFFile.derivable_from(FSFile)"
     @classmethod
-    def creatable_from(cls, ent: "Entity") -> bool | None: ...
+    def creatable_from(cls, ent: Any) -> bool | None: ...
 
     # RENAME? .from_entity | .reinterpret | .convert | .derive | .make_from
     #   WHY: to also allow .from_<non_entity>() kind of conversions
     # ex~: "ent = ELFFile.create_from(FSFile)" | "ent = FSFile.convert_to(ELFFile)"
     @classmethod
-    def create_from(cls, ent: "Entity") -> Self: ...
+    def create_from(cls, ent: Any) -> Self: ...
 
     # RENAME? get_available_interpretations()
     # MAYBE:BET? cvt ret-vals to Entities by external adapter-factory?
-    def interp_as(self) -> "Entities": ...
+    def interp_as(self) -> Entities: ...
 
 
 # REMOVE?
@@ -76,7 +75,7 @@ class Atomic(Addressable, Representable, Protocol):
 
 
 # RENAME? `Derivable `Composite (in contrast to `Atomic)
-class Standart(
+class GoldenStandartProtocol(
     Interpretable,
     Explorable,
     Locatable,

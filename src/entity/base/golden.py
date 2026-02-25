@@ -1,18 +1,11 @@
 from functools import cached_property
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Iterable,
-    Iterator,
-    Protocol,
-    Self,
-    override,
-)
+from typing import TYPE_CHECKING, Any, Callable, Iterable, Protocol, override
 
 from .autodiscover import AutoRegistered
-from .interp import InterpretableMixin
+from .interp import InterpretableImpl
+from .traits import GoldenStandartProtocol
 
-type Entity = "Golden[Any]"
+type Entity = Golden[Any]
 type Entities = Iterable[Entity]
 
 
@@ -35,16 +28,39 @@ class Accessor(Protocol):
     def __str__(self) -> str: ...
 
 
+# RENAME? @implements
+def augment_with[T](*providers: type[Any]) -> Callable[[type[T]], type[T]]:
+    def wrapper(cls: type[T]) -> type[T]:
+        for provider in providers:
+            for name, attr in provider.__dict__.items():
+                if not name.startswith("__"):
+                    setattr(cls, name, attr)
+        return cls
+
+    return wrapper
+
+
 # RENAME? `Entity `Node `Discoverable
 # ALT:(Protocol):NEED:BAD:PERF:(@runtime_checkable):COS:TEMP: to focus_on(match-case Golden())
-class Golden[T](InterpretableMixin, AutoRegistered):
+# @augment_with(GoldenProtocol, RepresentableImpl, AddressableImpl, ExplorableImpl, InterpretableImpl)
+@augment_with(InterpretableImpl)
+class Golden[T](
+    AutoRegistered, GoldenStandartProtocol
+):  # (false-positive for protocols) pylint:disable=too-many-ancestors
     __slots__ = ()
+    # __slots__ = ("_x", "__dict__")
 
     # ERR:(pylint=3.3.1):TRY: upgrade?
     # pylint:disable=undefined-variable
     def __init__(self, x: T, parent: Entity, /) -> None:
         self._x = x
         self._parent = parent
+
+    ## ALT:(augment_with): delegate calls to "mixin" instances (=Composition=)
+    # def __init__(self):
+    #     self._handler = DataHandler()
+    # def __getattr__(self, name):
+    #     return getattr(self._handler, name)
 
     # NICE: as we have a separate .name field, we can *dynamically* augment regular filenames
     # ex~:
@@ -54,11 +70,13 @@ class Golden[T](InterpretableMixin, AutoRegistered):
     #   ~ smart-compress long textlines to use them everywhere as unique names
     # ALT:BET? do it inside "item visualization", which would be both more logical and practical
     #   i.e. we may visualize both augmented and shadowed original names at the same time
+    @override
     @property
     def name(self) -> str:
         # FUT:PERF:CMP: use @cached_property vs @property+@lru_cache(1) vs .update(self._name) method
         return str(self._x)
 
+    @override
     def explore(self) -> Entities:
         # NOTE: it's reasonable to raise inof using @abc.abstractmethod
         #   * rarely we may have atomic leafs, but for most it's "NOT YET IMPLEMENTED"
@@ -75,12 +93,14 @@ class Golden[T](InterpretableMixin, AutoRegistered):
     #   => USE:CASE: able to jump to unrelated node, press <Back> and get to actions which produced it
     #   [_] FAIL: we can't link `Entity to its `Action, so we lose "actions" in `Loci URL
     #     orse we would need: Action.explore() { Entity.explore(parent=self) }
+    @override
     @property
     def parent(self) -> Entity:
         # assert self._parent != self
         return self._parent
 
     # REMOVE? -> construct `Loci on demand through external means
+    @override
     @cached_property
     def loci(self) -> str:
         assert self._parent != self
@@ -89,6 +109,7 @@ class Golden[T](InterpretableMixin, AutoRegistered):
         return self._parent.loci + "/" + self.name
 
     # BAD: names can be non-unique; BET? disallow or keep by order added ?
+    @override
     def __lt__(self, other: Entity) -> bool:
         return self.name < other.name
 
@@ -102,11 +123,17 @@ class Golden[T](InterpretableMixin, AutoRegistered):
         return f"{type(self).__name__}({loci})"
 
 
-## FIXED:ERR: `FSEntry [too-many-ancestors] Too many ancestors (8/7)
-# REF: Is there a way to tell mypy to check a class implements a Protocol without inheriting from it? ⌇⡧⢟⠦⡴
-#   https://github.com/python/mypy/issues/8235
-if TYPE_CHECKING:  # WARN: we rely on !mypy to verify this (inof runtime checks)
-    from . import traits as TR
+if TYPE_CHECKING:
+    # This will now PASS if all methods are present and FAIL if Golden is missing even one method.
+    def verify_interface(_obj: GoldenStandartProtocol) -> None: ...
 
-    # OR:(check for instantiation): _: Standart = Golden()
-    _: type[TR.Standart] = Golden[Any]
+    inst = Golden[None](None, None)
+    verify_interface(inst)  # Static check
+
+    ## FIXED:ERR: `FSEntry [too-many-ancestors] Too many ancestors (8/7)
+    # NOTE: validate that the class constructor matches the protocol requirements
+    # REF: Is there a way to tell mypy to check a class implements a Protocol without inheriting from it? ⌇⡧⢟⠦⡴
+    #   https://github.com/python/mypy/issues/8235
+    # WARN: we rely on !mypy to verify this (inof runtime checks)
+    # FAIL: it's supposed to catch when we are missing methods...
+    _check: type[GoldenStandartProtocol] = Golden[Any]

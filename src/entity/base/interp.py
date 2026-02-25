@@ -1,32 +1,35 @@
-from typing import TYPE_CHECKING, Iterator, Self
+from typing import TYPE_CHECKING, Any, Self
+
+from ..autoreg import get_all_subclasses
+from .traits import Interpretable
 
 if TYPE_CHECKING:
     from .golden import Entities, Entity
 
 
-class InterpretableMixin:
+class InterpretableImpl:
     # PERF: Cache for required attributes per class to avoid re-inspection
-    _req_cache: dict[type, tuple[str, ...]] = {}
+    _rq_cache: dict[type, tuple[str, ...]]
 
     @classmethod
     def _get_required_attrs(cls) -> tuple[str, ...]:
         """PERF: Caches __init__ signatures to avoid inspection overhead."""
-        if cls not in cls._req_cache:
+        if cls not in cls._rq_cache:
             import inspect
 
             ## ALT(Base): Golden: _required_fields: tuple[str, ...] = ()
             ##   ex~:(Derived): _required_fields = ("uid", "meta", "priority")
             sig = inspect.signature(cls.__init__)
-            cls._req_cache[cls] = tuple(
+            cls._rq_cache[cls] = tuple(
                 p.name
                 for p in sig.parameters.values()
                 if p.name not in ("self", "args", "kwargs")
                 and p.kind in (p.POSITIONAL_OR_KEYWORD, p.KEYWORD_ONLY)
             )
-        return cls._req_cache[cls]
+        return cls._rq_cache[cls]
 
     @classmethod
-    def creatable_from(cls, ent: Entity) -> bool | None:
+    def creatable_from(cls, ent: Any) -> bool | None:
         """
         PERF:(fast preliminary check): avoid knowingly failing object construction
         USAGE: override in subclasses for value-dependent logic
@@ -38,6 +41,7 @@ class InterpretableMixin:
         """
         try:
             # CASE: structural "Poking": does ent have all attributes __init__ expects?
+            # ALT:(prematch by typehints): tuple(signature(cls.__call__).parameters.values())[1].annotation
             attrs = cls._get_required_attrs()
             ## ALT:PERF? fastest way to preliminary check several attrs
             # _ = (subject.uid, subject.meta, subject.priority)
@@ -57,42 +61,11 @@ class InterpretableMixin:
 
     # RENAME? .reinterpret_as ?
     ## MAYBE?(overload): .interpret_as ?
-    def coerce_to[T](self, target: type[T]) -> T:
+    def coerce_to[T: Interpretable](self, target: type[T]) -> T:
         """Fluent entry point: ex~: my_ent.coerce_to(EntityB)"""
         return target.create_from(self)
 
-    @staticmethod
-    def _ensure_entities_are_registered() -> None:
-        """Standard recursive loader using importlib.resources."""
-        import importlib
-        import importlib.resources
-        import sys
-
-        pkg_name = __package__.rpartition(".")[0]
-        pkg_files = importlib.resources.files(pkg_name)
-        for path in pkg_files.rglob("*.py"):
-            if path.name == "__init__.py":
-                continue
-            rel_path = path.relative_to(pkg_files).with_suffix("")
-            module_name = f"{pkg_name}.{'.'.join(rel_path.parts)}"
-            if module_name not in sys.modules:
-                try:
-                    importlib.import_module(module_name)
-                except ImportError:
-                    continue
-
-    def interp_as(self) -> Entities:
-        """
-        Imports all entity modules ecosystem on first call.
-        (This triggers class auto-registration into __subclasses__())
-        Then replaces itself with a high-performance version.
-        """
-        self._ensure_entities_are_registered()
-        # NOTE: swap this method to bypass initialization next time
-        self.__class__.interp_as = self._orig_interp_as
-        return self.interp_as()
-
-    def _orig_interp_as(self) -> Entities:  # OR:  -> Iterator[type[Self]]
+    def interp_as(self) -> Entities:  # OR:  -> Iterator[type[Self]]
         """
         Scans all loaded Entity classes and yields those compatible
         with the current instance state.
@@ -107,45 +80,36 @@ class InterpretableMixin:
         #         continue
         # return candidates
 
-        # MAYBE: stop inhereting from `AutoRegistered as we have __subclasses__ ?
-        def walk(base: type[Entity]) -> Iterator[type[Entity]]:
-            """Recursively find all entity types."""
-            for sub in base.__subclasses__():
-                # if sub is self.__class__:
-                #     continue
-                if sub.creatable_from(self) is not False:  # True or None
-                    yield sub
-                yield from walk(sub)
-
-        from ..error import ErrorEntry
-        from ..objaction import ObjAction
+        from ..core.error import ErrorEntry
         from .golden import Entity
 
-        compat: set[str] = set()
-        for cls in walk(Entity):
-            nm = cls.__name__  # cls.__qualname__
+        def _try_cvt(cls: Entity) -> Entity:
             try:
-                yield cls.create_from(self)
-                compat.add(nm)
+                # FIXME:PERF: return lazy-init (or self-replace) named proxies to .create_from() only on access
+                #   and produce results=[ErrorEntry] on error (or self-replace itself by ErrorEntry)
+                return cls.create_from(self)
             except Exception as exc:
-                yield ErrorEntry(name=f".interp({nm}): {exc}", parent=self)
-                continue
+                nm = f".interp_as({cls.__qualname__})"
+                return ErrorEntry(name=nm, parent=self, exc=exc)
 
-    #     yield ObjAction(
-    #         name="@try_others",
-    #         parent=self,
-    #         fn=lambda: self._yield_remaining_interps(compat),
-    #     )
-    #
-    # def _yield_remaining_interps(self, tried: set[str]) -> Entities:
-    #     h = self._x.handle
-    #     for interp_class in InterpRegistry.all():
-    #         interp = interp_class()
-    #         if interp.name not in tried:
-    #             try:
-    #                 yield from interp.interpret(h)
-    #             except Exception as exc:
-    #                 yield ErrorEntry(name=f".interp({interp.name}): {exc}", parent=self)
+        # TODO: dif color .creatable_from for known(True)=GREN vs unknown(None)=YELW vs failed()=RED
+        deferred: list[type] = []
+        for cls in get_all_subclasses(Entity):
+            sup = cls.creatable_from(self)
+            if sup is False:  # <PERF: skip surely unsupported conversions
+                continue
+            if sup is None:
+                deferred.append(cls)
+                continue
+            yield _try_cvt(cls)
+
+        # RENAME? _try_{possible,unknown}
+        def _try_remaining() -> Entities:
+            return map(_try_cvt, deferred)
+
+        from ..core.objaction import ObjAction
+
+        yield ObjAction(name="@try_remaining", parent=self, fn=_try_remaining)
 
 
 # class InterpArbiter:
