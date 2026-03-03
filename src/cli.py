@@ -4,8 +4,12 @@ from typing import TYPE_CHECKING, override
 
 from . import _pkg
 from .app import AppOptions, g_app
-from .entity.base import autodiscover as AD
+from .entity.autoreg import get_all_subclasses
 from .util.logger import LogLevel, log
+
+
+if TYPE_CHECKING:
+    from .entity.base.traits import Entity
 
 
 # FIXME? only allow 3 values to prevent options sprawling ?
@@ -17,7 +21,7 @@ class SwitchEnum(Enum):
 
 class SwitchAction(Action):
     @override
-    def __call__(self, _ap, ns, s, s_opt=None):  # type:ignore[no-untyped-def]
+    def __call__(self, _ap, ns, s, s_opt=None):  # type: ignore[no-untyped-def]
         # ALT: create enum as Enum('SwitchEnum', {"0":True, ...}) to allow Literal keys too
         # if s == "0": s = "no" elif s == "1": s = "yes"
         setattr(ns, self.dest, SwitchEnum[s.lower()].value)
@@ -25,7 +29,7 @@ class SwitchAction(Action):
 
 class SigAction(Action):
     @override
-    def __call__(self, _ap, ns, s, s_opt=None):  # type:ignore[no-untyped-def]
+    def __call__(self, _ap, ns, s, s_opt=None):  # type: ignore[no-untyped-def]
         if not isinstance(s, str) or not s.isascii():
             raise NotImplementedError()
         if s.isdigit():
@@ -36,7 +40,7 @@ class SigAction(Action):
 
 
 class LogLevelCvt(Action):
-    def __call__(self, _ap, ns, s: str, option_string=None):  # type:ignore
+    def __call__(self, _ap, ns, s: str, option_string=None):  # type: ignore
         s = s.upper()
         if s.isdigit():
             m = LogLevel(int(s))
@@ -50,34 +54,19 @@ class LogLevelCvt(Action):
 
 
 class EntryCvt(Action):
+    @staticmethod
+    def entity_names() -> dict[str, Entity]:
+        return {x.__name__: x for x in get_all_subclasses(Entity)}
+
+    @staticmethod
+    def entity_aliases() -> dict[str, Entity]:
+        return {x.__name__: x for x in get_all_subclasses(Entity)}
+
     @override
-    def __call__(self, _ap, ns, s, s_opt=None):  # type:ignore[no-untyped-def]
-        fn = AD.entry_cls_aliases if s.islower() else AD.entry_cls_names
+    def __call__(self, _ap, ns, s, s_opt=None):  # type: ignore[no-untyped-def]
+        fn = self.entity_aliases if s.islower() else self.entity_names
         cls = fn()[s]
         setattr(ns, self.dest, cls)
-
-
-def _register_entity_catalogue() -> None:
-    import importlib
-    import os
-    import os.path as fs
-
-    # BAD: it's "src" inof "miur"
-    log.info(f"{__package__=}")
-    entpkg = importlib.import_module(".entity", __package__)
-    assert entpkg.__file__
-
-    ## FAIL: you need to export all modnms into __all__ first
-    # import inspect
-    # for nm, val in inspect.getmembers_static(entpkg, inspect.ismodule):
-    #     log.info((nm, val))
-
-    # WARN:RQ: import/declare all classess -- to register them
-    for fnm in os.listdir(fs.dirname(entpkg.__file__)):
-        if fnm == "__init__.py" or fnm[-3:] != ".py":
-            continue
-        # log.info(("." + fnm[:-3], entpkg.__package__))
-        _ = importlib.import_module("." + fnm[:-3], entpkg.__package__)
 
 
 def cli_spec(parser: ArgumentParser, *, dfl: AppOptions) -> ArgumentParser:
@@ -89,10 +78,8 @@ def cli_spec(parser: ArgumentParser, *, dfl: AppOptions) -> ArgumentParser:
     o("-a", "--asyncio", dest="bare", default=dfl.bare, action="store_false")
     o("-b", "--bare", default=dfl.bare, action="store_true")
 
-    # WARN:RQ: import/declare all classess -- to register them
-    _register_entity_catalogue()
-    log.info(f"VIZ: {{{" ".join(AD.entry_cls_names())}}}")
-    _entrycls = [*(AD.entry_cls_aliases()), *(AD.entry_cls_names())]
+    log.info(f"VIZ: {{{' '.join(EntryCvt.entity_names())}}}")
+    _entrycls = [*(EntryCvt.entity_aliases()), *(EntryCvt.entity_names())]
 
     o("-i", "--stdinfmt", default=None, choices=_entrycls, action=EntryCvt)
     o("-D", "--devinstall", action="store_true")
