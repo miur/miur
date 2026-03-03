@@ -1,10 +1,11 @@
-from typing import TYPE_CHECKING, Any, Self
+from typing import Any, Iterable, Self, cast
 
 from ..autoreg import get_all_subclasses
-from .traits import Interpretable
+from .traits import Entities, Entity, Interpretable
 
-if TYPE_CHECKING:
-    from .golden import Entities, Entity
+
+# if TYPE_CHECKING:
+#     from .golden import GoldenAny
 
 
 class InterpretableImpl:
@@ -29,7 +30,7 @@ class InterpretableImpl:
         return cls._rq_cache[cls]
 
     @classmethod
-    def creatable_from(cls, ent: Any) -> bool | None:
+    def creatable_from(cls: type[Self], ent: Any) -> bool | None:
         """
         PERF:(fast preliminary check): avoid knowingly failing object construction
         USAGE: override in subclasses for value-dependent logic
@@ -53,7 +54,7 @@ class InterpretableImpl:
             return False
 
     @classmethod
-    def create_from(cls, ent: Entity) -> Self:
+    def create_from(cls: type[Self], ent: Entity) -> Self:
         """The actual factory. Assumes .eligible() was checked or will raise."""
         # FUT: raise ConversionError(f"Missing field: {e.name}")
         fields = {a: getattr(ent, a) for a in cls._get_required_attrs()}
@@ -65,7 +66,7 @@ class InterpretableImpl:
         """Fluent entry point: ex~: my_ent.coerce_to(EntityB)"""
         return target.create_from(self)
 
-    def interp_as(self) -> Entities:  # OR:  -> Iterator[type[Self]]
+    def interp_as(self: Entity) -> Entities:  # OR:  -> Iterator[type[Self]]
         """
         Scans all loaded Entity classes and yields those compatible
         with the current instance state.
@@ -81,27 +82,37 @@ class InterpretableImpl:
         # return candidates
 
         from ..core.error import ErrorEntry
-        from .golden import Entity
+        from .golden import Golden
 
-        def _try_cvt(cls: Entity) -> Entity:
+        def _try_cvt[T: Interpretable](cls: type[T]) -> T | ErrorEntry:
             try:
                 # FIXME:PERF: return lazy-init (or self-replace) named proxies to .create_from() only on access
                 #   and produce results=[ErrorEntry] on error (or self-replace itself by ErrorEntry)
+                # e.g::
+                # class Proxy:
+                #     def __getattr__(self, name):
+                #         inst = cls.create_from(target)
+                #         setattr(self, "__class__", inst.__class__)
+                #         self.__dict__.update(inst.__dict__)
+                #         return getattr(inst, name)
+                # return Proxy()
                 return cls.create_from(self)
             except Exception as exc:
                 nm = f".interp_as({cls.__qualname__})"
                 return ErrorEntry(name=nm, parent=self, exc=exc)
 
         # TODO: dif color .creatable_from for known(True)=GREN vs unknown(None)=YELW vs failed()=RED
-        deferred: list[type] = []
-        for cls in get_all_subclasses(Entity):
-            sup = cls.creatable_from(self)
+        deferred: list[type[Entity]] = []
+        # HACK: Tell the type checker these are concrete types that satisfy the interface
+        subclasses = cast(Iterable[type[Entity]], get_all_subclasses(Golden[Any]))
+        for subcls in subclasses:
+            sup = subcls.creatable_from(self)
             if sup is False:  # <PERF: skip surely unsupported conversions
                 continue
             if sup is None:
-                deferred.append(cls)
+                deferred.append(subcls)
                 continue
-            yield _try_cvt(cls)
+            yield _try_cvt(subcls)
 
         # RENAME? _try_{possible,unknown}
         def _try_remaining() -> Entities:

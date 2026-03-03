@@ -1,5 +1,6 @@
 from typing import Any, override
 
+
 g_registries: dict[type[AutoRegistered], list[type[AutoRegistered]]] = {}
 
 
