@@ -147,6 +147,34 @@ profile = "black"
 # force_grid_wrap = 0
 # use_parentheses = true
 
+
+# REF: https://docs.astral.sh/ruff/configuration/
+[tool.ruff]
+# Match your .editorconfig line length
+line-length = 112
+
+[tool.ruff.lint]
+# Enable Pycodestyle (E), Pyflakes (F), and Isort (I)
+select = ["E", "F", "I"]
+# E501 is the 'line-too-long' rule.
+# We ignore it here so Ruff doesn't nag about the 112 comment limit.
+# ignore = ["E501"]
+# ignore = ["ERA001"]
+
+[tool.ruff.lint.isort]
+# Ruff's isort implementation is Black-compatible by default,
+# but you can explicitly ensure it matches your preference.
+force-single-line = false
+lines-after-imports = 2
+
+[tool.ruff.format]
+# Ruff formatter does not currently support a separate 'comment-length'.
+# By default, it tries not to reflow comments unless they are docstrings.
+skip-magic-trailing-comma = false
+# Stop joining comments into single block (infuriating)
+# comment-alignment = "preserve"
+
+
 # [tool.pylsp.plugins.pylsp_mypy]
 [tool.mypy]
 enabled = true

@@ -64,7 +64,8 @@ good-names-rgxs = ^[a-z][a-z0-9]?$
 
 
 [DESIGN]
-
+# max-parents=7
+ignored-parents=src.entity.base.golden.Golden
 # Maximum number of arguments for function / method.
 # max-args=5
 
