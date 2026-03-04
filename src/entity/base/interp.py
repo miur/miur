@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 
 class InterpretableImpl:
     # PERF: Cache for required attributes per class to avoid re-inspection
-    _rq_cache: dict[type, tuple[str, ...]]
+    _rq_cache: dict[type, tuple[str, ...]] = {}
 
     @classmethod
     def _get_required_attrs(cls) -> tuple[str, ...]:
@@ -50,11 +50,11 @@ class InterpretableImpl:
                 return True
             # CASE:(uncertain): you don't know until you try to create object
             return None
-        except (AttributeError, ValueError, TypeError):  # REMOVE?
+        except AttributeError, ValueError, TypeError:  # REMOVE?
             return False
 
     @classmethod
-    def create_from(cls, ent: Entity) -> Self:
+    def create_from(cls, ent: Any) -> Self:
         """The actual factory. Assumes .eligible() was checked or will raise."""
         # FUT: raise ConversionError(f"Missing field: {e.name}")
         fields = {a: getattr(ent, a) for a in cls._get_required_attrs()}
@@ -98,7 +98,7 @@ class InterpretableImpl:
                 return cls.create_from(self)
             except Exception as exc:
                 nm = f".interp_as({cls.__qualname__})"
-                return ErrorEntry(name=nm, parent=self, exc=exc)  # type: ignore[arg-type]
+                return ErrorEntry(name=nm, parent=self, exc=exc)  # type: ignore[arg-type]  # pyright: ignore[reportArgumentType]  # pylint:disable=line-too-long
 
         # TODO: dif color .creatable_from for known(True)=GREN vs unknown(None)=YELW vs failed()=RED
         deferred: list[type[Entity]] = []
@@ -121,7 +121,7 @@ class InterpretableImpl:
 
         from ..core.objaction import ObjAction
 
-        yield ObjAction(name="@try_remaining", parent=self, fn=_try_remaining)
+        yield ObjAction(name="@try_remaining", parent=self, fn=_try_remaining)  # type: ignore[arg-type]  # pyright: ignore[reportArgumentType]  # pylint:disable=line-too-long
 
 
 # class InterpArbiter:

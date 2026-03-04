@@ -1,13 +1,14 @@
-import inspect
 import os
-from typing import Any, Callable, Iterable, Sequence, override
+from typing import Callable, Sequence, override
 
-from ..entity.base import Action, Entities, Entity, StopExploration
+from ..entity.base.action import Action
+from ..entity.base.golden import Entities, Entity, StopExploration
 from ..entity.core.error import ErrorEntry
 from ..entity.core.fsentry import FSDir
 from ..entity.core.objaction import pyobj_to_actions
 from ..util.logger import log
 from .vlst import SatelliteViewport
+
 
 # T = TypeVar("T")
 # class ListCachingProxy(list[T]):
@@ -125,7 +126,7 @@ class EntityView:
     def _transform(self) -> None:
         # NOTE: avoid printing status from ctor(), but print on each change
         if hasattr(self, "_xfm_lst"):
-            log.info(f"orderby{self._sortby}{"-" if self._sortrev else "+"}")
+            log.info(f"orderby{self._sortby}{'-' if self._sortrev else '+'}")
         lst = list(self._orig_lst)
         ## DISABLED: we should allways preserve orig list order (to be able to restore it)
         ##   NICE: when toggling reverse, we don't need to track the _orig_lst current rev state

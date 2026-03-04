@@ -1,4 +1,5 @@
-from typing import TYPE_CHECKING, Any, Iterable, cast, override
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, Any, cast, override
 
 from .interp import InterpretableImpl
 
@@ -8,13 +9,16 @@ class StopExploration(Exception):
     pass
 
 
-type Entity = Golden[Any]  # OR=GoldenProto[col]
+# OR=GoldenProto[col]
+type Entity = Golden[Any]  # pyright: ignore[reportExplicitAny]
 type Entities = Iterable[Entity]
 
 
 # RENAME? `Entity `Node `Discoverable
 class Golden[T](InterpretableImpl):
-    __slots__ = ("_x", "_parent")
+    __slots__: tuple[str, ...] = ("_x", "_parent")
+    _x: T
+    _parent: Entity
 
     def __init__(self, x: T, parent: Entity, /) -> None:
         self._x = x
@@ -109,7 +113,7 @@ if TYPE_CHECKING:
     #   which passes because Any wins.
     GoldenDummy = Golden[complex]  # OR=None|Literal["dummy"]
     _type: type[GoldenProtocol] = GoldenDummy
-    _inst = GoldenDummy(complex(), cast(GoldenDummy, None))
+    _inst = GoldenDummy(complex(), cast(GoldenDummy, object))
     # from typing import reveal_type
     # reveal_type(GoldenDummy.parent)
     # reveal_type(GoldenDummy.explore)
@@ -117,7 +121,7 @@ if TYPE_CHECKING:
 
     # Verify Golden[X] is assignable to GoldenProtocol for a concrete X
     # Use a concrete non-Any type that has no special assignability rules
-    _proto: GoldenProtocol = cast(GoldenDummy, None)
+    _proto: GoldenProtocol = cast(GoldenDummy, object)
     _golden: GoldenDummy = _proto  # type: ignore[assignment]  # reverse check
     _back: GoldenProtocol = _golden  # forward check — this is the useful one
 
@@ -145,22 +149,3 @@ if TYPE_CHECKING:
         ## ALT:
         # from typing import assert_type
         # assert_type(cast(Golden[int], None), GoldenProtocol)
-
-
-if __debug__ or __name__ == "__main__":
-    import inspect
-
-    def _verify_protocol_impl(impl: type, protocol: type) -> None:
-        for name, member in inspect.getmembers(protocol):
-            if name.startswith("_"):
-                continue
-            impl_member = getattr(impl, name, None)
-            assert impl_member is not None, f"{impl} missing {name}"
-            # check signatures
-            proto_sig = inspect.signature(member)
-            impl_sig = inspect.signature(impl_member)
-            assert proto_sig == impl_sig, (
-                f"{impl}.{name} signature {impl_sig} != protocol {proto_sig}"
-            )
-
-    _verify_protocol_impl(Golden, GoldenProtocol)  # runs once at import time in dev

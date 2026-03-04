@@ -1,6 +1,7 @@
 import os
 import os.path as fs
-from typing import Iterable, assert_never, override
+from collections.abc import Iterable
+from typing import assert_never, override
 
 # from ..util.logger import log
 from ..base.golden import Entities, Entity, Golden
@@ -8,6 +9,9 @@ from .text import TextEntry
 
 
 class FSAccessor:
+    __slots__: tuple[str, ...] = ("_path",)
+    _path: str
+
     def __init__(self, path: str) -> None:
         self._path = path  # OR: .fd
 
@@ -25,7 +29,7 @@ class FSAccessor:
 
 # OLD:ALT: FSEntity, FSEntityAdapter, Path2Entity, InterpretAsFSEntity
 class FSEntry(Golden[FSAccessor]):
-    __slots__ = ()
+    __slots__: tuple[str, ...] = ()
 
     # def __init__(self, path: str, nm: bool | str = True, alt: bool = False) -> None:
     def __init__(self, path: str, parent: Entity) -> None:

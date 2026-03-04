@@ -4,12 +4,9 @@ from typing import TYPE_CHECKING, override
 
 from . import _pkg
 from .app import AppOptions, g_app
+from .entity.base.golden import Entity
 from .entity.discover import get_all_subclasses
 from .util.logger import LogLevel, log
-
-
-if TYPE_CHECKING:
-    from .entity.base.traits import Entity
 
 
 # FIXME? only allow 3 values to prevent options sprawling ?
@@ -69,6 +66,7 @@ class EntryCvt(Action):
         setattr(ns, self.dest, cls)
 
 
+# pyright: reportUnusedCallResult=false
 def cli_spec(parser: ArgumentParser, *, dfl: AppOptions) -> ArgumentParser:
     o = parser.add_argument
     o("xpath", nargs="?")

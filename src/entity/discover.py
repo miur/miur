@@ -19,7 +19,8 @@ def ensure_all_modules_loaded_and_registered(pkg_base: str = "") -> None:
             raise ValueError("pkg_base must be provided if called from a non-package.")
         ## BAD: it's "src" inof "miur"
         # log.info(f"{__package__=}")
-        pkg_base = __package__.rpartition(".")[0]
+        # pkg_base = __package__.rpartition(".")[0]
+        pkg_base = __package__
 
     import pkgutil
     import sys
@@ -68,8 +69,8 @@ def ensure_all_modules_loaded_and_registered(pkg_base: str = "") -> None:
         if any(info.name.startswith(p) for p in _IGNORE_PREFIXES):
             continue
         try:
-            import_module(info.name)
-        except (ImportError, AttributeError, RuntimeError):
+            _ = import_module(info.name)
+        except ImportError, AttributeError, RuntimeError:
             # FUT: log this, otherwise skip
             continue
 
@@ -88,24 +89,28 @@ def get_all_subclasses[T](cls: TypeAliasType, again: bool = False) -> list[type[
 def get_all_subclasses[T](
     cls: type[T] | TypeAliasType,
     again: bool = False,
+    pkg_base: str = "",
 ) -> list[type[T]]:
     """
     Iteratively finds all subclasses using a stack.
     """
     state = get_all_subclasses.__dict__
     if again or not state.get("init"):
-        ensure_all_modules_loaded_and_registered()
+        ensure_all_modules_loaded_and_registered(pkg_base)
         state["init"] = True
         state["cache"] = {}
     # NOTE:(type[Any]): cache contains not only T, but multiple unrelated hierarchies
-    cache: dict[type[Any], list[type[Any]]] = state["cache"]
+    cache = cast(dict[type[Any], list[type[Any]]], state["cache"])
 
     # FIXED:(__value__):ERR: arg1 has incompatible type "TypeAliasType"; expected "type"
     #   ALT: inof "type Entity = ..." use direct assignment "Entity = Golden[Any]"
     # INFO: In modern Python, one TypeAliasType can point to another TypeAliasType
     root_cls = cls
-    while isinstance(root_cls, TypeAliasType):
-        root_cls = root_cls.__value__
+    while not isinstance(root_cls, type):
+        root_cls = getattr(root_cls, "__origin__", None) or getattr(
+            root_cls, "__value__"
+        )
+
     # root_cls = cast(type[T], root_cls)
 
     ## ALSO? guard against AttributeError for Union/Literal types that don't support __subclasses__

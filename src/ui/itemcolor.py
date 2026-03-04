@@ -1,3 +1,4 @@
+import _curses as C
 import os
 import os.path as fs
 from functools import cache
@@ -5,9 +6,8 @@ from types import ModuleType
 from typing import Any, Iterable, cast
 from unicodedata import east_asian_width
 
-import _curses as C
-
-from ..entity.base import Action, Golden
+from ..entity.base.action import Action
+from ..entity.base.golden import Golden
 from ..entity.core.fsentry import FSDir, FSEntry, FSFile, FSLink
 from ..util.exchook import log_exc
 from ..util.logger import log

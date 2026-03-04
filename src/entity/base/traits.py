@@ -60,8 +60,6 @@ class Interpretable(Protocol):
 
 # REMOVE?: *all objects are black-boxes* -- until they can be .interp_as() to some structure
 class Atomic(Locatable, Representable, Protocol):
-    __slots__ = ()
-
     # RENAME? "ATOMIC" | "INTERPRETATION NOT ASSIGNED" | "NO INTERPRETATION" (for blob)
     explore: str = "NOT EXPLORABLE (YET)"
 

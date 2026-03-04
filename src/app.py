@@ -1,12 +1,11 @@
 # PERF:(typing): abc collections copyreg contextlib functools operator re sys types warnings _typing
 #   NOTE: native "from io import TextIOWrapper" is much faster
 if globals().get("TYPE_CHECKING"):
+    import _curses as C
     from io import StringIO
     from multiprocessing import Process
     from types import ModuleType
     from typing import Callable, Optional, TextIO, Union
-
-    import _curses as C
 
     from .entity.base import Golden
     from .ui.root import RootWidget

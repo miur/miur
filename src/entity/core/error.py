@@ -6,6 +6,9 @@ from .text import TextEntry
 
 # class ErrorEntry(HaltEntry(Atomic))
 class ErrorEntry(Golden[str]):
+    __slots__: tuple[str, ...] = ("_exc",)
+    _exc: Exception | None
+
     # def __init__(self, msg: str, loci: tuple[str, ...] | None = None) -> None:
     def __init__(
         self,

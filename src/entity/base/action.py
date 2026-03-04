@@ -10,6 +10,9 @@ from .golden import Entities, Entity, Golden
 #   * ActionVlst/ViewportListTransformations
 #   * ActionKeys (or annotate above actions by binded keys)
 class Action(Golden[str]):
+    __slots__: tuple[str, ...] = ("_sfn",)
+    _sfn: Callable[[], Entities]
+
     def __init__(
         self,
         name: str,
