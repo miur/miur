@@ -1,14 +1,13 @@
 import os
 import os.path as fs
-from functools import lru_cache
-from typing import Iterable, override
+from typing import Iterable, assert_never, override
 
 # from ..util.logger import log
-from ..base.golden import Accessor, Entities, Entity, Golden
+from ..base.golden import Entities, Entity, Golden
 from .text import TextEntry
 
 
-class FSAccessor(Accessor):
+class FSAccessor:
     def __init__(self, path: str) -> None:
         self._path = path  # OR: .fd
 
@@ -17,7 +16,6 @@ class FSAccessor(Accessor):
         return self._path
 
     @override
-    @lru_cache(1)
     def __str__(self) -> str:
         # BET? make FSRoot node with fixed .name=file:///
         nm = "/" if self._path == "/" else fs.basename(self._path)
@@ -45,7 +43,7 @@ class FSEntry(Golden[FSAccessor]):
         raise NotImplementedError(f"TBD: `{self.__class__.__name__}")
 
     def open_by(self) -> Entities:
-        from ..integ.any_exe import run_bg_wait
+        from ...integ.any_exe import run_bg_wait
         from .objaction import ObjAction
 
         return [
@@ -97,8 +95,7 @@ def FSAuto(x: os.DirEntry[str] | str, parent: Entity) -> FSEntry:
         else:
             cls = FSEntry
         return cls(x, parent)
-
-    return NotImplementedError(x)
+    assert_never(x)
 
 
 class FSDir(FSEntry):

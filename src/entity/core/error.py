@@ -1,14 +1,19 @@
 from typing import override
 
-from ..base.golden import Golden
-from ..base.traits import Entities, Entity, StopExploration
+from ..base.golden import Entities, Entity, Golden, StopExploration
 from .text import TextEntry
 
 
 # class ErrorEntry(HaltEntry(Atomic))
 class ErrorEntry(Golden[str]):
     # def __init__(self, msg: str, loci: tuple[str, ...] | None = None) -> None:
-    def __init__(self, *, parent: Entity, name: str | None = None, exc: Exception | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        parent: Entity,
+        name: str | None = None,
+        exc: Exception | None = None,
+    ) -> None:
         nm = name if name else exc.__class__.__name__ if exc else "ERROR"
         self._exc = exc
         super().__init__(nm, parent)
@@ -34,4 +39,8 @@ class ErrorEntry(Golden[str]):
 
         from traceback import format_exception
 
-        return [TextEntry(l.rstrip("\n"), self) for l in format_exception(self._exc, chain=True)]
+        # BET:FIXME:USE: exchook.log_exc() as formatter
+        return [
+            TextEntry(line.rstrip("\n"), self)
+            for line in format_exception(self._exc, chain=True)
+        ]

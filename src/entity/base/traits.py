@@ -1,12 +1,12 @@
 # RENAME? proto.py
-from typing import TYPE_CHECKING, Any, Iterable, Protocol, Self, override
+from typing import TYPE_CHECKING, Any, Protocol, Self, override
 
 
 if TYPE_CHECKING:
-    from .golden import GoldenAny
+    from .golden import Entities, Entity
 
-type Entity = GoldenProtocol  # OR: GoldenProto
-type Entities = Iterable[Entity]
+# type Entity = GoldenProtocol  # OR: GoldenProto
+# type Entities = Iterable[GoldenProtocol]
 
 
 # RENAME? `Named (to keep Representable for __repr__)
@@ -16,7 +16,7 @@ class Representable(Protocol):
 
 
 class Sortable(Protocol):
-    def __lt__(self, other: Representable) -> bool: ...
+    def __lt__(self, other: Entity) -> bool: ...
 
 
 # BET?ALT: direct linked list of `EntityView.originator
@@ -26,7 +26,7 @@ class Backtrackable(Protocol):
     # RENAME? .pv=[parent|prev]view .parent .orig[inator] .back .up .off .prod[ucer]
     # NOTE: we use short ".pv" for more succint usage in code (orse use ".orig[inator]")
     @property
-    def parent(self) -> GoldenAny: ...
+    def parent(self) -> Entity: ...
 
 
 class Locatable(Protocol):
@@ -37,11 +37,6 @@ class Locatable(Protocol):
 class Explorable(Protocol):
     # RENAME? .browse()
     def explore(self) -> Entities: ...
-
-
-# RENAME? Indivisible AtomicError HaltExploration Leaf SolidBox
-class StopExploration(Exception):
-    pass
 
 
 class Interpretable(Protocol):

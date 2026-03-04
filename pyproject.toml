@@ -150,15 +150,13 @@ profile = "black"
 
 # REF: https://docs.astral.sh/ruff/configuration/
 [tool.ruff]
-# Match your .editorconfig line length
-line-length = 112
+line-length = 88
 
 [tool.ruff.lint]
 # Enable Pycodestyle (E), Pyflakes (F), and Isort (I)
 select = ["E", "F", "I"]
-# E501 is the 'line-too-long' rule.
-# We ignore it here so Ruff doesn't nag about the 112 comment limit.
-# ignore = ["E501"]
+# ignore 'line-too-long' so Ruff won't nag about the 112 comment limit.
+ignore = ["E501"]
 # ignore = ["ERA001"]
 
 [tool.ruff.lint.isort]

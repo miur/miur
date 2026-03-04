@@ -1,11 +1,11 @@
-from typing import Any, Iterable, Self, cast
+from typing import TYPE_CHECKING, Any, Self
 
-from ..autoreg import get_all_subclasses
-from .traits import Entities, Entity, Interpretable
+from ..discover import get_all_subclasses
 
 
-# if TYPE_CHECKING:
-#     from .golden import GoldenAny
+if TYPE_CHECKING:
+    from .golden import Entities, Entity
+    from .traits import Interpretable
 
 
 class InterpretableImpl:
@@ -30,7 +30,7 @@ class InterpretableImpl:
         return cls._rq_cache[cls]
 
     @classmethod
-    def creatable_from(cls: type[Self], ent: Any) -> bool | None:
+    def creatable_from(cls, ent: Any) -> bool | None:
         """
         PERF:(fast preliminary check): avoid knowingly failing object construction
         USAGE: override in subclasses for value-dependent logic
@@ -54,7 +54,7 @@ class InterpretableImpl:
             return False
 
     @classmethod
-    def create_from(cls: type[Self], ent: Entity) -> Self:
+    def create_from(cls, ent: Entity) -> Self:
         """The actual factory. Assumes .eligible() was checked or will raise."""
         # FUT: raise ConversionError(f"Missing field: {e.name}")
         fields = {a: getattr(ent, a) for a in cls._get_required_attrs()}
@@ -66,7 +66,7 @@ class InterpretableImpl:
         """Fluent entry point: ex~: my_ent.coerce_to(EntityB)"""
         return target.create_from(self)
 
-    def interp_as(self: Entity) -> Entities:  # OR:  -> Iterator[type[Self]]
+    def interp_as(self) -> Entities:
         """
         Scans all loaded Entity classes and yields those compatible
         with the current instance state.
@@ -82,7 +82,6 @@ class InterpretableImpl:
         # return candidates
 
         from ..core.error import ErrorEntry
-        from .golden import Golden
 
         def _try_cvt[T: Interpretable](cls: type[T]) -> T | ErrorEntry:
             try:
@@ -99,13 +98,15 @@ class InterpretableImpl:
                 return cls.create_from(self)
             except Exception as exc:
                 nm = f".interp_as({cls.__qualname__})"
-                return ErrorEntry(name=nm, parent=self, exc=exc)
+                return ErrorEntry(name=nm, parent=self, exc=exc)  # type: ignore[arg-type]
 
         # TODO: dif color .creatable_from for known(True)=GREN vs unknown(None)=YELW vs failed()=RED
         deferred: list[type[Entity]] = []
-        # HACK: Tell the type checker these are concrete types that satisfy the interface
-        subclasses = cast(Iterable[type[Entity]], get_all_subclasses(Golden[Any]))
-        for subcls in subclasses:
+        from .golden import Golden
+
+        # ALT:HACK: Tell the type checker these are concrete types that satisfy the interface
+        # subclasses = cast(Iterable[type[Entity]], get_all_subclasses(Entity))
+        for subcls in get_all_subclasses(Golden):
             sup = subcls.creatable_from(self)
             if sup is False:  # <PERF: skip surely unsupported conversions
                 continue

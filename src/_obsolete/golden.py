@@ -1,25 +1,15 @@
-from typing import TYPE_CHECKING, Any, Iterable, cast, override
+from typing import TYPE_CHECKING, Any, cast, override
 
-from .interp import InterpretableImpl
-
-
-# RENAME? Indivisible AtomicError HaltExploration Leaf SolidBox
-class StopExploration(Exception):
-    pass
+# from .interp import InterpretableImpl
+from .traits import Entities, GoldenProtocol, Representable
 
 
-type Entity = Golden[Any]  # OR=GoldenProto[col]
-type Entities = Iterable[Entity]
+type GoldenAny = Golden[Any]
 
 
-# RENAME? `Entity `Node `Discoverable
-class Golden[T](InterpretableImpl):
-    __slots__ = ("_x", "_parent")
-
-    def __init__(self, x: T, parent: Entity, /) -> None:
-        self._x = x
-        self._parent = parent
-        # self._parent: Golden[Any] = parent  # type: ignore[assignment]
+class RepresentableImpl:
+    __slots__ = ()
+    _x: Any
 
     # NICE: as we have a separate .name field, we can *dynamically* augment regular filenames
     # ex~:
@@ -34,7 +24,22 @@ class Golden[T](InterpretableImpl):
     def name(self) -> str:
         return str(self._x)
 
-    ## SUM: merged into Golden, standalone Protocol won't work as parent should *always* return GoldenAny
+
+# MOVE? merge-into Golden, no sense for standalone due to homohenicity of Entitites lists
+class SortableImpl(RepresentableImpl):
+    __slots__ = ()
+
+    # BAD: names can be non-unique; BET? disallow or keep by order added ?
+    #   ALT: comparing .loci may be unreliable w/o miur:// URL schema
+    def __lt__(self, other: Representable) -> bool:
+        return self.name < other.name
+
+
+# MOVE? merge-into Golden, no sense for standalone due to return type
+class BacktrackableImpl:
+    __slots__ = ()
+    _parent: GoldenAny
+
     # NOTE: directly point to `Entity which introspected it or `Action which produced it
     #   => and then you can access cached EntityView._vlst and _wdg only through _pool
     #   i.e. individual `Entity will lose the ability to directly access associated _wdg
@@ -46,9 +51,13 @@ class Golden[T](InterpretableImpl):
     # FAIL: we can't link `Entity to its `Action, so we lose "actions" in `Loci URL
     #     orse we would need: Action.explore() { Entity.explore(parent=self) }
     @property
-    def parent(self) -> Entity:
+    def parent(self) -> GoldenAny:
         # assert self._parent != self
         return self._parent
+
+
+class LocatableImpl(BacktrackableImpl, RepresentableImpl):
+    __slots__ = ()
 
     # REMOVE? -> construct `Loci on demand through external means
     # @cached_property
@@ -59,11 +68,42 @@ class Golden[T](InterpretableImpl):
         # FAIL:TEMP: "self.name" -> "self._x.selector_for_interpreter"
         return self._parent.loci + "/" + self.name
 
-    ## SUM: merged into Golden -- standalone Protocol has no sense for mixed Golden containers
-    # BAD: names can be non-unique; BET? disallow or keep by order added ?
-    def __lt__(self, other: Entity) -> bool:
-        # ALT: comparing .loci may be unreliable w/o miur:// URL schema
-        return self.name < other.name
+
+## ARCH:
+#  * on ERROR -> return [`ErrorEntry], mixed with regular entries
+#    >> if whole list ~can't be read~ -- it will result in empty list with error
+#    COS: we may get multiple errors, for e.g. unreadable elements in the list
+#  * on empty list -> return [], and interpret it based on `*Entry itself
+#    e.g. to make different messages for empty folder and empty file
+#  * if entry is atomic -> return "None", and again interpret it based on `*Entry
+#    COS: behavior of HaltEntry is NOT inherent and depends on how we decide to interpret it
+#    ALT:BET? remove the method itself and use getattr() to verify its presence
+class ExplorableImpl:
+    __slots__ = ()
+
+    # MAYBE: make default entity `Atomic, so exploration would return nothing or error ?
+    def explore(self) -> Entities:
+        # NOTE: it's reasonable to raise inof using @abc.abstractmethod
+        #   * rarely we may have atomic leafs, but for most it's "NOT YET IMPLEMENTED"
+        #   * we will use try-catch around .explore() anyway -- to catch errors
+        raise NotImplementedError("TBD: not yet implemented")
+
+
+# RENAME? `Entity `Node `Discoverable
+class Golden[T](
+    # InterpretableImpl,
+    ExplorableImpl,
+    LocatableImpl,
+    BacktrackableImpl,
+    SortableImpl,
+    RepresentableImpl,
+):  # pylint: disable=abstract-method
+    __slots__ = ("_x", "_parent")
+
+    def __init__(self, x: T, parent: GoldenAny, /) -> None:
+        self._x = x
+        self._parent = parent
+        # self._parent: Golden[Any] = parent  # type: ignore[assignment]
 
     @override
     def __repr__(self) -> str:
@@ -74,27 +114,8 @@ class Golden[T](InterpretableImpl):
         #     return f"`{loci}"
         return f"{type(self).__name__}({loci})"
 
-    ## ARCH:
-    #  * on ERROR -> return [`ErrorEntry], mixed with regular entries
-    #    >> if whole list ~can't be read~ -- it will result in empty list with error
-    #    COS: we may get multiple errors, for e.g. unreadable elements in the list
-    #  * on empty list -> return [], and interpret it based on `*Entry itself
-    #    e.g. to make different messages for empty folder and empty file
-    #  * if entry is atomic -> return "None", and again interpret it based on `*Entry
-    #    COS: behavior of HaltEntry is NOT inherent and depends on how we decide to interpret it
-    #    ALT:BET? remove the method itself and use getattr() to verify its presence
-    # MAYBE: make default entity `Atomic, so exploration would return nothing or error ?
-    def explore(self) -> Entities:
-        # NOTE: it's reasonable to raise inof using @abc.abstractmethod
-        #   * rarely we may have atomic leafs, but for most it's "NOT YET IMPLEMENTED"
-        #   * we will use try-catch around .explore() anyway -- to catch errors
-        raise NotImplementedError("TBD: not yet implemented")
 
-
-# pyright: reportUnusedFunction=false
 if TYPE_CHECKING:
-    from .traits import GoldenProtocol
-
     ## FIXED:ERR: `FSEntry [too-many-ancestors] Too many ancestors (8/7)
     # NOTE: validate that the class constructor matches the protocol requirements
     # REF: Is there a way to tell mypy to check a class implements a Protocol without inheriting from it? ⌇⡧⢟⠦⡴
@@ -108,18 +129,39 @@ if TYPE_CHECKING:
     #   substitutes Self = Golden[complex] and then checks if Golden[Any] is assignable to Golden[complex]...
     #   which passes because Any wins.
     GoldenDummy = Golden[complex]  # OR=None|Literal["dummy"]
-    _type: type[GoldenProtocol] = GoldenDummy
-    _inst = GoldenDummy(complex(), cast(GoldenDummy, None))
     # from typing import reveal_type
     # reveal_type(GoldenDummy.parent)
     # reveal_type(GoldenDummy.explore)
     # reveal_type(GoldenDummy.interp_as)
+    _type: type[GoldenProtocol] = GoldenDummy
+    _inst = GoldenDummy(complex(), cast(GoldenDummy, None))
 
     # Verify Golden[X] is assignable to GoldenProtocol for a concrete X
     # Use a concrete non-Any type that has no special assignability rules
     _proto: GoldenProtocol = cast(GoldenDummy, None)
     _golden: GoldenDummy = _proto  # type: ignore[assignment]  # reverse check
     _back: GoldenProtocol = _golden  # forward check — this is the useful one
+
+    # fmt:off
+    # pylint:disable=multiple-statements
+    from .traits import Explorable, Interpretable, Locatable, Sortable
+    def _check_interpretable(x: GoldenDummy) -> Interpretable: return x
+    def _check_explorable(x: GoldenDummy) -> Explorable: return x
+    def _check_locatable(x: GoldenDummy) -> Locatable: return x
+    def _check_representable(x: GoldenDummy) -> Representable: return x
+    def _check_sortable(x: GoldenDummy) -> Sortable: return x
+    def _verify_compat(x: GoldenDummy) -> GoldenProtocol: return x
+    # fmt:on
+    _check_interpretable(_inst)
+    _check_explorable(_inst)
+    _check_locatable(_inst)
+    _check_representable(_inst)
+    _check_sortable(_inst)
+    _verify_compat(_inst)
+
+    ## ALT:
+    # from typing import assert_type
+    # assert_type(cast(Golden[int], None), GoldenProtocol)
 
     # class GoldenDummy(Golden[None]):
     #     def __init__(self) -> None:
@@ -129,25 +171,8 @@ if TYPE_CHECKING:
     #         raise NotImplementedError
     # inst: GoldenProtocol = GoldenDummy()
 
-    def _typecheck_protocols() -> None:
-        # fmt:off
-        # pylint:disable=multiple-statements
-        from . import traits as TR
-        def _check_representable(x: GoldenDummy) -> TR.Representable: return x
-        def _check_sortable(x: GoldenDummy) -> TR.Sortable: return x
-        def _check_backtrackable(x: GoldenDummy) -> TR.Backtrackable: return x
-        def _check_locatable(x: GoldenDummy) -> TR.Locatable: return x
-        def _check_explorable(x: GoldenDummy) -> TR.Explorable: return x
-        def _check_interpretable(x: GoldenDummy) -> TR.Interpretable: return x
-        def _check_golden(x: GoldenDummy) -> TR.GoldenProtocol: return x
-        # fmt:on
 
-        ## ALT:
-        # from typing import assert_type
-        # assert_type(cast(Golden[int], None), GoldenProtocol)
-
-
-if __debug__ or __name__ == "__main__":
+if __name__ == "__main__":  # or DEBUG:
     import inspect
 
     def _verify_protocol_impl(impl: type, protocol: type) -> None:
@@ -159,8 +184,6 @@ if __debug__ or __name__ == "__main__":
             # check signatures
             proto_sig = inspect.signature(member)
             impl_sig = inspect.signature(impl_member)
-            assert proto_sig == impl_sig, (
-                f"{impl}.{name} signature {impl_sig} != protocol {proto_sig}"
-            )
+            assert proto_sig == impl_sig, f"{impl}.{name} signature {impl_sig} != protocol {proto_sig}"
 
     _verify_protocol_impl(Golden, GoldenProtocol)  # runs once at import time in dev

@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, override
 
 from . import _pkg
 from .app import AppOptions, g_app
-from .entity.autoreg import get_all_subclasses
+from .entity.discover import get_all_subclasses
 from .util.logger import LogLevel, log
 
 

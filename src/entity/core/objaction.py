@@ -1,8 +1,8 @@
-import inspect
-from typing import Any, Callable, Iterable, Mapping, Sequence, override
+from typing import Any, Callable, Mapping
 
 # from ..util.termansi import num_lo, num_up
-from ..base import Action, Entities, Entity, Golden
+from ..base.action import Action
+from ..base.golden import Entities, Entity, Golden
 from .error import ErrorEntry
 from .fsentry import FSAuto
 from .text import TextEntry
@@ -60,7 +60,7 @@ def cvt_to_ents(x: Any, parent: Entity) -> Entities:
         ## TODO: recursive description w/ or w/o intermediate `Actions
         return [TextEntry(str(a), parent) for a in x]
     if isinstance(x, str):
-        if any(x.startswith(l) for l in ("/", "~/", "../")):
+        if any(x.startswith(p) for p in ("/", "~/", "../")):
             # return [FSAuto(x, parent), TextEntry(x, parent)]
             return [FSAuto(x, parent)]
         return [TextEntry(x, parent)]
@@ -112,8 +112,7 @@ class ObjAction(Action):
         fn: Callable[[], Any],
         allowpreview: bool = True,
     ) -> None:
-        sfn = lambda: cvt_to_ents(fn(), parent=self)
-        super().__init__(name, parent, sfn)
+        super().__init__(name, parent, sfn=lambda: cvt_to_ents(fn(), parent=self))
         self.allowpreview = allowpreview
 
 
@@ -121,6 +120,8 @@ class ObjAction(Action):
 #   Action.explore(): super(self, Golden).explore() to introspect itself
 #   [_] ALT:BET? per-Entity introspection :DEV: .actions() -> Actions
 def pyobj_to_actions(obj: Any, parent: Entity) -> Entities:
+    import inspect
+
     # ALT:PERF(slow): @runtime_checkable : isinstance(ent, Explorable)
     #   https://mypy.readthedocs.io/en/latest/protocols.html#using-isinstance-with-protocols
     # [_] ALSO: iterate over readable @property

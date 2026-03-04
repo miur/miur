@@ -1,7 +1,6 @@
 from typing import Callable, override
 
-from .golden import Golden, GoldenAny
-from .traits import Entities
+from .golden import Entities, Entity, Golden
 
 
 # ENH? inherit variety of `*Action and apply different color to each
@@ -14,7 +13,7 @@ class Action(Golden[str]):
     def __init__(
         self,
         name: str,
-        parent: GoldenAny,
+        parent: Entity,
         sfn: Callable[[], Entities],
     ) -> None:
         super().__init__(name, parent)

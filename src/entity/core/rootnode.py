@@ -32,14 +32,14 @@ class MiurAppNode(Golden[str]):
         import os
 
         from ...app import g_app
-        from ..wip.ymemnode import PyMemRoot
+        from ..gpt.pymemnode import PyMemRoot
         from .objaction import ObjAction
 
         # FIXME:BET: inof "None" return RemoteException to explore (or at least errcode)
         def _spawn_render(nm: str) -> None:
             import importlib
 
-            from ..integ.any_spawn import spawn_py
+            from ...integ.any_spawn import spawn_py
 
             mod = importlib.import_module("..ui.render." + nm, __package__)
             return spawn_py(mod.main, nm)
@@ -52,7 +52,7 @@ class MiurAppNode(Golden[str]):
             ObjAction(name="@g_app", parent=self, fn=lambda: vars(g_app)),
             ObjAction(name="@keybindings", parent=self, fn=lambda: g_app.keytableroot),
             # ObjAction(name="@pymem", parent=self, fn=lambda: [PyMemRoot(self)]),
-            ObjAction(name="@pymem", parent=self, fn=lambda: PyMemRoot.explore(self)),
+            ObjAction(name="@pymem", parent=self, fn=lambda: PyMemRoot(self).explore()),
             ObjAction(
                 name="@demo/render",
                 parent=self,
@@ -61,6 +61,7 @@ class MiurAppNode(Golden[str]):
                         name=nm,
                         parent=self,
                         allowpreview=False,
+                        # FIXME:BET: make some "LazyAction" inof ad-hoc lambda capture
                         fn=lambda nm=nm: _spawn_render(nm),
                     )
                     for nm in [
@@ -83,7 +84,7 @@ class ProtocolNode(Golden[str]):
 
     @override
     def explore(self) -> Entities:
-        from .mpdnode import MPDProto
+        from ..wip.mpdnode import MPDProto
 
         return [MPDProto("&mpd", self)]
 
@@ -94,7 +95,7 @@ class WebNode(Golden[str]):
 
     @override
     def explore(self) -> Entities:
-        from .webnode import WebPageEntity
+        from ..wip.webnode import WebPageEntity
 
         return [
             WebPageEntity("http://example.com/", self),
@@ -108,7 +109,7 @@ class DatasetNode(Golden[str]):
 
     @override
     def explore(self) -> Entities:
-        from .unicodenode import UnicodeNode
+        from ..wip.unicodenode import UnicodeNode
 
         return [
             UnicodeNode("*unicode", self),
@@ -127,15 +128,17 @@ class RootNode(Golden[str]):
         # BET:CHG:(pview)=self=_pool[RootNode] -> EntityView
         super().__init__("miur://", self)
 
-    @override
     @property
+    @override
     def loci(self) -> str:
-        return ""  # NOTE:(""): it's sole non-ambiguous loci for central menu
+        # NICE:(""): it's sole non-ambiguous loci for central menu
+        #   BAD: empty str can be produced by any Entities by mistake
+        return ""
 
     @override
     def explore(self) -> Entities:
-        from .dockernode import DockerNode
-        from .helpexplorer import ExperimentalHelpNode
+        from ..wip.dockernode import DockerNode
+        from ..wip.helpexplorer import ExperimentalHelpNode
 
         # OR: do we really need "file://" ?
         #   isn't it prolifiration from "http://" ? -- which is wrong and should had been "http:"

@@ -1,15 +1,26 @@
 import threading
 
 
+## ALT:
+# def _try_cvt[T: Interpretable](cls: type[T]) -> T | ErrorEntry:
+#     class Proxy:
+#         def __getattr__(self, name):
+#             inst = cls.create_from(target)
+#             setattr(self, "__class__", inst.__class__)
+#             self.__dict__.update(inst.__dict__)
+#             return getattr(inst, name)
+#     return Proxy()
+
+
 class LazyTransform:
     _lock = threading.Lock()
 
-    def __init__(self, target_cls, *args, **kwargs):
+    def __init__(self, target_cls, *args, **kwargs) -> None:
         # Using __dict__ directly avoids triggering any logic
         self.__dict__["_target_cls"] = target_cls
         self.__dict__["_init_args"] = (args, kwargs)
 
-    def _materialize(self):
+    def _materialize(self) -> None:
         with self._lock:
             # Re-check in case another thread finished while we waited
             if not isinstance(self, self._target_cls):
@@ -36,6 +47,16 @@ class LazyTransform:
     def __dir__(self):
         """Makes dir() match the target class immediately."""
         return dir(self._target_cls)
+
+
+# --- Example ---
+class HeavyObject:
+    def __init__(self, val):
+        self.val = val
+        print("--- HeavyObject fully initialized ---")
+
+    def action(self):
+        return f"Action with {self.val}"
 
 
 # 1. Create proxy: No HeavyObject init yet

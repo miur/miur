@@ -7,6 +7,7 @@ from typing import override
 from ..base.golden import Entities, Entity, Golden
 from ..core.text import TextEntry
 
+
 MAX_DEPTH = sys.getrecursionlimit() - 100
 LARGE_OBJECT_THRESHOLD = 1024 * 1024
 
@@ -99,7 +100,7 @@ class InstanceData:
 class PyMemInstance(Golden[InstanceData]):
     __slots__ = ()
 
-    def __init__(self, name: str, parent: Entity, obj: object) -> None:
+    def __init__(self, _name: str, parent: Entity, obj: object) -> None:
         size_result = get_deep_size(obj)
         type_name = get_type_name(obj)
         preview = get_preview(obj)
@@ -124,8 +125,8 @@ class PyMemInstance(Golden[InstanceData]):
             parent,
         )
 
-    @override
     @property
+    @override
     def name(self) -> str:
         return self._x.name
 
@@ -152,7 +153,7 @@ class PyMemRef(Golden[tuple[str, object]]):
 
     @override
     def explore(self) -> Entities:
-        name, obj = self._x
+        _name, obj = self._x
         yield PyMemInstance(f"obj @0x{id(obj):x}", self, obj)
 
 
@@ -269,7 +270,7 @@ class PyMemLarge(Golden[str]):
 
         large_objs.sort(key=lambda x: x[1], reverse=True)
 
-        for obj, size in large_objs:
+        for obj, _size in large_objs:
             yield PyMemInstance(f"@0x{id(obj):x}", self, obj)
 
 
@@ -364,7 +365,7 @@ class PyMemStat(Golden[str]):
             type_sizes[tn] += size_result.size
 
         yield TextEntry(f"Total objects: {total_count}", self)
-        yield TextEntry(f"Total size: {total_size // (1024*1024)} MB", self)
+        yield TextEntry(f"Total size: {total_size // (1024 * 1024)} MB", self)
         yield TextEntry(f"gc.garbage: {len(gc.garbage)}", self)
         yield TextEntry(f"Modules: {len(sys.modules)}", self)
         yield TextEntry("", self)
