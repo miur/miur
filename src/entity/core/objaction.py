@@ -1,4 +1,5 @@
-from typing import Any, Callable, Mapping
+import inspect
+from typing import Any, Callable, Iterable, Mapping, get_type_hints
 
 # from ..util.termansi import num_lo, num_up
 from ..base.action import Action
@@ -116,11 +117,81 @@ class ObjAction(Action):
         self.allowpreview = allowpreview
 
 
+def get_hints(fn: Any) -> dict[str, Any]:
+    import sys
+
+    extra_ns = {
+        "Entity": Golden[Any],
+        "Entities": Iterable[Golden[Any]],
+        "Golden": Golden,
+    }
+
+    module = sys.modules.get(fn.__module__, None)
+    injected = {}
+    if module is not None:
+        for name, val in extra_ns.items():
+            if name not in module.__dict__:
+                module.__dict__[name] = val
+                injected[name] = val
+    try:
+        return get_type_hints(fn)
+    finally:
+        # clean up what we injected
+        if module is not None:
+            for name in injected:
+                module.__dict__.pop(name, None)
+
+
+def get_sig(fn: Any) -> inspect.Signature:
+    ## ALT: gather all objects to resolve sigs
+    # # entity/base/ns.py — no imports from within entity, pure stdlib
+    # from typing import Any
+    #
+    # _registry: dict[str, Any] = {}
+    #
+    # def register(**kwargs: Any) -> None:
+    #     _registry.update(kwargs)
+    #
+    # def get_ns() -> dict[str, Any]:
+    #     return _registry
+    # python# entity/base/golden.py — after defining Entity, Entities
+    # from .ns import register
+    # register(Entity=Entity, Entities=Entities, Golden=Golden)
+    # python# anywhere that needs to resolve annotations
+    # import inspect
+    # import typing
+    # from entity.base.ns import get_ns
+    #
+    # def get_hints(fn: Any) -> dict[str, Any]:
+    #     return typing.get_type_hints(fn, localns=get_ns())
+    #
+    # def get_sig(fn: Any) -> inspect.Signature:
+    #     return inspect.signature(fn, eval_str=True, globals=get_ns())
+
+    # print(sys.modules[fn.__module__].__dict__.get("Entities"))
+
+    try:
+        # hints = get_type_hints(fn, globalns=extra_ns, localns=fn.__globals__)
+        # merged_ns = {**fn.__globals__, **extra_ns}
+        # hints = get_type_hints(fn, globalns=merged_ns)
+        hints = get_hints(fn)
+    except Exception:
+        return inspect.signature(fn, follow_wrapped=False)
+    sig = inspect.signature(fn, follow_wrapped=False)
+    params = [
+        p.replace(annotation=hints.get(name, p.annotation))
+        for name, p in sig.parameters.items()
+    ]
+    return sig.replace(
+        parameters=params,
+        return_annotation=hints.get("return", sig.return_annotation),
+    )
+
+
 # ALT:XP~: directly produce this list by Golden.explore(), accessed only as:
 #   Action.explore(): super(self, Golden).explore() to introspect itself
 #   [_] ALT:BET? per-Entity introspection :DEV: .actions() -> Actions
 def pyobj_to_actions(obj: Any, parent: Entity) -> Entities:
-    import inspect
 
     # ALT:PERF(slow): @runtime_checkable : isinstance(ent, Explorable)
     #   https://mypy.readthedocs.io/en/latest/protocols.html#using-isinstance-with-protocols
@@ -134,6 +205,42 @@ def pyobj_to_actions(obj: Any, parent: Entity) -> Entities:
         ##   OR: `Interpret any non-explore as generic TextEntry(str(...))
         if k.startswith("_"):
             continue
+
+        ## FIXED: skip methods I can't auto-execute
+        #    FUT: generate list of some possible values for methods to pick in UI and still execute them
+        try:
+            print("-----------")
+            print(v)
+            # sig = inspect.signature(v, follow_wrapped=False)
+            sig = get_sig(v)
+            print(sig)
+        except Exception as exc:
+            from ...util.exchook import log_exc
+
+            log_exc(exc)
+        else:
+            params = [
+                p
+                for p in sig.parameters.values()
+                if p.default is inspect.Parameter.empty
+                and p.kind
+                not in (
+                    inspect.Parameter.VAR_POSITIONAL,  # *args
+                    inspect.Parameter.VAR_KEYWORD,  # **kwargs
+                )
+            ]
+            print(params)
+            if params:
+                continue
+
+        # try:
+        #     hints = get_hints(v)
+        #     ret = hints.get("return")
+        #     # filter by return type if needed
+        #     if ret is not None and not _matches_entities(ret):
+        #         continue
+        # except Exception:
+        #     continue
 
         # IDEA: rename {.explore==.default} to show only "L" as 1st `Action in list
         # OR=name=f"{k.capitalize()}:"
