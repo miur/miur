@@ -208,12 +208,13 @@ def pyobj_to_actions(obj: Any, parent: Entity) -> Entities:
 
         ## FIXED: skip methods I can't auto-execute
         #    FUT: generate list of some possible values for methods to pick in UI and still execute them
+        #      IDEA: allow user to "insert" new values into suggested list -- basically "accepting user input"
         try:
-            print("-----------")
-            print(v)
+            # print("-----------")
+            # print(v)
             # sig = inspect.signature(v, follow_wrapped=False)
             sig = get_sig(v)
-            print(sig)
+            # print(sig)
         except Exception as exc:
             from ...util.exchook import log_exc
 
@@ -229,7 +230,7 @@ def pyobj_to_actions(obj: Any, parent: Entity) -> Entities:
                     inspect.Parameter.VAR_KEYWORD,  # **kwargs
                 )
             ]
-            print(params)
+            # print(params)
             if params:
                 continue
 

@@ -11,7 +11,7 @@ class StopExploration(Exception):
 
 # OR=GoldenProto[col]
 type Entity = Golden[Any]  # pyright: ignore[reportExplicitAny]
-type Entities = Iterable[Entity]
+type Entities = Iterable[Entity]  # :FUT=> GoldenListingOrError
 
 
 # RENAME? `Entity `Node `Discoverable
@@ -33,6 +33,7 @@ class Golden[T](InterpretableImpl):
     #   ~ smart-compress long textlines to use them everywhere as unique names
     # ALT:BET? do it inside "item visualization", which would be both more logical and practical
     #   i.e. we may visualize both augmented and shadowed original names at the same time
+    #   BET:SPLIT: `EntityView -> `*Listing, so I could apply ops to explored lists independent from UI
     # FUT:PERF:CMP: use @cached_property vs @property+@lru_cache(1) vs .update(self._name) method
     @property
     def name(self) -> str:

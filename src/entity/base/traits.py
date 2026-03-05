@@ -45,13 +45,13 @@ class Interpretable(Protocol):
     #   ALT: .can_be_made_from | .compatible_with | .understands/recognizes/resembles
     # ex~: "if ELFFile.derivable_from(FSFile)"
     @classmethod
-    def creatable_from(cls, ent: Any) -> bool | None: ...
+    def creatable_from(cls, ent: Any) -> bool | None: ...  # pyright: ignore[reportAny,reportExplicitAny]
 
     # RENAME? .from_entity | .reinterpret | .convert | .derive | .make_from
     #   WHY: to also allow .from_<non_entity>() kind of conversions
     # ex~: "ent = ELFFile.create_from(FSFile)" | "ent = FSFile.convert_to(ELFFile)"
     @classmethod
-    def create_from(cls, ent: Any) -> Self: ...
+    def create_from(cls, ent: Any) -> Self: ...  # pyright: ignore[reportAny,reportExplicitAny]
 
     # RENAME? get_available_interpretations()
     # MAYBE:BET? cvt ret-vals to Entities by external adapter-factory?
@@ -66,7 +66,7 @@ class Atomic(Locatable, Representable, Protocol):
 
 # RENAME? `Derivable `Composite (in contrast to `Atomic)
 class GoldenProtocol(
-    # Interpretable,
+    Interpretable,
     Explorable,
     Locatable,
     Backtrackable,

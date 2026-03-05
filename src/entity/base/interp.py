@@ -1,16 +1,26 @@
-from typing import TYPE_CHECKING, Any, Self
+from typing import TYPE_CHECKING, Self, final, override
 
 from ..discover import get_all_subclasses
 
-
 if TYPE_CHECKING:
+    from ..core.error import ErrorEntry
     from .golden import Entities, Entity
     from .traits import Interpretable
 
 
 class InterpretableImpl:
+    __slots__: tuple[str, ...] = ()
+    _blacklist: set[type] = set()
+    _supported: set[type] = set()
     # PERF: Cache for required attributes per class to avoid re-inspection
     _rq_cache: dict[type, tuple[str, ...]] = {}
+
+    @override
+    def __init_subclass__(cls, **kwargs: object) -> None:
+        super().__init_subclass__(**kwargs)
+        # ALT: use single global "registry: dict[type, set[type]]" for cross-queries
+        cls._blacklist = set()
+        cls._supported = set()
 
     @classmethod
     def _get_required_attrs(cls) -> tuple[str, ...]:
@@ -30,98 +40,135 @@ class InterpretableImpl:
         return cls._rq_cache[cls]
 
     @classmethod
-    def creatable_from(cls, ent: Any) -> bool | None:
+    def _compatible_with(cls, ent: object) -> bool | None:
+        # CASE: structural "Poking": does ent have all attributes __init__ expects?
+        # ALT:(prematch by typehints): tuple(signature(cls.__call__).parameters.values())[1].annotation
+        attrs = cls._get_required_attrs()
+        if all(hasattr(ent, a) for a in attrs):
+            return True
+        ## ALT:PERF? fastest way to preliminary check several attrs
+        # _ = (ent.uid, ent.meta, ent.priority)
+        return False
+
+    @final
+    @classmethod
+    def creatable_from(cls, ent: object) -> bool | None:
         """
         PERF:(fast preliminary check): avoid knowingly failing object construction
         USAGE: override in subclasses for value-dependent logic
-          ex~: return super().accepts(subject) and ent.data(0,4) == "\x7fELF"
+          ex~: return super().creatable_from(ent) and ent.data(0,4) == "\x7fELF"
         Returns:
-            True  - Certain this interpretation can handle the object
-            False - Certain this interpretation cannot handle the object
-            None  - Not sure, force interpret() and treat exceptions as "not possible"
+            True  - should be able to handle the object (still may throw on actual attempt)
+            False - blacklisted beforehand or due to repeated failures
+            None  - uncertain, until you try costly .interp_as() and check for exceptions
         """
-        try:
-            # CASE: structural "Poking": does ent have all attributes __init__ expects?
-            # ALT:(prematch by typehints): tuple(signature(cls.__call__).parameters.values())[1].annotation
-            attrs = cls._get_required_attrs()
-            ## ALT:PERF? fastest way to preliminary check several attrs
-            # _ = (subject.uid, subject.meta, subject.priority)
-            if all(hasattr(ent, a) for a in attrs):
-                return True
-            # CASE:(uncertain): you don't know until you try to create object
-            return None
-        except AttributeError, ValueError, TypeError:  # REMOVE?
+        tp = type(ent)
+        if tp in cls._supported:
+            return True
+        if any(c in cls._blacklist for c in tp.__mro__):
             return False
+        try:
+            return cls._compatible_with(ent)
+        except AttributeError, TypeError:
+            # CASE: attr/type issues usually indicate "fundamental incompatibility"
+            cls._blacklist.add(tp)
+        except ValueError:
+            # CASE: value issues are most likely instance-related, so "try again"
+            pass
+        return False
 
+    # DONE:DECI:XLR: return ErrorEntry directly here, or wrap it one level higher
+    #   ::: if I want to be able to override this method -- it should be in stable .interp_as
     @classmethod
-    def create_from(cls, ent: Any) -> Self:
+    def create_from(cls, ent: object) -> Self:
         """The actual factory. Assumes .eligible() was checked or will raise."""
         # FUT: raise ConversionError(f"Missing field: {e.name}")
         fields = {a: getattr(ent, a) for a in cls._get_required_attrs()}
-        return cls(**fields)
+        try:
+            # BET? explicitly raise FailedInterp to distinguish from other errors
+            return cls(**fields)  # ADD: , parent=ent
+            ## DISABLED: no way to distinguish if whole class vs specific instance are convertible
+            # cls._supported.add(type(ent))
+        except AttributeError, TypeError:
+            # FIXME: auto-blacklist only if classess are really incompatible
+            #   (i.e. keep trying FSFile -> ELF for each separate instance)
+            cls._blacklist.add(type(ent))
+            raise
 
-    # RENAME? .reinterpret_as ?
-    ## MAYBE?(overload): .interpret_as ?
-    def coerce_to[T: Interpretable](self, target: type[T]) -> T:
-        """Fluent entry point: ex~: my_ent.coerce_to(EntityB)"""
-        return target.create_from(self)
+    # RENAME? .coerce_to .reinterpret_as .try_cvt_to ?
+    # BET?(overload): .interp_as()
+    def try_interp_as[T: Interpretable](self, target_cls: type[T]) -> T | ErrorEntry:
+        from ..core.objaction import ObjAction, pyobj_to_actions
 
+        # MAYBE: dif Lazy* UI color for known(True)=GREN vs unknown(None)=YELW vs failed()=RED
+        # FIXME:PERF: return lazy-init (or self-replace) named proxies to .create_from() only on access
+        #   and produce results=[ErrorEntry] on error (or self-replace itself by ErrorEntry)
+        # e.g::
+        # class Proxy:
+        #     def __getattr__(self, name):
+        #         inst = cls.create_from(target)
+        #         setattr(self, "__class__", inst.__class__)
+        #         self.__dict__.update(inst.__dict__)
+        #         return getattr(inst, name)
+        # return Proxy()
+        # from .action import Action
+        # class LazyInterpAction(Action):
+        #     def __init__(
+        #         self,
+        #         name: str,
+        #         parent: Entity,
+        #         fn: Callable[[], Any],
+        #         allowpreview: bool = True,
+        #     ) -> None:
+        #         super().__init__(
+        #             name, parent, sfn=lambda: cvt_to_ents(fn(), parent=self)
+        #         )
+        #         self.allowpreview = allowpreview
+
+        def _deferred() -> Entities | ErrorEntry:
+            try:
+                tgt = target_cls.create_from(self)
+            except Exception as exc:
+                from ..core.error import ErrorEntry
+
+                nm = f".interp_as({target_cls.__qualname__})"
+                return ErrorEntry(name=nm, parent=self, exc=exc)  # type: ignore[arg-type]  # pyright: ignore[reportArgumentType]  # pylint:disable=line-too-long
+            return pyobj_to_actions(tgt, parent=tgt)
+
+        # MAYBE:NEED: global registry of Entities to give them unique short names to disambiguate them
+        #   e.g. check if __name__ alrady exists and then fallback to uniquely shortened __qualname__
+        nm = target_cls.__name__
+        return ObjAction(name=nm, parent=self, allowpreview=False, fn=_deferred)
+
+    # ARCH:THINK! list of `Actions we return... can be unified as .interp_as(ActionsListing)
+    #   i.e. in same way how .explore() gives some listing of chosen .interp_as type
+    #   ALSO: list of `Actions itself -- is a curated subset of API from `SystemAccessor e.g. from os.path.*
+    @final
     def interp_as(self) -> Entities:
         """
         Scans all loaded Entity classes and yields those compatible
-        with the current instance state.
+        with the current instance structure/data/state.
         """
-        ## ALT:
-        # candidates = []
-        # for cls in self.__class__.mro()[1].__subclasses__():
-        #     try:
-        #         cls.make_from(self)
-        #         candidates.append(cls)
-        #     except (AttributeError, ValueError, ConversionError):
-        #         continue
-        # return candidates
-
-        from ..core.error import ErrorEntry
-
-        def _try_cvt[T: Interpretable](cls: type[T]) -> T | ErrorEntry:
-            try:
-                # FIXME:PERF: return lazy-init (or self-replace) named proxies to .create_from() only on access
-                #   and produce results=[ErrorEntry] on error (or self-replace itself by ErrorEntry)
-                # e.g::
-                # class Proxy:
-                #     def __getattr__(self, name):
-                #         inst = cls.create_from(target)
-                #         setattr(self, "__class__", inst.__class__)
-                #         self.__dict__.update(inst.__dict__)
-                #         return getattr(inst, name)
-                # return Proxy()
-                return cls.create_from(self)
-            except Exception as exc:
-                nm = f".interp_as({cls.__qualname__})"
-                return ErrorEntry(name=nm, parent=self, exc=exc)  # type: ignore[arg-type]  # pyright: ignore[reportArgumentType]  # pylint:disable=line-too-long
-
-        # TODO: dif color .creatable_from for known(True)=GREN vs unknown(None)=YELW vs failed()=RED
-        deferred: list[type[Entity]] = []
         from .golden import Golden
 
-        # ALT:HACK: Tell the type checker these are concrete types that satisfy the interface
-        # subclasses = cast(Iterable[type[Entity]], get_all_subclasses(Entity))
+        deferred: list[type[Entity]] = []
         for subcls in get_all_subclasses(Golden):
             sup = subcls.creatable_from(self)
-            if sup is False:  # <PERF: skip surely unsupported conversions
+            if sup is False:  # <PERF: 1st step skip surely unsupported conversions
                 continue
             if sup is None:
                 deferred.append(subcls)
                 continue
-            yield _try_cvt(subcls)
+            yield self.try_interp_as(subcls)
 
-        # RENAME? _try_{possible,unknown}
-        def _try_remaining() -> Entities:
-            return map(_try_cvt, deferred)
+        if deferred:
+            # RENAME? _try_{possible,unknown}
+            def _try_remaining() -> Entities:
+                return [self.try_interp_as(subcls) for subcls in deferred]
 
-        from ..core.objaction import ObjAction
+            from ..core.objaction import ObjAction
 
-        yield ObjAction(name="@try_remaining", parent=self, fn=_try_remaining)  # type: ignore[arg-type]  # pyright: ignore[reportArgumentType]  # pylint:disable=line-too-long
+            yield ObjAction(name="@try_remaining", parent=self, fn=_try_remaining)  # type: ignore[arg-type]  # pyright: ignore[reportArgumentType]  # pylint:disable=line-too-long
 
 
 # class InterpArbiter:

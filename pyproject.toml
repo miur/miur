@@ -160,16 +160,22 @@ line-length = 88
 
 [tool.ruff.lint]
 # Enable Pycodestyle (E), Pyflakes (F), and Isort (I)
-select = ["E", "F", "I"]
+select = ["E", "F", "I", "PL"]
+# "I" includes isort-like import sorting
+extend-select = [ "I" ]
+# Ensures sorting is part of formatting
+# format = [ "I" ]
 # ignore 'line-too-long' so Ruff won't nag about the 112 comment limit.
-ignore = ["E501"]
+# FIXED: Ruff: `import` should be at the top-level of a file [PLC0415]
+ignore = ["E501", "PLC0415"]
 # ignore = ["ERA001"]
 
 [tool.ruff.lint.isort]
 # Ruff's isort implementation is Black-compatible by default,
 # but you can explicitly ensure it matches your preference.
 force-single-line = false
-lines-after-imports = 2
+## DISABLED:BAD: due to some racing it either leaves one or two lines, crawling cursor up on each save
+# lines-after-imports = 2
 
 [tool.ruff.format]
 # Ruff formatter does not currently support a separate 'comment-length'.
@@ -205,7 +211,7 @@ extraPaths = ["."]
 # FIXED: it ignores TYPE_CHECKING forward imports
 reportImportCycles = "none"
 # FAIL: doesn't suppress?
-reportExplicitAny = "none"
+# reportExplicitAny = "none"
 
 #%USAGE:DFL:WF:REF: https://github.com/jazzband/pip-tools
 # ALT: $ pip install -r requirements.in --dry-run --ignore-installed --quiet --report - | jq -r '(.environment | to_entries[] | "# \(.key): \(.value)"), (.install[] | "\(.metadata.name)==\(.metadata.version)")' > requirements.txt

@@ -124,7 +124,7 @@ def get_all_subclasses[T](
     #   INFO: returning "seen" set is slightly faster, but we lose predictable ordering in logs
     #   MAYBE: stop inhereting from `AutoRegistered as we have __subclasses__ ?
     # WARN:FUT:(PEP-690): might be empty until the module is actually accessed, not just imported.
-    xs = root_cls.__subclasses__()
+    xs = root_cls.__subclasses__()  # ALT? self.__class__.mro()[1].__subclasses__()
     seen = set(xs)
     add = seen.add
     append = xs.append

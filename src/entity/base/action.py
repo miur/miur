@@ -20,6 +20,7 @@ class Action(Golden[str]):
         sfn: Callable[[], Entities],
     ) -> None:
         super().__init__(name, parent)
+        # BET?(less indirection == directly assign): self.explore = sfn
         self._sfn = sfn
 
     # TEMP:FIXED:ERR: Cannot instantiate abstract class "Action" with abstract attribute "loci"
