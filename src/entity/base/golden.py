@@ -79,6 +79,8 @@ class Golden[T](InterpretableImpl):
         #     return f"`{loci}"
         return f"{type(self).__name__}({loci})"
 
+    # RENAME? .explore -> {.execute + .introspect}
+    #   COS: `Entity <is> `Action, and both are opaque
     ## ARCH:
     #  * on ERROR -> return [`ErrorEntry], mixed with regular entries
     #    >> if whole list ~can't be read~ -- it will result in empty list with error

@@ -32,6 +32,7 @@ class MiurAppNode(Golden[str]):
         import os
 
         from ...app import g_app
+        from ..discover import get_all_subclasses
         from ..gpt.pymemnode import PyMemRoot
         from .objaction import ObjAction
 
@@ -48,6 +49,9 @@ class MiurAppNode(Golden[str]):
             # NICE:IDEA: inof exposing each subsystem of !miur one-by-one,
             #   BET: directly expose whole "g_app" and *make its structure easy to access/navigate*
             #   i.e. it should look the same during programming and during navi()
+            ObjAction(
+                name="@*Entity", parent=self, fn=lambda: get_all_subclasses(Golden)
+            ),
             ObjAction(name="@env", parent=self, fn=lambda: os.environ),
             ObjAction(name="@g_app", parent=self, fn=lambda: vars(g_app)),
             ObjAction(name="@keybindings", parent=self, fn=lambda: g_app.keytableroot),

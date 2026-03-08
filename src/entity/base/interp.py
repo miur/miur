@@ -39,8 +39,21 @@ class InterpretableImpl:
             )
         return cls._rq_cache[cls]
 
+    # RENAME? _compatible_with BAD:(different notion): its != .creatable_from
+    # TODO: start hardcoding conversions, and then refactor commonality
+    # CASE: "compatible" on class level means:
+    #   ~ same `Accessor (automatic)
+    #   ~ same .handle and `BaseSystem [of Accessor] (automatic)
+    #   ~ we have embeeded conversion AccessorA(x).get_Accessor_B() (semi-automatic)
+    #   ~ we know/imported ext system which accepts .handle_B, derivable from .handle_A
+    #     = TextLinesProjectionSystem(FSAccessor(path, FileSystem(localhost)).read_file())  | OR: memview(...)
+    #     >> to make it "automatic", we should compare all FSAccessor API return types
+    #        over all known types `*System(...) accepts (i.e. parse typehint/signature)
+    # BUT: not all "files" are ELFFile
+    #   ~ i.e. per-instance checks will be returning None (unless they are *very* fast)
+    #   ~ and everything not PathLike will be glob-blacklisted by default
     @classmethod
-    def _compatible_with(cls, ent: object) -> bool | None:
+    def _creatable_from(cls, ent: object) -> bool | None:
         # CASE: structural "Poking": does ent have all attributes __init__ expects?
         # ALT:(prematch by typehints): tuple(signature(cls.__call__).parameters.values())[1].annotation
         attrs = cls._get_required_attrs()
@@ -65,10 +78,11 @@ class InterpretableImpl:
         tp = type(ent)
         if tp in cls._supported:
             return True
+        # TODO: glob "*" to blacklist everything which *isn't* a FSFile nor Path nor PathLike-str
         if any(c in cls._blacklist for c in tp.__mro__):
             return False
         try:
-            return cls._compatible_with(ent)
+            return cls._creatable_from(ent)
         except AttributeError, TypeError:
             # CASE: attr/type issues usually indicate "fundamental incompatibility"
             cls._blacklist.add(tp)
@@ -97,7 +111,10 @@ class InterpretableImpl:
 
     # RENAME? .coerce_to .reinterpret_as .try_cvt_to ?
     # BET?(overload): .interp_as()
-    def try_interp_as[T: Interpretable](self, target_cls: type[T]) -> T | ErrorEntry:
+    @final
+    def _lazy_try_interp_as[T: Interpretable](
+        self, target_cls: type[T]
+    ) -> T | ErrorEntry:
         from ..core.objaction import ObjAction, pyobj_to_actions
 
         # MAYBE: dif Lazy* UI color for known(True)=GREN vs unknown(None)=YELW vs failed()=RED
@@ -159,12 +176,13 @@ class InterpretableImpl:
             if sup is None:
                 deferred.append(subcls)
                 continue
-            yield self.try_interp_as(subcls)
+            # NOTE: it's somewhat confusing to have .name inof .type
+            yield self._lazy_try_interp_as(subcls)
 
         if deferred:
             # RENAME? _try_{possible,unknown}
             def _try_remaining() -> Entities:
-                return [self.try_interp_as(subcls) for subcls in deferred]
+                return [self._lazy_try_interp_as(subcls) for subcls in deferred]
 
             from ..core.objaction import ObjAction
 
