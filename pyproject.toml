@@ -60,6 +60,7 @@ members = ["pkg/*"]
 dev = [
   "bandit>=1.9.4",
   "basedpyright>=1.38.2",
+  "jurigged[develoop]>=0.6",
   "mypy>=1.19.1",
   "pylint>=4.0.5",
   "pytest>=9.0.2",

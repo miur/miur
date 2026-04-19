@@ -20,9 +20,10 @@ shopt -qs inherit_errexit lastpipe
 this=$(realpath -e "${BASH_SOURCE[0]:-$0}")
 readonly this here="${this%/*}" PATH="$HOME/.local/bin:$HOME/.cargo/bin:/usr/bin"
 readonly nm=${here##*/}
+readonly venvbin="$here/.venv/bin"
 
 declare -A opts=()
-while LC_COLLATE=C getopts 'AcClrt-:' o; do
+while LC_COLLATE=C getopts 'AcCjlrt-:' o; do
 case $o in :|'?') exit 2
 ;; A) exec /d/airy/ai/run -- "$here"  # "$@"
 ;; c) exec git clean -ndX -- ':!.venv'
@@ -30,6 +31,7 @@ case $o in :|'?') exit 2
   # WARN: remove .venv from :/.gitignore, orse ":/.venv/.gitignore" will force removal
   ## ALT: find "$here" -name .venv -prune -o \( -name __pycache__ -o -name .pytest_cache \) -exec rm -rf {} +
 ;; i) opts[install]=1
+;; j) opts[jurigged]=1
 ;; l) opts[lint]=1
 ;; r) opts[run]=1
 ;; t) opts[test]=1
@@ -76,7 +78,7 @@ if [[ ${opts[vent]:+x} || ! -d $here/.venv ]]; then
   uvs --all-packages --all-extras --group devall
   # OLD: uv sync --group devall
 
-elif [[ ${opts[install]:+x} ]] || [[ ! -x "$here/.venv/bin/miur" ]]; then
+elif [[ ${opts[install]:+x} ]] || [[ ! -x "$venvbin/miur" ]] || [[ ${opts[jurigged]:+x} && ! -x "$venvbin/jurigged" ]]; then
 
 # if [[ ${opts[install]:+x} ]] || ! command -v miur >/dev/null; then
   # OLD: uv tool install --editable .
@@ -85,7 +87,7 @@ elif [[ ${opts[install]:+x} ]] || [[ ! -x "$here/.venv/bin/miur" ]]; then
 
   # Force a full dev bootstrap/update without launching the app.
   uvs --all-packages --all-extras --group devall
-  exit 0
+  [[ ${opts[install]:+x} ]] && exit 0
 fi
 
 if [[ ${opts[lint]:+x} ]]; then
@@ -125,6 +127,12 @@ if [[ ${opts[test]:+x} ]]; then
 fi
 
 if [[ ${opts[run]:+x} ]]; then
-  # uvr miur "$@"
-  exec "$here/.venv/bin/miur" "$@"
+  if [[ ${opts[jurigged]:+x} ]]; then
+    exec "$venvbin/jurigged" -v -w "$here/pkg" -m miurapp "$@"
+  else
+    ## FAIL? seems doesn't work with uv/workspace
+    #   SEE: https://github.com/astral-sh/uv/issues/13095
+    # uvr miur "$@"
+    exec "$venvbin/miur" "$@"
+  fi
 fi
