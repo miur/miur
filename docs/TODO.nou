@@ -1,0 +1,48 @@
+%%%%% TODO
+
+[_] Define the minimal entity schema
+  Decide which fields are fixed-width and always resident.
+  Separate stable identity from cache slot location.
+
+[_] Define relation storage
+  Pick the representation for child edges and high-fanout adjacency.
+  Require lazy loading for very large child sets.
+
+[_] Implement the working-set cache
+  Add:
+  - entity ID -> slot mapping
+  - free-slot tracking
+  - recency / eviction bookkeeping
+  - eviction hooks for discard vs persist
+
+[_] Define the accessor protocol
+  Specify how a backend returns graph frames, relation slices, previews, and invalidation signals.
+
+[_] Implement the first accessor
+  Start with filesystem-backed entities and metadata.
+  Keep it small enough to validate the protocol before adding other domains.
+
+[_] Define command and operation types
+  Navigation, expansion, filtering, selection, preview, and mutation commands should be serializable.
+
+[_] Build the core dispatch loop
+  Centralize command handling, cache mutation, and refresh/invalidation flow.
+
+[_] Build a minimal TUI
+  One cursor, one list-oriented view, framed rendering, and command dispatch are enough for the first pass.
+
+[_] Add preview workers
+  Keep expensive preview generation out of the critical navigation path.
+
+[_] Add persistence for unique data
+  Start with annotations and durable overlays.
+  Leave regeneratable graph fragments out of the persistence path.
+
+[_] Define memory targets and tests
+  Enforce the intended operating envelope:
+  - typical working set under ~200 MiB
+  - hard ceiling under ~8 GiB
+  Add benchmarks for entity load, relation expansion, eviction, and refill.
+
+[_] Audit legacy material
+  Extract useful concepts from `legacy/` without inheriting obsolete implementation constraints.

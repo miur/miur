@@ -1,0 +1,131 @@
+%%%%% Arch
+miur is an explorer-first system for navigating heterogeneous resources as a graph.
+The architecture should keep UI concerns, graph state, backend access, and persistence separate.
+
+
+%%%% Model
+* Entity
+  A compact record identified by a stable handle.
+  It may represent a filesystem path, generated text, process output, annotation, workflow node, URL, etc.
+* Relation
+  Directed links between entities.
+  Fanout can be small in the common case and very large in rare cases.
+* Working set
+  Only a small slice of the full graph is expected to stay resident in memory.
+* Operation
+  A serializable command applied against the graph or a reflected view of it.
+
+
+%%%% Layers
+% UI
+  Concrete frontend: TUI first, but GUI/web/CLI/test frontends remain possible.
+  Responsibilities:
+  - render widgets and layouts
+  - translate input events into commands
+  - keep frontend-specific caches only
+  UI should be replaceable without redefining graph semantics.
+
+% View
+  A projection of graph state for presentation.
+  Responsibilities:
+  - widget layout
+  - framing and slicing of visible items
+  - attachment of widgets to cursor state or previews
+  A view should be reconstructable after UI restart.
+
+% Cursor
+  A navigation-centered reflection of the graph.
+  Responsibilities:
+  - current focus and selection
+  - scroll/frame state for long lists
+  - local sorting/filtering masks
+  - pending visual operations
+  Cursor state should minimize repeated backend access during navigation.
+
+% Core / DOM
+  Shared graph state and command dispatch.
+  Responsibilities:
+  - host the materialized graph working set
+  - serve frames/slices to cursors and views
+  - coordinate refresh, invalidation, and updates
+  - mediate between UI-side commands and backend accessors
+
+% Accessor
+  Backend adapter for one data domain.
+  Examples: filesystem, database, process output, remote source, semantic overlay.
+  Responsibilities:
+  - expose entities through a unified protocol
+  - load or regenerate graph fragments on demand
+  - convert backend-native data into graph frames
+
+% Preview
+  Optional side-channel for expensive secondary representations.
+  Examples: image preview, PDF render, content summary.
+  Preview work should be asynchronous and cacheable.
+
+
+%%%% Data Strategy
+The project background points to a compact array-oriented layout for active entities.
+The main point is not a custom allocator, but bounded materialization.
+
+Recommended shape:
+* compact columns or equivalent fixed-width storage for active entity fields,
+* adjacency stored in a contiguous relation structure,
+* ID-to-slot mapping for resident entities,
+* cache metadata separate from payload arrays.
+
+The graph in memory is not the source of truth for every entity ever seen.
+Instead:
+* hot data stays resident,
+* regeneratable data may be dropped,
+* unique data must be persisted,
+* large relation sets should be loaded lazily and preferably in slices.
+
+
+%%%% Cache Lifecycle
+The dominant architectural problem is lifecycle management:
+* cache miss -> load or regenerate entity,
+* attach entity to a free slot,
+* mark recency / usage,
+* evict when limits are reached,
+* on eviction:
+  - discard derived data if reproducible,
+  - persist unique data if needed,
+  - release the slot back to the pool.
+
+This implies:
+* stable entity IDs independent of slot position,
+* slot reuse inside the active working set,
+* no requirement that every entity remain continuously resident.
+
+
+%%%% Concurrency
+The legacy notes favor a single-threaded async core first, with controlled offloading for slow work.
+
+Practical direction:
+* keep graph state mutation centralized,
+* use async boundaries for I/O,
+* use worker threads or processes for blocking or CPU-heavy preview/generation tasks,
+* treat refresh and invalidation as explicit signals rather than implicit shared-state mutation.
+
+
+%%%% Persistence
+Persistence is for data durability and cache recovery, not for replacing the graph abstraction.
+
+Persist at least:
+* unique annotations and overlays,
+* durable handles and metadata,
+* optional cached previews,
+* optional session/view state.
+
+Do not require persistence for every regeneratable fragment.
+The architecture should support lazy refill after restart.
+
+
+%%%% Near-Term Interpretation
+For the current repository state, the most defensible near-term implementation path is:
+* define the entity and relation model,
+* build one core graph/cache service,
+* expose one accessor family first, likely filesystem-oriented,
+* add a minimal TUI that consumes framed graph slices,
+* keep previews and persistence modular.
