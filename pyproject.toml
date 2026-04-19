@@ -1,0 +1,209 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+# requires = ["setuptools>=68"]
+# build-backend = "setuptools.build_meta"
+
+[project]
+name = "miur"
+version = "1.0.0"
+description = "Explorer-first graph workbench for navigating heterogeneous resources through stable handles, serializable ops, and streaming views."
+readme = "README.rst"
+requires-python = ">=3.14"
+license = { text = "GPL-3.0-only" }
+keywords = ["explorer", "graph", "tui", "workflow", "navigation"]
+classifiers = [
+  # "Development Status :: 5 - Production/Stable",
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console :: Curses",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+  # "Operating System :: OS Independent",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3.14",
+  "Programming Language :: Python :: Implementation :: CPython",
+  "Topic :: Utilities",
+  "Typing :: Typed",
+]
+dependencies = []
+
+# Test core only::
+#   $ uv sync
+# Test with GUI features::
+#  ~$ uv sync --all-extras
+#  ~$ uv sync --extra lmdb,media
+#  ~$ uv sync --group devall
+[project.optional-dependencies]
+lmdb = ["lmdb>=1.7"]
+media = [
+  "Pillow>=10.4",
+  "PyMuPDF>=1.26",
+]
+all = ["miur[lmdb,media]"]  # RENAME? full,complete,std
+default = ["miur[lmdb]"]
+
+# [project.scripts]
+# miur = "miur.tui.__main__:main"
+# miur-demo = "miur.demo_cli:main"
+
+[dependency-groups]
+dev = [
+  "bandit>=1.9.4",
+  "basedpyright>=1.38.2",
+  "mypy>=1.19.1",
+  "pylint>=4.0.5",
+  "pytest>=9.0.2",
+  "pytest-cov>=7.0.0",
+  "pytest-durations>=1.6.2",
+  "pytest-profiling>=1.8.1",
+  "pytest-split>=0.11.0",
+  "pytest-timeout>=2.4.0",
+  "pytest-xdist>=3.8.0",
+  "ruff>=0.15.6",
+]
+devall = [
+  { include-group = "dev" },
+  "miur[all]",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/miur"]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.uv]
+default-groups = ["dev"]
+
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+## This sets the number of pytest-durations shown to 0 by default
+# OR: addopts = "-p no:pytest-durations"
+# OR: --html=report.html --self-contained-html
+# addopts = "--durations=0"
+# ALSO: --fail-slow=8.0
+addopts = "--strict-markers -m 'not slow' -p no:pytest-durations"
+markers = ["slow: marks tests as slow"]
+xfail_strict = true
+
+
+[tool.coverage.run]
+source = ["miur"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+
+[tool.ruff]
+# ruff auto-detects .venv, nothing needed
+target-version = "py314"
+line-length = 88
+src = ["src", "tests"]
+extend-exclude = ["src/legacy"]
+
+[tool.ruff.lint]
+# Enable Pycodestyle (E), Pyflakes (F), and Isort (I)
+select = ["E", "F", "I", "PL"]
+# REM? extend-select = [ "I" ]
+ignore = [
+  # Ruff formatter does not currently support a separate 'comment-length'.
+  # By default, it tries not to reflow comments unless they are docstrings.
+  "E501",     # <(comments>=112 > 88): ignore 'line-too-long' so Ruff won't nag
+  "E741",     # <(for l in labs/lines): ambiguous-variable-name (l, I, O)
+  "E402",  # <(import after __future__ and doc): Module level import not at top of file
+  "PLC0415",  # <(import in functions): `import` should be at the top-level of a file
+  "PLR1730",  # <(keep less reassignments): `if var < 0: var=0` inof `var=max(var,0)`
+  "PLR0911",  # TEMP: Too many return statements (8 > 6)
+  "PLR0912",  # TEMP: Too many branches (15 > 12)
+  "PLR0913",  # TEMP: Too many arguments in function definition (8 > 5)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["PLR2004"]  # Ignore magic value comparisons in all test files
+
+[tool.ruff.lint.isort]
+force-single-line = false
+split-on-trailing-comma = true
+
+
+[tool.pylint.main]
+py-version = "3.14"
+ignore-paths = ["src/legacy/.*"]
+ignore = ["t", "alt", "doc", "&", "#", "pkg", "_try", ".git", ".reuse", ".venv"]
+ignore-patterns = ["^[_#&].*"]
+
+[tool.pylint.messages_control]
+disable = [
+    "consider-using-f-string",
+    "missing-module-docstring",
+    "missing-class-docstring",
+    "missing-function-docstring",
+    "import-outside-toplevel",
+    "too-few-public-methods",
+    "invalid-name",
+    "broad-exception-caught",
+]
+
+[tool.pylint.miscellaneous]
+notes = ["[_]", "[!]"]
+
+[tool.pylint.basic]
+good-names-rgxs = "^[a-z][a-z0-9]?$"
+
+[tool.pylint.format]
+expected-line-ending-format = "LF"
+ignore-long-lines = "^\\s*(#.*\\s+)?https?://\\S+$"
+max-line-length = 112
+
+
+[tool.mypy]
+# Paths (Note: TOML doesn't support $MYPY_CONFIG_FILE_DIR; use relative paths)
+cache_dir = ".mypy_cache"
+python_executable = ".venv/bin/python"
+python_version = "3.14"
+platform = "linux"
+files = ["src/miur", "tests"]
+# REM? live_mode = false
+exclude = ["^src/legacy/"]  # [".git", ".venv", "out"]
+# exclude = '''(?x)(
+#     ^\.(git|reuse|venv)(/|$)            # hidden top-folders
+#
+#     |^(pkg|_try)(/|$)                   # top-folders
+#     |(^|/)(t|alt|doc|[_#&][^/]*)(/|$)   # refs in any folder
+# )'''
+warn_unused_configs = true
+show_error_codes = true
+show_column_numbers = true
+pretty = true
+ignore_missing_imports = true
+# Strictness settings
+strict = true
+no_implicit_reexport = true
+disallow_untyped_calls = true
+warn_return_any = true
+strict_optional = true
+strict_equality = true
+warn_no_return = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+disallow_untyped_defs = true
+check_untyped_defs = true
+# Features
+enable_error_code = ["explicit-override"]
+
+
+[tool.pyright]
+pythonVersion = "3.14"
+typeCheckingMode = "strict"
+include = ["src/miur", "tests"]
+exclude = ["src/legacy"]
+extraPaths = ["src"]
+venvPath = "."
+venv = ".venv"
+# FIXED: it ignores TYPE_CHECKING forward imports
+reportImportCycles = "none"

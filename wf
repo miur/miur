@@ -1,0 +1,108 @@
+#!/usr/bin/env bash
+
+if (return 0 2>/dev/null); then
+  [[ -v __app ]] && return 2
+  __app=$(realpath -e "${BASH_SOURCE[0]:-$0}") || return
+  # builtin source "${__app%/*}/aliases.sh" "$__app" "$@" || return
+  unset __app
+  return 0
+fi
+
+set -o errexit -o errtrace -o functrace -o noclobber -o noglob -o nounset -o pipefail
+shopt -qs inherit_errexit lastpipe
+[[ ${1-} == -x ]] && shift && set -x && xt=${-//[^x]}
+
+this=$(realpath -e "${BASH_SOURCE[0]:-$0}")
+readonly this here="${this%/*}" PATH="$HOME/.local/bin:$HOME/.cargo/bin:/usr/bin"
+readonly nm=${here##*/}
+
+declare -A opts=()
+while LC_COLLATE=C getopts 'AcClrt-:' o; do
+case $o in :|'?') exit 2
+;; A) exec /d/airy/ai/run -- "$here"  # "$@"
+;; c) exec git clean -ndX -- ':!.venv'
+;; C) exec git clean -fdX -- ':!.venv'
+  # WARN: remove .venv from :/.gitignore, orse ":/.venv/.gitignore" will force removal
+  ## ALT: find "$here" -name .venv -prune -o \( -name __pycache__ -o -name .pytest_cache \) -exec rm -rf {} +
+;; i) opts[install]=1
+;; l) opts[lint]=1
+;; r) opts[run]=1
+;; t) opts[test]=1
+;; v) opts[vent]=1
+;; x) set -x && xt=${-//[^x]}
+esac; ((rc=$?)) && exit $rc; done; shift $((OPTIND-1)); unset o
+[[ ${opts[@]:+x} ]] || opts[run]=1
+
+if ! command -v uv >/dev/null; then
+  echo "ERROR: 'uv' not found. Install it first:"
+  echo "  pacman -S uv  / apt install uv  / brew install uv  / pipx install uv"
+  exit 1
+fi
+
+# NOTE: hardlinks won't work if repo cloned on different partition than $HOME
+[[ "$(stat -c "%d" "${0%/*}/..")" = "$(stat -c "%d" "$HOME")" ]] || export UV_LINK_MODE=copy
+uvr(){ uv ${xt:+-v} run --project "$here" "$@"; }
+
+
+if [[ ${opts[vent]:+x} || ! -d $here/.venv ]]; then
+  ## Bootstrap
+  ## INFO: VSCode/PyCharm auto-detect .venv in project root.
+  # uv venv --python 3.14
+  ## ALT: $ uv add --dev pytest pytest-cov ruff basedpyright mypy pylint
+  # uv sync --group dev
+  # uv lock
+
+  # Test core only::
+  #   $ uv sync
+  # Test with GUI features::
+  #  ~$ uv sync --all-extras
+  #  ~$ uv sync --extra lmdb,media
+  #  ~$ uv sync --group devall
+  uv sync --group devall
+fi
+
+if [[ ${opts[install]:+x} ]] || ! command -v miur >/dev/null; then
+  uv tool install --editable .
+  uv tool upgrade miur
+  echo "Done. 'miur' command available system-wide."
+fi
+
+if [[ ${opts[lint]:+x} ]]; then
+  uvr ruff check .
+  uvr basedpyright
+  uvr bandit .
+  # uvr mypy .
+  # uvr pylint .
+fi
+
+
+if [[ ${opts[test]:+x} ]]; then
+  uvr pytest -q --tb=short "$@"
+  ## ADD: @pytest.mark.slow
+  # List the top 10 slowest tests:
+  # pytest --durations=10
+  # List all tests taking longer than 1 second:
+  # pytest --durations=0 --durations-min=1.0
+  # Show everything (including very fast tests):
+  # pytest --durations=0 -vv
+
+  # DEP: pytest-profiling
+  # pytest --profile
+  # Visualize: pytest --profile-svg (requires gprof2dot and dot) to see a "heat map" of your code's performance.
+
+  # DEP: pytest-durations
+  # provides a cleaner breakdown of fixture overhead specifically.
+  # pytest --pytest-durations=20
+
+  # ## SUM: run all tests in parallel
+  # # DEP: pytest-xdist
+  # uv run pytest -q -n 4
+  #
+  # ## SUM: run only time-balanced part of testsuite
+  # # DEP: pytest-split
+  # uv run pytest -q --store-durations --splits 3 --group 1
+fi
+
+if [[ ${opts[run]:+x} ]]; then
+  uvr miur "$@"
+fi

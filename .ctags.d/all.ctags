@@ -1,11 +1,11 @@
 # ALT:(hide dangling symlinks): $ find . -path "./&" -prune -o -print | ctags -L -
 # DEBUG: $ ctags --_echo ./.ctags.d/all.ctags
---exclude=&*/
---exclude=/.git/
---exclude=.mypy_cache/
---exclude=.venv*/
---exclude=_try/
---exclude=/LICENSES/
+--exclude=&*
+--exclude=/.git
+--exclude=.mypy_cache
+--exclude=.venv*
+# --exclude=_try
+--exclude=LICENSES
 --exclude=_obsolete
 --exclude=_unused
 

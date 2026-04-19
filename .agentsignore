@@ -1,0 +1,56 @@
+# .agentsignore - Optimized for Python 3.14 + Agents
+# --------------------------------------------------
+
+## 0. Local-only reference materials, temporary cloned repos, etc.
+# &*/
+
+# 1. CORE AI AGENT INFRASTRUCTURE (Prevent Recursive Loops)
+# .agents/*
+# !.agents/README.md
+# !.agents/skills/
+# !.agents/skills/**
+# .codex/
+# .opencode/
+# .claude/
+# .github/agents/
+
+
+# 2. PYTHON 3.14 RUNTIME ARTIFACTS
+__pycache__/
+*.py[codz]
+*$py.class
+*.so
+.python-version
+# New: Subinterpreter state dumps (PEP 734)
+.interpreters/
+# New: JIT artifacts if using the experimental 3.14 JIT
+.jit_cache/
+
+
+# 3. VIRTUAL ENVIRONMENTS & PACKAGE MANAGERS
+# Standardized on 'uv' for 2026
+.venv/
+.uv/
+venv/
+
+
+# 4. TESTING & ANALYSIS (High Token Bloat)
+.pytest_cache/
+.coverage
+htmlcov/
+.ruff_cache/
+.mypy_cache/
+.tox/
+.nox/
+.ropeproject/
+
+
+# 5. DATA & SECRETS
+.env
+*.db
+*.sqlite3
+# instance/
+
+
+# cached ZSH scripts
+*.zwc

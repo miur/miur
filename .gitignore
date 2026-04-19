@@ -1,15 +1,58 @@
-## Python project
-/.mypy_cache/
-/.venv/
-__pycache__/
+## .gitignore - Python 3.14 Layout
+# -------------------------------
 
+## [0] Local-only reference materials, temporary cloned repos, etc.
+&*/
+
+
+## [1] Python 3.14 Standard
+__pycache__/
+# *.py[cod]
+# *$py.class
+# *.so
+## New to 3.14: Template string literal artifacts (t-strings)
+# *.tstr.cache
+# build/
+# dist/
+*.egg-info/
+
+
+## [2] Modern Tooling (uv / Ruff)
+/.venv/
+# uv.lock
+/.ruff_cache/
+/.mypy_cache/
+
+
+## [3] AI Agent State (2026 Spec)
+## DO NOT IGNORE the skill definitions
+# !.agents/skills/
+# !.agents/skills/**/SKILL.md
+
+## DO IGNORE the volatile session data
+# .codex/sessions/
+# .opencode/state/
+# .claude/history/
+# .claude/tmp/
+## agent_working_dir/
+## *.agent.log
+
+
+## [4] Testing & Docs
+/.pytest_cache/
+/.coverage
+/.test_durations
+# htmlcov/
+# site/
+# docs/_build/
+
+
+## [5] IDEs
+# .vscode/
+# .idea/
+# *.swp
+/.tags
 # project-specific index
 /.ropeproject/
-
-.tags
-
 # cached ZSH scripts
 *.zwc
-
-## Local-only reference materials, temporary cloned repos, etc.
-&*/
