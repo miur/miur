@@ -1,0 +1,18 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "miursys"
+version = "0.1.0"
+description = "System protocol, system registry surface, and in-package systems for miur."
+readme = "README.rst"
+requires-python = ">=3.14"
+license = { text = "GPL-3.0-only" }
+dependencies = ["miurcore"]
+
+[tool.uv.sources]
+miurcore = { workspace = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/miursys"]

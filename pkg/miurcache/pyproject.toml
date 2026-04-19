@@ -1,0 +1,23 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+# requires = ["setuptools>=68"]
+# build-backend = "setuptools.build_meta"
+
+[project]
+name = "miurcache"
+version = "0.1.0"
+description = "Resident DOM/cache state and persistence boundary for miur."
+readme = "README.rst"
+requires-python = ">=3.14"
+license = { text = "GPL-3.0-only" }
+dependencies = ["miurcore"]
+
+[project.optional-dependencies]
+lmdb = ["lmdb>=1.7"]
+
+[tool.uv.sources]
+miurcore = { workspace = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/miurcache"]

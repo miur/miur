@@ -1,0 +1,19 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "miurdemo"
+version = "0.1.0"
+description = "Demonstration scenarios and smoke-entry points for the miur workspace."
+readme = "README.rst"
+requires-python = ">=3.14"
+license = { text = "GPL-3.0-only" }
+dependencies = ["miurapp", "miurcore"]
+
+[tool.uv.sources]
+miurapp = { workspace = true }
+miurcore = { workspace = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/miurdemo"]

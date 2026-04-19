@@ -5,15 +5,21 @@ The architecture should keep UI concerns, graph state, backend access, and persi
 
 %%%% Model
 * Entity
-  A compact record identified by a stable handle.
+  A compact record identified by:
+  - system name
+  - opaque handle interpreted only by that system
   It may represent a filesystem path, generated text, process output, annotation, workflow node, URL, etc.
+* System
+  Owns interpretation of entity handles and the operations applicable to entities of that system.
+  Systems provide the semantic frontend through which the rest of the program talks to entities.
 * Relation
   Directed links between entities.
   Fanout can be small in the common case and very large in rare cases.
 * Working set
   Only a small slice of the full graph is expected to stay resident in memory.
 * Operation
-  A serializable command applied against the graph or a reflected view of it.
+  Usually a system-defined operation applied to an entity.
+  There should be very few commands outside system-owned ops.
 
 
 %%%% Layers
@@ -43,20 +49,22 @@ The architecture should keep UI concerns, graph state, backend access, and persi
   Cursor state should minimize repeated backend access during navigation.
 
 % Core / DOM
-  Shared graph state and command dispatch.
+  Shared graph state and minimal app-level wiring.
   Responsibilities:
   - host the materialized graph working set
   - serve frames/slices to cursors and views
   - coordinate refresh, invalidation, and updates
-  - mediate between UI-side commands and backend accessors
+  - stay thin where behavior properly belongs to systems
 
-% Accessor
-  Backend adapter for one data domain.
+% System
+  Semantic owner for one data domain.
   Examples: filesystem, database, process output, remote source, semantic overlay.
   Responsibilities:
-  - expose entities through a unified protocol
+  - interpret opaque entity handles
+  - define and execute entity operations
   - load or regenerate graph fragments on demand
   - convert backend-native data into graph frames
+  Concrete systems may live as submodules under *miursys*; local filesystem currently does.
 
 % Preview
   Optional side-channel for expensive secondary representations.
@@ -94,7 +102,7 @@ The dominant architectural problem is lifecycle management:
   - release the slot back to the pool.
 
 This implies:
-* stable entity IDs independent of slot position,
+* stable entity identity independent of slot position,
 * slot reuse inside the active working set,
 * no requirement that every entity remain continuously resident.
 
@@ -124,8 +132,8 @@ The architecture should support lazy refill after restart.
 
 %%%% Near-Term Interpretation
 For the current repository state, the most defensible near-term implementation path is:
-* define the entity and relation model,
-* build one core graph/cache service,
-* expose one accessor family first, likely filesystem-oriented,
+* define entity identity as system plus opaque handle,
+* define the system protocol and one concrete system first, likely filesystem-oriented,
+* build one core graph/cache service around that system model,
 * add a minimal TUI that consumes framed graph slices,
-* keep previews and persistence modular.
+* keep app-level commands thin and previews/persistence modular.

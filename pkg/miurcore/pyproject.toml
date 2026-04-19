@@ -1,0 +1,15 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "miurcore"
+version = "0.1.0"
+description = "Core entity and system vocabulary for the miur workspace."
+readme = "README.rst"
+requires-python = ">=3.14"
+license = { text = "GPL-3.0-only" }
+dependencies = []
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/miurcore"]

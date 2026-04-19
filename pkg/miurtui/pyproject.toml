@@ -1,0 +1,19 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "miurtui"
+version = "0.1.0"
+description = "Terminal frontend and input translation for the miur workspace."
+readme = "README.rst"
+requires-python = ">=3.14"
+license = { text = "GPL-3.0-only" }
+dependencies = ["miurcore", "miurview"]
+
+[tool.uv.sources]
+miurcore = { workspace = true }
+miurview = { workspace = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/miurtui"]

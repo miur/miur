@@ -1,0 +1,18 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "miurview"
+version = "0.1.0"
+description = "View and cursor projection types for the miur workspace."
+readme = "README.rst"
+requires-python = ">=3.14"
+license = { text = "GPL-3.0-only" }
+dependencies = ["miurcore"]
+
+[tool.uv.sources]
+miurcore = { workspace = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/miurview"]

@@ -1,8 +1,15 @@
 %%%%% TODO
 
 [_] Define the minimal entity schema
+  Include:
+  - system identifier
+  - opaque handle
   Decide which fields are fixed-width and always resident.
   Separate stable identity from cache slot location.
+
+[_] Define the system protocol
+  Systems interpret entity handles and own applicable operations.
+  Keep non-system commands to a minimum.
 
 [_] Define relation storage
   Pick the representation for child edges and high-fanout adjacency.
@@ -15,15 +22,17 @@
   - recency / eviction bookkeeping
   - eviction hooks for discard vs persist
 
-[_] Define the accessor protocol
-  Specify how a backend returns graph frames, relation slices, previews, and invalidation signals.
+[_] Define the common system frontend
+  Specify how the rest of miur resolves a system, materializes entities, enumerates relations, and invokes ops.
 
-[_] Implement the first accessor
-  Start with filesystem-backed entities and metadata.
+[_] Implement the first concrete system
+  Start with the ``miursys.localfs`` filesystem-backed system.
   Keep it small enough to validate the protocol before adding other domains.
 
 [_] Define command and operation types
-  Navigation, expansion, filtering, selection, preview, and mutation commands should be serializable.
+  Separate:
+  - system-owned entity operations
+  - the very small set of app-level commands outside those ops
 
 [_] Build the core dispatch loop
   Centralize command handling, cache mutation, and refresh/invalidation flow.

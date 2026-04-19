@@ -1,9 +1,3 @@
-[build-system]
-requires = ["hatchling>=1.27"]
-build-backend = "hatchling.build"
-# requires = ["setuptools>=68"]
-# build-backend = "setuptools.build_meta"
-
 [project]
 name = "miur"
 version = "1.0.0"
@@ -25,26 +19,42 @@ classifiers = [
   "Topic :: Utilities",
   "Typing :: Typed",
 ]
-dependencies = []
+dependencies = [
+  "miurapp",
+  "miurcache",
+  "miurcore",
+  "miursys",
+  "miurtui",
+  "miurview",
+]
 
-# Test core only::
-#   $ uv sync
-# Test with GUI features::
-#  ~$ uv sync --all-extras
-#  ~$ uv sync --extra lmdb,media
-#  ~$ uv sync --group devall
 [project.optional-dependencies]
 lmdb = ["lmdb>=1.7"]
 media = [
   "Pillow>=10.4",
   "PyMuPDF>=1.26",
 ]
-all = ["miur[lmdb,media]"]  # RENAME? full,complete,std
+demo = ["miurdemo"]
+all = ["miur[lmdb,media,demo]"]  # RENAME? full,complete,std
 default = ["miur[lmdb]"]
 
+# Root is a workspace coordinator; executable entry points should live in member packages.
+#   ALT:SEE: https://github.com/astral-sh/uv/issues/13095
 # [project.scripts]
-# miur = "miur.tui.__main__:main"
-# miur-demo = "miur.demo_cli:main"
+# miur = "miurapp.__main__:main"
+# miur-demo = "miurdemo.__main__:main"
+
+[tool.uv.sources]
+miurapp = { workspace = true }
+miurcache = { workspace = true }
+miurcore = { workspace = true }
+miurdemo = { workspace = true }
+miursys = { workspace = true }
+miurtui = { workspace = true }
+miurview = { workspace = true }
+
+[tool.uv.workspace]
+members = ["pkg/*"]
 
 [dependency-groups]
 dev = [
@@ -66,15 +76,6 @@ devall = [
   "miur[all]",
 ]
 
-[tool.hatch.build.targets.wheel]
-packages = ["src/miur"]
-
-[tool.setuptools]
-package-dir = {"" = "src"}
-
-[tool.setuptools.packages.find]
-where = ["src"]
-
 [tool.uv]
 default-groups = ["dev"]
 
@@ -92,7 +93,15 @@ xfail_strict = true
 
 
 [tool.coverage.run]
-source = ["miur"]
+source = [
+  "miurapp",
+  "miurcache",
+  "miurcore",
+  "miurdemo",
+  "miursys",
+  "miurtui",
+  "miurview",
+]
 branch = true
 
 [tool.coverage.report]
@@ -103,8 +112,8 @@ skip_covered = true
 # ruff auto-detects .venv, nothing needed
 target-version = "py314"
 line-length = 88
-src = ["src", "tests"]
-extend-exclude = ["src/legacy"]
+src = ["pkg"]  # ,"tests"
+extend-exclude = ["legacy"]
 
 [tool.ruff.lint]
 # Enable Pycodestyle (E), Pyflakes (F), and Isort (I)
@@ -133,7 +142,7 @@ split-on-trailing-comma = true
 
 [tool.pylint.main]
 py-version = "3.14"
-ignore-paths = ["src/legacy/.*"]
+ignore-paths = ["legacy/.*"]
 ignore = ["t", "alt", "doc", "&", "#", "pkg", "_try", ".git", ".reuse", ".venv"]
 ignore-patterns = ["^[_#&].*"]
 
@@ -167,9 +176,9 @@ cache_dir = ".mypy_cache"
 python_executable = ".venv/bin/python"
 python_version = "3.14"
 platform = "linux"
-files = ["src/miur", "tests"]
+files = ["pkg"]  # ,"tests"
 # REM? live_mode = false
-exclude = ["^src/legacy/"]  # [".git", ".venv", "out"]
+exclude = ["^legacy/"]  # [".git", ".venv", "out"]
 # exclude = '''(?x)(
 #     ^\.(git|reuse|venv)(/|$)            # hidden top-folders
 #
@@ -200,9 +209,9 @@ enable_error_code = ["explicit-override"]
 [tool.pyright]
 pythonVersion = "3.14"
 typeCheckingMode = "strict"
-include = ["src/miur", "tests"]
-exclude = ["src/legacy"]
-extraPaths = ["src"]
+include = ["pkg"]  # ,"tests"
+exclude = ["legacy"]
+extraPaths = ["pkg"]
 venvPath = "."
 venv = ".venv"
 # FIXED: it ignores TYPE_CHECKING forward imports
