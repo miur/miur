@@ -3,8 +3,13 @@
 if (return 0 2>/dev/null); then
   [[ -v __app ]] && return 2
   __app=$(realpath -e "${BASH_SOURCE[0]:-$0}") || return
+  __here=${__app%/*}
+  if [[ -d $__here/.venv/bin ]]; then
+    export PATH="$__here/.venv/bin:$PATH"
+    # export VIRTUAL_ENV="$__here/.venv"
+  fi
   # builtin source "${__app%/*}/aliases.sh" "$__app" "$@" || return
-  unset __app
+  unset __app __here
   return 0
 fi
 
@@ -42,6 +47,7 @@ fi
 # NOTE: hardlinks won't work if repo cloned on different partition than $HOME
 [[ "$(stat -c "%d" "${0%/*}/..")" = "$(stat -c "%d" "$HOME")" ]] || export UV_LINK_MODE=copy
 uvr(){ uv ${xt:+-v} run --project "$here" "$@"; }
+uvs(){ uv ${xt:+-v} sync --project "$here" "$@"; }
 
 
 if [[ ${opts[vent]:+x} || ! -d $here/.venv ]]; then
@@ -58,26 +64,41 @@ if [[ ${opts[vent]:+x} || ! -d $here/.venv ]]; then
   #  ~$ uv sync --all-extras
   #  ~$ uv sync --extra lmdb,media
   #  ~$ uv sync --group devall
-  uv sync --group devall
-fi
 
-if [[ ${opts[install]:+x} ]] || ! command -v miur >/dev/null; then
-  uv tool install --editable .
-  uv tool upgrade miur
-  echo "Done. 'miur' command available system-wide."
+  # Workspace bootstrap for development:
+  # * create/update the shared .venv
+  # * install all workspace members as editable packages
+  # * create package entry points inside .venv/bin
+  # * include all extras and dev tooling
+  #
+  # REF: https://docs.astral.sh/uv/concepts/projects/workspaces/
+  # REF: https://docs.astral.sh/uv/concepts/projects/sync/
+  uvs --all-packages --all-extras --group devall
+  # OLD: uv sync --group devall
+
+elif [[ ${opts[install]:+x} ]] || [[ ! -x "$here/.venv/bin/miur" ]]; then
+
+# if [[ ${opts[install]:+x} ]] || ! command -v miur >/dev/null; then
+  # OLD: uv tool install --editable .
+  # uv tool upgrade miur
+  # echo "Done. 'miur' command available system-wide."
+
+  # Force a full dev bootstrap/update without launching the app.
+  uvs --all-packages --all-extras --group devall
+  exit 0
 fi
 
 if [[ ${opts[lint]:+x} ]]; then
-  uvr ruff check .
-  uvr basedpyright
-  uvr bandit .
+  uvr --all-packages ruff check .
+  uvr --all-packages basedpyright
+  uvr --all-packages bandit .
   # uvr mypy .
   # uvr pylint .
 fi
 
 
 if [[ ${opts[test]:+x} ]]; then
-  uvr pytest -q --tb=short "$@"
+  uvr --all-packages pytest -q --tb=short "$@"
   ## ADD: @pytest.mark.slow
   # List the top 10 slowest tests:
   # pytest --durations=10
@@ -104,5 +125,6 @@ if [[ ${opts[test]:+x} ]]; then
 fi
 
 if [[ ${opts[run]:+x} ]]; then
-  uvr miur "$@"
+  # uvr miur "$@"
+  exec "$here/.venv/bin/miur" "$@"
 fi

@@ -11,6 +11,9 @@ requires-python = ">=3.14"
 license = { text = "GPL-3.0-only" }
 dependencies = ["miurapp", "miurcore"]
 
+[project.scripts]
+miur-demo = "miurdemo.__main__:main"
+
 [tool.uv.sources]
 miurapp = { workspace = true }
 miurcore = { workspace = true }
