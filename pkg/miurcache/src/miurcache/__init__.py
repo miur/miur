@@ -4,6 +4,9 @@ from dataclasses import dataclass
 
 from miurcore import Entity
 
+from .resident import ResidentEntity, ResidentGraphCache, SpillStore
+from .store import PackedAdjacency, PackedEntityColumns
+
 
 @dataclass(frozen=True, slots=True)
 class CacheSlot:
@@ -13,4 +16,11 @@ class CacheSlot:
     slot: int
 
 
-__all__ = ["CacheSlot"]
+__all__ = [
+    "CacheSlot",
+    "PackedAdjacency",
+    "PackedEntityColumns",
+    "ResidentEntity",
+    "ResidentGraphCache",
+    "SpillStore",
+]
