@@ -29,6 +29,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# NOTE: use "ec" (EntityCache) or "dc" (DataCache) as global var name
+# mchpy = ...  # USAGE:(switch bw cext/py): $ pip install .[mchpy]
+# mchcx = ...
 lmdb = ["lmdb>=1.7"]
 media = [
   "Pillow>=10.4",
@@ -47,6 +50,9 @@ default = ["miur[lmdb]"]
 [tool.uv.sources]
 miurapp = { workspace = true }
 miurcache = { workspace = true }
+# OR: miurcache-cx = { path = "pkg/miurcache-cx" }
+miurcache-cx = { workspace = true }
+miurcache-py = { workspace = true }
 miurcore = { workspace = true }
 miurdemo = { workspace = true }
 miursys = { workspace = true }
@@ -54,6 +60,7 @@ miurtui = { workspace = true }
 miurview = { workspace = true }
 
 [tool.uv.workspace]
+# OR: members = ["miurcache", "miurcore", ...]
 members = ["pkg/*"]
 
 [dependency-groups]
@@ -79,6 +86,10 @@ devall = [
 
 [tool.uv]
 default-groups = ["dev"]
+
+# This tells every subprocess (including conan) where to find the profile
+# so you don't have to pass the path manually in every sub-package.
+# config-settings = { CONAN_DEFAULT_PROFILE = "{root}/.conan-profile" }
 
 
 [tool.pytest.ini_options]
