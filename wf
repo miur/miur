@@ -23,19 +23,20 @@ readonly nm=${here##*/}
 readonly venvbin="$here/.venv/bin"
 
 declare -A opts=()
-while LC_COLLATE=C getopts 'AcCjlrt-:' o; do
+while LC_COLLATE=C getopts 'AcCjlrtuvx-:' o; do
 case $o in :|'?') exit 2
 ;; A) exec /d/airy/ai/run -- "$here"  # "$@"
 ;; c) exec git clean -ndX -- ':!.venv'
 ;; C) exec git clean -fdX -- ':!.venv'
   # WARN: remove .venv from :/.gitignore, orse ":/.venv/.gitignore" will force removal
-  ## ALT: find "$here" -name .venv -prune -o \( -name __pycache__ -o -name .pytest_cache \) -exec rm -rf {} +
+  ## ALT:ONELINER: $ find . -name .venv -prune -o \( -name __pycache__ -o -name .pytest_cache -o -name .ropeproject \) -exec rm -rf {} +
 ;; i) opts[install]=1
 ;; j) opts[jurigged]=1
 ;; l) opts[lint]=1
 ;; r) opts[run]=1
 ;; t) opts[test]=1
-;; v) opts[vent]=1
+;; u) opts[update]=1
+;; v) opts[venv]=1
 ;; x) set -x && xt=${-//[^x]}
 esac; ((rc=$?)) && exit $rc; done; shift $((OPTIND-1)); unset o
 [[ ${opts[@]:+x} ]] || opts[run]=1
@@ -52,7 +53,7 @@ uvr(){ uv ${xt:+-v} run --project "$here" "$@"; }
 uvs(){ uv ${xt:+-v} sync --project "$here" "$@"; }
 
 
-if [[ ${opts[vent]:+x} || ! -d $here/.venv ]]; then
+if [[ ${opts[venv]:+x} || ! -d $here/.venv ]]; then
   ## Bootstrap
   ## INFO: VSCode/PyCharm auto-detect .venv in project root.
   # uv venv --python 3.14
@@ -135,4 +136,84 @@ if [[ ${opts[run]:+x} ]]; then
     # uvr miur "$@"
     exec "$venvbin/miur" "$@"
   fi
+fi
+
+if [[ ${opts[update]} ]]; then
+
+  # 4. Specific Tool Formatters
+  # pyproject-fmt: A specialized tool to format Python pyproject.toml files.
+  # toml-formatter: A simple Python-based CLI formatter.
+  # OR:BET! taplo fmt -- versatile Rust-based TOML toolkit that includes a CLI formatter, linter, and language server.
+
+  ## Generate DB w/o cmake
+  # bear -- make  #< for Makefile
+  # bear -- pip install .  #< for scikit-build-core / pip
+  ## OR: pip install compiledb && compiledb make
+  ## OR: ninja -t compdb > compile_commands.json
+
+  # TODO: generate _miurcache.pyi stub (PEP 484) from your compiled binary using stubgen (part of the mypy package).
+  # It loads the binary and generates a stub based on the docstrings and signatures it finds.
+  # uv run stubgen -m _miurcache -o packages/miurcache/src/miurcache/
+
+
+  find "$here/pkg" -type f -name '*.[ch]' -exec \
+    clang-tidy -checks='modernize-*' -fix -extra-arg="-std=c2y" -fix {} +
+  # OR: vim.lsp.buf.format()
+  find "$here/pkg" -type f -name '*.[ch]' -exec \
+    clang-format -i {} +
+
+  ### ABI3 compliance
+  ## cppcheck Library: Use the Python configuration if available, or suppress "unused function" warnings for your PyMethodDef arrays.
+  ## Clang-Tidy: Add -modernize-macro-to-enum to the exclusion list, as Python's API relies heavily on specific preprocessor definitions that shouldn't be touched.
+  ## Py_DEBUG: Compiling your extension with this defined enables Python's internal "Specialized Memory Allocator" checks.
+  ## Valgrind with Python Suppressions: Python has a specific suppression file (usually Misc/valgrind-python.supp in the CPython source) to ignore the "intentional" memory leaks in the Python interpreter so you can focus on your extension's leaks.
+  # pip install abi3audit
+  # abi3audit my_extension.abi3.so
+
+  ## ALSO: auditwheel -- check if all libs were packed
+
+  ## FMT: cmake
+  # pip install gersemi
+  # gersemi --check --diff .
+  # gersemi --indent=2 --line-width=88 -i CMakeLists.txt
+
+
+  # cmake -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON && \
+  # cppcheck --project=build/compile_commands.json --std=c23 --enable=all --output-file=cppcheck.log && \
+  # scan-build -o ./reports ninja -C build
+
+  # clang-tidy -p compile_commands.json \
+  #   -checks='*,-readability-braces-around-statements,-readability-identifier-length,-readability-magic-numbers,-modernize-use-trailing-return-type,-bugprone-easily-swappable-parameters' \
+  #   -header-filter=".*" \
+  #   --system-headers \
+  #   --warnings-as-errors='*' \
+  #   $(find src -name "*.c")
+
+  # rm -rf build  # 1. Clean previous build artifacts (important!)
+  # # 2. Run scan-build over the build command
+  # scan-build cmake -B build -G Ninja
+  # scan-build -v -k -enable-checker ninja -C build
+  # scan-build -v \
+  #   -enable-checker alpha.security.taint \
+  #   -enable-checker alpha.unix.PthreadLock \
+  #   -enable-checker alpha.core.CastToStruct \
+  #   -enable-checker core,deadcode,security,unix \
+  #   --status-bugs \
+  #   -o ./scan_reports \
+  #   make -j$(nproc)
+
+
+  # cppcheck --project=compile_commands.json --cppcheck-build-dir=build_check
+  # cppcheck --library=posix --library=std --library=gnu ...
+  # cppcheck --addon=misra.json myfile.c
+  # cppcheck --project=compile_commands.json \
+  #   --std=c23 \
+  #   --enable=all \
+  #   --inconclusive \
+  #   --library=std,posix,gnu \
+  #   --inline-suppr \
+  #   --suppress=missingIncludeSystem \
+  #   --check-level=exhaustive \
+  #   --check-config \
+  #   --output-file=cppcheck_report.txt
 fi

@@ -1,0 +1,33 @@
+CompileFlags:
+  ## Force C23 if the compilation database is inconsistent
+  # Add: [-std=c23, -DPy_LIMITED_API=0x030A0000]
+  ## Fallback if a file isn't in compile_commands.json
+  # Add: [-I/usr/include/python3.12]
+
+  ## Remove flags that can crash or slow down the LSP indexer
+  # Remove: [-fsanitize=address, -fsanitize=undefined]
+  Remove: [-fsanitize=*]  # Stop the LSP from trying to "sanitize" itself
+
+  # Treat Python headers as system headers to suppress their warnings
+  CompilationDatabase: "."
+
+
+InlayHints:
+  Enabled: Yes
+  Designators: Yes
+  ParameterNames: Yes
+  DeducedTypes: Yes
+
+Hover:
+  ShowAKA: Yes
+
+Index:
+  Background: Build
+
+# Diagnostics:
+#   # Clang-tidy integration
+#   ClangTidy:
+#     Add: [bugprone-*, modernize-*, readability-*, performance-*]
+#     Remove: [readability-braces-around-statements, modernize-use-trailing-return-type]
+#     CheckOptions:
+#       readability-identifier-length.MinVariableNameLength: "3"

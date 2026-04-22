@@ -1,0 +1,6 @@
+# vim:ft=toml
+include(clang21)
+
+# [buildenv]
+# # Optional: Add local paths if Clang 21 isn't in global PATH
+# PATH+=(path)/to/clang21/bin

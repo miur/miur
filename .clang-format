@@ -1,0 +1,98 @@
+---
+Language: Cpp
+Standard: Latest
+BasedOnStyle: LLVM
+
+# AlignConsecutiveAssignments:
+#   Enabled: true
+#   AcrossEmptyLines: true
+#   AcrossComments: true
+#   AlignCompound: true
+#   PadOperators: true
+#
+# AlignConsecutiveBitFields:
+#   Enabled: true
+#   AcrossEmptyLines: true
+#   AcrossComments: true
+#
+# AlignConsecutiveDeclarations:
+#   Enabled: true
+#   AcrossEmptyLines: true
+#   AcrossComments: true
+#
+# AlignConsecutiveMacros:
+#   Enabled: true
+#   AcrossEmptyLines: true
+#   AcrossComments: true
+#
+# AlignConsecutiveShortCaseStatements:
+#   Enabled: true
+#   AcrossEmptyLines: true
+#   AcrossComments: true
+#   AlignCaseArrows: true
+#   AlignCaseColons: true
+#
+# # --- New Clang 19-21 Specific Instructions ---
+#
+# # Improved handling of 'noexcept' and attributes
+# BreakBeforeNoexceptSpecifier: OnlyWithParen
+# AllowShortCompoundAssignments: Always
+#
+# # Keeps trailing comments aligned even if the code layout changes slightly
+# AlignTrailingComments:
+#   Kind: Always
+#   OverEmptyLines: 1
+#
+# # Modern C++20/23/26 support
+QualifierAlignment: Right
+# ReferenceAlignment: Pointer
+#
+# # --- Original Intent Preservation ---
+#
+# AccessModifierOffset: -4
+# AlignAfterOpenBracket: Align
+AlignEscapedNewlines: DontAlign
+# AlignOperands: Align
+# AllowShortBlocksOnASingleLine: Always
+# AllowShortFunctionsOnASingleLine: All
+# AllowShortIfStatementsOnASingleLine: All
+# AllowShortLoopsOnASingleLine: true
+#
+AlwaysBreakAfterReturnType: AllDefinitions
+# AlwaysBreakTemplateDeclarations: Yes
+#
+# BinPackArguments: false
+# BinPackParameters: false
+#
+# BraceWrapping:
+#   AfterClass: true
+#   AfterControlStatement: Never
+#   AfterEnum: true
+#   AfterFunction: true
+#   AfterNamespace: false
+#   AfterStruct: true
+#   AfterUnion: true
+#   BeforeCatch: true
+#   BeforeElse: true
+#   IndentBraces: false
+#   SplitEmptyFunction: false
+#
+# BreakBeforeBinaryOperators: None
+BreakBeforeBraces: Linux
+InsertBraces: true
+# BreakBeforeTernaryOperators: true
+# BreakConstructorInitializers: BeforeColon
+# BreakInheritanceList: BeforeColon
+
+ColumnLimit: 112
+# ConstructorInitializerIndentWidth: 4
+# ContinuationIndentWidth: 4
+IndentWidth: 4
+# MaxEmptyLinesToKeep: 2
+# PointerAlignment: Middle
+PointerAlignment: Left
+# ReferenceAlignment: Left
+# SpacesInContainerLiterals: false
+# TabWidth: 4
+# UseTab: Never
+# ...
