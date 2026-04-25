@@ -1,24 +1,25 @@
+# cmake_minimum_required(VERSION 3.15...3.27)
 cmake_minimum_required(VERSION 4.2)
 
-# Bootstrap the Conan Provider automatically
-set(CONAN_PROVIDER_HASH "648e6df950de16df21a74a3aed70f89b19dc8045")
-set(CONAN_PROVIDER_URL "https://raw.githubusercontent.com/conan-io/cmake-conan/${CONAN_PROVIDER_HASH}/conan_provider.cmake")
-if(NOT EXISTS "${CMAKE_BINARY_DIR}/conan_provider.cmake")
-  message(STATUS "Downloading Conan provider from ${CONAN_PROVIDER_URL}")
-  file(DOWNLOAD "${CONAN_PROVIDER_URL}"
-    "${CMAKE_BINARY_DIR}/conan_provider.cmake"
-    EXPECTED_HASH SHA256=... # Optional: Add SHA256 for maximum security
-    STATUS download_status)
+## FAIL: doesn't work anymore for cmake>3.30 -- NEED: cmake .. -DCMAKE_PROJECT_TOP_LEVEL_INCLUDES=conan_provider.cmake
+## Bootstrap the Conan Provider automatically
+# set(CONAN_PROVIDER_HASH "648e6df950de16df21a74a3aed70f89b19dc8045")
+# set(CONAN_PROVIDER_URL "https://raw.githubusercontent.com/conan-io/cmake-conan/${CONAN_PROVIDER_HASH}/conan_provider.cmake")
+# if(NOT EXISTS "${CMAKE_BINARY_DIR}/conan_provider.cmake")
+#   message(STATUS "Downloading Conan provider from ${CONAN_PROVIDER_URL}")
+#   file(DOWNLOAD "${CONAN_PROVIDER_URL}"
+#     "${CMAKE_BINARY_DIR}/conan_provider.cmake"
+#     EXPECTED_HASH SHA256=2440641a32f24ad1e7c5d00d3fc4aab74c1d225f5bcdfdfb2972ed85ade672fd  # <OPT
+#     STATUS download_status)
+#   list(GET download_status 0 status_code)
+#   if(NOT status_code EQUAL 0)
+#     message(FATAL_ERROR "Failed to download conan_provider.cmake: ${download_status}")
+#   endif()
+# endif()
+# include("${CMAKE_BINARY_DIR}/conan_provider.cmake")
 
-  list(GET download_status 0 status_code)
-  if(NOT status_code EQUAL 0)
-    message(FATAL_ERROR "Failed to download conan_provider.cmake: ${download_status}")
-  endif()
-endif()
-include("${CMAKE_BINARY_DIR}/conan_provider.cmake")
 
-
-project(miurcache_cx LANGUAGES C)
+project(miurcache_ext_cc LANGUAGES C)
 # project(${SKBUILD_PROJECT_NAME} LANGUAGES C)
 
 ## DISABLED: should come from conan toolchain
@@ -30,11 +31,14 @@ project(miurcache_cx LANGUAGES C)
 find_package(Python REQUIRED COMPONENTS Development.Module)
 
 # WARN: name MUST match the module.name in pyproject.toml
-python_add_library(${PROJECT_NAME} MODULE src/extension.c)
+python_add_library(${PROJECT_NAME} MODULE ext_cc/miurcache_core.c)
 # target_include_directories(${PROJECT_NAME} PRIVATE inc)
+# 2. Rename the output file to "_core" (so it becomes _core.so or _core.pyd)
+
+set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME "_ext_cc")
 
 # RQ:(Python::Module is correct): links on Windows but does nothing on Linux
-target_link_libraries(my_extension PRIVATE Python::Module)
+target_link_libraries(${PROJECT_NAME} PRIVATE Python::Module)
 
 ## <conanstuff>
 # find_package(OpenSSL REQUIRED)
@@ -65,7 +69,7 @@ target_link_libraries(my_extension PRIVATE Python::Module)
 
 
 # 3. Apply the Limited API flag directly to the target
-target_compile_definitions(my_extension PRIVATE
+target_compile_definitions(${PROJECT_NAME} PRIVATE
     Py_LIMITED_API=0x030E0000
 )
 
@@ -86,3 +90,6 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
   C_VISIBILITY_PRESET hidden
   VISIBILITY_INLINES_HIDDEN ON
 )
+
+# 3. Tell scikit-build-core to put the binary inside the miurcache python folder
+install(TARGETS ${PROJECT_NAME} DESTINATION miurcache)

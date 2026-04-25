@@ -1,0 +1,22 @@
+{
+  "version": 4,
+  "configurePresets": [
+    {
+      "name": "default",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CONAN_BUILD_PROFILE": "${sourceDir}/../../cfg/conan/profiles/clang21",
+        "CONAN_HOST_PROFILE": "${sourceDir}/../../cfg/conan/profiles/clang21",
+        "CMAKE_PROJECT_TOP_LEVEL_INCLUDES": "${sourceDir}/../../cfg/conan/conan_provider.cmake"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "default",
+      "configurePreset": "default"
+    }
+  ]
+}

@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+exec "${BASH_SOURCE[0]%/*}/wf" "$@"
+# exec /data/aura/miur/.venv/bin/miur "$@"

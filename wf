@@ -23,7 +23,7 @@ readonly nm=${here##*/}
 readonly venvbin="$here/.venv/bin"
 
 declare -A opts=()
-while LC_COLLATE=C getopts 'AcCjlrtuvx-:' o; do
+while LC_COLLATE=C getopts 'AcCijlrtuvx-:' o; do
 case $o in :|'?') exit 2
 ;; A) exec /d/airy/ai/run -- "$here"  # "$@"
 ;; c) exec git clean -ndX -- ':!.venv'

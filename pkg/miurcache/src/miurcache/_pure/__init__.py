@@ -8,6 +8,11 @@ from .resident import ResidentEntity, ResidentGraphCache, SpillStore
 from .store import PackedAdjacency, PackedEntityColumns
 
 
+def hello() -> str:
+    """Returns a greeting from the pure Python implementation."""
+    return "Hello from Pure Python!"
+
+
 @dataclass(frozen=True, slots=True)
 class CacheSlot:
     """Resident slot for an entity in the live working set."""
@@ -23,4 +28,5 @@ __all__ = [
     "ResidentEntity",
     "ResidentGraphCache",
     "SpillStore",
+    "hello",
 ]

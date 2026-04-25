@@ -1,12 +1,21 @@
+import miurcache
+
+
+def test_hello_output():
+    # Calling the unified API
+    result = miurcache.hello()
+
+    assert isinstance(result, str)
+    assert result.startswith("Hello from")
+
+    # Optional debug print so you can see which one ran if you run pytest -s
+    # print(f"\n[Running via: {miurcache.IMPL_USED}] -> {result}")
+
+
 from dataclasses import dataclass
 
-from miurcache import CacheSlot
-from miurcache import PackedAdjacency
-from miurcache import PackedEntityColumns
-from miurcache import ResidentEntity
-from miurcache import ResidentGraphCache
-from miurcore import Entity
-from miurcore import EntityRecord
+from miurcache import CacheSlot, PackedAdjacency, PackedEntityColumns, ResidentEntity, ResidentGraphCache
+from miurcore import Entity, EntityRecord
 
 
 def test_cache_slot_keeps_entity_and_slot() -> None:

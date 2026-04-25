@@ -121,8 +121,6 @@ class ResidentGraphCache:
             )
         return evicted.slot
 
-    ec.
-
     def _resident_from_slot(self, slot: int) -> ResidentEntity:
         entity = self._slot_to_entity[slot]
         if entity is None:

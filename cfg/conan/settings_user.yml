@@ -1,0 +1,6 @@
+# /home/user/.conan2/settings_user.yml
+# $ conan config install ./settings_user.yml
+compiler:
+    clang:
+        version: ["21"]
+        cstd: ["2y", "gnu2y"]

@@ -4,14 +4,16 @@ version = "1.0.0"
 description = "Explorer-first graph workbench for navigating heterogeneous resources through stable handles, serializable ops, and streaming views."
 readme = "README.rst"
 requires-python = ">=3.14"
-license = { text = "GPL-3.0-only" }
+license = "GPL-3.0-only"
+# license-files = ["LICENSES/*"]
+license-files = ["LICENSES/GPL-3.0-only.txt"]
 keywords = ["explorer", "graph", "tui", "workflow", "navigation"]
 classifiers = [
   # "Development Status :: 5 - Production/Stable",
   "Development Status :: 3 - Alpha",
   "Environment :: Console :: Curses",
   "Intended Audience :: Developers",
-  "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+  # "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
   # "Operating System :: OS Independent",
   "Operating System :: POSIX :: Linux",
   "Programming Language :: Python :: 3.14",
@@ -49,10 +51,8 @@ default = ["miur[lmdb]"]
 
 [tool.uv.sources]
 miurapp = { workspace = true }
+# OR: miurcache = { path = "pkg/miurcache" }
 miurcache = { workspace = true }
-# OR: miurcache-cx = { path = "pkg/miurcache-cx" }
-miurcache-cx = { workspace = true }
-miurcache-py = { workspace = true }
 miurcore = { workspace = true }
 miurdemo = { workspace = true }
 miursys = { workspace = true }
@@ -93,7 +93,7 @@ default-groups = ["dev"]
 
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["t"]
 ## This sets the number of pytest-durations shown to 0 by default
 # OR: addopts = "-p no:pytest-durations"
 # OR: --html=report.html --self-contained-html

@@ -1,9 +1,10 @@
-from miurapp import AppSession
-from miurapp import run
+from miurapp import AppSession, run
+from miurcache import hello
 from miurcore import Entity
 
 
 def main() -> None:
+    print(hello())
     print(run(AppSession(focus=Entity(system="demo", handle="bootstrap"))))
 
 
