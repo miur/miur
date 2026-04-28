@@ -67,10 +67,20 @@ target_link_libraries(${PROJECT_NAME} PRIVATE Python::Module)
 # * Mangle: It renames the libs to include a hash (e.g., libssl-f3a2.so) to avoid conflicts with system libraries.
 
 
+## SEE:PERF: https://www.sbstndbs.me/blog/soa-vs-aos ※⡩⣯⢠⡧
+##   ALSO: __attribute__((target_clones("default","arch=x86-64-v2","arch=x86-64-v3")))
+## VIZ: -march=
+#   x86-64-v1 SSE, SSE2 Pre-2008  100% Safe (Baseline)
+#   x86-64-v2 SSE4.2, SSSE3, POPCNT ~2009+ (Nehalem)  Highest Safe Choice
+#   x86-64-v3 AVX2, BMI2, FMA ~2015+ (Haswell)  Risky (Crashes old servers)
+#   x86-64-v4 AVX-512 ~2017+ (Skylake-X)  Very High (Niche)
+target_compile_options(${PROJECT_NAME} PRIVATE -march=x86-64-v2)  # For GCC/Clang/ICX
+# if (MSVC) target_compile_options(your_target_name PRIVATE "/arch:AVX")  # <<inof v3
+
 
 # 3. Apply the Limited API flag directly to the target
 target_compile_definitions(${PROJECT_NAME} PRIVATE
-    Py_LIMITED_API=0x030E0000
+  Py_LIMITED_API=0x030E0000
 )
 
 # WARN:(TEMP:DEV only): sanitized binaries run much slower and will crash w/o same rt-lib for user
@@ -92,4 +102,6 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 )
 
 # 3. Tell scikit-build-core to put the binary inside the miurcache python folder
-install(TARGETS ${PROJECT_NAME} DESTINATION miurcache)
+install(TARGETS ${PROJECT_NAME} DESTINATION miurcache
+  # CONFIGURATIONS Release RelWithDebInfo
+)

@@ -12,9 +12,10 @@ else:
         case "ext_cc":
             # ERR: ImportError: dynamic module does not define module export function (PyInit__ext_cc)
             # from ._ext_cc import *
-            from . import _ext_cc as impl
+            from ._ext_cc import hello
 
-            hello = impl.hello
+            # from . import _ext_cc as impl
+            # hello = impl.hello
             __all__ = ["hello"]
 
             # NOTE: can be useful in testing

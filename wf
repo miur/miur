@@ -131,6 +131,16 @@ if [[ ${opts[run]:+x} ]]; then
   if [[ ${opts[jurigged]:+x} ]]; then
     exec "$venvbin/jurigged" -v -w "$here/pkg" -m miurapp "$@"
   else
+
+    ## USAGE: switch impl=pure,ext_cc
+    # MIUR_IMPL=ext_cc uv sync --reinstall-package miurcache --inexact
+    # MIUR_IMPL=ext_cc uv sync --project /d/miur --all-packages --all-extras --group devall --reinstall-package miurcache
+    # MIUR_IMPL=ext_cc uv pip install --force-reinstall --no-deps -e .  # --config-setting="build-dir=build"
+    # MIURCACHE_BACKEND=ext_cc /d/miur/wf
+
+    ## USAGE:(wf -w): src-watch / dev-loop
+    # inotifywait -m -q -e modify --format '%w%f %e' ./ext_cc | while read file event; do /d/miur/wf; done
+
     ## FAIL? seems doesn't work with uv/workspace
     #   SEE: https://github.com/astral-sh/uv/issues/13095
     # uvr miur "$@"

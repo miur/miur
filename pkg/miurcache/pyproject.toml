@@ -48,8 +48,10 @@ build-backend = "scikit_build_core.build"
 # uv sync --reinstall
 ## Best practice for modern editable installs
 editable.mode = "redirect"
-## Ensures it re-compiles if you change C++ code
-# editable.rebuild = true
+## USAGE: on import re-compile changed C/C++ code
+editable.rebuild = true
+# ALT:(silent ninja): export SKBUILD_EDITABLE_VERBOSE=0
+editable.verbose = false
 ## Forces the .so file into the actual src directory
 # editable.mode = "inplace"
 # minimum-version = "build-system.requires"

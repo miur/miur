@@ -21,6 +21,8 @@ classifiers = [
   "Topic :: Utilities",
   "Typing :: Typed",
 ]
+
+# CASE-1: "miur" is meta-package -- which pulls parts
 dependencies = [
   "miurapp",
   "miurcache",
@@ -29,6 +31,26 @@ dependencies = [
   "miurtui",
   "miurview",
 ]
+
+# CASE-2: "miur" is monolith OR:TRY: provide it as "miur-all" sub-package
+# [project]
+# dependencies = []  # < only third-party here
+# [build-system]
+# requires = ["hatchling>=1.27"]
+# build-backend = "hatchling.build"
+# [tool.hatch.build.targets.wheel]
+# # This forces the build to include the sub-packages as if they were local modules
+# packages = [
+#     "pkg/miurapp/src/miurapp",
+#     "pkg/miurcache/src/miurcache",
+#     "pkg/miurcore/src/miurcore",
+#     "pkg/miursys/src/miursys",
+#     "pkg/miurtui/src/miurtui",
+#     "pkg/miurview/src/miurview",
+# ]
+# DEBUG: Inspect the contents
+# $ uv build && unzip -l dist/*.whl | grep miur
+
 
 [project.optional-dependencies]
 # NOTE: use "ec" (EntityCache) or "dc" (DataCache) as global var name
