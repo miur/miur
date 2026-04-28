@@ -139,6 +139,8 @@ if [[ ${opts[run]:+x} ]]; then
     # MIURCACHE_BACKEND=ext_cc /d/miur/wf
 
     ## USAGE:(wf -w): src-watch / dev-loop
+    # git clean -fXd
+    # MIUR_IMPL=ext_cc uv sync --project /d/miur --all-packages --all-extras --group devall --reinstall-package miurcache
     # inotifywait -m -q -e modify --format '%w%f %e' ./ext_cc | while read file event; do /d/miur/wf; done
 
     ## FAIL? seems doesn't work with uv/workspace

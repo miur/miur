@@ -1,0 +1,4 @@
+# This specific package's database
+CompileFlags:
+  # This override only applies to files inside this subdirectory
+  CompilationDatabase: "build/default"

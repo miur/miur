@@ -16,16 +16,21 @@ lmdb = ["lmdb>=1.7"]
 [tool.uv.sources]
 miurcore = { workspace = true }
 
-# USAGE: $ uv build
-[build-system]
+# [build-system]
 # requires = ["uv_build>=0.11.7,<0.12"]
 # build-backend = "uv_build"
 # requires = ["hatchling>=1.27"]
 # build-backend = "hatchling.build"
 # requires = ["setuptools>=68"]
 # build-backend = "setuptools.build_meta"
-requires = ["scikit-build-core>=0.10", "conan"]  # , "pybind11"
+[build-system]
+requires = ["scikit-build-core>=0.10", "conan>=2.4"]  # , "pybind11"
 build-backend = "scikit_build_core.build"
+
+# USAGE: $ uv build
+## NEED:(if using): $ uv sync --no-build-isolation ...
+#    [tool.uv.extra-build-dependencies]
+#    miurcache = ["scikit_build_core"]
 
 ## BET:TRY: combined
 # [build-system]
@@ -34,7 +39,7 @@ build-backend = "scikit_build_core.build"
 # [tool.scikit-build-core-conan]
 # # This replaces your manual bootstrapping
 # # conan_requirements = ["fmt/10.1.1", "nlohmann_json/3.11.2"]
-# conan_profile = "cfg/conan/profiles/clang21"
+# conan_profile = "../../cfg/conan/profiles/clang21"
 
 ## USAGE: example of a fully hermetic install command
 # Install: $ CONAN_HOME=./.conan_cache conan install . -pr:h ./conan/profiles/clang21 -pr:b ./conan/profiles/clang21 --build=missing
@@ -46,16 +51,13 @@ build-backend = "scikit_build_core.build"
 [tool.scikit-build]
 # DEBUG(editable): $ uv run python -c "import miurcache; print(miurcache.__file__)"
 # uv sync --reinstall
-## Best practice for modern editable installs
-editable.mode = "redirect"
-## USAGE: on import re-compile changed C/C++ code
-editable.rebuild = true
-# ALT:(silent ninja): export SKBUILD_EDITABLE_VERBOSE=0
-editable.verbose = false
-## Forces the .so file into the actual src directory
-# editable.mode = "inplace"
+editable.mode = "redirect"  ## Best practice for modern editable installs
+# editable.mode = "inplace"  ## Forces the .so file into the actual src directory
+editable.rebuild = true  ## USAGE: on import re-compile changed C/C++ code
+editable.verbose = false  ## ALT:(silent ninja): export SKBUILD_EDITABLE_VERBOSE=0
 # minimum-version = "build-system.requires"
 # minimum-version = "0.10"
+# experimental = true  ## Ensure experimental/modern features for 2026 are enabled
 cmake.version = ">=4.2"
 cmake.args = ["--preset=default"]
 ## DISABLED: use preset to be able to build manually with same flags
@@ -91,7 +93,8 @@ sdist.include = ["ext_cc/*", "src/*"]
 # Redirects the C++ build artifacts (CMake cache, object files)
 # {root} in scikit-build-core refers to the directory containing pyproject.toml
 # build-dir = "../../out/{package_name}"
-build-dir = "build/{wheel_tag}"
+# build-dir = "build/{wheel_tag}"
+build-dir = "build/default"  # TEMP: fixed name to match preset
 wheel.cmake = true
 
 ## REF: https://scikit-build-core.readthedocs.io/en/latest/configuration/overrides.html

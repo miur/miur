@@ -19,6 +19,35 @@ cmake_minimum_required(VERSION 4.2)
 # include("${CMAKE_BINARY_DIR}/conan_provider.cmake")
 
 
+## FIXED? sligtly more controllable (than scikit) way to auto-generate conan toolchain
+## ALT?
+#  "cacheVariables": {
+#    ...
+#    "CONAN_BUILD_PROFILE": "${sourceDir}/../../cfg/conan/profiles/clang21",
+#    "CONAN_HOST_PROFILE": "${sourceDir}/../../cfg/conan/profiles/clang21",
+#    "CMAKE_PROJECT_TOP_LEVEL_INCLUDES": "${sourceDir}/../../cfg/conan/conan_provider.cmake"
+#    "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/build/${presetName}/conan/conan_toolchain.cmake",
+#  }
+set(CONAN_TOOLCHAIN "${CMAKE_BINARY_DIR}/conan/conan_toolchain.cmake")
+if(NOT EXISTS "${CONAN_TOOLCHAIN}")
+  message(STATUS "Conan toolchain not found, running conan install...")
+  execute_process(
+    COMMAND conan install ${CMAKE_SOURCE_DIR}
+      --profile:build ${CMAKE_SOURCE_DIR}/../../cfg/conan/profiles/clang21
+      --profile:host ${CMAKE_SOURCE_DIR}/../../cfg/conan/profiles/clang21
+      --output-folder=${CMAKE_BINARY_DIR}/conan
+      # --deployer=direct_deploy  # <--- This prevents the second "conan/" level
+      --build=missing
+    RESULT_VARIABLE _rc
+    # WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+  )
+  if(NOT _rc EQUAL 0)
+    message(FATAL_ERROR "Err(${_rc}): Conan installation failed")
+  endif()
+endif()
+set(CMAKE_TOOLCHAIN_FILE "${CONAN_TOOLCHAIN}" CACHE FILEPATH "" FORCE)
+
+
 project(miurcache_ext_cc LANGUAGES C)
 # project(${SKBUILD_PROJECT_NAME} LANGUAGES C)
 

@@ -24,10 +24,12 @@ Hover:
 Index:
   Background: Build
 
-# Diagnostics:
-#   # Clang-tidy integration
-#   ClangTidy:
-#     Add: [bugprone-*, modernize-*, readability-*, performance-*]
-#     Remove: [readability-braces-around-statements, modernize-use-trailing-return-type]
-#     CheckOptions:
-#       readability-identifier-length.MinVariableNameLength: "3"
+
+Diagnostics:
+  UnusedIncludes: Strict
+  ## Clang-tidy integration
+  # ClangTidy:
+  #   Add: [bugprone-*, modernize-*, readability-*, performance-*]
+  #   Remove: [readability-braces-around-statements, modernize-use-trailing-return-type]
+  #   CheckOptions:
+  #     readability-identifier-length.MinVariableNameLength: "3"
