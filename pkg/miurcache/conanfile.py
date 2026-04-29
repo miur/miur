@@ -5,6 +5,7 @@ from conan.tools.cmake import cmake_layout
 class MiurCacheRecipe(ConanFile):
     # name = "miurcache"
     # version = "0.1.0"
+    languages = "C", "C++"
     ## Standard settings for a compiled C extension
     settings = ("os", "compiler", "build_type", "arch")
     # Generate the CMake toolchain (for compiler/flags) and dependencies

@@ -18,4 +18,7 @@ os=Linux
 # tools.build:cstd=2y
 # Ensure we use Clang 21 specifically
 tools.build:compiler_executables={'c': 'clang-21', 'cpp': 'clang++-21'}
+# OR:BET: conanfile.py: languages = ["C", "C++"]
+# tools.build:cflags=["-std=c23"]
+# tools.build:cflags={'c': "-std=c23"}
 tools.cmake.cmaketoolchain:generator=Ninja

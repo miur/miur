@@ -3,9 +3,9 @@ Checks: >
   -*,bugprone-*,cert-*,clang-analyzer-*,concurrency-*,
   cppcoreguidelines-*,misc-*,modernize-*,performance-*,
   portability-*,readability-*,
-  -readability-braces-around-statements,   #
-  -readability-identifier-length,          #
-  -readability-magic-numbers,              #
-  -modernize-use-trailing-return-type,     #
-  -bugprone-easily-swappable-parameters    #
-WarningsAsErrors: "*" #
+  -readability-braces-around-statements,
+  -readability-identifier-length,
+  -readability-magic-numbers,
+  -modernize-use-trailing-return-type,
+  -bugprone-easily-swappable-parameters
+WarningsAsErrors: "*"

@@ -96,3 +96,5 @@ PointerAlignment: Left
 # TabWidth: 4
 # UseTab: Never
 # ...
+
+SpacesBeforeTrailingComments: 2
