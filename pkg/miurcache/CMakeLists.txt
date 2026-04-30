@@ -19,20 +19,22 @@ cmake_minimum_required(VERSION 4.2)
 # include("${CMAKE_BINARY_DIR}/conan_provider.cmake")
 
 
-## FIXED? sligtly more controllable (than scikit) way to auto-generate conan toolchain
-## ALT?
+## BAD:DISABLED: when you are fine with whatever toolchain
 #  "cacheVariables": {
 #    ...
-#    "CONAN_BUILD_PROFILE": "${sourceDir}/../../cfg/conan/profiles/clang21",
 #    "CONAN_HOST_PROFILE": "${sourceDir}/../../cfg/conan/profiles/clang21",
+#    "CONAN_BUILD_PROFILE": "${sourceDir}/../../cfg/conan/profiles/clang21",
+#    "CONAN_INSTALL_ARGS": "--build=missing",
 #    "CMAKE_PROJECT_TOP_LEVEL_INCLUDES": "${sourceDir}/../../cfg/conan/conan_provider.cmake"
-#    "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/build/${presetName}/conan/conan_toolchain.cmake",
 #  }
+## FIXED? sligtly more controllable (than scikit) way to auto-generate conan toolchain
+#  ALT: [tool.scikit-build.build-script].pre-configure = "conan install ..."
 set(CONAN_TOOLCHAIN "${CMAKE_BINARY_DIR}/conan/conan_toolchain.cmake")
 if(NOT EXISTS "${CONAN_TOOLCHAIN}")
   message(STATUS "Conan toolchain not found, running conan install...")
+  find_program(CONAN_COMMAND "conan" REQUIRED)
   execute_process(
-    COMMAND conan install ${CMAKE_SOURCE_DIR}
+    COMMAND ${CONAN_COMMAND} install ${CMAKE_SOURCE_DIR}
       --profile:build ${CMAKE_SOURCE_DIR}/../../cfg/conan/profiles/clang21
       --profile:host ${CMAKE_SOURCE_DIR}/../../cfg/conan/profiles/clang21
       --output-folder=${CMAKE_BINARY_DIR}/conan

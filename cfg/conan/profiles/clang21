@@ -5,7 +5,7 @@ build_type=Release
 compiler=clang
 compiler.cppstd=26
 compiler.cstd=23
-compiler.libcxx=libstdc++11
+# compiler.libcxx=libstdc++11
 compiler.version=21
 os=Linux
 
@@ -16,8 +16,9 @@ os=Linux
 [conf]
 # Force the standard here so it's injected into the generated toolchain
 # tools.build:cstd=2y
-# Ensure we use Clang 21 specifically
-tools.build:compiler_executables={'c': 'clang-21', 'cpp': 'clang++-21'}
+# BAD:FIXED:ERR: -- The C compiler identification is GNU 15.2.1
+tools.build:compiler_executables={'c': 'clang', 'cpp': 'clang++'}
+# tools.build:compiler_executables={'c': 'clang-21', 'cpp': 'clang++-21'}
 # OR:BET: conanfile.py: languages = ["C", "C++"]
 # tools.build:cflags=["-std=c23"]
 # tools.build:cflags={'c': "-std=c23"}

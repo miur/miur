@@ -48,6 +48,11 @@ build-backend = "scikit_build_core.build"
 #   $ cmake --preset conan-clang21-release
 
 
+# [tool.scikit-build.build-script]
+# # ALT: pre-configure = "python -m miurcache._conan_bootstrap"
+# pre-configure = "conan install . --profile:host ../../cfg/conan/profiles/clang21 --profile:build ../../cfg/conan/profiles/clang21 --output-folder=build/conan --build=missing"
+
+
 [tool.scikit-build]
 # DEBUG(editable): $ uv run python -c "import miurcache; print(miurcache.__file__)"
 # uv sync --reinstall
@@ -94,8 +99,8 @@ sdist.include = ["ext_cc/*", "src/*"]
 # {root} in scikit-build-core refers to the directory containing pyproject.toml
 # build-dir = "../../out/{package_name}"
 # build-dir = "build/{wheel_tag}"
-build-dir = "build/default"  # TEMP: fixed name to match preset
-wheel.cmake = true
+build-dir = "build"  # TEMP: fixed name to match preset
+wheel.cmake = false
 
 ## REF: https://scikit-build-core.readthedocs.io/en/latest/configuration/overrides.html
 [[tool.scikit-build.overrides]]
