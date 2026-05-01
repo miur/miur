@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 if (return 0 2>/dev/null); then
-  [[ -v __app ]] && return 2
+  # [[ -v __app ]] && return 2
   __app=$(realpath -e "${BASH_SOURCE[0]:-$0}") || return
   __here=${__app%/*}
   if [[ -d $__here/.venv/bin ]]; then
@@ -9,7 +9,12 @@ if (return 0 2>/dev/null); then
     # export VIRTUAL_ENV="$__here/.venv"
   fi
   # builtin source "${__app%/*}/aliases.sh" "$__app" "$@" || return
-  unset __app __here
+
+  ## WARN: don't exec anything during "source", orse <C-c> won't work
+  ## USAGE: $ . /d/miur/wf && mw
+  mw(){ inotifywait -r -m -q -e modify --format '%w%f %e' "$__here/src" | while read file event; do printf '\n---\n'; time "$__here/run" "$@"; done; }
+
+  # unset __app __here
   return 0
 fi
 
@@ -146,11 +151,24 @@ if [[ ${opts[run]:+x} ]]; then
     ## FAIL? seems doesn't work with uv/workspace
     #   SEE: https://github.com/astral-sh/uv/issues/13095
     # uvr miur "$@"
-    exec "$venvbin/miur" "$@"
+
+    # # export PYTHONTRACEMALLOC=5
+    pyargs=(
+      -IBu  # -S
+      -Xutf8  # TEMP: needed until python=3.15
+
+      -Xdev  # -Xfaulthandler
+      -Ximporttime  # =2
+      # -Xtracemalloc=5
+    )
+    # BAD: can't pass pyargs, only envvars w/o -I $ exec "$venvbin/miur" "$@"
+    # BAD:PERF:(+30ms): $ uvr python "${pyargs[@]}" "$venvbin/miur" "$@"
+    # BAD:PERF:(+10ms): $ time /d/miur/wf
+    exec "$venvbin/python" "${pyargs[@]}" "$venvbin/miur" "$@"
   fi
 fi
 
-if [[ ${opts[update]} ]]; then
+if [[ ${opts[update]-} ]]; then
 
   # 4. Specific Tool Formatters
   # pyproject-fmt: A specialized tool to format Python pyproject.toml files.

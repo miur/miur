@@ -22,23 +22,26 @@ classifiers = [
   "Typing :: Typed",
 ]
 
-# CASE-1: "miur" is meta-package -- which pulls parts
-dependencies = [
-  "miurapp",
-  "miurcache",
-  "miurcore",
-  "miursys",
-  "miurtui",
-  "miurview",
-]
+# # CASE-1: "miur" is meta-package -- which pulls parts
+# dependencies = [
+#   "miurapp",
+#   "miurcache",
+#   "miurcore",
+#   "miursys",
+#   "miurtui",
+#   "miurview",
+# ]
 
 # CASE-2: "miur" is monolith OR:TRY: provide it as "miur-all" sub-package
 # [project]
-# dependencies = []  # < only third-party here
-# [build-system]
-# requires = ["hatchling>=1.27"]
-# build-backend = "hatchling.build"
-# [tool.hatch.build.targets.wheel]
+dependencies = []  # < only third-party here
+[project.scripts]
+miur = "miur.__main__:main"
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+[tool.hatch.build.targets.wheel]
+packages = ["src/miur"]
 # # This forces the build to include the sub-packages as if they were local modules
 # packages = [
 #     "pkg/miurapp/src/miurapp",
@@ -158,12 +161,13 @@ ignore = [
   # By default, it tries not to reflow comments unless they are docstrings.
   "E501",     # <(comments>=112 > 88): ignore 'line-too-long' so Ruff won't nag
   "E741",     # <(for l in labs/lines): ambiguous-variable-name (l, I, O)
-  "E402",  # <(import after __future__ and doc): Module level import not at top of file
+  "E402",     # <(import after __future__ and doc): Module level import not at top of file
   "PLC0415",  # <(import in functions): `import` should be at the top-level of a file
   "PLR1730",  # <(keep less reassignments): `if var < 0: var=0` inof `var=max(var,0)`
   "PLR0911",  # TEMP: Too many return statements (8 > 6)
   "PLR0912",  # TEMP: Too many branches (15 > 12)
   "PLR0913",  # TEMP: Too many arguments in function definition (8 > 5)
+  "PLR1714",  # BAD: Consider merging multiple comparisons: `nm not in {b".", b".."}`
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -205,10 +209,11 @@ max-line-length = 112
 
 
 [tool.mypy]
-# Paths (Note: TOML doesn't support $MYPY_CONFIG_FILE_DIR; use relative paths)
-cache_dir = ".mypy_cache"
-python_executable = ".venv/bin/python"
+# Paths (Note: TOML doesn't support $MYPY_CONFIG_FILE_DIR; use PWD-relative paths)
+cache_dir = "/d/miur/.mypy_cache"
+python_executable = "/d/miur/.venv/bin/python"
 python_version = "3.14"
+# plugins = ["pydantic.mypy"]
 platform = "linux"
 files = ["pkg"]  # ,"tests"
 # REM? live_mode = false

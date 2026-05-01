@@ -320,15 +320,7 @@ wheels = [
 [[package]]
 name = "miur"
 version = "1.0.0"
-source = { virtual = "." }
-dependencies = [
-    { name = "miurapp" },
-    { name = "miurcache" },
-    { name = "miurcore" },
-    { name = "miursys" },
-    { name = "miurtui" },
-    { name = "miurview" },
-]
+source = { editable = "." }
 
 [package.optional-dependencies]
 all = [
@@ -389,13 +381,7 @@ requires-dist = [
     { name = "lmdb", marker = "extra == 'lmdb'", specifier = ">=1.7" },
     { name = "miur", extras = ["lmdb"], marker = "extra == 'default'" },
     { name = "miur", extras = ["lmdb", "media", "demo"], marker = "extra == 'all'" },
-    { name = "miurapp", editable = "pkg/miurapp" },
-    { name = "miurcache", editable = "pkg/miurcache" },
-    { name = "miurcore", editable = "pkg/miurcore" },
     { name = "miurdemo", marker = "extra == 'demo'", editable = "pkg/miurdemo" },
-    { name = "miursys", editable = "pkg/miursys" },
-    { name = "miurtui", editable = "pkg/miurtui" },
-    { name = "miurview", editable = "pkg/miurview" },
     { name = "pillow", marker = "extra == 'media'", specifier = ">=10.4" },
     { name = "pymupdf", marker = "extra == 'media'", specifier = ">=1.26" },
 ]

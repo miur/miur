@@ -1,3 +1,8 @@
-#!/usr/bin/env bash
-exec "${BASH_SOURCE[0]%/*}/wf" "$@"
+#!/bin/sh
+## USAGE: $ . /d/miur/wf && mw
+vx="${0%/*}/.venv/bin"
+exec "$vx/python" -IBu -Xutf8 -Xdev "$vx/miur" "$@"
+# exec "$vx/python" -IBu -Xutf8 -Xdev -Ximporttime "$vx/miur" "$@"
+## ALT:
+# exec "${BASH_SOURCE[0]%/*}/wf" "$@"
 # exec /data/aura/miur/.venv/bin/miur "$@"
