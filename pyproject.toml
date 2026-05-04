@@ -154,7 +154,7 @@ extend-exclude = ["legacy"]
 
 [tool.ruff.lint]
 # Enable Pycodestyle (E), Pyflakes (F), and Isort (I)
-select = ["E", "F", "I", "PL"]
+select = ["E", "F", "I", "PL", "ANN"]
 # REM? extend-select = [ "I" ]
 ignore = [
   # Ruff formatter does not currently support a separate 'comment-length'.
@@ -194,6 +194,7 @@ disable = [
     "too-few-public-methods",
     "invalid-name",
     "broad-exception-caught",
+    "consider-using-dict-items",
 ]
 
 [tool.pylint.miscellaneous]
@@ -248,9 +249,9 @@ enable_error_code = ["explicit-override"]
 [tool.pyright]
 pythonVersion = "3.14"
 typeCheckingMode = "strict"
-include = ["pkg"]  # ,"tests"
+include = ["pkg", "src"]  # ,"tests"
 exclude = ["legacy"]
-extraPaths = ["pkg"]
+extraPaths = ["pkg", "src"]
 venvPath = "."
 venv = ".venv"
 # FIXED: it ignores TYPE_CHECKING forward imports
