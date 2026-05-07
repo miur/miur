@@ -64,7 +64,7 @@ class OpResult:  # RENAME? Snapshot, View, Result, RetData, Data
 
     def __init__(
         self,
-        data: object,
+        data: object,  # RENAME? .out[put]
         op: OpRef | None = None,  # THINK: do I even need to store it ?
         ts: int | None = None,
         dt: int | None = None,
@@ -290,6 +290,12 @@ class PentaPanelNavi:
     def go_back(self) -> None:
         pass
 
+    def cursor_step_by(self, _steps: int) -> None:
+        # ALT: self.browse.bus.send_event(self.go_up)
+        #   WHY:BET: moving cursor up/down will be solely through .browse API
+        #   BUT:BAD: moving up/dn parent (and most other keybinds) would still involve .navi :(
+        pass
+
 
 class RootTUI:
     def __init__(self, nav: PentaPanelNavi) -> None:
@@ -308,9 +314,8 @@ class RootTUI:
 
 
 def main() -> None:
-    # print("[miur]")
     k = MiurKernel()
-    op = k.uri_to_opref("file:///data/g/miur_gen/demo")
+    op = k.uri_to_opref("file:///data/g/miur_gen/demo?op=listdir")
     # CHG: avoid hardcoding -- wrap .ops_for() into generic OpRef part of MetaSystem
     snap = k.exec(op)  # RENAME? result, ret, lst, value
     view = RowsView(snap)
