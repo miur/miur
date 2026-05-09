@@ -34,7 +34,7 @@ classifiers = [
 
 # CASE-2: "miur" is monolith OR:TRY: provide it as "miur-all" sub-package
 # [project]
-dependencies = []  # < only third-party here
+dependencies = ["wcwidth", "rich"]  # < only third-party here
 [project.scripts]
 miur = "miur.__main__:main"
 [build-system]

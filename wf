@@ -12,7 +12,10 @@ if (return 0 2>/dev/null); then
 
   ## WARN: don't exec anything during "source", orse <C-c> won't work
   ## USAGE: $ . /d/miur/wf && mw
-  mw(){ inotifywait -r -m -q -e modify --format '%w%f %e' "$__here/src" | while read file event; do printf '\n---\n'; time "$__here/run" "$@"; done; }
+  mr(){ printf '\n---\n'; time "$__here/run" "$@"; }
+  mw(){ mr "$@"; inotifywait -r -m -q -e modify --format '%w%f %e' "$__here/src" | while read; do mr "$@"; done; }
+  mj(){ local vx="$__here/.venv/bin"; printf '\n---\n'; time "$vx/python" -IBu -Xutf8 -Xdev -- "$vx/jurigged" -v --watch="$__here/src" --loop="miur.main:main" -- "$vx/miur" "$@"; }
+  alias wf="$__app"
 
   # unset __app __here
   return 0
@@ -28,7 +31,7 @@ readonly nm=${here##*/}
 readonly venvbin="$here/.venv/bin"
 
 declare -A opts=()
-while LC_COLLATE=C getopts 'AcCijlrtuvx-:' o; do
+while LC_COLLATE=C getopts 'AcCijlprtuvx-:' o; do
 case $o in :|'?') exit 2
 ;; A) exec /d/airy/ai/run -- "$here"  # "$@"
 ;; c) exec git clean -ndX -- ':!.venv'
@@ -38,6 +41,7 @@ case $o in :|'?') exit 2
 ;; i) opts[install]=1
 ;; j) opts[jurigged]=1
 ;; l) opts[lint]=1
+;; l) opts[profile]=1
 ;; r) opts[run]=1
 ;; t) opts[test]=1
 ;; u) opts[update]=1
@@ -160,6 +164,9 @@ if [[ ${opts[run]:+x} ]]; then
       -Xdev  # -Xfaulthandler
       -Ximporttime  # =2
       # -Xtracemalloc=5
+
+      # -m cProfile -s cumulative --
+      # -m cProfile -s tottime --
     )
     # BAD: can't pass pyargs, only envvars w/o -I $ exec "$venvbin/miur" "$@"
     # BAD:PERF:(+30ms): $ uvr python "${pyargs[@]}" "$venvbin/miur" "$@"
