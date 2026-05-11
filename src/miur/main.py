@@ -8,12 +8,12 @@ from typing import NamedTuple, assert_never
 # ALT:(copy-paste): //site-packages/_pytest/_io/wcwidth.py
 from wcwidth import clip, width
 
-# from typing import Iterator
+from .filecontent import FileContentProxy
 
 type DisplayList = list[TextSpan]
 
 
-class TextSpan(NamedTuple):
+class TextSpan(NamedTuple):  # RENAME: CellSpan
     x: int
     y: int
     t: str
@@ -33,14 +33,19 @@ class MiurKernel:
         with os.scandir(h) as it:
             return [x.name for x in it]
 
+    # BAD: where to cache mm/ino ? In OpenedFilesSystem to limit fd-open resources ?
+    #   DECI: or combine with "scroll/view state" ?
+    def lfs_file_content(self, h: str) -> FileContentProxy:
+        return FileContentProxy(h)
+
 
 class UI:
-    def redraw(self, names: list[str]) -> None:
+    def redraw(self, names: list[str]) -> str:
         t0 = monotonic_ns()
         displ = self.bake(names)
         self.render(displ)
         t1 = monotonic_ns()
-        print(f"[dt={(t1 - t0) / 1e6:.3f}ms (tokens={len(displ)})]")
+        return f"dt={(t1 - t0) / 1e6:.3f}ms (tokens={len(displ)})"
 
     def render(self, displ: DisplayList) -> None:
         mydrv_print = print
@@ -72,12 +77,13 @@ class UI:
         if l:
             mydrv_print(l)
 
-    def bake(self, names: list[str]) -> DisplayList:  # pylint:disable=too-many-locals
+    def bake(self, names: list[str]) -> DisplayList:
+        # pylint:disable=too-many-locals,too-many-branches
         hipatt = r"[._-]"
         boundary = "|"
         bounw = width(boundary)
         tww, twh = shutil.get_terminal_size(fallback=(80, 24))
-        vpw, vph = min(100, tww), min(3, twh)
+        vpw, vph = min(100, tww), min(5, twh)
         i = 0
         ch = 0
         lenitems = len(names)
@@ -126,6 +132,8 @@ class UI:
                     lw += abw
 
                 i += 1
+                break  # TEMP: process one item per line
+
             spacer = vpw - lw
             if spacer > 0:
                 # ALT:(string): l = wcwidth.ljust(l, vpw, " ") + "|"
@@ -161,16 +169,35 @@ class UI:
         return displ
 
 
-def main() -> None:
+def main() -> str | None:
     try:
+        perf: list[str] = []
         k = MiurKernel()
-        handle = "/etc"
-        names = list(sorted(k.lfs_listdir(handle)))
-        UI().redraw(names)
-        focused = next(nm for nm in names if nm.startswith("av"))
-        subhdl = handle + "/" + focused
-        subdir = list(sorted(k.lfs_listdir(subhdl)))
-        UI().redraw(subdir)
+        h = "/data/g/miur_gen/demo/errors/chained.py"
+        proxy = k.lfs_file_content(h)
+        lnview = [
+            f"#{i} {l.rstrip('\r\n') or ' '}"
+            for i, l in enumerate(proxy[5:10], start=5)
+        ]
+        # print(lnview)
+        perf.append(UI().redraw(lnview))
+
+        # handle = "/etc"
+        # names = list(sorted(k.lfs_listdir(handle)))
+        # perf.append(UI().redraw(names))
+        #
+        # focused = next(nm for nm in names if nm.startswith("av"))  # TEMP
+        #
+        # subhdl = handle + "/" + focused
+        # subdir = list(sorted(k.lfs_listdir(subhdl)))
+        # UI().redraw(subdir)
+        # perf.append(UI().redraw(subdir))
+        perfstr = " | ".join(perf)
+        if "jurigged" in __import__("sys").modules:
+            return perfstr
+        print(perfstr)
+        return None
+
     except Exception:
         ## PERF:BAD: +400ms
         # from rich.traceback import install
