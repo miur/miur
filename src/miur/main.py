@@ -1,6 +1,8 @@
 import os
 import re
 import shutil
+from collections.abc import Sequence
+from dataclasses import dataclass
 from time import monotonic_ns
 from typing import NamedTuple, assert_never
 
@@ -39,10 +41,43 @@ class MiurKernel:
         return FileContentProxy(h)
 
 
+@dataclass(slots=True)
+class VisibleArea:
+    beg_cursor: int
+    end_hint: int
+    end_actual: int = 0
+
+
+@dataclass(slots=True, kw_only=True)
+class Item:
+    text: str
+    idx: int
+    h: object
+
+
+class LazyTextLinesView(Sequence[Item]):
+    order_by: None = None
+
+    def __init__(self, provider: FileContentProxy) -> None:
+        self._provider = provider
+        # if self.order_by:
+        #     self._lst.sort(key=self.order_by)  # OR key=str
+
+    def __len__(self) -> int:
+        return self._provider.count_lines()
+
+    def __getitem__(self, i: int) -> Item:
+        # FIXME: cache loff to continue seeking next line
+        #   OR:BET? new func to iterate from starting line
+        loff = self._provider.seek_fwd_to_line_nth(i)
+        line = next(self._provider.read_lines(1, offset=loff))
+        return Item(text=f"{line.rstrip('\r\n') or ' '}", idx=i, h=(loff, line))
+
+
 class UI:
-    def redraw(self, names: list[str]) -> str:
+    def redraw(self, items: Sequence[Item], va: VisibleArea) -> str:
         t0 = monotonic_ns()
-        displ = self.bake(names)
+        displ = self.bake(items, va)
         self.render(displ)
         t1 = monotonic_ns()
         return f"dt={(t1 - t0) / 1e6:.3f}ms (tokens={len(displ)})"
@@ -77,96 +112,125 @@ class UI:
         if l:
             mydrv_print(l)
 
-    def bake(self, names: list[str]) -> DisplayList:
+    def bake(self, items: Sequence[Item], va: VisibleArea) -> DisplayList:
         # pylint:disable=too-many-locals,too-many-branches
-        hipatt = r"[._-]"
-        boundary = "|"
-        bounw = width(boundary)
         tww, twh = shutil.get_terminal_size(fallback=(80, 24))
-        vpw, vph = min(100, tww), min(5, twh)
-        i = 0
-        ch = 0
-        lenitems = len(names)
+        vpw, vph = min(100, tww), min(7, twh)
+        vpx, vpy = 0, 0
+
+        # BET: pylint:disable=fixme
+        #   [_] use list of layers, ordered by zi
+        #   [_] add optional check for non-overlapping inside each layer
+        #   [_] use list/tuple of tokens per visual line -- to explore them in miur easier
         displ: DisplayList = []
 
-        # ATT:TEMP:RND: always draw full list of spacers to override trash
-        while i < lenitems and ch < vph:
-            pfx = f"{ch + 1:02d}:"
-            pw = width(pfx)
-            displ.append(TextSpan(0, ch, pfx, pw))
+        i = va.beg_cursor
+        lenitems = len(items)
+        # ATT:(cy<vph):TEMP:RND: always draw full list of spacers to override trash
+        cy = vpy
+        while i < lenitems and cy < vph:
+            cx = vpx
+
+            # XLR: how to chain this better
+            def unfit(ss: str, wc: int = 0) -> bool:
+                nonlocal cx
+                sw = wc or width(ss)
+                if cx + sw > vpw:
+                    return True
+                displ.append(TextSpan(cx, cy, ss, sw))
+                cx += sw
+                return False
+
+            if unfit(f"{cy + 1:02d}:"):
+                break
+
             # PERF? merge multiple tokens with same style into continuous spans
             #   BUT:BAD? mouse-click and diff-update will be much more messy?
-            lw = pw
             while i < lenitems:
-                sw = 1
-                if lw + sw > vpw:
+                okcx = cx
+                oklen = len(displ)
+                # CHG?(" " * 1): use Spacer(1) ?
+                if unfit(" " * 1) or unfit(f"{i:02d}:"):
+                    cx = okcx
+                    del displ[oklen:]
                     break
-                displ.append(TextSpan(lw, ch, " " * sw, sw))  # CHG? use Spacer(1) ?
-                lw += sw
 
-                text = names[i]
+                item = items[i]
+                text = item.text
                 tw = width(text)
-                if lw + tw > vpw:
+                if cx + tw > vpw:
+                    cx = okcx
+                    del displ[oklen:]
                     break
-
-                ## ALT: no hi
-                # displ.append(TextSpan(lw, ch, text, tw))
-                # lw += tw
-                pe = 0
-                for m in re.finditer(hipatt, text):
-                    if m.start() > pe:
-                        ab = text[pe : m.start()]
-                        abw = width(ab)
-                        displ.append(TextSpan(lw, ch, ab, abw))
-                        lw += abw
-                    needle = m.group()
-                    ndw = width(needle)
-                    sid = hipatt.index(needle)  # TEMP:HACK: diff style
-                    displ.append(TextSpan(lw, ch, needle, ndw, sid=sid))
-                    lw += ndw
-                    pe = m.end()
-                if pe < len(text):
-                    ab = text[pe:]
-                    abw = width(ab)
-                    displ.append(TextSpan(lw, ch, ab, abw))
-                    lw += abw
+                ## ALT:(no hi): displ.append(TextSpan(cx, cy, text, tw)); cx += tw
+                cx = self.enrich_hi(displ, text, cx, cy)
 
                 i += 1
                 break  # TEMP: process one item per line
-
-            spacer = vpw - lw
-            if spacer > 0:
-                # ALT:(string): l = wcwidth.ljust(l, vpw, " ") + "|"
-                displ.append(TextSpan(lw, ch, " " * spacer, spacer))
-                lw += spacer
-                displ.append(TextSpan(lw, ch, boundary, bounw))
-            elif spacer == 0:
-                displ.append(TextSpan(lw, ch, boundary, bounw))
-            else:
-                # WARN: list needs to be sorted by .x
-                # ALT:PERF: for large lists use bisect()
-                broken_token_idx = -1
-                for i in range(len(displ) - 1, -1, -1):
-                    t = displ[i]
-                    if t.y != ch:
-                        break  # <CASE: single line only
-                    # FAIL:FIXME: splice if exactly bw two tokens
-                    if t.x <= vpw < t.x + t.wc:
-                        broken_token_idx = i
-                        break  # <FIXME? also split multiple overlapping tokens
-                if broken_token_idx != -1:
-                    t = displ[broken_token_idx]
-                    # FAIL:(only works on ascii): l = l[:vpw] + "|" + l[vpw:]
-                    a = clip(t.t, 0, vpw - t.x, fillchar="·")
-                    b = clip(t.t, vpw - t.x, tww - vpw, fillchar="·")
-                    wa = width(a)
-                    displ[broken_token_idx : broken_token_idx + 1] = [
-                        t._replace(t=a, wc=wa),
-                        TextSpan(t.x + wa, t.y, boundary, bounw),
-                        t._replace(t=b, wc=width(b)),
-                    ]
-            ch += 1
+            self.pad_boundary(displ, cx, cy, vpw, tww)
+            cy += 1
+        va.end_actual = i
         return displ
+
+    def enrich_hi(self, displ: DisplayList, text: str, cx: int, cy: int) -> int:
+        hipatt = r"[._-]"
+        pe = 0
+        for m in re.finditer(hipatt, text):
+            if m.start() > pe:
+                ab = text[pe : m.start()]
+                abw = width(ab)
+                displ.append(TextSpan(cx, cy, ab, abw))
+                cx += abw
+            needle = m.group()
+            ndw = width(needle)
+            sid = hipatt.index(needle)  # TEMP:HACK: diff style
+            displ.append(TextSpan(cx, cy, needle, ndw, sid=sid))
+            cx += ndw
+            pe = m.end()
+        if pe < len(text):
+            ab = text[pe:]
+            abw = width(ab)
+            displ.append(TextSpan(cx, cy, ab, abw))
+            cx += abw
+        return cx
+
+    def pad_boundary(  # pylint:disable=too-many-arguments,too-many-positional-arguments
+        self, displ: DisplayList, cx: int, cy: int, vpw: int, tww: int
+    ) -> int:
+        boundary = "|"
+        bounw = width(boundary)
+        spacer = vpw - cx
+        if spacer > 0:
+            # ALT:(string): l = wcwidth.ljust(l, vpw, " ") + "|"
+            displ.append(TextSpan(cx, cy, " " * spacer, spacer))
+            cx += spacer
+            displ.append(TextSpan(cx, cy, boundary, bounw))
+        elif spacer == 0:
+            displ.append(TextSpan(cx, cy, boundary, bounw))
+        else:
+            # WARN: list needs to be sorted by .x
+            # ALT:PERF: for large lists use bisect()
+            broken_token_idx = -1
+            for i in range(len(displ) - 1, -1, -1):
+                t = displ[i]
+                if t.y != cy:
+                    break  # <CASE: single line only
+                # FAIL:FIXME: splice if exactly bw two tokens
+                if t.x <= vpw < t.x + t.wc:
+                    broken_token_idx = i
+                    break  # <FIXME? also split multiple overlapping tokens
+            if broken_token_idx != -1:
+                t = displ[broken_token_idx]
+                # FAIL:(only works on ascii): l = l[:vpw] + "|" + l[vpw:]
+                a = clip(t.t, 0, vpw - t.x, fillchar="·")
+                b = clip(t.t, vpw - t.x, tww - vpw, fillchar="·")
+                wa = width(a)
+                displ[broken_token_idx : broken_token_idx + 1] = [
+                    t._replace(t=a, wc=wa),
+                    TextSpan(t.x + wa, t.y, boundary, bounw),
+                    t._replace(t=b, wc=width(b)),
+                ]
+        return cx
 
 
 def main() -> str | None:
@@ -175,12 +239,9 @@ def main() -> str | None:
         k = MiurKernel()
         h = "/data/g/miur_gen/demo/errors/chained.py"
         proxy = k.lfs_file_content(h)
-        lnview = [
-            f"#{i} {l.rstrip('\r\n') or ' '}"
-            for i, l in enumerate(proxy[5:10], start=5)
-        ]
-        # print(lnview)
-        perf.append(UI().redraw(lnview))
+        lazyview = LazyTextLinesView(proxy)
+        va = VisibleArea(4, 11)
+        perf.append(UI().redraw(lazyview, va))
 
         # handle = "/etc"
         # names = list(sorted(k.lfs_listdir(handle)))
@@ -199,8 +260,7 @@ def main() -> str | None:
         return None
 
     except Exception:
-        ## PERF:BAD: +400ms
-        # from rich.traceback import install
-        #
-        # install(show_locals=True)
+        from rich.traceback import install  # PERF:BAD: +400ms
+
+        install(show_locals=True)
         raise

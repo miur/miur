@@ -4,6 +4,7 @@ import os
 from typing import Iterator
 
 
+# TODO:ENH: cache files <512kiB and reload them on change inof reopening mmap
 class FileContentProxy:
     __slots__ = ("_path", "_fd", "_mm", "_st_ino", "_st_dev", "_aligned_offset")
     _fd: int  # ALT:(int): type FilDes = int
@@ -75,18 +76,19 @@ class FileContentProxy:
         return self.read_lines()
 
     def __getitem__(self, kx: slice, /) -> list[str]:
-        linebegoff = 0 if kx.start is None else self.seek_to_line_nth(kx.start)
+        linebegoff = 0 if kx.start is None else self.seek_fwd_to_line_nth(kx.start)
         lnum = (kx.stop or 0) - (kx.start or 0)
         return list(self.read_lines(lnum, offset=linebegoff))
 
-    def seek_to_line_nth(self, lnum: int, relative_to_offset: int = 0) -> int:
+    def seek_fwd_to_line_nth(self, lnum: int, relative_to_offset: int = 0) -> int:
         self._ensure_mmap()
         cur = relative_to_offset - self._aligned_offset
         find = self._mm.find
         for _ in range(lnum):
             end = find(b"\n", cur)
             if end == -1:
-                return len(self._mm)  # CHG? eof OR raise Error
+                # return len(self._mm)  # OR: -1 | eof
+                raise ValueError(lnum)
             cur = end + 1
         return cur
 
@@ -119,8 +121,23 @@ class FileContentProxy:
         except BlockingIOError:
             return None  # File is locked by an exclusive writer
 
+    # WARN: don't cache it -- mmap can be externally overwritten and change number of lines
+    def count_lines(self, start: int = 0, end: int = 0) -> int:
+        self._ensure_mmap()
+        count = 0
+        pos = start - self._aligned_offset - 1
+        eom = (end or min(10_000_000, self._mm.size())) - self._aligned_offset
+        assert -1 <= pos < eom <= self._mm.size()
+        find = self._mm.find
+        while (pos := find(b"\n", pos + 1, eom)) != -1:
+            count += 1
+        if self._mm[-1:] != b"\n":
+            count += 1
+        return count
+
     def read_lines(self, num: int = 0, offset: int = 0) -> Iterator[str]:
         self._ensure_mmap()
+        # CHECK? self._mm.seek(self._skipped_padding)
         self._mm.seek(offset - self._aligned_offset)
         readline_bytes = self._mm.readline
         if not num:  # CASE: read till end or break from loop
@@ -142,10 +159,11 @@ class FileContentProxy:
         mm = self._mm
         lines: list[str] = []
         assert mm
+        find = self._mm.find
         with memoryview(mm) as mv:
             for _ in range(num_lines):
                 # INFO: find() on mmap is fast; find() on memoryview is slow
-                end_pos = mm.find(b"\n", cur_pos)
+                end_pos = find(b"\n", cur_pos)
                 if end_pos == -1:
                     if cur_pos < len(mm):
                         lines.append(str(mv[cur_pos:], encoding="utf-8"))
