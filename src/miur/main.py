@@ -55,6 +55,16 @@ class Item:
     h: object
 
 
+def make_printable(text: str) -> str:
+    # VIZ: https://en.wikipedia.org/wiki/List_of_Unicode_characters#Control_Pictures
+    # text = text.rstrip("\r\n") or " "
+    text = text.replace(os.linesep, "␤")  # "↵¬"
+    # text = text.replace("\t", "▸ ").replace("\x7f", "␡").replace(" ", "␣")
+    NUL = ord("␀")
+    SP = ord(" ")
+    return "".join(chr(NUL + ci) if (ci := ord(c)) < SP else c for c in text)
+
+
 class LazyTextLinesView(Sequence[Item]):
     order_by: None = None
 
@@ -71,7 +81,7 @@ class LazyTextLinesView(Sequence[Item]):
         #   OR:BET? new func to iterate from starting line
         loff = self._provider.seek_fwd_to_line_nth(i)
         line = next(self._provider.read_lines(1, offset=loff))
-        return Item(text=f"{line.rstrip('\r\n') or ' '}", idx=i, h=(loff, line))
+        return Item(text=line, idx=i, h=(loff, line))
 
 
 class UI:
@@ -156,7 +166,7 @@ class UI:
                     break
 
                 item = items[i]
-                text = item.text
+                text = make_printable(item.text)
                 tw = width(text)
                 if cx + tw > vpw:
                     cx = okcx
@@ -167,7 +177,8 @@ class UI:
 
                 i += 1
                 break  # TEMP: process one item per line
-            self.pad_boundary(displ, cx, cy, vpw, tww)
+            if vpw < tww:
+                self.pad_boundary(displ, cx, cy, vpw, tww)
             cy += 1
         va.end_actual = i
         return displ
@@ -197,7 +208,7 @@ class UI:
     def pad_boundary(  # pylint:disable=too-many-arguments,too-many-positional-arguments
         self, displ: DisplayList, cx: int, cy: int, vpw: int, tww: int
     ) -> int:
-        boundary = "|"
+        boundary = "|"  # ALT="|\n↪"
         bounw = width(boundary)
         spacer = vpw - cx
         if spacer > 0:
