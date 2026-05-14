@@ -1,7 +1,6 @@
 import os
 import re
 import shutil
-from collections.abc import Sequence
 from dataclasses import dataclass
 from time import monotonic_ns
 from typing import NamedTuple, assert_never
@@ -28,24 +27,17 @@ class TextSpan(NamedTuple):  # RENAME: CellSpan
     #     return width(self.t)
 
 
-class MiurKernel:
-    # def exec(self, op: object) -> object:
-    #     return None
-    def lfs_listdir(self, h: str) -> list[str]:
-        with os.scandir(h) as it:
-            return [x.name for x in it]
-
-    # BAD: where to cache mm/ino ? In OpenedFilesSystem to limit fd-open resources ?
-    #   DECI: or combine with "scroll/view state" ?
-    def lfs_file_content(self, h: str) -> FileContentProxy:
-        return FileContentProxy(h)
-
-
 @dataclass(slots=True)
-class VisibleArea:
+class VisibleArea:  # pylint:disable=too-many-instance-attributes
     beg_cursor: int
     end_hint: int
     end_actual: int = 0
+    wnd_w: int = 0
+    wnd_h: int = 0
+    vp_w: int = 0
+    vp_h: int = 0
+    vp_x: int = 0
+    vp_y: int = 0
 
 
 @dataclass(slots=True, kw_only=True)
@@ -65,38 +57,37 @@ def make_printable(text: str) -> str:
     return "".join(chr(NUL + ci) if (ci := ord(c)) < SP else c for c in text)
 
 
-class LazyTextLinesView(Sequence[Item]):
-    order_by: None = None
+class MiurKernel:
+    # def exec(self, op: object) -> object:
+    #     return None
+    def lfs_listdir(self, h: str) -> list[str]:
+        with os.scandir(h) as it:
+            return [x.name for x in it]
 
-    def __init__(self, provider: FileContentProxy) -> None:
-        self._provider = provider
+    # BAD: where to cache mm/ino ? In OpenedFilesSystem to limit fd-open resources ?
+    #   DECI: or combine with "scroll/view state" ?
+    def lfs_file_content(self, h: str) -> FileContentProxy:
+        return FileContentProxy(h)
+
+    def view_len_items(self, h: str) -> int:
+        # FIXME: should be able to return Infinity or Unknown
+        return self.lfs_file_content(h).count_lines()
+
+    def view_get_item(self, h: str, i: int) -> Item:
         # if self.order_by:
         #     self._lst.sort(key=self.order_by)  # OR key=str
-
-    def __len__(self) -> int:
-        return self._provider.count_lines()
-
-    def __getitem__(self, i: int) -> Item:
         # FIXME: cache loff to continue seeking next line
         #   OR:BET? new func to iterate from starting line
-        loff = self._provider.seek_fwd_to_line_nth(i)
-        line = next(self._provider.read_lines(1, offset=loff))
+        proxy = self.lfs_file_content(h)
+        loff = proxy.seek_fwd_to_line_nth(i)
+        line = next(proxy.read_lines(1, offset=loff))
         return Item(text=line, idx=i, h=(loff, line))
 
-
-class UI:
-    def redraw(self, items: Sequence[Item], va: VisibleArea) -> str:
-        t0 = monotonic_ns()
-        displ = self.bake(items, va)
-        self.render(displ)
-        t1 = monotonic_ns()
-        return f"dt={(t1 - t0) / 1e6:.3f}ms (tokens={len(displ)})"
-
-    def render(self, displ: DisplayList) -> None:
-        mydrv_print = print
+    def tui_render_term_strings(self, displ: DisplayList) -> list[str]:
         py = 0
         nx = 0
         l = ""
+        strings: list[str] = []
         for token in displ:
             match token:
                 case TextSpan(x, y, text, wc, sid):
@@ -104,7 +95,7 @@ class UI:
                     # print(token, nx)
                     if nl := y - py:
                         assert nl > 0
-                        mydrv_print(l + "\n" * nl, end="")
+                        strings.append(l + "\n" * nl)
                         l = ""
                         nx = 0
                     assert x == nx
@@ -120,13 +111,11 @@ class UI:
                     #   derived on ordered list of prev/next tokens
                     assert_never(token)
         if l:
-            mydrv_print(l)
+            strings.append(l)
+        return strings
 
-    def bake(self, items: Sequence[Item], va: VisibleArea) -> DisplayList:
+    def tui_bake_display_area(self, handle: str, va: VisibleArea) -> DisplayList:
         # pylint:disable=too-many-locals,too-many-branches
-        tww, twh = shutil.get_terminal_size(fallback=(80, 24))
-        vpw, vph = min(100, tww), min(7, twh)
-        vpx, vpy = 0, 0
 
         # BET: pylint:disable=fixme
         #   [_] use list of layers, ordered by zi
@@ -135,17 +124,17 @@ class UI:
         displ: DisplayList = []
 
         i = va.beg_cursor
-        lenitems = len(items)
+        lenitems = self.view_len_items(handle)
         # ATT:(cy<vph):TEMP:RND: always draw full list of spacers to override trash
-        cy = vpy
-        while i < lenitems and cy < vph:
-            cx = vpx
+        cy = va.vp_y
+        while i < lenitems and cy < va.vp_h:
+            cx = va.vp_x
 
             # XLR: how to chain this better
             def unfit(ss: str, wc: int = 0) -> bool:
                 nonlocal cx
                 sw = wc or width(ss)
-                if cx + sw > vpw:
+                if cx + sw > va.vp_w:
                     return True
                 displ.append(TextSpan(cx, cy, ss, sw))
                 cx += sw
@@ -165,25 +154,26 @@ class UI:
                     del displ[oklen:]
                     break
 
-                item = items[i]
+                # item = items[i]
+                item = self.view_get_item(handle, i)
                 text = make_printable(item.text)
                 tw = width(text)
-                if cx + tw > vpw:
+                if cx + tw > va.vp_w:
                     cx = okcx
                     del displ[oklen:]
                     break
                 ## ALT:(no hi): displ.append(TextSpan(cx, cy, text, tw)); cx += tw
-                cx = self.enrich_hi(displ, text, cx, cy)
+                cx = self.tui_enrich_hi(displ, text, cx, cy)
 
                 i += 1
                 break  # TEMP: process one item per line
-            if vpw < tww:
-                self.pad_boundary(displ, cx, cy, vpw, tww)
+            if va.vp_w < va.wnd_w:
+                self.tui_pad_boundary(displ, cx, cy, va.vp_w, va.wnd_w)
             cy += 1
         va.end_actual = i
         return displ
 
-    def enrich_hi(self, displ: DisplayList, text: str, cx: int, cy: int) -> int:
+    def tui_enrich_hi(self, displ: DisplayList, text: str, cx: int, cy: int) -> int:
         hipatt = r"[._-]"
         pe = 0
         for m in re.finditer(hipatt, text):
@@ -205,7 +195,7 @@ class UI:
             cx += abw
         return cx
 
-    def pad_boundary(  # pylint:disable=too-many-arguments,too-many-positional-arguments
+    def tui_pad_boundary(  # pylint:disable=too-many-arguments,too-many-positional-arguments
         self, displ: DisplayList, cx: int, cy: int, vpw: int, tww: int
     ) -> int:
         boundary = "|"  # ALT="|\n↪"
@@ -244,15 +234,28 @@ class UI:
         return cx
 
 
+class UI:
+    def redraw(self, kernel: MiurKernel, handle: str, va: VisibleArea) -> str:
+        t0 = monotonic_ns()
+        va.wnd_w, va.wnd_h = shutil.get_terminal_size(fallback=(80, 24))
+        va.vp_w, va.vp_h = min(100, va.wnd_w), min(7, va.wnd_h)
+        displ = kernel.tui_bake_display_area(handle, va)
+        strings = kernel.tui_render_term_strings(displ)
+        t1 = monotonic_ns()
+        # NOTE: separate print() delays from frame preps measurement
+        mydrv_print = print
+        mydrv_print("".join(strings))
+        t2 = monotonic_ns()
+        return f"dt={(t1 - t0) / 1e6:.3f}ms [+{(t2 - t1) / 1e6:.3f}ms] (tokens={len(displ)})"
+
+
 def main() -> str | None:
     try:
         perf: list[str] = []
         k = MiurKernel()
         h = "/data/g/miur_gen/demo/errors/chained.py"
-        proxy = k.lfs_file_content(h)
-        lazyview = LazyTextLinesView(proxy)
         va = VisibleArea(4, 11)
-        perf.append(UI().redraw(lazyview, va))
+        perf.append(UI().redraw(k, h, va))
 
         # handle = "/etc"
         # names = list(sorted(k.lfs_listdir(handle)))
