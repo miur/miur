@@ -46,7 +46,8 @@ def main() -> str | None:
     try:
         perf: list[str] = []
         k = MiurKernel()
-        h = "/data/g/miur_gen/demo/errors/chained.py"
+        # h = "/data/g/miur_gen/demo/errors/chained.py"
+        h = "/etc"
         va = tuisystem.VisibleArea(4, 11)
         perf.append(UI().redraw(k, h, va))
 
