@@ -2,31 +2,33 @@ import shutil
 from time import monotonic_ns
 from typing import TYPE_CHECKING
 
-from .systems.localfilesystem import LocalFileSystem
-from .systems.tuisystem import TuiSystem, VisibleArea
-from .systems.viewsystem import ViewSystem
+from .systems import filecontentsystem as FCS
+from .systems import localfilesystem as LFS
+from .systems import textsystem, tuisystem, viewsystem
 
 
 class MiurKernel:
     def __init__(self) -> None:
-        self.lfs = LocalFileSystem(self)
-        self.view = ViewSystem(self)
-        self.tui = TuiSystem(self)
+        self.lfs = LFS.LocalFileSystem(self)
+        self.file = FCS.FileContentSystem(self)
+        self.text = textsystem.TextSystem(self)
+        self.view = viewsystem.ViewSystem(self)
+        self.tui = tuisystem.TuiSystem(self)
 
     # def exec(self, op: object) -> object:
     #     return None
 
 
 if TYPE_CHECKING:
-    from .systems import localfilesystem, tuisystem, viewsystem
-
-    _lfs: localfilesystem.IKernel = MiurKernel()
+    _lfs: LFS.IKernel = MiurKernel()
+    _file: FCS.IKernel = MiurKernel()
+    _text: textsystem.IKernel = MiurKernel()
     _view: viewsystem.IKernel = MiurKernel()
     _tui: tuisystem.IKernel = MiurKernel()
 
 
 class UI:
-    def redraw(self, kernel: MiurKernel, handle: str, va: VisibleArea) -> str:
+    def redraw(self, kernel: MiurKernel, handle: str, va: tuisystem.VisibleArea) -> str:
         t0 = monotonic_ns()
         va.wnd_w, va.wnd_h = shutil.get_terminal_size(fallback=(80, 24))
         va.vp_w, va.vp_h = min(100, va.wnd_w), min(7, va.wnd_h)
@@ -45,7 +47,7 @@ def main() -> str | None:
         perf: list[str] = []
         k = MiurKernel()
         h = "/data/g/miur_gen/demo/errors/chained.py"
-        va = VisibleArea(4, 11)
+        va = tuisystem.VisibleArea(4, 11)
         perf.append(UI().redraw(k, h, va))
 
         # handle = "/etc"

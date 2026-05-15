@@ -208,6 +208,10 @@ expected-line-ending-format = "LF"
 ignore-long-lines = "^\\s*(#.*\\s+)?https?://\\S+$"
 max-line-length = 112
 
+[tool.pylint.design]
+max-args=6
+max-positional-arguments=6
+
 
 [tool.mypy]
 # Paths (Note: TOML doesn't support $MYPY_CONFIG_FILE_DIR; use PWD-relative paths)
