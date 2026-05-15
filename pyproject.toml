@@ -150,7 +150,7 @@ skip_covered = true
 target-version = "py314"
 line-length = 88
 src = ["pkg"]  # ,"tests"
-extend-exclude = ["legacy"]
+extend-exclude = ["legacy", "#"]
 
 [tool.ruff.lint]
 # Enable Pycodestyle (E), Pyflakes (F), and Isort (I)
@@ -216,9 +216,10 @@ python_executable = "/d/miur/.venv/bin/python"
 python_version = "3.14"
 # plugins = ["pydantic.mypy"]
 platform = "linux"
-files = ["pkg"]  # ,"tests"
+files = ["src"]  # "pkg","tests"
 # REM? live_mode = false
-exclude = ["^legacy/"]  # [".git", ".venv", "out"]
+exclude = ["^legacy/", "(^|/)#(/|$)"]  # [".git", ".venv", "out"]
+# '^src/.*/bad_module\\.py$'
 # exclude = '''(?x)(
 #     ^\.(git|reuse|venv)(/|$)            # hidden top-folders
 #
@@ -249,8 +250,8 @@ enable_error_code = ["explicit-override"]
 [tool.pyright]
 pythonVersion = "3.14"
 typeCheckingMode = "strict"
-include = ["pkg", "src"]  # ,"tests"
-exclude = ["legacy"]
+include = ["src"]  # "pkg","tests"
+exclude = ["legacy", "**/#"]
 extraPaths = ["pkg", "src"]
 venvPath = "."
 venv = ".venv"

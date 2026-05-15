@@ -322,6 +322,8 @@ name = "miur"
 version = "1.0.0"
 source = { editable = "." }
 dependencies = [
+    { name = "rich" },
+    { name = "watchdog" },
     { name = "wcwidth" },
 ]
 
@@ -387,6 +389,8 @@ requires-dist = [
     { name = "miurdemo", marker = "extra == 'demo'", editable = "pkg/miurdemo" },
     { name = "pillow", marker = "extra == 'media'", specifier = ">=10.4" },
     { name = "pymupdf", marker = "extra == 'media'", specifier = ">=1.26" },
+    { name = "rich" },
+    { name = "watchdog" },
     { name = "wcwidth" },
 ]
 provides-extras = ["lmdb", "media", "demo", "all", "default"]

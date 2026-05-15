@@ -103,6 +103,7 @@ fi
 if [[ ${opts[lint]:+x} ]]; then
   uvr --all-packages ruff check .
   uvr --all-packages basedpyright
+  uvr --all-packages mypy .
   uvr --all-packages bandit .
   # uvr mypy .
   # uvr pylint .
