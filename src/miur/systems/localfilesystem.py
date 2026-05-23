@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 
 type FDInt = int
-type HPath = str
+type HPath = str  # PERF:BET? use "bytes"
 
 
 class ListdirProxy(NamedTuple):

@@ -7,6 +7,7 @@ from .systems import localfilesystem as LFS
 from .systems import textsystem, tuisystem, viewsystem
 
 
+# THINK: do we even need all these classes, or C-like global funcs will do?
 class MiurKernel:
     def __init__(self) -> None:
         self.lfs = LFS.LocalFileSystem(self)
@@ -15,8 +16,22 @@ class MiurKernel:
         self.view = viewsystem.ViewSystem(self)
         self.tui = tuisystem.TuiSystem(self)
 
+    def list_systems(self) -> list[str]:
+        return [k for k, v in vars().items() if v.__class__.__name__.endswith("System")]
+
     # def exec(self, op: object) -> object:
     #     return None
+
+    # TODO? NaviSystem
+    # TODO: CentralPipeline/Sequence
+    def navi_sequence(
+        self,
+        handle: str,
+        va: tuisystem.VisibleArea,
+    ) -> tuple[tuisystem.DisplayList, list[str]]:
+        displ = self.tui.bake_display_area(handle, va)
+        strings = self.tui.render_term_strings(displ)
+        return displ, strings
 
 
 if TYPE_CHECKING:
@@ -32,8 +47,7 @@ class UI:
         t0 = monotonic_ns()
         va.wnd_w, va.wnd_h = shutil.get_terminal_size(fallback=(80, 24))
         va.vp_w, va.vp_h = min(100, va.wnd_w), min(7, va.wnd_h)
-        displ = kernel.tui.bake_display_area(handle, va)
-        strings = kernel.tui.render_term_strings(displ)
+        displ, strings = kernel.navi_sequence(handle, va)
         t1 = monotonic_ns()
         # NOTE: separate print() delays from frame preps measurement
         mydrv_print = print

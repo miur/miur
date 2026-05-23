@@ -95,6 +95,7 @@ dev = [
   "jurigged[develoop]>=0.6",
   "mypy>=1.19.1",
   "pylint>=4.0.5",
+  "pylint-venv>=3.0.4",
   "pytest>=9.0.2",
   "pytest-cov>=7.0.0",
   "pytest-durations>=1.6.2",
@@ -183,6 +184,11 @@ py-version = "3.14"
 ignore-paths = ["legacy/.*"]
 ignore = ["t", "alt", "doc", "&", "#", "pkg", "_try", ".git", ".reuse", ".venv"]
 ignore-patterns = ["^[_#&].*"]
+init-hook = """
+try: import pylint_venv
+except ImportError: pass
+else: pylint_venv.inithook()
+"""
 
 [tool.pylint.messages_control]
 disable = [
