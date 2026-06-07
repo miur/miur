@@ -49,11 +49,12 @@ class FileContentSystem:
         self._mmap_zones_maxnum = 100
         # self._aligned_offset: int
 
-    def find_fn(self, h: HPath) -> Callable[[bytes, int, int], int]:
+    def find_fn(self, h: HPath) -> Callable[[bytes, int, int | None], int]:
         cp = self._ensure_cached(h, 0, 0, None)
         if not cp:
             raise RuntimeError()
-        return cp.data.find
+        fd = cp.data.find
+        return lambda s, b, e: fd(s, b) if e is None else fd(s, b, e)
 
     def size(self, h: HPath) -> int:
         cp = self._ensure_cached(h, 0, 0, None)
@@ -61,6 +62,9 @@ class FileContentSystem:
             raise RuntimeError()
         if isinstance(cp.data, bytes):
             return len(cp.data)
+        # WARN: len(mm): Returns the size of the currently memory-mapped buffer.
+        #   If you resize the memory map, this value shifts to match the active window of bytes you can read.
+        # * mm.size(): Returns the size of the underlying file on disk when the mmap was initially opened.
         return cp.data.size()
 
     def readline(self, h: HPath, offset: int) -> bytes:
@@ -139,6 +143,7 @@ class FileContentSystem:
         # WARN: on Windows, st_ino is less reliable
         #   BUT recreation usually requires closing the handle anyway
         #   ALSO: on Windows file can't be deleted if mapped, but recreation can still occur
+        assert st and fd  # WTF:WHY: error: "st" (reportPossiblyUnboundVariable)
         was_replaced = st.st_ino != cp.st_ino or st.st_dev != cp.st_dev
         was_resized = st.st_size != cp.st_size
         maybe_modified = st.st_mtime_ns != cp.st_mtime_ns

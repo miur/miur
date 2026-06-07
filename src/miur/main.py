@@ -4,7 +4,7 @@ from itertools import pairwise
 from time import monotonic_ns
 
 from .kernel import MiurKernel
-from .systems.tuisystem import VisibleArea
+from .systems.tuisystem import DisplayList, TextSpan, VisibleArea, width
 from .uidrv.curses_drv import CursesUIDriver
 
 g_dkpi: dict[str, int] = {}
@@ -22,26 +22,49 @@ def main_navi() -> str:
     ## TODO: multi-window UIDriver for synchronous navigation on side-monitor
     # from .uidrv.printtext_drv import PrintTextUIDriver
     # with PrintTextUIDriver() as ui:
+    displ: DisplayList = []
     with CursesUIDriver() as ui:
-        kpi("bake")
-        # THINK: ui.bake() to apply UI-specific constrains ?
-        #   BUT: ui-model lives in .kernel, so .drv should be dumb
-        #     ~~ unless "baking" inserts colorcodes
-        va.wnd_w, va.wnd_h = ui.sizewh()
-        va.vp_w, va.vp_h = min(100, va.wnd_w), min(7, va.wnd_h)
-        displ, _lines = k.navi_sequence(nvid, va)
+        while True:
+            kpi("bake")  # NOTE: overwrites prev values -> so keeps only last frame
+            # THINK: ui.bake() to apply UI-specific constrains ?
+            #   BUT: ui-model lives in .kernel, so .drv should be dumb
+            #     ~~ unless "baking" inserts colorcodes
+            va.wnd_w, va.wnd_h = ui.sizewh()
+            va.vp_w, va.vp_h = min(100, va.wnd_w), min(7, max(1, va.wnd_h - 1))
+            displ, _lines = k.navi_sequence(nvid, va)
 
-        kpi("draw")
-        # ui.draw_lines(lines)
-        ui.draw_displ(displ)
-        kpi("done")
-        input()
+            import curses
 
-    kpistr = " ".join(
-        f"{nm}={(t1 - t0) / 1e6:.3f}ms"
-        for (nm, t0), (_, t1) in pairwise(sorted(g_dkpi.items(), key=lambda x: x[1]))
-    )
-    return f"{kpistr} (tokens={len(displ)})"
+            # FAIL:(chicken-and-egg problem): drawing time is still unknown
+            #   BAD~ show *previous frame* kpi(draw) instead of current one
+            kpistr = (
+                " ".join(
+                    f"{nm}={(t1 - t0) / 1e6:.3f}ms"
+                    for (nm, t0), (_, t1) in pairwise(
+                        sorted(g_dkpi.items(), key=lambda x: x[1])
+                    )
+                )
+                + f" (tokens={len(displ)}) {curses.COLOR_PAIRS}"
+            )
+            if va.wnd_h > 0:
+                displ.append(
+                    TextSpan(0, va.wnd_h - 1, kpistr, min(va.wnd_w, width(kpistr)))
+                )
+
+            kpi("draw")
+            # ui.draw_lines(lines)
+            ui.draw_displ(displ)
+
+            kpi("input")
+            match wch := ui.input():
+                case "q":
+                    break
+                case _:
+                    print(wch)
+                    pass
+            kpi("done")
+
+    return kpistr
 
 
 def main() -> str | None:

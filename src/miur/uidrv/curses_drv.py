@@ -6,7 +6,8 @@ from ..systems.tuisystem import DisplayList, TextSpan
 
 # SEP/OPT::
 #   * fullscreen (vs embedded piece-of-screen)
-#   * curses (vs my own native-tui) (vs blessed)
+#   * curses (vs my own native-tui) (vs textual/blessed/urwid/prompt-toolkit)
+#   * TBD: webapp/pygame
 class CursesUIDriver:
     def __init__(self) -> None:
 
@@ -23,7 +24,13 @@ class CursesUIDriver:
         self.stdscr.keypad(True)
         self._pvis = C.curs_set(0)
         C.start_color()
-        self.stdscr.nodelay(True)
+        ## DISABLED: currently I use blocking while-loop
+        ##   ALT: py$ try: get_wch() ; except curses.error: pass; curses.napms(100)
+        # self.stdscr.nodelay(True)
+        ## BAD: maybe keys should be assigned only *after* initscr
+        ##   BUT:FAIL? can't pre-set enum type for self.code2key
+        # from .curses_keys import code2key
+        # self.code2key = code2key
         return self
 
     def __exit__(self, *_a: object) -> None:
@@ -34,6 +41,14 @@ class CursesUIDriver:
         C.echo()
         C.noraw()
         C.endwin()
+
+    # TBD? translate C.KEY_HOME -> universal "<Home>" str (or my common key_enum.HOME)
+    #   WHY: to have the same keybindings for all clients
+    def input(self) -> int | str:
+        wch = self.stdscr.get_wch()
+        if isinstance(wch, str):
+            wch = C.unctrl(wch).decode("utf-8")
+        return wch
 
     def sizewh(self) -> tuple[int, int]:
         # FIXME: for embedding we may want to return whatever was set during .resize(...)

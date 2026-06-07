@@ -29,7 +29,7 @@ class TextSystem:
         cur = relative_to_offset  # - self._aligned_offset
         find = self.k.file.find_fn(h)
         for _ in range(lnum):
-            end = find(b"\n", cur)
+            end = find(b"\n", cur, None)
             if end == -1:
                 # return len(self._mm)  # OR: -1 | eof
                 raise ValueError(lnum)
