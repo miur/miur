@@ -1,14 +1,10 @@
 import curses as C
 from typing import Self
 
-from ..kernel import MiurKernel, NaviId
-from ..systems.tuisystem import DisplayList, VisibleArea
-
 
 class CursesUIDriver:
     def __init__(self) -> None:
-        self.displ: DisplayList
-        self.lines: list[str]  # CHG? bytes
+
         self.stdscr: C.window
         self._pvis: int
 
@@ -34,13 +30,12 @@ class CursesUIDriver:
         C.noraw()
         C.endwin()
 
-    def bake(self, kernel: MiurKernel, nvid: NaviId, va: VisibleArea) -> None:
-        va.wnd_h, va.wnd_w = self.stdscr.getmaxyx()
-        va.vp_w, va.vp_h = min(100, va.wnd_w), min(7, va.wnd_h)
-        self.displ, self.lines = kernel.navi_sequence(nvid, va)
+    def sizewh(self) -> tuple[int, int]:
+        h, w = self.stdscr.getmaxyx()
+        return w, h
 
-    def draw(self) -> None:
+    def draw(self, lines: list[str]) -> None:  # CHG? bytes
         self.stdscr.clear()
-        for s in self.lines:
+        for s in lines:
             self.stdscr.addstr(s)
         self.stdscr.refresh()

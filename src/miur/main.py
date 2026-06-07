@@ -14,11 +14,17 @@ def main() -> str | None:
         va = VisibleArea(4, 11)  # OR? use "vpid"
         with PrintTextUIDriver() as ui:
             t0 = monotonic_ns()
-            ui.bake(k, nvid, va)
+            # THINK: ui.bake() to apply UI-specific constrains ?
+            #   BUT: ui-model lives in .kernel, so .drv should be dumb
+            #     ~~ unless "baking" inserts colorcodes
+            va.wnd_h, va.wnd_w = ui.sizewh()
+            va.vp_w, va.vp_h = min(100, va.wnd_w), min(7, va.wnd_h)
+            displ, lines = k.navi_sequence(nvid, va)
+
             t1 = monotonic_ns()
-            ui.draw()
+            ui.draw(lines)
             t2 = monotonic_ns()
-            kpi = f"bake={(t1 - t0) / 1e6:.3f}ms draw={(t2 - t1) / 1e6:.3f}ms (tokens={len(ui.displ)})"
+            kpi = f"bake={(t1 - t0) / 1e6:.3f}ms draw={(t2 - t1) / 1e6:.3f}ms (tokens={len(displ)})"
         perf.append(kpi)
 
         # handle = "/etc"
