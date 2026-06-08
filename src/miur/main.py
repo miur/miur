@@ -4,7 +4,7 @@ from itertools import pairwise
 from time import monotonic_ns
 
 from .kernel import MiurKernel
-from .systems.tuisystem import DisplayList, TextSpan, VisibleArea, width
+from .systems.tuisystem import DisplayList, StyleId, TextSpan, VisibleArea, width
 from .uidrv.curses_drv import CursesUIDriver
 
 g_dkpi: dict[str, int] = {}
@@ -14,6 +14,9 @@ def kpi(seqnm: str) -> None:
     g_dkpi[seqnm] = monotonic_ns()
 
 
+## WTF: if you press and hold <j>, miur crashes:
+# OSError: [Errno 24] Too many open files: '/etc'
+# OSError: [Errno 24] Too many open files: '/data/aura/miur/.venv/lib/python3.14/site-packages/rich/__init__.py'
 def main_navi() -> str:
     k = MiurKernel()
     # h = "/data/g/miur_gen/demo/errors/chained.py"
@@ -41,14 +44,23 @@ def main_navi() -> str:
                 " ".join(
                     f"{nm}={(t1 - t0) / 1e6:.3f}ms"
                     for (nm, t0), (_, t1) in pairwise(
-                        sorted(g_dkpi.items(), key=lambda x: x[1])
+                        ## DISABLED: order becomes wrong due to draw from prev frame
+                        # sorted(g_dkpi.items(), key=lambda x: x[1])
+                        ## FIXME: without sorting "bake" is negative
+                        g_dkpi.items()
                     )
                 )
                 + f" (tokens={len(displ)}) {curses.COLOR_PAIRS}"
             )
             if va.wnd_h > 0:
                 displ.append(
-                    TextSpan(0, va.wnd_h - 1, kpistr, min(va.wnd_w, width(kpistr)))
+                    TextSpan(
+                        0,
+                        va.wnd_h - 1,
+                        kpistr,
+                        min(va.wnd_w, width(kpistr)),
+                        StyleId.footer,
+                    )
                 )
 
             kpi("draw")

@@ -1,6 +1,7 @@
 import os
 import re
 from dataclasses import dataclass
+from enum import IntEnum, auto
 from typing import TYPE_CHECKING, NamedTuple, Protocol, assert_never
 
 ## PERF: 45ms(bare) -> 75ms(typing) -> 95ms(shutil,time) -> 250ms(wcwidth)
@@ -12,6 +13,12 @@ if TYPE_CHECKING:
 
     class IKernel(Protocol):
         view: ViewSystem
+
+
+class StyleId(IntEnum):
+    default = auto()
+    item = auto()
+    footer = auto()
 
 
 class TextSpan(NamedTuple):  # RENAME: CellSpan
@@ -75,7 +82,7 @@ class TuiSystem:
                         l = ""
                         nx = 0
                     assert x == nx
-                    if sid == 0:
+                    if sid == StyleId.default:
                         l += text
                     else:
                         l += f"\033[3{sid}m" + text + "\033[m"
@@ -156,18 +163,19 @@ class TuiSystem:
             if m.start() > pe:
                 ab = text[pe : m.start()]
                 abw = width(ab)
-                displ.append(TextSpan(cx, cy, ab, abw))
+                displ.append(TextSpan(cx, cy, ab, abw, sid=StyleId.item))
                 cx += abw
             needle = m.group()
             ndw = width(needle)
-            sid = hipatt.index(needle)  # TEMP:HACK: diff style
+            # sid = hipatt.index(needle)  # TEMP:HACK: diff style
+            sid = StyleId.item
             displ.append(TextSpan(cx, cy, needle, ndw, sid=sid))
             cx += ndw
             pe = m.end()
         if pe < len(text):
             ab = text[pe:]
             abw = width(ab)
-            displ.append(TextSpan(cx, cy, ab, abw))
+            displ.append(TextSpan(cx, cy, ab, abw, sid=StyleId.item))
             cx += abw
         return cx
 
