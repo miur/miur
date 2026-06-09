@@ -15,7 +15,23 @@ if TYPE_CHECKING:
         view: ViewSystem
 
 
-class StyleId(IntEnum):
+## RND:(umbrella term): .aid = {attributes|algorithm|animation|appearance|applet}_id
+#   WHY: short name .sid (static "style_id") is too similar to system_id
+#   NICE: "aid" == "the aux means to accomplish smth" (e.g. rendering)
+#   ALT:(name): style/effect/theme/look/presentation
+#   ARCH: good fit for "presentation/appearance"
+#     * signals a visual intent (inof "how to draw")
+#     * allows composition of effects
+#     * can apply transformation to content (like vertex shader)
+#     * can describe transitioning algo (like animation)
+#     * allows gradients/etc.
+#     * parametrized styles (e.g. color is based on some argvalue/function)
+#       ? similar to "nested style" (TRY: generalize one to another)
+#     * associates dif attrs to be used by diff UIs (e.g. RGB24 vs I16/I256 colors)
+#       - ALSO: provides fg/bg styles for TUI; border for GUI; shape for opengl
+#     * same id can mean dif things for obj-type (Text/Rect/Image/etc.)
+class Aid(IntEnum):
+    unknown = 0  # ALT: py:$ def _generate_next_value_(name, start, count, last_values): return count
     default = auto()
     item = auto()
     footer = auto()
@@ -26,7 +42,7 @@ class TextSpan(NamedTuple):  # RENAME: CellSpan
     y: int
     t: str
     wc: int  # <MAYBE? cache cell-width hint for renderer's BoundingBox
-    sid: int = 0  # MAYBE: split into fg/bg styles? BUT: curses groups them
+    aid: int  # WARN: don't use DFL=0 here -- always set style explicitly to .default
     zi: int = 1  # < Z-index of whole layer bucket (NOT per-element)
     ## ALT:
     # @property
@@ -73,8 +89,8 @@ class TuiSystem:
         strings: list[str] = []
         for token in displ:
             match token:
-                case TextSpan(x, y, text, wc, sid):
-                    # DEBUG: mydrv_print(x, y, text, wc, sid)
+                case TextSpan(x, y, text, wc, aid):
+                    # DEBUG: mydrv_print(x, y, text, wc, aid)
                     # print(token, nx)
                     if nl := y - py:
                         assert nl > 0
@@ -82,10 +98,12 @@ class TuiSystem:
                         l = ""
                         nx = 0
                     assert x == nx
-                    if sid == StyleId.default:
+                    if aid == Aid.default:
                         l += text
                     else:
-                        l += f"\033[3{sid}m" + text + "\033[m"
+                        # FIXME: use "parametrized style" here ?
+                        #   OR: define generic rainbow in TermStyle and map range of Aid indexes to it
+                        l += f"\033[3{aid}m" + text + "\033[m"
                     py = y
                     nx = x + wc
                 case _:
@@ -119,7 +137,7 @@ class TuiSystem:
                 sw = wc or width(ss)
                 if cx + sw > va.vp_w:
                     return True
-                displ.append(TextSpan(cx, cy, ss, sw))
+                displ.append(TextSpan(cx, cy, ss, sw, Aid.default))
                 cx += sw
                 return False
 
@@ -163,19 +181,19 @@ class TuiSystem:
             if m.start() > pe:
                 ab = text[pe : m.start()]
                 abw = width(ab)
-                displ.append(TextSpan(cx, cy, ab, abw, sid=StyleId.item))
+                displ.append(TextSpan(cx, cy, ab, abw, aid=Aid.item))
                 cx += abw
             needle = m.group()
             ndw = width(needle)
-            # sid = hipatt.index(needle)  # TEMP:HACK: diff style
-            sid = StyleId.item
-            displ.append(TextSpan(cx, cy, needle, ndw, sid=sid))
+            # aid = hipatt.index(needle)  # TEMP:HACK: diff style
+            aid = Aid.item
+            displ.append(TextSpan(cx, cy, needle, ndw, aid=aid))
             cx += ndw
             pe = m.end()
         if pe < len(text):
             ab = text[pe:]
             abw = width(ab)
-            displ.append(TextSpan(cx, cy, ab, abw, sid=StyleId.item))
+            displ.append(TextSpan(cx, cy, ab, abw, aid=Aid.item))
             cx += abw
         return cx
 
@@ -187,11 +205,11 @@ class TuiSystem:
         spacer = vpw - cx
         if spacer > 0:
             # ALT:(string): l = wcwidth.ljust(l, vpw, " ") + "|"
-            displ.append(TextSpan(cx, cy, " " * spacer, spacer))
+            displ.append(TextSpan(cx, cy, " " * spacer, spacer, Aid.default))
             cx += spacer
-            displ.append(TextSpan(cx, cy, boundary, bounw))
+            displ.append(TextSpan(cx, cy, boundary, bounw, Aid.default))
         elif spacer == 0:
-            displ.append(TextSpan(cx, cy, boundary, bounw))
+            displ.append(TextSpan(cx, cy, boundary, bounw, Aid.default))
         else:
             # WARN: list needs to be sorted by .x
             # ALT:PERF: for large lists use bisect()
@@ -212,7 +230,7 @@ class TuiSystem:
                 wa = width(a)
                 displ[broken_token_idx : broken_token_idx + 1] = [
                     t._replace(t=a, wc=wa),
-                    TextSpan(t.x + wa, t.y, boundary, bounw),
+                    TextSpan(t.x + wa, t.y, boundary, bounw, Aid.default),
                     t._replace(t=b, wc=width(b)),
                 ]
         return cx

@@ -1,7 +1,7 @@
 import curses as C
 from typing import ClassVar, Protocol, Self, assert_never, overload
 
-from ..systems.tuisystem import DisplayList, StyleId, TextSpan
+from ..systems.tuisystem import Aid, DisplayList, TextSpan
 
 ## Direct 24-bit True Color Printing in Python
 # def rgb_text(text, fg_rgb=None, bg_rgb=None):
@@ -26,6 +26,7 @@ class HasContext(Protocol):
     chr2attr: dict[str, int]
 
 
+# TEMP: we are converting dynamic .aid solely to static fg/bg/attr termstyle
 class StyleDef[T: HasContext]:  # RENAME? LazyStyle
     """A descriptor that self-destructs on first access, replacing itself with a raw int."""
 
@@ -40,6 +41,10 @@ class StyleDef[T: HasContext]:  # RENAME? LazyStyle
         self.fg = fg
         self.bg = bg
         self.attrs = attrs  # ALT:(str): enum.IntFlag -- to allow only possible combo
+        ## RENAME?(same_as): .base .base_from .copyfrom .use
+        #   WHY: to override its value by new fg/bg/attr
+        #   IDEA: .mix .mix_chain -- override each prop by latest value
+        #   IDEA: .blend -- combine colors into new value
         self.same_as = same_as
         self.name: str
 
@@ -57,35 +62,38 @@ class StyleDef[T: HasContext]:  # RENAME? LazyStyle
             return self  # CASE: class-level access (TermStyle.HEADER)
         if self.same_as:
             # FUT:MAYBE: allow partial fallback i.e. override only when fg/bg/attr=-2
-            #   CHECK: if chained fallback works
-            return getattr(instance, self.same_as)
-        registry = instance.registered_color_pairs
-        # EXPL: Internalize using parent context
-        #   FIXED? positive bg with negative fg goes into prev-bg
-        fgbg = self.bg * C.COLORS * 2 + self.fg + C.COLORS
-        if (style_id := registry.get(fgbg, 0)) == 0:
-            i = len(registry)
-            # REF: https://stackoverflow.com/questions/476878/256-colors-foreground-and-background
-            #   = (65536 if has_extended_color_support() else 256)
-            # REF: https://docs.python.org/3/library/curses.html#curses.color_pair
-            #   BAD: Only the first 256 color pairs are supported.
-            assert i < C.COLOR_PAIRS
-            C.init_pair(i, self.fg, self.bg)
-            style_id = registry[fgbg] = C.color_pair(i)
+            #   CHECK: if recursive fallback (with destructive caching) works
+            curses_attr = getattr(instance, self.same_as)
+        else:
+            registry = instance.registered_color_pairs
+            # EXPL: Internalize using parent context
+            #   FIXED? positive bg with negative fg goes into prev-bg
+            fgbg = self.bg * C.COLORS * 2 + self.fg + C.COLORS
+            if (curses_attr := registry.get(fgbg, 0)) == 0:
+                i = len(registry)
+                # REF: https://stackoverflow.com/questions/476878/256-colors-foreground-and-background
+                #   = (65536 if has_extended_color_support() else 256)
+                # REF: https://docs.python.org/3/library/curses.html#curses.color_pair
+                #   BAD: Only the first 256 color pairs are supported.
+                assert i < C.COLOR_PAIRS
+                C.init_pair(i, self.fg, self.bg)
+                curses_attr = registry[fgbg] = C.color_pair(i)
 
-        # ALT: next(a for nm, a in [("n": C.A_NORMAL), ...] if nm in self.attrs)
-        for a in self.attrs:
-            style_id |= instance.chr2attr[a]
+            # ALT: next(a for nm, a in [("n": C.A_NORMAL), ...] if nm in self.attrs)
+            for a in self.attrs:
+                curses_attr |= instance.chr2attr[a]
 
         # 2. Overwrite descriptor with raw primitive int on the instance
-        setattr(instance, self.name, style_id)
-        return style_id
+        setattr(instance, self.name, curses_attr)
+        return curses_attr
 
 
 # THINK: no point in overengineering -- we use DisplayList anyway
 #   * tui should have IntEnum: name -> styleid(int)
 #   * curses should match/convert that IntEnum into internal dict
 #      NEED: verify none has unique/unmatched keys
+#   * DEV: use "common_basestyle" and auto-generate derived "term_style" with overrides from it
+#      WHY: to improve maintainability for colorschemes and switch them at the same time in all UIs
 class TermStyle:
     # DFL:(default): gray text on transparent bkgr
     default: ClassVar[StyleDef[Self]] = StyleDef(-1, -1)
@@ -102,6 +110,7 @@ class TermStyle:
         fgbg = -1 * C.COLORS * 2 - 1 + C.COLORS
         # FIXED: init_pair(-1,-1)==0 always exist (and reset by .use_default_colors())
         self.registered_color_pairs: dict[int, int] = {fgbg: 0}
+        # CHG: use enum.IntFlag16
         self.chr2attr = {
             "": 0,  # do nothing
             "n": C.A_NORMAL,  # Normal display (no highlight)
@@ -129,7 +138,7 @@ class CursesUIDriver:
 
         self.stdscr: C.window
         self._pvis: int
-        self.style: TermStyle
+        self.termstyle: TermStyle
 
     def __enter__(self) -> Self:
         C.setupterm()
@@ -145,7 +154,7 @@ class CursesUIDriver:
         ##   BUT:FAIL? can't pre-set enum type for self.code2key
         # from .curses_keys import code2key
         # self.code2key = code2key
-        self.style = TermStyle(stdscr=self.stdscr)
+        self.termstyle = TermStyle(stdscr=self.stdscr)
         return self
 
     def __exit__(self, *_a: object) -> None:
@@ -181,18 +190,13 @@ class CursesUIDriver:
         self.stdscr.clear()
         for token in displ:
             match token:
-                case TextSpan(x, y, text, wc, sid):
+                case TextSpan(x, y, text, wc, aid):
                     # MAYBE: sanitize string out of interfering /\n|\r/
                     # FIXME: shortly exit fn on resize to avoid curses crash
                     #   WHY: no sense to crop frame on shrink or continue drawing on enlarge,
                     #     as displ should be recalculated for adaptive-layout anyway
-                    # FIXME: convert my styleid to curses fg/bg/attr-id
-                    attr = (
-                        self.style.footer
-                        if sid == StyleId.footer
-                        else self.style.default
-                    )
-                    # attr = C.A_BOLD
+                    # TEMP: disable fallback to "self.termstyle.default" to catch mismatches
+                    attr = getattr(self.termstyle, Aid(aid).name)
                     self.stdscr.addnstr(y, x, text, wc, attr)
                 case _:
                     assert_never(token)

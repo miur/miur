@@ -4,7 +4,7 @@ from itertools import pairwise
 from time import monotonic_ns
 
 from .kernel import MiurKernel
-from .systems.tuisystem import DisplayList, StyleId, TextSpan, VisibleArea, width
+from .systems.tuisystem import Aid, DisplayList, TextSpan, VisibleArea, width
 from .uidrv.curses_drv import CursesUIDriver
 
 g_dkpi: dict[str, int] = {}
@@ -50,7 +50,7 @@ def main_navi() -> str:
                         g_dkpi.items()
                     )
                 )
-                + f" (tokens={len(displ)}) {curses.COLOR_PAIRS}"
+                + f" (tokens={len(displ)}) {curses.COLOR_PAIRS} {curses.termattrs():b}"
             )
             if va.wnd_h > 0:
                 displ.append(
@@ -59,7 +59,7 @@ def main_navi() -> str:
                         va.wnd_h - 1,
                         kpistr,
                         min(va.wnd_w, width(kpistr)),
-                        StyleId.footer,
+                        Aid.footer,
                     )
                 )
 
