@@ -27,11 +27,15 @@ class NaviSessionSystem:
 
 
 # THINK: do we even need all these classes, or C-like global funcs will do?
-class MiurKernel:
+class MiurKernel:  # pylint:disable=too-many-instance-attributes
     def __init__(self) -> None:
+        from .systems.logsystem import log
+
         ## TBD: query data from one to other connected client-ids
         ##   e.g. viewport-sz, cursors, tab-idx, etc.
         # self.clients = ClientsRegistrySystem(self)
+        log.k = self  # HACK: switch "early logs" to "proper ones"
+        self.log = log
         self._sess: list[SSS.SessionStateSystem] = []
         self._navi: list[NaviSessionSystem] = []
         self.lfs = LFS.LocalFileSystem(self)

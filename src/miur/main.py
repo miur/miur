@@ -36,8 +36,6 @@ def main_navi() -> str:
             va.vp_w, va.vp_h = min(100, va.wnd_w), min(7, max(1, va.wnd_h - 1))
             displ, _lines = k.navi_sequence(nvid, va)
 
-            import curses
-
             # FAIL:(chicken-and-egg problem): drawing time is still unknown
             #   BAD~ show *previous frame* kpi(draw) instead of current one
             kpistr = (
@@ -50,7 +48,7 @@ def main_navi() -> str:
                         g_dkpi.items()
                     )
                 )
-                + f" (tokens={len(displ)}) {curses.COLOR_PAIRS} {curses.termattrs():b}"
+                + f" (tokens={len(displ)})"
             )
             if va.wnd_h > 0:
                 displ.append(
@@ -76,7 +74,7 @@ def main_navi() -> str:
                     pass
             kpi("done")
 
-    return kpistr
+    return k.log.dump() + kpistr
 
 
 def main() -> str | None:

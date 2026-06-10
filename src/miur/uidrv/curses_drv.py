@@ -1,6 +1,7 @@
 import curses as C
 from typing import ClassVar, Protocol, Self, assert_never, overload
 
+from .. import log
 from ..systems.tuisystem import Aid, DisplayList, TextSpan
 
 ## Direct 24-bit True Color Printing in Python
@@ -69,7 +70,7 @@ class StyleDef[T: HasContext]:  # RENAME? LazyStyle
             # EXPL: Internalize using parent context
             #   FIXED? positive bg with negative fg goes into prev-bg
             fgbg = self.bg * C.COLORS * 2 + self.fg + C.COLORS
-            if (curses_attr := registry.get(fgbg, 0)) == 0:
+            if (curses_attr := registry.get(fgbg, None)) is None:
                 i = len(registry)
                 # REF: https://stackoverflow.com/questions/476878/256-colors-foreground-and-background
                 #   = (65536 if has_extended_color_support() else 256)
@@ -78,6 +79,7 @@ class StyleDef[T: HasContext]:  # RENAME? LazyStyle
                 assert i < C.COLOR_PAIRS
                 C.init_pair(i, self.fg, self.bg)
                 curses_attr = registry[fgbg] = C.color_pair(i)
+                log.info((i, fgbg))
 
             # ALT: next(a for nm, a in [("n": C.A_NORMAL), ...] if nm in self.attrs)
             for a in self.attrs:
@@ -85,6 +87,7 @@ class StyleDef[T: HasContext]:  # RENAME? LazyStyle
 
         # 2. Overwrite descriptor with raw primitive int on the instance
         setattr(instance, self.name, curses_attr)
+        log.info((self.name, curses_attr))
         return curses_attr
 
 
@@ -98,7 +101,7 @@ class TermStyle:
     # DFL:(default): gray text on transparent bkgr
     default: ClassVar[StyleDef[Self]] = StyleDef(-1, -1)
     item: ClassVar[StyleDef[Self]] = StyleDef(same_as="default")
-    footer: ClassVar[StyleDef[Self]] = StyleDef(217, 17)
+    footer: ClassVar[StyleDef[Self]] = StyleDef(217, 17, "b")
 
     def __init__(self, stdscr: C.window) -> None:
         self.stdscr = stdscr
@@ -106,6 +109,7 @@ class TermStyle:
             raise NotImplementedError
         C.start_color()
         C.use_default_colors()
+        log.info(f"{C.COLORS=} {C.COLOR_PAIRS=} {C.termattrs()=:b}")
         assert C.COLORS == (1 << 8), "OBSOL?FIXME: bg<<8 should use inferred mask"
         fgbg = -1 * C.COLORS * 2 - 1 + C.COLORS
         # FIXED: init_pair(-1,-1)==0 always exist (and reset by .use_default_colors())
