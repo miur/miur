@@ -1,5 +1,5 @@
 import curses as C
-from typing import ClassVar, Protocol, Self, assert_never, overload
+from typing import Callable, ClassVar, Protocol, Self, assert_never, overload
 
 from .. import log
 from ..systems.tuisystem import Aid, DisplayList, TextSpan
@@ -139,36 +139,83 @@ class TermStyle:
 #   * TBD: webapp/pygame
 class CursesUIDriver:
     def __init__(self) -> None:
+        self._cleanup_callbacks: list[Callable[[], object]] = []
 
         self.stdscr: C.window
         self._pvis: int
         self.termstyle: TermStyle
 
-    def __enter__(self) -> Self:
+    def _configure(self) -> None:
+        __ = self._cleanup_callbacks.append  # RENAME? _defer()
         C.setupterm()
         self.stdscr = C.initscr()
+        __(C.endwin)
         C.noecho()
+        __(C.echo)
+
         C.raw()
+        __(C.noraw)
+
         self.stdscr.keypad(True)
-        self._pvis = C.curs_set(0)
+        __(lambda: self.stdscr.keypad(False))
+
+        pvis = C.curs_set(0)
+        __(lambda: C.curs_set(pvis))
+
         ## DISABLED: currently I use blocking while-loop
         ##   ALT: py$ try: get_wch() ; except curses.error: pass; curses.napms(100)
         # self.stdscr.nodelay(True)
+        __(lambda: self.stdscr.nodelay(False))
+
         ## BAD: maybe keys should be assigned only *after* initscr
         ##   BUT:FAIL? can't pre-set enum type for self.code2key
         # from .curses_keys import code2key
         # self.code2key = code2key
         self.termstyle = TermStyle(stdscr=self.stdscr)
+
+        # CHECK: do I even need this in cleanup?
+        __(self.stdscr.refresh)
+
+    def _restore(self) -> ExceptionGroup | None:
+        errors: list[Exception] = []
+        interrupts: list[BaseException] = []
+        for fn in reversed(self._cleanup_callbacks):
+            try:
+                fn()
+            except Exception as exc:
+                # CASE: run all cleanups, even if some of them are failing
+                #   >> we should try to restore terminal as much as we can
+                errors.append(exc)
+            except BaseException as cfl:
+                # WARN:(BaseException): teardown even on Ctrl+C (KeyboardInterrupt) or forced exit (SystemExit)
+                interrupts.append(cfl)
+        if interrupts:
+            # FIXME? chain them to each other (e.g. Ctrl+C during SystemExit)
+            raise interrupts[0] from None
+        self._cleanup_callbacks.clear()
+        return ExceptionGroup("cleanup failures", errors) if errors else None
+
+    def __enter__(self) -> Self:
+        try:
+            self._configure()
+        except Exception as setup_exc:
+            # FIXED: crash in __enter__ doesn't call __exit__
+            if restore_grp := self._restore():
+                # BAD: should be py:$ raise restore_grp from setup_exc
+                #   BUT! we want to keep "setup_exc" as "primary error"
+                raise setup_exc from restore_grp
+            raise
         return self
 
-    def __exit__(self, *_a: object) -> None:
-        self.stdscr.refresh()
-        self.stdscr.nodelay(False)
-        C.curs_set(self._pvis)
-        self.stdscr.keypad(False)
-        C.echo()
-        C.noraw()
-        C.endwin()
+    def __exit__(self, exc_type: type, exc: BaseException | None, _tb: object) -> None:
+        restore_exc = self._restore()
+        if restore_exc:
+            if exc:
+                ## DISABLED: we want to keep "exc" as "primary error"
+                # raise restore_exc from exc
+                exc.__context__ = restore_exc
+            else:
+                raise restore_exc
 
     # TBD? translate C.KEY_HOME -> universal "<Home>" str (or my common key_enum.HOME)
     #   WHY: to have the same keybindings for all clients
