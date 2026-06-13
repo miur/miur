@@ -34,7 +34,7 @@ def main_navi() -> str:
             #     ~~ unless "baking" inserts colorcodes
             va.wnd_w, va.wnd_h = ui.sizewh()
             va.vp_w, va.vp_h = min(100, va.wnd_w), min(7, max(1, va.wnd_h - 1))
-            displ, _lines = k.navi_sequence(nvid, va)
+            displ = k.navi_sequence(nvid, va)
 
             # FAIL:(chicken-and-egg problem): drawing time is still unknown
             #   BAD~ show *previous frame* kpi(draw) instead of current one

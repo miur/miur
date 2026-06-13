@@ -73,11 +73,10 @@ class MiurKernel:  # pylint:disable=too-many-instance-attributes
         self,
         nvid: NaviId,
         va: tuisystem.VisibleArea,
-    ) -> tuple[tuisystem.DisplayList, list[str]]:
+    ) -> tuisystem.DisplayList:
         handle = self._navi[nvid].handle
         displ = self.tui.bake_display_area(handle, va)
-        strings = self.tui.render_term_strings(displ)
-        return displ, strings
+        return displ
 
 
 if TYPE_CHECKING:

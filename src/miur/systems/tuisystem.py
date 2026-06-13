@@ -2,11 +2,11 @@ import os
 import re
 from dataclasses import dataclass
 from enum import IntEnum, auto
-from typing import TYPE_CHECKING, NamedTuple, Protocol, assert_never
+from typing import TYPE_CHECKING, Iterable, NamedTuple, Protocol
 
-## PERF: 45ms(bare) -> 75ms(typing) -> 95ms(shutil,time) -> 250ms(wcwidth)
+## PERF:(startup): 45ms(bare) -> 75ms(typing) -> 95ms(shutil,time) -> 250ms(wcwidth)
 # ALT:(copy-paste): //site-packages/_pytest/_io/wcwidth.py
-from wcwidth import clip, width
+from wcwidth import width
 
 if TYPE_CHECKING:
     from .viewsystem import ViewSystem
@@ -24,16 +24,32 @@ if TYPE_CHECKING:
 #     * allows composition of effects
 #     * can apply transformation to content (like vertex shader)
 #     * can describe transitioning algo (like animation)
-#     * allows gradients/etc.
+#     * decorative animations and ops indicators
+#       - blinking cursor OR plasma gradient bkgr
+#       - bright dot on cursor boarder coursing around item text
+#       - highlight one cell left-right-left-right as "indeterminate waiting"
+#         ~~ e.g. for currenly downloaded partial files
+#       - flash bg to indicate "copy/paste" operations
+#         NEED: history to cvt to selection any "last flashed pasted selection"
+#           or "touched/created files in folder"
+#         ARCH: should be done fully on client side to minimize server/kernel latency for timestamps
+#           ~~ ALSO: each UI may do stuff totally differently, so it may have no common parts on server
+#             ALT: calc ani frame in kernel to get displ with static styles only on client
+#       - WARN: diff-update won't work as both token and style are the same
+#          >> NEED: store animations in some list to update those by timer
+#     * allows gradients/beautifications
+#       - e.g. enlarging font-size in Qt/GL or making a distorted zoom-bubble around cursor
 #     * parametrized styles (e.g. color is based on some argvalue/function)
 #       ? similar to "nested style" (TRY: generalize one to another)
 #     * associates dif attrs to be used by diff UIs (e.g. RGB24 vs I16/I256 colors)
 #       - ALSO: provides fg/bg styles for TUI; border for GUI; shape for opengl
 #     * same id can mean dif things for obj-type (Text/Rect/Image/etc.)
+#   IDEA: use each name fg/bg as progressbar for e.g. !mpd OR as gauge for e.g. relative file/dirsize like !ncdu
 class Aid(IntEnum):
     unknown = 0  # ALT: py:$ def _generate_next_value_(name, start, count, last_values): return count
     default = auto()
     item = auto()
+    itempunct = auto()
     footer = auto()
 
 
@@ -51,6 +67,7 @@ class TextSpan(NamedTuple):  # RENAME: CellSpan
 
 
 type DisplayList = list[TextSpan]
+type DisplayStream = Iterable[TextSpan]
 
 
 @dataclass(slots=True)
@@ -81,39 +98,6 @@ class TuiSystem:
 
     def __init__(self, kernel: IKernel) -> None:
         self.k = kernel
-
-    def render_term_strings(self, displ: DisplayList) -> list[str]:
-        py = 0
-        nx = 0
-        l = ""
-        strings: list[str] = []
-        for token in displ:
-            match token:
-                case TextSpan(x, y, text, wc, aid):
-                    # DEBUG: mydrv_print(x, y, text, wc, aid)
-                    # print(token, nx)
-                    if nl := y - py:
-                        assert nl > 0
-                        strings.append(l + "\n" * nl)
-                        l = ""
-                        nx = 0
-                    assert x == nx
-                    if aid == Aid.default:
-                        l += text
-                    else:
-                        # FIXME: use "parametrized style" here ?
-                        #   OR: define generic rainbow in TermStyle and map range of Aid indexes to it
-                        l += f"\033[3{aid}m" + text + "\033[m"
-                    py = y
-                    nx = x + wc
-                case _:
-                    # TODO: log errors and continue; MAYBE store errs in list and return them
-                    # TODO: visually render some read bars in their assumed locations,
-                    #   derived on ordered list of prev/next tokens
-                    assert_never(token)
-        if l:
-            strings.append(l)
-        return strings
 
     def bake_display_area(self, handle: str, va: VisibleArea) -> DisplayList:
         # pylint:disable=too-many-locals,too-many-branches
@@ -164,7 +148,7 @@ class TuiSystem:
                     del displ[oklen:]
                     break
                 ## ALT:(no hi): displ.append(TextSpan(cx, cy, text, tw)); cx += tw
-                cx = self.enrich_hi(displ, text, cx, cy)
+                cx = self.hi_match(displ, text, cx, cy)
 
                 i += 1
                 break  # TEMP: process one item per line
@@ -174,7 +158,9 @@ class TuiSystem:
         va.end_actual = i
         return displ
 
-    def enrich_hi(self, displ: DisplayList, text: str, cx: int, cy: int) -> int:
+    # CHG: hi match text/chars into bold RED
+    #   >> dim/underline hi! after pressing <CR/Esc> to reduce hi! distraction during navi over filtered
+    def hi_match(self, displ: DisplayList, text: str, cx: int, cy: int) -> int:
         hipatt = r"[._-]"
         pe = 0
         for m in re.finditer(hipatt, text):
@@ -195,42 +181,4 @@ class TuiSystem:
             abw = width(ab)
             displ.append(TextSpan(cx, cy, ab, abw, aid=Aid.item))
             cx += abw
-        return cx
-
-    def pad_boundary(  # pylint:disable=too-many-arguments,too-many-positional-arguments
-        self, displ: DisplayList, cx: int, cy: int, vpw: int, tww: int
-    ) -> int:
-        boundary = "|"  # ALT="|\n↪"
-        bounw = width(boundary)
-        spacer = vpw - cx
-        if spacer > 0:
-            # ALT:(string): l = wcwidth.ljust(l, vpw, " ") + "|"
-            displ.append(TextSpan(cx, cy, " " * spacer, spacer, Aid.default))
-            cx += spacer
-            displ.append(TextSpan(cx, cy, boundary, bounw, Aid.default))
-        elif spacer == 0:
-            displ.append(TextSpan(cx, cy, boundary, bounw, Aid.default))
-        else:
-            # WARN: list needs to be sorted by .x
-            # ALT:PERF: for large lists use bisect()
-            broken_token_idx = -1
-            for i in range(len(displ) - 1, -1, -1):
-                t = displ[i]
-                if t.y != cy:
-                    break  # <CASE: single line only
-                # FAIL:FIXME: splice if exactly bw two tokens
-                if t.x <= vpw < t.x + t.wc:
-                    broken_token_idx = i
-                    break  # <FIXME? also split multiple overlapping tokens
-            if broken_token_idx != -1:
-                t = displ[broken_token_idx]
-                # FAIL:(only works on ascii): l = l[:vpw] + "|" + l[vpw:]
-                a = clip(t.t, 0, vpw - t.x, fillchar="·")
-                b = clip(t.t, vpw - t.x, tww - vpw, fillchar="·")
-                wa = width(a)
-                displ[broken_token_idx : broken_token_idx + 1] = [
-                    t._replace(t=a, wc=wa),
-                    TextSpan(t.x + wa, t.y, boundary, bounw, Aid.default),
-                    t._replace(t=b, wc=width(b)),
-                ]
         return cx

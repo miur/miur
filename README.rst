@@ -63,3 +63,11 @@ See also:
 * ``./&g/background.nou`` for the initial design discussion.
 * ``./docs/ARCH.nou`` for the distilled architecture notes.
 * ``./docs/TODO.nou`` for the current implementation priorities.
+
+
+REF
+===
+
+READ:XLR: Arcan: 10 Years of Online Obscurity | Arcan ⌇⡪⠬⢄⣌
+  https://arcan-fe.com/2026/06/02/arcan-10-years-of-online-obscurity/
+    = similar to #miur in scope, but focuses on GUI-exploration

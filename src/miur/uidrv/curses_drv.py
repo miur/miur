@@ -2,23 +2,7 @@ import curses as C
 from typing import Callable, ClassVar, Protocol, Self, assert_never, overload
 
 from .. import log
-from ..systems.tuisystem import Aid, DisplayList, TextSpan
-
-## Direct 24-bit True Color Printing in Python
-# def rgb_text(text, fg_rgb=None, bg_rgb=None):
-#     codes = []
-#     if fg_rgb:
-#         r, g, b = fg_rgb
-#         codes.append(f"38;2;{r};{g};{b}")  # Foreground code
-#     if bg_rgb:
-#         r, g, b = bg_rgb
-#         codes.append(f"48;2;{r};{g};{b}")  # Background code
-#
-#     ansi_sequence = f"\x1b[{';'.join(codes)}m" if codes else ""
-#     ansi_reset = "\x1b[0m"
-#     return f"{ansi_sequence}{text}{ansi_reset}"
-## Print vibrant orange text on a deep navy background
-# print(rgb_text("Hello from 24-bit True Color!", fg_rgb=(255, 140, 0), bg_rgb=(10, 25, 47)))
+from ..systems.tuisystem import Aid, DisplayStream, TextSpan
 
 
 class HasContext(Protocol):
@@ -27,7 +11,7 @@ class HasContext(Protocol):
     chr2attr: dict[str, int]
 
 
-# TEMP: we are converting dynamic .aid solely to static fg/bg/attr termstyle
+# TEMP: we are converting dynamic .aid solely to static fg/bg/attr cursesstyle
 class StyleDef[T: HasContext]:  # RENAME? LazyStyle
     """A descriptor that self-destructs on first access, replacing itself with a raw int."""
 
@@ -53,14 +37,14 @@ class StyleDef[T: HasContext]:  # RENAME? LazyStyle
         """Automatically captures the property variable name on assignment"""
         self.name = name
 
-    @overload  # 1. Type hint for Class-level access: TermStyle.HEADER -> returns StyleDef
+    @overload  # 1. Type hint for Class-level access: CursesStyle.HEADER -> returns StyleDef
     def __get__(self, instance: None, owner: type[T]) -> Self: ...
     @overload  # 2. Type hint for Instance-level access: s.HEADER -> returns int
     def __get__(self, instance: T, owner: type[T]) -> int: ...
 
     def __get__(self, instance: T | None, owner: type[T]) -> int | Self:
         if instance is None:
-            return self  # CASE: class-level access (TermStyle.HEADER)
+            return self  # CASE: class-level access (CursesStyle.HEADER)
         if self.same_as:
             # FUT:MAYBE: allow partial fallback i.e. override only when fg/bg/attr=-2
             #   CHECK: if recursive fallback (with destructive caching) works
@@ -97,7 +81,7 @@ class StyleDef[T: HasContext]:  # RENAME? LazyStyle
 #      NEED: verify none has unique/unmatched keys
 #   * DEV: use "common_basestyle" and auto-generate derived "term_style" with overrides from it
 #      WHY: to improve maintainability for colorschemes and switch them at the same time in all UIs
-class TermStyle:
+class CursesStyle:
     # DFL:(default): gray text on transparent bkgr
     default: ClassVar[StyleDef[Self]] = StyleDef(-1, -1)
     item: ClassVar[StyleDef[Self]] = StyleDef(same_as="default")
@@ -138,12 +122,11 @@ class TermStyle:
 #     - Asciimatics: Great if you need animations or 24-bit graphics running directly inside your terminal.
 #   * TBD: webapp/pygame
 class CursesUIDriver:
+    cursesstyle: CursesStyle
+    stdscr: C.window
+
     def __init__(self) -> None:
         self._cleanup_callbacks: list[Callable[[], object]] = []
-
-        self.stdscr: C.window
-        self._pvis: int
-        self.termstyle: TermStyle
 
     def _configure(self) -> None:
         __ = self._cleanup_callbacks.append  # RENAME? _defer()
@@ -171,7 +154,7 @@ class CursesUIDriver:
         ##   BUT:FAIL? can't pre-set enum type for self.code2key
         # from .curses_keys import code2key
         # self.code2key = code2key
-        self.termstyle = TermStyle(stdscr=self.stdscr)
+        self.cursesstyle = CursesStyle(stdscr=self.stdscr)
 
         # CHECK: do I even need this in cleanup?
         __(self.stdscr.refresh)
@@ -237,7 +220,7 @@ class CursesUIDriver:
             self.stdscr.addstr(s)
         self.stdscr.refresh()
 
-    def draw_displ(self, displ: DisplayList) -> None:
+    def draw_displ(self, displ: DisplayStream) -> None:
         self.stdscr.clear()
         for token in displ:
             match token:
@@ -246,8 +229,8 @@ class CursesUIDriver:
                     # FIXME: shortly exit fn on resize to avoid curses crash
                     #   WHY: no sense to crop frame on shrink or continue drawing on enlarge,
                     #     as displ should be recalculated for adaptive-layout anyway
-                    # TEMP: disable fallback to "self.termstyle.default" to catch mismatches
-                    attr = getattr(self.termstyle, Aid(aid).name)
+                    # TEMP: disable fallback to "self.cursesstyle.default" to catch mismatches
+                    attr = getattr(self.cursesstyle, Aid(aid).name)
                     self.stdscr.addnstr(y, x, text, wc, attr)
                 case _:
                     assert_never(token)
