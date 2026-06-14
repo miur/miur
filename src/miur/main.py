@@ -1,32 +1,62 @@
 import ctypes
+import os
 import sys
+from argparse import ArgumentParser
 from itertools import pairwise
 from time import monotonic_ns
+from typing import assert_never
+
+import psutil
 
 from .kernel import MiurKernel
 from .systems.tuisystem import Aid, DisplayList, TextSpan, VisibleArea, width
-from .uidrv.curses_drv import CursesUIDriver
 
 g_dkpi: dict[str, int] = {}
 
+if not sys.warnoptions:
+    # WHY: print a traceback pinpointing exactly where the unclosed file object was created.
+    __import__("warnings").simplefilter("always", ResourceWarning)
 
+
+# MOVE: logger?
 def kpi(seqnm: str) -> None:
     g_dkpi[seqnm] = monotonic_ns()
 
 
-## WTF: if you press and hold <j>, miur crashes:
-# OSError: [Errno 24] Too many open files: '/etc'
-# OSError: [Errno 24] Too many open files: '/data/aura/miur/.venv/lib/python3.14/site-packages/rich/__init__.py'
+def cli_spec(parser: ArgumentParser) -> ArgumentParser:
+    o = parser.add_argument
+    _uiset = "pr printtext cu curses".split()
+    o("--ui", choices=_uiset, default="curses")
+    return parser
+
+
 def main_navi() -> str:
+    ns = cli_spec(ArgumentParser()).parse_args(sys.argv[1:])
+
+    ## TODO: multi-window UIDriver spawner for synchronous navigation on side-monitor
+    #    USE: spawned term with fd redirect from #miur
+    #      /d/miur/legacy/bc5_miur_asyncio/devhelp/newterm.py
+    #      /d/miur/src/miur/#/newterm.nou
+    match ns.ui:
+        case "printtext" | "pr":
+            from .uidrv.printtext_drv import PrintTextUIDriver
+
+            UIDrv = PrintTextUIDriver
+        case "curses" | "cu":
+            from .uidrv.curses_drv import CursesUIDriver
+
+            UIDrv = CursesUIDriver
+        case _:
+            assert_never(ns.ui)
+
+    process = psutil.Process(os.getpid())
+
     k = MiurKernel()
     # h = "/data/g/miur_gen/demo/errors/chained.py"
     nvid = k.new_navi(0, "/etc")
-    va = VisibleArea(4, 11)  # OR? use "vpid"
-    ## TODO: multi-window UIDriver for synchronous navigation on side-monitor
-    # from .uidrv.printtext_drv import PrintTextUIDriver
-    # with PrintTextUIDriver() as ui:
+    va = VisibleArea(8, 11)  # OR? use "vpid"
     displ: DisplayList = []
-    with CursesUIDriver() as ui:
+    with UIDrv() as ui:
         while True:
             kpi("bake")  # NOTE: overwrites prev values -> so keeps only last frame
             # THINK: ui.bake() to apply UI-specific constrains ?
@@ -48,7 +78,7 @@ def main_navi() -> str:
                         g_dkpi.items()
                     )
                 )
-                + f" (tokens={len(displ)})"
+                + f" (tokens={len(displ)}) Nfd={process.num_fds()}"
             )
             if va.wnd_h > 0:
                 displ.append(

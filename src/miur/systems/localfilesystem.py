@@ -38,22 +38,21 @@ class LocalFileSystem:
     def listdir(self, h: HPath) -> list[str]:
         fd = os.open(h, os.O_RDONLY | os.O_DIRECTORY)
         try:
+            # RND:(early bubble up to ui): FileNotFoundError,PermissionDenied
             st = os.fstat(fd)
-        except:
-            os.close(fd)
-            raise  # RND:(early bubble up to ui): FileNotFoundError,PermissionDenied
-
-        if lp := self._listdir_cache.get(h):
-            was_replaced = st.st_ino != lp.st_ino or st.st_dev != lp.st_dev
-            was_resized = st.st_size != lp.st_size
-            maybe_modified = st.st_mtime_ns != lp.st_mtime_ns
-            if was_replaced or was_resized or maybe_modified:
-                lp = self._listdir_new(h, fd, st)
+            # WARN: keep in same try-catch (inof "else:") for os.scandir exceptions
+            if lp := self._listdir_cache.get(h):
+                was_replaced = st.st_ino != lp.st_ino or st.st_dev != lp.st_dev
+                was_resized = st.st_size != lp.st_size
+                maybe_modified = st.st_mtime_ns != lp.st_mtime_ns
+                if was_replaced or was_resized or maybe_modified:
+                    lp = self._listdir_new(h, fd, st)
+                else:
+                    self._listdir_cache.move_to_end(h)  # LRU: Mark as recently used
             else:
-                self._listdir_cache.move_to_end(h)  # LRU: Mark as recently used
-        else:
-            lp = self._listdir_new(h, fd, st)
-
+                lp = self._listdir_new(h, fd, st)
+        finally:
+            os.close(fd)
         return lp.dlst
 
     def _listdir_new(self, h: HPath, fd: FDInt, st: os.stat_result) -> ListdirProxy:

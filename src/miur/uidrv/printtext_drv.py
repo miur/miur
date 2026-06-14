@@ -1,6 +1,6 @@
 import shutil
 import sys
-from typing import Self, assert_never
+from typing import Iterator, Self, assert_never
 
 from wcwidth import clip, width
 
@@ -102,6 +102,7 @@ class PrintTextUIDriver:
                     if aid != Aid.default:
                         # FIXME: use "parametrized style" here ?
                         #   OR: define generic rainbow in TermStyle and map range of Aid indexes to it
+                        # RED!.
                         text = f"\033[3{aid}m" + text + "\033[m"
 
                     attr = getattr(self.termstyle, Aid(aid).name)
@@ -118,56 +119,82 @@ class PrintTextUIDriver:
         return lines
 
     def pad_boundary(self, displ: DisplayStream, wfit: int, wmax: int) -> DisplayStream:
+        # pylint:disable=too-many-locals
         boundary = "|"  # ALT="|\n↪"
         bounw = width(boundary)
-        py = 0
+        tailw = max(0, wmax - wfit)
+        aid = Aid.default
+
+        # py = 0
+        y = None
         nx = 0
+        marked = False
+
+        def mark() -> Iterator[TextSpan]:
+            nonlocal nx, marked
+            if y is None or marked:
+                return
+
+            if (spacer := wfit - nx) > 0:
+                # ALT:(string): l = wcwidth.ljust(l, wfit, " ") + "|"
+                yield TextSpan(nx, y, " " * spacer, spacer, aid)
+                nx = wfit
+            ## ALT: if y > py:
+            # if spacer >= 0:
+            #     yield TextSpan(nx + spacer, py, boundary, bounw, Aid.default)
+            yield TextSpan(nx, y, boundary, bounw, aid)
+            nx += bounw
+            marked = True
+            # nx = 0
+            # py = y
+
         # WARN: list needs to be sorted by .x
         # ALT:PERF: for large lists use bisect()
         for tok in displ:
             assert isinstance(tok, TextSpan)
-            x, y, wc = tok.x, tok.y, tok.wc
+
+            x, ty, wc = tok.x, tok.y, tok.wc
+            end = x + wc
+
             # WARN!BAD? prev token isn't guaranteed to be rightmost
-            if y > py:
-                if (spacer := wfit - nx) > 0:
-                    # ALT:(string): l = wcwidth.ljust(l, wfit, " ") + "|"
-                    yield TextSpan(nx, py, " " * spacer, spacer, Aid.default)
-                if spacer >= 0:
-                    yield TextSpan(nx + spacer, py, boundary, bounw, Aid.default)
-                nx = 0
-                py = y
+            if ty != y:
+                if y is not None:
+                    yield from mark()
+                y, nx, marked = ty, 0, False
 
-            nx = x + wc
-            if nx < min(wfit, wmax):
+            # Fully before boundary, including exact end at boundary.
+            if end <= wfit:
                 yield tok
-            elif nx >= wfit:
-                yield tok
+                nx = max(nx, end)
+
+                if end == wfit and not marked:
+                    yield from mark()
+
+            # Fully after boundary.
+            elif x >= wfit:
+                yield from mark()
+                yield tok._replace(x=x + bounw)
+                nx = max(nx, x + bounw + wc)
+
+            # Crosses boundary: x < wfit < end.
             else:
-                yield tok
+                cut = wfit - x
 
-        if (spacer := wfit - nx) >= 0:
-            yield TextSpan(nx, py, " " * spacer, spacer, Aid.default)
+                # FAIL:(only works on ascii): l = l[:wfit] + "|" + l[wfit:]
+                left = clip(tok.t, 0, cut, fillchar="·")
+                lw = width(left)
+                if left:
+                    yield tok._replace(t=left, wc=lw)
 
-    def _pad_line_boundary(  # pylint:disable=too-many-arguments,too-many-positional-arguments
-        self, displ: DisplayStream, cx: int, cy: int, wfit: int, wmax: int
-    ) -> int:
-        broken_token_idx = -1
-        for i in range(len(displ) - 1, -1, -1):
-            t = displ[i]
-            if t.y != cy:
-                break  # <CASE: single line only
-            # FAIL:FIXME: splice if exactly bw two tokens
-            if t.x <= wfit < t.x + t.wc:
-                broken_token_idx = i
-                break  # <FIXME? also split multiple overlapping tokens
-        if broken_token_idx != -1:
-            t = displ[broken_token_idx]
-            # FAIL:(only works on ascii): l = l[:wfit] + "|" + l[wfit:]
-            a = clip(t.t, 0, wfit - t.x, fillchar="·")
-            b = clip(t.t, wfit - t.x, wmax - wfit, fillchar="·")
-            wa = width(a)
-            displ[broken_token_idx : broken_token_idx + 1] = [
-                t._replace(t=a, wc=wa),
-                TextSpan(t.x + wa, t.y, boundary, bounw, Aid.default),
-                t._replace(t=b, wc=width(b)),
-            ]
+                nx = max(nx, x + lw)
+                yield from mark()
+
+                if tailw:
+                    right = clip(tok.t, cut, tailw, fillchar="·")
+                    rw = width(right)
+                    if right:
+                        yield tok._replace(x=x + lw + bounw, t=right, wc=rw)
+                        nx = max(nx, x + lw + bounw + rw)
+
+        if y is not None:
+            yield from mark()

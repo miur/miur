@@ -152,8 +152,6 @@ class TuiSystem:
 
                 i += 1
                 break  # TEMP: process one item per line
-            if va.vp_w < va.wnd_w:
-                self.pad_boundary(displ, cx, cy, va.vp_w, va.wnd_w)
             cy += 1
         va.end_actual = i
         return displ
