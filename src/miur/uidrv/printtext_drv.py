@@ -1,6 +1,6 @@
-import shutil
+import os
 import sys
-from typing import Iterator, Self, assert_never
+from typing import Iterator, Self, TextIO, assert_never
 
 from wcwidth import clip, width
 
@@ -11,7 +11,8 @@ from .ansicolor import ansicolor
 if sys.platform == "win32":
     import msvcrt  # pylint:disable=import-error
 
-    def _get_wch() -> str:
+    def _get_wch(rfd: TextIO, wfd: TextIO) -> str:
+        _ = rfd, wfd
         ch = msvcrt.getwch()  # Reads a single Unicode character
         # Special keys (arrows, F-keys) emit a null or 0xe0 byte first
         if ch in ("\000", "\xe0"):
@@ -22,15 +23,15 @@ else:  # Unix implementation (Linux/macOS)
     import termios
     import tty
 
-    def _get_wch() -> str:
-        fd = sys.stdin.fileno()
+    def _get_wch(rfd: TextIO, wfd: TextIO) -> str:
+        fd = wfd.fileno()
         old_settings = termios.tcgetattr(fd)
         try:
             tty.setraw(fd)
-            ch = sys.stdin.read(1)  # Reads one character
+            ch = rfd.read(1)  # Reads one character
             # Check for multi-byte sequences (e.g., arrow keys often start with \x1b)
             if ch == "\x1b":
-                ch += sys.stdin.read(2)  # Read the next 2 bytes of the sequence
+                ch += rfd.read(2)  # Read the next 2 bytes of the sequence
         finally:
             # MAYBE: instead of single char -- switch stdin mode permanently in __enter/exit ?
             termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
@@ -44,6 +45,7 @@ class TermStyle:
     # itempunct = lambda s:
 
 
+# RENAME? TextStreamUIDriver
 # SEP/OPT::
 #   * text (vs serialized DisplayList/AST dump for fmt-converters)
 #   * unicode vs ascii
@@ -57,8 +59,9 @@ class TermStyle:
 class PrintTextUIDriver:
     termstyle: TermStyle
 
-    def __init__(self) -> None:
-        self.print = print
+    def __init__(self, rfd: TextIO | None = None, wfd: TextIO | None = None) -> None:
+        self._rfd = rfd or sys.stdin
+        self._wfd = wfd or sys.stdout  # OR: store _writelines to reduce API surface
 
     def __enter__(self) -> Self:
         self.termstyle = TermStyle()
@@ -68,14 +71,32 @@ class PrintTextUIDriver:
         pass
 
     def input(self) -> str:
-        return _get_wch()
+        return _get_wch(self._rfd, self._wfd)
 
     def sizewh(self) -> tuple[int, int]:
-        return shutil.get_terminal_size(fallback=(80, 24))
+        # REF: shutil.get_terminal_size(fallback=(80, 24))
+        w = int(os.environ.get("COLUMNS", "0"))
+        h = int(os.environ.get("LINES", "0"))
+        if w <= 0 or h <= 0:
+            try:
+                wo, ho = os.get_terminal_size(self._wfd.fileno())
+            except AttributeError, ValueError, OSError:
+                wo, ho = (80, 24)
+            if w <= 0:
+                w = wo
+            if h <= 0:
+                h = ho
+        return w, h
+
+    def clear(self) -> None:
+        pass
+
+    def refresh(self) -> None:
+        pass
 
     # MAYBE? strip term-codes in draw_lines() and make draw_rawterm() to allow them
     def draw_lines(self, lines: list[str]) -> None:
-        self.print("".join(lines))
+        self._wfd.writelines(lines)
 
     def draw_displ(self, displ: DisplayStream) -> None:
         self.draw_lines(self.rasterize_displ(self.pad_boundary(displ, 80, 120)))

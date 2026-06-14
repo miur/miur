@@ -1,4 +1,5 @@
 import curses as C
+from types import TracebackType
 from typing import Callable, ClassVar, Protocol, Self, assert_never, overload
 
 from .. import log
@@ -190,7 +191,12 @@ class CursesUIDriver:
             raise
         return self
 
-    def __exit__(self, exc_type: type, exc: BaseException | None, _tb: object) -> None:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: TracebackType | None,
+    ) -> None:
         restore_exc = self._restore()
         if restore_exc:
             if exc:
@@ -214,14 +220,17 @@ class CursesUIDriver:
         h, w = self.stdscr.getmaxyx()
         return w, h
 
-    def draw_lines(self, lines: list[str]) -> None:  # CHG? bytes
+    def clear(self) -> None:
         self.stdscr.clear()
-        for s in lines:
-            self.stdscr.addstr(s)
+
+    def refresh(self) -> None:
         self.stdscr.refresh()
 
+    def draw_lines(self, lines: list[str]) -> None:  # CHG? bytes
+        for s in lines:
+            self.stdscr.addstr(s)
+
     def draw_displ(self, displ: DisplayStream) -> None:
-        self.stdscr.clear()
         for token in displ:
             match token:
                 case TextSpan(x, y, text, wc, aid):
@@ -234,4 +243,3 @@ class CursesUIDriver:
                     self.stdscr.addnstr(y, x, text, wc, attr)
                 case _:
                     assert_never(token)
-        self.stdscr.refresh()

@@ -25,27 +25,27 @@ def kpi(seqnm: str) -> None:
 
 def cli_spec(parser: ArgumentParser) -> ArgumentParser:
     o = parser.add_argument
-    _uiset = "pr printtext cu curses".split()
-    o("--ui", choices=_uiset, default="curses")
+    _uiset = "pr printtext cu curses mu multi".split()
+    o("--ui", choices=_uiset, default="multi")
     return parser
 
 
 def main_navi() -> str:
     ns = cli_spec(ArgumentParser()).parse_args(sys.argv[1:])
 
-    ## TODO: multi-window UIDriver spawner for synchronous navigation on side-monitor
-    #    USE: spawned term with fd redirect from #miur
-    #      /d/miur/legacy/bc5_miur_asyncio/devhelp/newterm.py
-    #      /d/miur/src/miur/#/newterm.nou
     match ns.ui:
-        case "printtext" | "pr":
-            from .uidrv.printtext_drv import PrintTextUIDriver
+        case "mu" | "multi":
+            from .uidrv.multi_drv import MultiUIDriver
 
-            UIDrv = PrintTextUIDriver
-        case "curses" | "cu":
+            UIDrv = MultiUIDriver
+        case "cu" | "curses":
             from .uidrv.curses_drv import CursesUIDriver
 
             UIDrv = CursesUIDriver
+        case "pr" | "printtext":
+            from .uidrv.printtext_drv import PrintTextUIDriver
+
+            UIDrv = PrintTextUIDriver
         case _:
             assert_never(ns.ui)
 
@@ -56,6 +56,7 @@ def main_navi() -> str:
     nvid = k.new_navi(0, "/etc")
     va = VisibleArea(8, 11)  # OR? use "vpid"
     displ: DisplayList = []
+    kpistr = ""
     with UIDrv() as ui:
         while True:
             kpi("bake")  # NOTE: overwrites prev values -> so keeps only last frame
@@ -66,33 +67,8 @@ def main_navi() -> str:
             va.vp_w, va.vp_h = min(100, va.wnd_w), min(7, max(1, va.wnd_h - 1))
             displ = k.navi_sequence(nvid, va)
 
-            # FAIL:(chicken-and-egg problem): drawing time is still unknown
-            #   BAD~ show *previous frame* kpi(draw) instead of current one
-            kpistr = (
-                " ".join(
-                    f"{nm}={(t1 - t0) / 1e6:.3f}ms"
-                    for (nm, t0), (_, t1) in pairwise(
-                        ## DISABLED: order becomes wrong due to draw from prev frame
-                        # sorted(g_dkpi.items(), key=lambda x: x[1])
-                        ## FIXME: without sorting "bake" is negative
-                        g_dkpi.items()
-                    )
-                )
-                + f" (tokens={len(displ)}) Nfd={process.num_fds()}"
-            )
-            if va.wnd_h > 0:
-                displ.append(
-                    TextSpan(
-                        0,
-                        va.wnd_h - 1,
-                        kpistr,
-                        min(va.wnd_w, width(kpistr)),
-                        Aid.footer,
-                    )
-                )
-
             kpi("draw")
-            # ui.draw_lines(lines)
+            ui.clear()
             ui.draw_displ(displ)
 
             kpi("input")
@@ -100,8 +76,24 @@ def main_navi() -> str:
                 case "q":
                     break
                 case _:
-                    print(wch)
                     pass
+
+            kpi("status")
+            ## HACK: draw "status" *after* drawing evels -- to have all actual KPIs
+            kpistr = " ".join(
+                f"{nm}={(t1 - t0) / 1e6:.3f}ms"
+                for (nm, t0), (_, t1) in pairwise(
+                    ## DISABLED: order becomes wrong due to draw from prev frame
+                    # sorted(g_dkpi.items(), key=lambda x: x[1])
+                    ## FIXME: without sorting "bake" is negative
+                    g_dkpi.items()
+                )
+            )
+            kpistr = f"{wch!r} {kpistr} (tokens={len(displ)}) Nfd={process.num_fds()}"
+            kpiw = min(va.wnd_w, width(kpistr))
+            if va.wnd_h > 0:
+                ui.draw_displ([TextSpan(0, va.wnd_h - 1, kpistr, kpiw, Aid.footer)])
+            ui.refresh()
             kpi("done")
 
     return k.log.dump() + kpistr

@@ -1,7 +1,7 @@
 import enum
 import time
 from collections import deque
-from typing import TYPE_CHECKING, Literal, NamedTuple, Protocol
+from typing import TYPE_CHECKING, Literal, NamedTuple, Protocol, override
 
 if TYPE_CHECKING:
 
@@ -21,6 +21,7 @@ class LogEntry(NamedTuple):
     lvl: LogLevel
     obj: object
 
+    @override
     def __str__(self) -> str:
         return f"{self.ts / 1e9:8.3f}  {self.lvl.name[0]}  {self.obj}\n"
 
@@ -39,8 +40,8 @@ class LogSystem:
         # WARN: float may lose .ms precision for large .ts TRY:USE: (ts//1e9, ts%1e9//1e6)
         return "".join(map(str, self.ringbuffer))
 
-    def __call__(self, lvl: int | Literal["E", "W", "I"], obj: object) -> None:
-        if not isinstance(lvl, int):
+    def __call__(self, lvl: Literal["E", "W", "I"] | LogLevel, obj: object) -> None:
+        if isinstance(lvl, str):
             lvl = LogLevel[lvl]
         ts = time.monotonic_ns() - self._initts
         # MAYBE: keep object as-is until dump() -- but run lambda() immediately here
