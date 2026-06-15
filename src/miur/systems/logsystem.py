@@ -31,12 +31,16 @@ class LogSystem:
     def __init__(self, kernel: IKernel | None) -> None:
         self._initts = time.monotonic_ns()
         self.k = kernel
-        self.ringbuffer: deque[LogEntry] = deque(maxlen=100)
+        ## DISABLED:(deque): I need pointer for what last element was dumped into .printdrv
+        # self.ringbuffer: deque[LogEntry] = deque(maxlen=100)
+        self.ringbuffer: list[LogEntry] = []
 
+    # MAYBE? allow [*aobj, **kobj] and store all of them to rasterize later?
     def info(self, obj: object) -> None:
         self(LogLevel.INFO, obj)
 
     def dump(self) -> str:
+        self(LogLevel.INFO, f"Nlogs={len(self.ringbuffer)}")
         # WARN: float may lose .ms precision for large .ts TRY:USE: (ts//1e9, ts%1e9//1e6)
         return "".join(map(str, self.ringbuffer))
 

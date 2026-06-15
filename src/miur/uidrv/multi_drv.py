@@ -21,7 +21,8 @@ def newtermwindow() -> Generator[tuple[TextIO, TextIO]]:
         tmpf = stack.enter_context(tempfile.NamedTemporaryFile(mode="r"))
         cmd = 'tty > "$0"; trap "kill -WINCH $1" WINCH; inotifywait -qq -e delete_self "$0"'
         bgtty = stack.enter_context(
-            Popen(["st", "-M", "-e", "sh", "-c", cmd, tmpf.name, str(os.getpid())])
+            # DISABLED:("-M"): I need to scroll history up
+            Popen(["st", "-e", "sh", "-c", cmd, tmpf.name, str(os.getpid())])
         )
 
         def _cleanup_terminal() -> None:

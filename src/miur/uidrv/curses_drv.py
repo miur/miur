@@ -76,6 +76,7 @@ class StyleDef[T: HasContext]:  # RENAME? LazyStyle
         return curses_attr
 
 
+# BAD: descriptors are clever, but !jurigged doesn't update them :(
 # THINK: no point in overengineering -- we use DisplayList anyway
 #   * tui should have IntEnum: name -> styleid(int)
 #   * curses should match/convert that IntEnum into internal dict
@@ -86,6 +87,8 @@ class CursesStyle:
     # DFL:(default): gray text on transparent bkgr
     default: ClassVar[StyleDef[Self]] = StyleDef(-1, -1)
     item: ClassVar[StyleDef[Self]] = StyleDef(same_as="default")
+    lineidx: ClassVar[StyleDef[Self]] = StyleDef(0, -1)
+    itemidx: ClassVar[StyleDef[Self]] = StyleDef(10, -1)
     footer: ClassVar[StyleDef[Self]] = StyleDef(217, 17, "b")
 
     def __init__(self, stdscr: C.window) -> None:
@@ -239,7 +242,18 @@ class CursesUIDriver:
                     #   WHY: no sense to crop frame on shrink or continue drawing on enlarge,
                     #     as displ should be recalculated for adaptive-layout anyway
                     # TEMP: disable fallback to "self.cursesstyle.default" to catch mismatches
+                    # TBD:OPT: for unknown styles either throw/log, fallback to default, or use toxic-pink
                     attr = getattr(self.cursesstyle, Aid(aid).name)
-                    self.stdscr.addnstr(y, x, text, wc, attr)
+                    try:
+                        self.stdscr.addnstr(y, x, text, wc, attr)
+                    except C.error:
+                        ## DISABLED:FAIL:(racing): even if we query sizewh before and after,
+                        ##   window may had changed size *twice* and returned to prev size
+                        ##     e.g. another window was created/destroyed on tiling WM
+                        # if self.sizewh() != prevwh:
+                        ## TEMP:WKRND: return early and cleanly redraw "next time"
+                        ##   FIXME?: set invalidate OR issue redraw but limit number of attempts on ERR
+                        ##     MAYBE? propagate and capture exception in main-loop -- to restart drawing easier
+                        return
                 case _:
                     assert_never(token)

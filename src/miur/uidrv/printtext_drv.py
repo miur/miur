@@ -1,11 +1,11 @@
 import os
 import sys
-from typing import Iterator, Self, TextIO, assert_never
+from typing import Iterable, Iterator, Self, TextIO, assert_never
 
 from wcwidth import clip, width
 
 from ..systems.tuisystem import Aid, DisplayStream, TextSpan
-from .ansicolor import ansicolor
+from .ansicolor import Palette, ansicolor
 
 # ALT: https://pypi.org/project/readkeys/
 if sys.platform == "win32":
@@ -41,6 +41,8 @@ else:  # Unix implementation (Linux/macOS)
 class TermStyle:
     reset = ansicolor()
     item = default = ansicolor(-1, -1)
+    lineidx = ansicolor(Palette.black)
+    itemidx = ansicolor(Palette.greydark)
     footer = ansicolor(217, 17, bold=True)
     # itempunct = lambda s:
 
@@ -95,11 +97,14 @@ class PrintTextUIDriver:
         pass
 
     # MAYBE? strip term-codes in draw_lines() and make draw_rawterm() to allow them
-    def draw_lines(self, lines: list[str]) -> None:
+    def draw_lines(self, lines: Iterable[str]) -> None:
         self._wfd.writelines(lines)
+        self._wfd.flush()
 
     def draw_displ(self, displ: DisplayStream) -> None:
-        self.draw_lines(self.rasterize_displ(self.pad_boundary(displ, 80, 120)))
+        # TODO: use .sizewh (nof 120) to avoid wrapping in terminal, and "max=None" for textstream
+        #   MAYBE? use "1024" for text logfiles (to avoid too long lines)
+        self.draw_lines(self.rasterize_displ(self.pad_boundary(displ, 70, 120)))
 
     def rasterize_displ(self, displ: DisplayStream) -> list[str]:
         py = 0
@@ -120,11 +125,11 @@ class PrintTextUIDriver:
                         raise NotImplementedError("moving left == potential overlap")
                     if cjump > 0:
                         s += " " * cjump
-                    if aid != Aid.default:
-                        # FIXME: use "parametrized style" here ?
-                        #   OR: define generic rainbow in TermStyle and map range of Aid indexes to it
-                        # RED!.
-                        text = f"\033[3{aid}m" + text + "\033[m"
+
+                    # if aid != Aid.default:
+                    #     # FIXME: use "parametrized style" here ?
+                    #     #   OR: define generic rainbow in TermStyle and map range of Aid indexes to it
+                    #     text = f"\033[3{aid}m" + text + "\033[m"
 
                     attr = getattr(self.termstyle, Aid(aid).name)
                     s += attr + text + self.termstyle.reset
@@ -136,15 +141,15 @@ class PrintTextUIDriver:
                     #   derived on ordered list of prev/next tokens
                     assert_never(token)
         if s:
-            lines.append(s)
+            lines.append(s + "\n")
         return lines
 
     def pad_boundary(self, displ: DisplayStream, wfit: int, wmax: int) -> DisplayStream:
         # pylint:disable=too-many-locals
         boundary = "|"  # ALT="|\n↪"
         bounw = width(boundary)
-        tailw = max(0, wmax - wfit)
         aid = Aid.default
+        wfit = min(wfit, wmax)
 
         # py = 0
         y = None
@@ -173,7 +178,6 @@ class PrintTextUIDriver:
         # ALT:PERF: for large lists use bisect()
         for tok in displ:
             assert isinstance(tok, TextSpan)
-
             x, ty, wc = tok.x, tok.y, tok.wc
             end = x + wc
 
@@ -183,39 +187,30 @@ class PrintTextUIDriver:
                     yield from mark()
                 y, nx, marked = ty, 0, False
 
-            # Fully before boundary, including exact end at boundary.
-            if end <= wfit:
+            if end <= wfit:  # <CASE: fully before boundary
                 yield tok
                 nx = max(nx, end)
-
                 if end == wfit and not marked:
                     yield from mark()
-
-            # Fully after boundary.
-            elif x >= wfit:
+            elif x >= wfit:  # <CASE: fully after boundary
                 yield from mark()
                 yield tok._replace(x=x + bounw)
                 nx = max(nx, x + bounw + wc)
-
-            # Crosses boundary: x < wfit < end.
-            else:
-                cut = wfit - x
-
+            else:  # <CASE: crossed boundary (x < wfit < end)
+                cutoff = wfit - x
                 # FAIL:(only works on ascii): l = l[:wfit] + "|" + l[wfit:]
-                left = clip(tok.t, 0, cut, fillchar="·")
+                left = clip(tok.t, 0, cutoff, fillchar="·")
                 lw = width(left)
                 if left:
                     yield tok._replace(t=left, wc=lw)
 
                 nx = max(nx, x + lw)
                 yield from mark()
-
-                if tailw:
-                    right = clip(tok.t, cut, tailw, fillchar="·")
+                if (roomw := wmax - nx) > 0:
+                    right = clip(tok.t, cutoff, cutoff + roomw, fillchar="·")
                     rw = width(right)
                     if right:
-                        yield tok._replace(x=x + lw + bounw, t=right, wc=rw)
-                        nx = max(nx, x + lw + bounw + rw)
-
+                        yield tok._replace(x=nx, t=right, wc=rw)
+                        nx = max(nx, nx + rw)
         if y is not None:
             yield from mark()

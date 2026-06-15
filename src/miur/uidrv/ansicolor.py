@@ -6,23 +6,23 @@ from typing import Final
 
 
 class Palette(IntEnum):
-    dark = 0
+    black = 0
     red = 1
     gren = 2
     yelw = 3
     blue = 4
     mgnt = 5
     cyan = 6
-    light = 7
+    white = 7
 
-    black = 8
+    darkblack = 8  # bkgr
     orgn = 9
-    greydark = 10
-    grey = 11
-    greylight = 12
+    greydark = 10  # content(dim)
+    grey = 11  # body light
+    greylight = 12  # body dark
     purp = 13
-    greyoff = 14
-    white = 15
+    greyoff = 14  # emphasized
+    brightwhite = 15
 
 
 type Color = int | str | Palette | tuple[int, int, int]
@@ -55,7 +55,7 @@ def _color(n: Color, base: int) -> str:
 _SGR: Final = {  # <OFF="Select Graphic Rendition"
     # "reset": (0, 0),  # BET? reset=ansicolor() vs dfl=ansicolor(-1,-1)
     "bold": (1, 22),
-    "faint": (2, 22),
+    "dim": (2, 22),  # RENAME? ="faint"
     "italic": (3, 23),
     "uline": (4, 24),
     "blink": (5, 25),
@@ -72,7 +72,7 @@ def ansicolor(
 ) -> str:
     # PERF:INFO: directly inserting into bytesarray+decode has no benefits
     #   ATT: "return (aon,aoff)" has no sense, as color can only be reset, but not restored
-    parts = [str(_SGR[k][v]) for k, v in sgr.items()]
+    parts = [str(_SGR[k][not v]) for k, v in sgr.items()]
     if fg is not None:
         parts.append(_color(fg, 30))
     if bg is not None:

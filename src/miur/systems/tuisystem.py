@@ -50,6 +50,8 @@ class Aid(IntEnum):
     default = auto()
     item = auto()
     itempunct = auto()
+    lineidx = auto()
+    itemidx = auto()
     footer = auto()
 
 
@@ -116,16 +118,16 @@ class TuiSystem:
             cx = va.vp_x
 
             # XLR: how to chain this better
-            def unfit(ss: str, wc: int = 0) -> bool:
+            def unfit(ss: str, wc: int = 0, aid: Aid = Aid.default) -> bool:
                 nonlocal cx
                 sw = wc or width(ss)
                 if cx + sw > va.vp_w:
                     return True
-                displ.append(TextSpan(cx, cy, ss, sw, Aid.default))
+                displ.append(TextSpan(cx, cy, ss, sw, aid))
                 cx += sw
                 return False
 
-            if unfit(f"{cy + 1:02d}:"):
+            if unfit(f"{cy + 1:02d}:", aid=Aid.lineidx):
                 break
 
             # PERF? merge multiple tokens with same style into continuous spans
@@ -134,7 +136,7 @@ class TuiSystem:
                 okcx = cx
                 oklen = len(displ)
                 # CHG?(" " * 1): use Spacer(1) ?
-                if unfit(" " * 1) or unfit(f"{i:02d}:"):
+                if unfit(" " * 1) or unfit(f"{i:02d}:", aid=Aid.itemidx):
                     cx = okcx
                     del displ[oklen:]
                     break
