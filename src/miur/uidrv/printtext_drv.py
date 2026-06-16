@@ -4,8 +4,9 @@ from typing import Iterable, Iterator, Self, TextIO, assert_never
 
 from wcwidth import clip, width
 
-from ..systems.tuisystem import Aid, DisplayStream, TextSpan
-from .ansicolor import Palette, ansicolor
+from ..uicommon.ansicolor import Palette, ansicolor
+from ..uicommon.displaylist import DisplayStream, TextSpan
+from ..uicommon.styleids import Aid
 
 # ALT: https://pypi.org/project/readkeys/
 if sys.platform == "win32":
@@ -104,7 +105,9 @@ class PrintTextUIDriver:
     def draw_displ(self, displ: DisplayStream) -> None:
         # TODO: use .sizewh (nof 120) to avoid wrapping in terminal, and "max=None" for textstream
         #   MAYBE? use "1024" for text logfiles (to avoid too long lines)
-        self.draw_lines(self.rasterize_displ(self.pad_boundary(displ, 70, 120)))
+        # displ = self.hi_punct(displ, "[-_.]")
+        displ = self.pad_boundary(displ, 70, 120)
+        self.draw_lines(self.rasterize_displ(displ))
 
     def rasterize_displ(self, displ: DisplayStream) -> list[str]:
         py = 0

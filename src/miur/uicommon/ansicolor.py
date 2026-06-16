@@ -5,6 +5,7 @@ from typing import Final
 # from typing_extensions import ReadOnly  # until python=3.15
 
 
+# FIXME: use actual names from e.g. neomutt, and annotate/reassign with solarized aliases
 class Palette(IntEnum):
     black = 0
     red = 1
@@ -17,7 +18,7 @@ class Palette(IntEnum):
 
     darkblack = 8  # bkgr
     orgn = 9
-    greydark = 10  # content(dim)
+    greydark = content = 10  # content(dim)
     grey = 11  # body light
     greylight = 12  # body dark
     purp = 13

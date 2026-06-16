@@ -3,7 +3,8 @@ from types import TracebackType
 from typing import Callable, ClassVar, Protocol, Self, assert_never, overload
 
 from .. import log
-from ..systems.tuisystem import Aid, DisplayStream, TextSpan
+from ..uicommon.displaylist import DisplayStream, TextSpan
+from ..uicommon.styleids import Aid
 
 
 class HasContext(Protocol):
