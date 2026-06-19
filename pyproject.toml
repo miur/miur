@@ -150,7 +150,7 @@ skip_covered = true
 # ruff auto-detects .venv, nothing needed
 target-version = "py314"
 line-length = 88
-src = ["pkg"]  # ,"tests"
+src = ["src"]  # ,"pkg","tests"
 extend-exclude = ["legacy", "#"]
 
 [tool.ruff.lint]
@@ -175,8 +175,15 @@ ignore = [
 "tests/*" = ["PLR2004"]  # Ignore magic value comparisons in all test files
 
 [tool.ruff.lint.isort]
+combine-as-imports = true
 force-single-line = false
 split-on-trailing-comma = true
+
+[tool.ruff.format]
+# Prevents the formatter from crashing into your long inline pyright comments
+# line-ending = "lf"
+# wrap-comments = true
+# `exclude`, `preview`, `indent-style`, `quote-style`, `nested-string-quote-style`, `skip-magic-trailing-comma`, `line-ending`, `docstring-code-format`, `docstring-code-line-length`
 
 
 [tool.pylint.main]
@@ -259,11 +266,16 @@ enable_error_code = ["explicit-override"]
 
 [tool.pyright]
 pythonVersion = "3.14"
-typeCheckingMode = "strict"
 include = ["src"]  # "pkg","tests"
 exclude = ["legacy", "**/#"]
 extraPaths = ["pkg", "src"]
 venvPath = "."
 venv = ".venv"
+typeCheckingMode = "strict"
 # FIXED: it ignores TYPE_CHECKING forward imports
 reportImportCycles = "none"
+# FIXED? Use Ruff's import organizer
+# disableOrganizeImports = true
+autoImportCompletions = true
+# autoSearchPaths = true
+useLibraryCodeForTypes = true

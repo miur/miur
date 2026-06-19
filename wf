@@ -101,12 +101,19 @@ elif [[ ${opts[install]:+x} ]] || [[ ! -x "$venvbin/miur" ]] || [[ ${opts[jurigg
 fi
 
 if [[ ${opts[lint]:+x} ]]; then
-  uvr --all-packages ruff check .
-  uvr --all-packages basedpyright
-  uvr --all-packages mypy .
-  uvr --all-packages bandit .
-  # uvr mypy .
-  # uvr pylint .
+  declare -A err=()
+  [[ $PWD == $here ]] && d="src/miur" || d="."
+  # DISABLED: uvr --all-packages "$@" "." ...
+  chk(){ uvr "$@" "$d" || err["$1"]=$?; }
+  chk ruff check
+  chk basedpyright
+  chk mypy
+  chk pylint
+  # chk bandit
+  if ((${#err[@]})); then
+    for k in "${!my_array[@]}"; do >&2 echo "$k=${my_array[$k]}"; done
+    exit 1
+  fi
 fi
 
 

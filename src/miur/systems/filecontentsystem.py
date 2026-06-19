@@ -96,10 +96,10 @@ class FileContentSystem:
         # NOTE:(just in case): we remove from both caches
         if cp := self._fullcontent_cache.pop(h, None):
             self._fullcontent_total -= cp.st_size
-        if cp := self._mmap_cache.pop(h, None):
-            cp.data.close()  # THINK: should I allow repeating .close() or prefer error?
-            os.posix_fadvise(cp.fd, 0, 0, os.POSIX_FADV_DONTNEED)
-            os.close(cp.fd)
+        if mp := self._mmap_cache.pop(h, None):
+            mp.data.close()  # THINK: should I allow repeating .close() or prefer error?
+            os.posix_fadvise(mp.fd, 0, 0, os.POSIX_FADV_DONTNEED)
+            os.close(mp.fd)
 
     def _ensure_cached(  # pylint:disable=too-many-branches,too-many-return-statements
         self,
@@ -109,6 +109,8 @@ class FileContentSystem:
         refresh: bool | None,
     ) -> ContentProxy[bytes] | ContentProxy[mmap.mmap] | None:
         cp = self._fullcontent_cache.get(h) or self._mmap_cache.get(h)
+        fd: FDInt | None = None
+        st: os.stat_result | None = None
         if refresh is False:
             if cp:
                 if isinstance(cp.data, bytes):
@@ -143,7 +145,8 @@ class FileContentSystem:
         # WARN: on Windows, st_ino is less reliable
         #   BUT recreation usually requires closing the handle anyway
         #   ALSO: on Windows file can't be deleted if mapped, but recreation can still occur
-        assert st and fd  # WTF:WHY: error: "st" (reportPossiblyUnboundVariable)
+        if st is None or fd is None:
+            raise RuntimeError("ERR in ALG above (refresh=True must stat cached file)")
         was_replaced = st.st_ino != cp.st_ino or st.st_dev != cp.st_dev
         was_resized = st.st_size != cp.st_size
         maybe_modified = st.st_mtime_ns != cp.st_mtime_ns

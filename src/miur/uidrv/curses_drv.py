@@ -1,6 +1,6 @@
 import curses as C
 from types import TracebackType
-from typing import Callable, ClassVar, Protocol, Self, assert_never, overload
+from typing import Callable, ClassVar, Protocol, Self, assert_never, cast, overload
 
 from .. import log
 from ..uicommon.displaylist import DisplayStream, TextSpan
@@ -74,7 +74,7 @@ class StyleDef[T: HasContext]:  # RENAME? LazyStyle
         # 2. Overwrite descriptor with raw primitive int on the instance
         setattr(instance, self.name, curses_attr)
         log.info((self.name, curses_attr))
-        return curses_attr
+        return cast(int, curses_attr)
 
 
 # BAD: descriptors are clever, but !jurigged doesn't update them :(

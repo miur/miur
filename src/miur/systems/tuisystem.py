@@ -3,8 +3,6 @@ import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
 
-## PERF:(startup): 45ms(bare) -> 75ms(typing) -> 95ms(shutil,time) -> 250ms(wcwidth)
-# ALT:(copy-paste): //site-packages/_pytest/_io/wcwidth.py
 from wcwidth import width
 
 from ..uicommon.displaylist import DisplayList, TextSpan

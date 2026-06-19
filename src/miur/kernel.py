@@ -4,6 +4,7 @@ from .systems import filecontentsystem as FCS
 from .systems import localfilesystem as LFS
 from .systems import sessionstatesystem as SSS
 from .systems import textsystem, tuisystem, viewsystem
+from .uicommon.displaylist import DisplayList
 
 if TYPE_CHECKING:
 
@@ -73,7 +74,7 @@ class MiurKernel:  # pylint:disable=too-many-instance-attributes
         self,
         nvid: NaviId,
         va: tuisystem.VisibleArea,
-    ) -> tuisystem.DisplayList:
+    ) -> DisplayList:
         handle = self._navi[nvid].handle
         displ = self.tui.bake_display_area(handle, va)
         return displ

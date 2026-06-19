@@ -1,1 +1,3 @@
-from .systems.logsystem import log as log
+from .systems.logsystem import log
+
+__all__ = ["log"]

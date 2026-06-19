@@ -1,6 +1,5 @@
 import enum
 import time
-from collections import deque
 from typing import TYPE_CHECKING, Literal, NamedTuple, Protocol, override
 
 if TYPE_CHECKING:

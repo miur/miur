@@ -8,12 +8,18 @@ from itertools import pairwise
 from time import monotonic_ns
 from typing import assert_never
 
-import jurigged
+import jurigged  # pyright: ignore[reportMissingTypeStubs]
 import psutil
-from jurigged.codetools import UpdateOperation
+from jurigged.codetools import UpdateOperation  # pyright: ignore[reportMissingTypeStubs]
+
+## PERF:(startup): 45ms(bare) -> 75ms(typing) -> 95ms(shutil,time) -> 250ms(wcwidth)
+# ALT:(copy-paste): //site-packages/_pytest/_io/wcwidth.py
+from wcwidth import width
 
 from .kernel import MiurKernel
-from .systems.tuisystem import Aid, DisplayList, TextSpan, VisibleArea, width
+from .systems.tuisystem import VisibleArea
+from .uicommon.displaylist import DisplayList, TextSpan
+from .uicommon.styleids import Aid
 
 g_dkpi: dict[str, int] = {}
 
@@ -34,7 +40,7 @@ def cli_spec(parser: ArgumentParser) -> ArgumentParser:
     return parser
 
 
-def main_navi() -> str:
+def main_navi() -> str:  # noqa: PLR0915  # pylint:disable=too-many-locals,too-many-statements
     ns = cli_spec(ArgumentParser()).parse_args(sys.argv[1:])
 
     match ns.ui:
@@ -42,14 +48,14 @@ def main_navi() -> str:
             from .uidrv.multi_drv import MultiUIDriver
 
             UIDrv = MultiUIDriver
-        case "cu" | "curses":
-            from .uidrv.curses_drv import CursesUIDriver
-
-            UIDrv = CursesUIDriver
-        case "pr" | "printtext":
-            from .uidrv.printtext_drv import PrintTextUIDriver
-
-            UIDrv = PrintTextUIDriver
+        # case "cu" | "curses":
+        #     from .uidrv.curses_drv import CursesUIDriver
+        #
+        #     UIDrv = CursesUIDriver
+        # case "pr" | "printtext":
+        #     from .uidrv.printtext_drv import PrintTextUIDriver
+        #
+        #     UIDrv = PrintTextUIDriver
         case _:
             assert_never(ns.ui)
 
@@ -83,7 +89,7 @@ def main_navi() -> str:
         ### HACK: hot-reload (recursive ./*.py files from PWD?)
         ## CHECK: if it has import-hook to discover lazily loaded modules later
         # OR: jurigged.watch(pattern=[fs.dirname(fs.realpath(__file__)) + "/**/*.py"], logger=jurigged_on_event)
-        jurigged.watch(logger=jurigged_on_event)  # <CASE: recursive
+        jurigged.watch(logger=jurigged_on_event)  # pyright: ignore[reportUnknownMemberType]  # <CASE: recursive
         # jurigged.watch("miur") # <OR watch a specific package directory (non-recursive)
         # import mymod; jurigged.watch(mymod) # <OR watch a specific imported module package
 

@@ -7,7 +7,7 @@ from subprocess import Popen, TimeoutExpired
 from types import TracebackType
 from typing import Generator, Self, TextIO
 
-from ..systems.tuisystem import DisplayList
+from ..uicommon.displaylist import DisplayList
 from .curses_drv import CursesUIDriver
 from .printtext_drv import PrintTextUIDriver
 
