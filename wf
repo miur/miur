@@ -178,6 +178,11 @@ fi
 
 if [[ ${opts[update]-} ]]; then
 
+  # upgrade .venv
+  uv ${xt:+-v} lock --project "$here" --upgrade
+  uvs --all-packages --all-extras --group devall
+  exit
+
   # 4. Specific Tool Formatters
   # pyproject-fmt: A specialized tool to format Python pyproject.toml files.
   # toml-formatter: A simple Python-based CLI formatter.
