@@ -244,7 +244,7 @@ class CursesUIDriver:
                     #     as displ should be recalculated for adaptive-layout anyway
                     # TEMP: disable fallback to "self.cursesstyle.default" to catch mismatches
                     # TBD:OPT: for unknown styles either throw/log, fallback to default, or use toxic-pink
-                    attr = getattr(self.cursesstyle, Aid(aid).name)
+                    attr = getattr(self.cursesstyle, Aid.get_name(aid).lower())
                     try:
                         self.stdscr.addnstr(y, x, text, wc, attr)
                     except C.error:

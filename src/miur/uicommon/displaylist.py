@@ -1,12 +1,14 @@
 from typing import Iterable, NamedTuple
 
+from .styleids import StyleId
+
 
 class TextSpan(NamedTuple):  # RENAME: CellSpan
     x: int
     y: int
     t: str
     wc: int  # <MAYBE? cache cell-width hint for renderer's BoundingBox
-    aid: int  # WARN: don't use DFL=0 here -- always set style explicitly to .default
+    aid: StyleId  # ATT: always ctor to Aid.DEFAULT inof using .aid=0 here
     zi: int = 1  # < Z-index of whole layer bucket (NOT per-element)
     ## ALT:
     # @property

@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Protocol
 from wcwidth import width
 
 from ..uicommon.displaylist import DisplayList, TextSpan
-from ..uicommon.styleids import Aid
+from ..uicommon.styleids import Aid, StyleId
 
 if TYPE_CHECKING:
     from .viewsystem import ViewSystem
@@ -62,7 +62,7 @@ class TuiSystem:
             cx = va.vp_x
 
             # XLR: how to chain this better
-            def unfit(ss: str, wc: int = 0, aid: Aid = Aid.default) -> bool:
+            def unfit(ss: str, wc: int = 0, aid: StyleId = Aid.DEFAULT) -> bool:
                 nonlocal cx
                 sw = wc or width(ss)
                 if cx + sw > va.vp_w:
@@ -71,7 +71,7 @@ class TuiSystem:
                 cx += sw
                 return False
 
-            if unfit(f"{cy + 1:02d}:", aid=Aid.lineidx):
+            if unfit(f"{cy + 1:02d}:", aid=Aid.LINEIDX):
                 break
 
             # PERF? merge multiple tokens with same style into continuous spans
@@ -80,7 +80,7 @@ class TuiSystem:
                 okcx = cx
                 oklen = len(displ)
                 # CHG?(" " * 1): use Spacer(1) ?
-                if unfit(" " * 1) or unfit(f"{i:02d}:", aid=Aid.itemidx):
+                if unfit(" " * 1) or unfit(f"{i:02d}:", aid=Aid.ITEMIDX):
                     cx = okcx
                     del displ[oklen:]
                     break
@@ -111,18 +111,18 @@ class TuiSystem:
             if m.start() > pe:
                 ab = text[pe : m.start()]
                 abw = width(ab)
-                displ.append(TextSpan(cx, cy, ab, abw, aid=Aid.item))
+                displ.append(TextSpan(cx, cy, ab, abw, aid=Aid.ITEM))
                 cx += abw
             needle = m.group()
             ndw = width(needle)
             # aid = hipatt.index(needle)  # TEMP:HACK: diff style
-            aid = Aid.item
+            aid = Aid.ITEM
             displ.append(TextSpan(cx, cy, needle, ndw, aid=aid))
             cx += ndw
             pe = m.end()
         if pe < len(text):
             ab = text[pe:]
             abw = width(ab)
-            displ.append(TextSpan(cx, cy, ab, abw, aid=Aid.item))
+            displ.append(TextSpan(cx, cy, ab, abw, aid=Aid.ITEM))
             cx += abw
         return cx

@@ -148,7 +148,7 @@ def main_navi() -> str:  # noqa: PLR0915  # pylint:disable=too-many-locals,too-m
             )
             kpistr = f"{wch!r} {kpistr} (tokens={len(displ)}) Nfd={process.num_fds()}"
             kpiw = min(va.wnd_w, width(kpistr))
-            tok = TextSpan(0, 0, kpistr, kpiw, Aid.footer)
+            tok = TextSpan(0, 0, kpistr, kpiw, Aid.FOOTER)
             if va.wnd_h > 0:
                 ui.cursesdrv.draw_displ([tok._replace(y=va.wnd_h - 1)])
             ui.printdrv.draw_displ([tok])

@@ -29,15 +29,27 @@
 #     * same id can mean dif things for obj-type (Text/Rect/Image/etc.)
 #   IDEA: use each name fg/bg as progressbar for e.g. !mpd OR as gauge for e.g. relative file/dirsize like !ncdu
 
-from enum import IntEnum, auto
+from typing import Final, NewType
+
+from ..stdlib.autoenum import AutoEnumMeta
+
+StyleId = NewType("StyleId", int)
+AUTO: Final = StyleId(0)
 
 
-# BAD:(IntEnum + jurigged): old inst/vars will break or cmp as False against the updated version
-class Aid(IntEnum):
-    unknown = 0  # ALT: py:$ def _generate_next_value_(name, start, count, last_values): return count
-    default = auto()
-    item = auto()
-    itempunct = auto()
-    lineidx = auto()
-    itemidx = auto()
-    footer = auto()
+class Aid(metaclass=AutoEnumMeta):
+    DEFAULT = AUTO
+    ITEM = AUTO
+    FOOTER = AUTO
+
+    ITEMPUNCT = AUTO
+    LINEIDX = AUTO
+    ITEMIDX = AUTO
+
+
+# if TYPE_CHECKING:
+#
+#     class Aid(_Style):
+#         def __getattr__(self, name: str) -> StyleId: ...
+# else:
+#     Aid = _Style

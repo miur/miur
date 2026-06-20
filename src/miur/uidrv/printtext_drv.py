@@ -129,12 +129,12 @@ class PrintTextUIDriver:
                     if cjump > 0:
                         s += " " * cjump
 
-                    # if aid != Aid.default:
+                    # if aid != Aid.DEFAULT:
                     #     # FIXME: use "parametrized style" here ?
                     #     #   OR: define generic rainbow in TermStyle and map range of Aid indexes to it
                     #     text = f"\033[3{aid}m" + text + "\033[m"
 
-                    attr = getattr(self.termstyle, Aid(aid).name)
+                    attr = getattr(self.termstyle, Aid.get_name(aid).lower())
                     s += attr + text + self.termstyle.reset
                     py = y
                     nx = x + wc
@@ -151,7 +151,7 @@ class PrintTextUIDriver:
         # pylint:disable=too-many-locals
         boundary = "|"  # ALT="|\n↪"
         bounw = width(boundary)
-        aid = Aid.default
+        aid = Aid.DEFAULT
         wfit = min(wfit, wmax)
 
         # py = 0
@@ -170,7 +170,7 @@ class PrintTextUIDriver:
                 nx = wfit
             ## ALT: if y > py:
             # if spacer >= 0:
-            #     yield TextSpan(nx + spacer, py, boundary, bounw, Aid.default)
+            #     yield TextSpan(nx + spacer, py, boundary, bounw, Aid.DEFAULT)
             yield TextSpan(nx, y, boundary, bounw, aid)
             nx += bounw
             marked = True
