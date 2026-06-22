@@ -51,6 +51,7 @@ else:  # Unix implementation (Linux/macOS)
 #   * print whole-frame (vs append-changes)
 #   * nocolor vs termcolor/style[8/16/256/64K/RGB] (vs rawterm-passthrough/strip-termcodes) (vs VT100-subset)
 #   * last-frame only (vs continuous worklog [append chunks] -- to email/troubleshoot interactions later)
+#   * IDEA: specially adapted TTS (QtTextToSpeech) with abbreviated names and play/stop/pause/jump-to controls
 class PrintTextUIDriver:
     style_by_id: list[Effect[str] | None]
 

@@ -3,7 +3,9 @@ import sys
 import tempfile
 import time
 from contextlib import ExitStack, contextmanager
+from queue import Queue
 from subprocess import Popen, TimeoutExpired
+from threading import Thread
 from types import TracebackType
 from typing import Generator, Self, TextIO
 
@@ -16,7 +18,7 @@ from .printtext_drv import PrintTextUIDriver
 #   BET? /d/miur/&g/newterm.nou
 #     SEE: dedicated .py script to send IO/events back'n'forth
 @contextmanager
-def newtermwindow() -> Generator[tuple[TextIO, TextIO]]:
+def new_termwindow() -> Generator[tuple[TextIO, TextIO]]:
     with ExitStack() as stack:
         tmpf = stack.enter_context(tempfile.NamedTemporaryFile(mode="r"))
         cmd = 'tty > "$0"; trap "kill -WINCH $1" WINCH; inotifywait -qq -e delete_self "$0"'
@@ -48,6 +50,29 @@ def newtermwindow() -> Generator[tuple[TextIO, TextIO]]:
         yield (rtty, wtty)
 
 
+@contextmanager
+def new_guithread() -> Generator[tuple[Queue[str], Queue[str]]]:
+    # RENAME? sendqt,recvqt
+    to_qt: Queue[str] = Queue()
+    from_qt: Queue[str] = Queue()
+
+    def _qt_tgt() -> None:
+        # RQ: all Qt stuff MUST be imported in GUI thread first
+        from .qt6wdg_drv import main
+
+        main(to_qt, from_qt)
+
+    qthr = Thread(target=_qt_tgt, daemon=True)  # , args=(to_qt, from_qt)
+    qthr.start()
+    try:
+        yield (to_qt, from_qt)
+    finally:
+        to_qt.put("SHUTDOWN")
+        qthr.join(timeout=3)
+        if qthr.is_alive():
+            print("WARN: qt thread did not exit cleanly within timeout")
+
+
 # MAYBE: spawn each client in its own thread from the get-go ?
 class MultiUIDriver:
     """Multiple side-windows spawner for synchronous navigation on side-monitor"""
@@ -55,13 +80,20 @@ class MultiUIDriver:
     _stack: ExitStack
     cursesdrv: CursesUIDriver
     printdrv: PrintTextUIDriver
+    # qt6wdgdrv: ...
+    to_qt: Queue[str]
+    from_qt: Queue[str]
 
     def __enter__(self) -> Self:
         with ExitStack() as stack:
             do = stack.enter_context
             self.cursesdrv = do(CursesUIDriver())
-            rtty, wtty = do(newtermwindow())
+            rtty, wtty = do(new_termwindow())
             self.printdrv = do(PrintTextUIDriver(rtty, wtty))
+            (self.to_qt, self.from_qt) = do(new_guithread())
+            self.to_qt.put("INIT")
+            # reply = self.from_qt.get()
+            # print(reply)
             self._stack = stack.pop_all()
         return self
 

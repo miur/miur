@@ -63,6 +63,10 @@ lmdb = ["lmdb>=1.7"]
 media = [
   "Pillow>=10.4",
   "PyMuPDF>=1.26",
+  "PySide6>=6.11",
+  # EXPL:(skip): QtWebView, QtMultimedia, QtCharts, QtDataVisualization, QtTextToSpeech
+  #   BAD: skips .pyi stubs too :(
+  # "PySide6-Essentials>=6.11", "PySide6-stubs",
 ]
 demo = ["miurdemo"]
 all = ["miur[lmdb,media,demo]"]  # RENAME? full,complete,std
@@ -96,6 +100,7 @@ dev = [
   "mypy>=1.19.1",
   "pylint>=4.0.5",
   "pylint-venv>=3.0.4",
+  "pylint-qt",
   "pytest>=9.0.2",
   "pytest-cov>=7.0.0",
   "pytest-durations>=1.6.2",
@@ -188,6 +193,9 @@ split-on-trailing-comma = true
 
 [tool.pylint.main]
 py-version = "3.14"
+# REF: https://github.com/pylint-dev/pylint-qt
+load-plugins = ["pylint_qt"]
+extension-pkg-allow-list = ["PySide6"]
 ignore-paths = ["legacy/.*"]
 ignore = ["t", "alt", "doc", "&", "#", "pkg", "_try", ".git", ".reuse", ".venv"]
 ignore-patterns = ["^[_#&].*"]
@@ -203,6 +211,8 @@ disable = [
     "consider-using-dict-items",
     "consider-using-enumerate",
     "consider-using-f-string",
+    "consider-using-max-builtin",
+    "consider-using-min-builtin",
     "import-outside-toplevel",
     "invalid-name",
     "missing-class-docstring",
