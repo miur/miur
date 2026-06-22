@@ -134,6 +134,7 @@ def main_navi() -> str:  # noqa: PLR0915  # pylint:disable=too-many-locals,too-m
             kpi("draw")
             ui.clear()
             ui.draw_displ(displ)
+            k.log.info(f"{ui.printdrv.style_by_id=}")
 
             kpi("status")
             ## HACK: draw "status" *after* drawing evels -- to have all actual KPIs

@@ -5,6 +5,8 @@ from typing import Final
 # from typing_extensions import ReadOnly  # until python=3.15
 
 
+# IDEA: use indexed colors for Solarized and keep default palette16 untouched
+#   FAIL: all other shell utils will use too bright default colors, which is irritating
 # FIXME: use actual names from e.g. neomutt, and annotate/reassign with solarized aliases
 class Palette(IntEnum):
     black = 0
@@ -79,3 +81,6 @@ def ansicolor(
     if bg is not None:
         parts.append(_color(bg, 40))
     return f"\033[{';'.join(parts)}m"
+
+
+RESET: Final = ansicolor()

@@ -4,9 +4,10 @@ from typing import Iterable, Iterator, Self, TextIO, assert_never
 
 from wcwidth import clip, width
 
-from ..uicommon.ansicolor import Palette, ansicolor
+from ..uicommon.ansicolor import RESET, ansicolor
 from ..uicommon.displaylist import DisplayStream, TextSpan
-from ..uicommon.styleids import Aid
+from ..uicommon.styleids import Aid, StyleId
+from ..uicommon.stylesheet import UnitedStylesheet
 
 # ALT: https://pypi.org/project/readkeys/
 if sys.platform == "win32":
@@ -39,15 +40,6 @@ else:  # Unix implementation (Linux/macOS)
         return ch
 
 
-class TermStyle:
-    reset = ansicolor()
-    item = default = ansicolor(-1, -1)
-    lineidx = ansicolor(Palette.black)
-    itemidx = ansicolor(Palette.greydark)
-    footer = ansicolor(217, 17, bold=True)
-    # itempunct = lambda s:
-
-
 # RENAME? TextStreamUIDriver
 # SEP/OPT::
 #   * text (vs serialized DisplayList/AST dump for fmt-converters)
@@ -60,14 +52,14 @@ class TermStyle:
 #   * nocolor vs termcolor/style[8/16/256/64K/RGB] (vs rawterm-passthrough/strip-termcodes) (vs VT100-subset)
 #   * last-frame only (vs continuous worklog [append chunks] -- to email/troubleshoot interactions later)
 class PrintTextUIDriver:
-    termstyle: TermStyle
+    style_by_id: list[str]
 
     def __init__(self, rfd: TextIO | None = None, wfd: TextIO | None = None) -> None:
         self._rfd = rfd or sys.stdin
         self._wfd = wfd or sys.stdout  # OR: store _writelines to reduce API surface
 
     def __enter__(self) -> Self:
-        self.termstyle = TermStyle()
+        self.style_by_id = []
         return self
 
     def __exit__(self, *_a: object) -> None:
@@ -109,7 +101,20 @@ class PrintTextUIDriver:
         displ = self.pad_boundary(displ, 70, 120)
         self.draw_lines(self.rasterize_displ(displ))
 
+    def resolve_style(self, aid: StyleId) -> str:
+        c = UnitedStylesheet.resolve_by_aid(aid)
+        # ALT? cache by StyleDef to auto-invalidate on jurigged update
+        #   BAD? stores refs to IMPL -- which may need to be hotreloaded too
+        # ansistr = sd2ansi[c]
+        # FIXME:DEV: write proper resolver of StyleDef to ANSI
+        ansistr = ansicolor(fg=c.fg, bg=c.bg, bold=c.bold)
+        return ansistr
+
     def rasterize_displ(self, displ: DisplayStream) -> list[str]:
+        if __debug__:
+            self.style_by_id = []
+        styles = self.style_by_id
+
         py = 0
         nx = 0
         s = ""
@@ -129,13 +134,18 @@ class PrintTextUIDriver:
                     if cjump > 0:
                         s += " " * cjump
 
-                    # if aid != Aid.DEFAULT:
-                    #     # FIXME: use "parametrized style" here ?
-                    #     #   OR: define generic rainbow in TermStyle and map range of Aid indexes to it
-                    #     text = f"\033[3{aid}m" + text + "\033[m"
+                    if Aid.sanitize(aid) >= len(styles):
+                        # BAD: some styles may really have empty string
+                        styles += [""] * (aid + 1 - len(styles))
+                    if not (ansistr := styles[aid]):
+                        ansistr = styles[aid] = self.resolve_style(aid)
 
-                    attr = getattr(self.termstyle, Aid.get_name(aid).lower())
-                    s += attr + text + self.termstyle.reset
+                    # FAIL: for multi-colors requires xfm to multiple tokens
+                    # TBD: parametrized .aid for /[-_.]/ rainbow hi
+                    # if callable(ansistr):
+                    #     ansistr = ansistr(text)
+
+                    s += ansistr + text + RESET
                     py = y
                     nx = x + wc
                 case _:

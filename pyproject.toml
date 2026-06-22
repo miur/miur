@@ -199,15 +199,16 @@ else: pylint_venv.inithook()
 
 [tool.pylint.messages_control]
 disable = [
-    "consider-using-f-string",
-    "missing-module-docstring",
-    "missing-class-docstring",
-    "missing-function-docstring",
-    "import-outside-toplevel",
-    "too-few-public-methods",
-    "invalid-name",
     "broad-exception-caught",
     "consider-using-dict-items",
+    "consider-using-enumerate",
+    "consider-using-f-string",
+    "import-outside-toplevel",
+    "invalid-name",
+    "missing-class-docstring",
+    "missing-function-docstring",
+    "missing-module-docstring",
+    "too-few-public-methods",
 ]
 
 [tool.pylint.miscellaneous]

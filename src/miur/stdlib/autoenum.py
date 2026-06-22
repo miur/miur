@@ -20,6 +20,14 @@ class AutoEnumMeta(type):
     def _is_member_name(name: str) -> bool:
         return name.isupper() and not name.startswith("_")
 
+    @classmethod
+    def sanitize(mcs, member_id: int) -> int:
+        if member_id < 0:
+            raise ValueError("ERR: efficient AutoEnum requires non-negative ids")
+        if member_id >= mcs._MAXID:
+            raise ValueError(f"BUG? AutoEnum has >={mcs._MAXID} members")
+        return member_id
+
     def __new__(
         mcs, name: str, bases: tuple[type, ...], ns: dict[str, Any]
     ) -> "AutoEnumMeta":
@@ -36,17 +44,13 @@ class AutoEnumMeta(type):
         """Safely catches Jurigged's automated `setattr` passes during runtime file changes."""
         if cls._is_member_name(name):
             nm2id = cls._names_by_id
-            if member_id < 0:
-                raise ValueError("ERR: efficient AutoEnum requires non-negative ids")
             if member_id == 0:
                 i = cls._next_autoid
                 while i < len(nm2id) and nm2id[i] is not cls._UNUSED:
                     i += 1
-                if i >= cls._MAXID:
-                    raise RuntimeError(f"BUG? AutoEnum has >={cls._MAXID} members")
                 cls._next_autoid = i + 1
                 member_id = i
-            if member_id >= len(nm2id):
+            if cls.sanitize(member_id) >= len(nm2id):
                 nm2id += [cls._UNUSED] * (member_id + 1 - len(nm2id))
             elif nm2id[member_id] is not cls._UNUSED:
                 raise ValueError(f"Duplicate member ID {member_id} for {name!r}")
