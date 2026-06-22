@@ -5,7 +5,7 @@ from typing import Callable, Self, assert_never
 from .. import log
 from ..uicommon.displaylist import DisplayStream, TextSpan
 from ..uicommon.styleids import Aid, StyleId
-from ..uicommon.stylesheet import ColorIndex, UnitedStylesheet
+from ..uicommon.stylesheet import ColorIndex, Effect, UnitedStylesheet
 
 
 # SEP/OPT::
@@ -19,7 +19,7 @@ from ..uicommon.stylesheet import ColorIndex, UnitedStylesheet
 class CursesUIDriver:
     stdscr: C.window
     registered_color_pairs: dict[int, int]
-    style_by_id: list[int]
+    style_by_id: list[Effect[int] | None]
 
     def __init__(self) -> None:
         self._cleanup_callbacks: list[Callable[[], object]] = []
@@ -31,10 +31,10 @@ class CursesUIDriver:
         assert -1 <= bg < C.COLORS
         return ((bg + 2) << 9) | (fg + 2)
 
-    def resolve_style(self, aid: StyleId) -> int:
-        c = UnitedStylesheet.resolve_by_aid(aid)
-        fg = -1 if c.fg is None else c.fg
-        bg = -1 if c.bg is None else c.bg
+    def _register_color(self, fg: ColorIndex | None, bg: ColorIndex | None) -> int:
+        # FAIL: "None" may indicate a BUG(forgotten fg/bg) and NEED for toxic-pink fallback
+        fg = -1 if fg is None else fg
+        bg = -1 if bg is None else bg
         fgbg = self._encode_fgbg(fg, bg)
         registry = self.registered_color_pairs
         if (curses_attr := registry.get(fgbg, None)) is None:
@@ -46,11 +46,38 @@ class CursesUIDriver:
             assert i < C.COLOR_PAIRS, "TBD: auto-cleanup colorpairs from hidden screens"
             C.init_pair(i, fg, bg)
             curses_attr = registry[fgbg] = C.color_pair(i)
-        # FIXME: error-out (or PINK or DFL) if any other keyword
+        return curses_attr
+
+    def resolve_style(self, aid: StyleId) -> Effect[int]:
+        c = UnitedStylesheet.resolve_by_aid(aid)
+        # FIXME: error-out (or toxic-PINK or DFL) if any other (yet unsupported) keyword
+        curses_attr = 0
         if c.bold:
             curses_attr |= C.A_BOLD
         if c.italic:
             curses_attr |= C.A_ITALIC
+        if c.uline:
+            curses_attr |= C.A_UNDERLINE
+
+        if c.effn:
+            text2idx = c.effn
+
+            def _effect(text: str) -> int:
+                idx = text2idx(text)
+                if isinstance(c.fg, (tuple, list)):
+                    fg = c.fg[idx % len(c.fg)]
+                else:
+                    fg = idx  # TEMP:HACK: use idx as termcolor index
+                if isinstance(c.bg, (tuple, list)):
+                    bg = c.bg[idx % len(c.bg)]
+                else:
+                    bg = -1
+                return curses_attr | self._register_color(fg, bg)
+
+            return _effect
+
+        assert isinstance(c.fg, int) and isinstance(c.bg, int)
+        curses_attr |= self._register_color(c.fg, c.bg)
         return curses_attr
 
     def _init_color_support(self) -> None:
@@ -180,16 +207,18 @@ class CursesUIDriver:
         for token in displ:
             match token:
                 case TextSpan(x, y, text, wc, aid):
-                    # MAYBE: sanitize string out of interfering /\n|\r/
-                    #   ~~ we already do that on server, but we may need to do that AGAIN -- for predictable UI
-                    # FIXME: shortly exit fn on resize to avoid curses crash
-                    #   WHY: no sense to crop frame on shrink or continue drawing on enlarge,
-                    #     as displ should be recalculated for adaptive-layout anyway
                     if Aid.sanitize(aid) >= len(styles):
-                        styles += [-1] * (aid + 1 - len(styles))
-                    if (curses_attr := styles[aid]) < 0:
-                        curses_attr = styles[aid] = self.resolve_style(aid)
+                        styles += [None] * (aid + 1 - len(styles))
+                    if (eff := styles[aid]) is None:
+                        eff = styles[aid] = self.resolve_style(aid)
+                    # FAIL: for multi-colors requires xfm to multiple tokens
+                    curses_attr = eff(text) if callable(eff) else eff
                     try:
+                        # MAYBE: sanitize string out of interfering /\n|\r/ for predictable UI
+                        #   ~~ we already do that on server, but we may need to do that AGAIN
+                        # FIXME: shortly exit fn on resize to avoid curses crash
+                        #   WHY: no sense to crop frame on shrink or continue drawing on enlarge,
+                        #     as displ should be recalculated for adaptive-layout anyway
                         self.stdscr.addnstr(y, x, text, wc, curses_attr)
                     except C.error:
                         ## DISABLED:FAIL:(racing): even if we query sizewh before and after,

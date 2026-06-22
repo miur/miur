@@ -71,11 +71,11 @@ def ansicolor(
     # *attrs: int,  # USAGE: parts.extend(str(a) for a in attrs)
     fg: Color | None = None,  # ALT:(None):=-2 , but it's error-prone
     bg: Color | None = None,
-    **sgr: bool,
+    **sgr: bool | None,
 ) -> str:
     # PERF:INFO: directly inserting into bytesarray+decode has no benefits
     #   ATT: "return (aon,aoff)" has no sense, as color can only be reset, but not restored
-    parts = [str(_SGR[k][not v]) for k, v in sgr.items()]
+    parts = [str(_SGR[k][not v]) for k, v in sgr.items() if v is not None]
     if fg is not None:
         parts.append(_color(fg, 30))
     if bg is not None:

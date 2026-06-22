@@ -115,9 +115,7 @@ class TuiSystem:
                 cx += abw
             needle = m.group()
             ndw = width(needle)
-            # aid = hipatt.index(needle)  # TEMP:HACK: diff style
-            aid = Aid.ITEM
-            displ.append(TextSpan(cx, cy, needle, ndw, aid=aid))
+            displ.append(TextSpan(cx, cy, needle, ndw, aid=Aid.ITEMPUNCT))
             cx += ndw
             pe = m.end()
         if pe < len(text):

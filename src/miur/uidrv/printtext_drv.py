@@ -7,7 +7,7 @@ from wcwidth import clip, width
 from ..uicommon.ansicolor import RESET, ansicolor
 from ..uicommon.displaylist import DisplayStream, TextSpan
 from ..uicommon.styleids import Aid, StyleId
-from ..uicommon.stylesheet import UnitedStylesheet
+from ..uicommon.stylesheet import Effect, UnitedStylesheet
 
 # ALT: https://pypi.org/project/readkeys/
 if sys.platform == "win32":
@@ -52,7 +52,7 @@ else:  # Unix implementation (Linux/macOS)
 #   * nocolor vs termcolor/style[8/16/256/64K/RGB] (vs rawterm-passthrough/strip-termcodes) (vs VT100-subset)
 #   * last-frame only (vs continuous worklog [append chunks] -- to email/troubleshoot interactions later)
 class PrintTextUIDriver:
-    style_by_id: list[str]
+    style_by_id: list[Effect[str] | None]
 
     def __init__(self, rfd: TextIO | None = None, wfd: TextIO | None = None) -> None:
         self._rfd = rfd or sys.stdin
@@ -101,13 +101,32 @@ class PrintTextUIDriver:
         displ = self.pad_boundary(displ, 70, 120)
         self.draw_lines(self.rasterize_displ(displ))
 
-    def resolve_style(self, aid: StyleId) -> str:
+    def resolve_style(self, aid: StyleId) -> Effect[str]:
         c = UnitedStylesheet.resolve_by_aid(aid)
-        # ALT? cache by StyleDef to auto-invalidate on jurigged update
-        #   BAD? stores refs to IMPL -- which may need to be hotreloaded too
-        # ansistr = sd2ansi[c]
+        if c.effn:
+            text2idx = c.effn
+
+            def _effect(text: str) -> str:
+                idx = text2idx(text)
+                if isinstance(c.fg, (tuple, list)):
+                    fg = c.fg[idx % len(c.fg)]
+                else:
+                    fg = idx  # TEMP:HACK: use idx as termcolor index
+                if isinstance(c.bg, (tuple, list)):
+                    bg = c.bg[idx % len(c.bg)]
+                else:
+                    bg = -1
+                return ansicolor(
+                    fg=fg, bg=bg, bold=c.bold, italic=c.italic, uline=c.uline
+                )
+
+            return _effect
+
+        assert isinstance(c.fg, int) and isinstance(c.bg, int)
         # FIXME:DEV: write proper resolver of StyleDef to ANSI
-        ansistr = ansicolor(fg=c.fg, bg=c.bg, bold=c.bold)
+        ansistr = ansicolor(
+            fg=c.fg, bg=c.bg, bold=c.bold, italic=c.italic, uline=c.uline
+        )
         return ansistr
 
     def rasterize_displ(self, displ: DisplayStream) -> list[str]:
@@ -134,16 +153,15 @@ class PrintTextUIDriver:
                     if cjump > 0:
                         s += " " * cjump
 
+                    # ALT? cache by StyleDef to auto-invalidate on jurigged update
+                    #   BAD? stores refs to IMPL -- which may need to be hotreloaded too
+                    # ansistr = styledef2ansi[c]
                     if Aid.sanitize(aid) >= len(styles):
-                        # BAD: some styles may really have empty string
-                        styles += [""] * (aid + 1 - len(styles))
-                    if not (ansistr := styles[aid]):
-                        ansistr = styles[aid] = self.resolve_style(aid)
-
+                        styles += [None] * (aid + 1 - len(styles))
+                    if (eff := styles[aid]) is None:
+                        eff = styles[aid] = self.resolve_style(aid)
                     # FAIL: for multi-colors requires xfm to multiple tokens
-                    # TBD: parametrized .aid for /[-_.]/ rainbow hi
-                    # if callable(ansistr):
-                    #     ansistr = ansistr(text)
+                    ansistr = eff(text) if callable(eff) else eff
 
                     s += ansistr + text + RESET
                     py = y
