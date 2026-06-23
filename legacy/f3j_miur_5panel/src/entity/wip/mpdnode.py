@@ -1,6 +1,14 @@
 # Using the client library — python-mpd2 3.0.3 documentation ⌇⡧⢪⡿⢰
 #   https://python-mpd2.readthedocs.io/en/latest/topics/getting-started.html
 
+## ALSO:BET? reuse .py !mopidy-mpd API for soundcloud-auth
+#   https://mopidy.com/
+#   https://github.com/mopidy
+#   https://github.com/mopidy/mopidy-soundcloud
+## MAYBE:IDEA: also expose !mopidy by FUSE
+#   https://polyfloyd.net/post/soundcloud-fuse-mpd/
+#   https://github.com/polyfloyd/soundcloud-fs
+
 # import os
 # import os.path as fs
 from typing import override
