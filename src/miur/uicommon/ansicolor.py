@@ -67,6 +67,7 @@ _SGR: Final = {  # <OFF="Select Graphic Rendition"
 
 
 # ex~: "bold-white-on-red": "\033[1;37m;41m"
+@lru_cache(maxsize=None)
 def ansicolor(
     # *attrs: int,  # USAGE: parts.extend(str(a) for a in attrs)
     fg: Color | None = None,  # ALT:(None):=-2 , but it's error-prone

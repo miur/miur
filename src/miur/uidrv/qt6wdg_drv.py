@@ -1,6 +1,9 @@
 import os
 import random
+import sys
 from queue import Queue
+from threading import Event
+from typing import Callable
 
 # pylint:disable=unsupported-assignment-operation
 os.environ["QT_ACCESSIBILITY"] = "0"
@@ -9,9 +12,11 @@ os.environ["QT_NO_DBUS"] = "1"
 
 # pylint:disable=wrong-import-position
 from PySide6 import QtCore, QtGui, QtWidgets
-from PySide6.QtCore import Property, QRect, Qt  # , Signal, Slot
+from PySide6.QtCore import Property, QRect, Qt
 from PySide6.QtGui import QColor, QFont, QPainter
 from PySide6.QtWidgets import QWidget
+
+from .. import log
 
 # TUT: https://www.pythonguis.com/
 # CMP: https://www.reddit.com/r/Python/comments/1g6brra/pyqt_best_option_for_commercial_use/
@@ -38,7 +43,7 @@ class MillerColumnWidget(QWidget):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.display_list = []
+        self.display_list: list[FileItem] = []
         self.cached_items: list[tuple[int, QRect]] = []
         self.cached_width = 150  # Discovered dynamically during the recorder pass
         self.top_visible_index = 0
@@ -94,7 +99,8 @@ class MillerColumnWidget(QWidget):
                 max_w = item_w
 
             # Stabilize boundary structures
-            # The layout phase uses the running max width, while painting locks into the fully computed column width
+            # The layout phase uses the running max width,
+            #   while painting locks into the fully computed column width
             row_width = max_w if is_recording else self.cached_width
             rect = QRect(0, current_y, row_width, item_h)
 
@@ -265,13 +271,22 @@ class MillerCanvas(QWidget):
 
 
 class MainWindow(QtWidgets.QMainWindow):
-    def __init__(self) -> None:
+    def __init__(self, recv_q: Queue[dict[str, object]]) -> None:
         super().__init__()
+        self.miur_recv_q = recv_q
         self.setWindowTitle("Terminal Miller Navigation - PySide6 IMGUI Loop")
         self.resize(900, 500)
 
         # Main Layout Setup
         central_widget = QWidget(self)
+        # MAYBE: make it into TEMP status
+        #   BUT: I already have statusline in DisplayList!
+        #   BET? send logline back
+        self.label = QtWidgets.QLabel("Waiting for live Python objects...", margin=20)
+        self.label.setWordWrap(False)
+        P = QtWidgets.QSizePolicy.Policy
+        self.label.setSizePolicy(P.Preferred, P.Fixed)
+
         self.setCentralWidget(central_widget)
         layout = QtWidgets.QVBoxLayout(central_widget)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -279,25 +294,182 @@ class MainWindow(QtWidgets.QMainWindow):
         # Initialize the custom Miller view canvas
         self.canvas = MillerCanvas(self)
         layout.addWidget(self.canvas)
+        layout.addWidget(self.label)
 
-        print(
-            "UI Initialized. Press [ Spacebar ] to simulate navigating deep into directories."
-        )
+        print("Press <Space> to simulate navigating into dirs")
 
-    def keyPressEvent(self, keyEvent: QtGui.QKeyEvent) -> None:
-        if keyEvent.key() == Qt.Key.Key_Space:
+    def keyPressEvent(self, event: QtGui.QKeyEvent) -> None:
+        if event.key() == Qt.Key.Key_Space:
             self.canvas.navigate_forward()
         else:
-            super().keyPressEvent(keyEvent)
+            super().keyPressEvent(event)
+        evkey = {
+            "ev": "keyPressEvent",
+            "code": event.key(),
+            "char": event.text(),
+            "shift_on": bool(event.modifiers() & Qt.KeyboardModifier.ShiftModifier),
+        }
+        self.miur_recv_q.put(evkey)
 
 
-def main(_sendqt: Queue[str] | None = None, _recvqt: Queue[str] | None = None) -> int:
-    app = QtWidgets.QApplication([])  # sys.argv
-    window = MainWindow()
-    window.show()
-    return app.exec()
-    # app.quit()
+class QtBridge(QtCore.QObject):
+    """Encapsulates cross-thread communication and GUI state mutation."""
+
+    # Assumption: Signal definition requires the builtin `object` type to satisfy
+    # the C++ meta-object compiler, not the `typing.Any` type hint.
+    # Qt natively handles the cross-thread context switch.
+    data_received = QtCore.Signal(object)
+
+    def __init__(self, app: QtWidgets.QApplication, wnd: MainWindow) -> None:
+        super().__init__()
+
+        # Limitation: We must bind UI components to the instance since we
+        # can no longer rely on the outer scope closure.
+        self._app = app
+        self._wnd = wnd
+
+        # Connect the signal to the internal slot. Qt guarantees that if this
+        # object lives on the GUI thread, the slot executes safely on the GUI thread.
+        self.data_received.connect(self.process_incoming)
+
+    @QtCore.Slot(object)
+    def process_incoming(self, item: object) -> None:
+        """Executes strictly inside the Qt main thread loop natively."""
+
+        log.warning(item)
+
+        # Corner Case: Raw strings for control flow can cause collisions if
+        # your data stream normally contains strings. A typed sentinel
+        # (e.g., `class ShutdownEvent: pass`) is structurally safer.
+        # FIXME: use "MiurEvent" type here
+        if item == "SHUTDOWN":
+            self._app.quit()
+            log.info("quit")
+            self._wnd.miur_recv_q.put({"ev": item})
+            return
+
+        # from .models import DisplayElement
+        # if isinstance(item, DisplayElement):
+        #     text = f"Rendering a {item.color} {item.shape_type} at ({item.x}, {item.y})"
+
+        text = str(item)
+        # 2. Set Elide mode so long text scales with an ellipsis instead of breaking lines
+        lb = self._wnd.label
+        right = Qt.TextElideMode.ElideRight
+        lb.setText(lb.fontMetrics().elidedText(text, right, lb.width()))
+        # Perform canvas updates...
+
+
+def main(
+    send_bridge: list[Callable[[object], None]],
+    miur_recv_q: Queue[dict[str, object]],
+    ready_event: Event,
+) -> int:
+    try:
+        app = QtWidgets.QApplication([])  # sys.argv
+        app.setQuitOnLastWindowClosed(
+            False
+        )  # CRITICAL: Keeps Qt alive when windows close
+
+        window = MainWindow(miur_recv_q)
+        window.show()
+
+        bridge = QtBridge(app=app, wnd=window)
+
+        # Export the bound emit method to the main thread
+        send_bridge.append(bridge.data_received.emit)
+    except Exception as exc:
+        log.exception(exc)
+        raise
+    finally:
+        # TEMP:HACK: unblock main app to crash
+        ready_event.set()
+
+    # FIXME: if it crashes *here* we should still return somehow...
+    try:
+        # Blocks until app.quit() is called
+        rc = app.exec()
+
+        log.info("qt_exit")
+
+        # CRITICAL: Sever the link from the main thread immediately.
+        # This guarantees the reference count to `bridge` drops to 0 inside the
+        # worker thread before it attempts C++ garbage collection.
+        send_bridge.clear()
+
+        # --- CRITICAL CLEANUP BLOCK ---
+        # Limitation: Python's GC is non-deterministic. If we let these variables
+        # naturally go out of scope, the C++ objects might outlive the thread and
+        # be destroyed by the main thread during process exit.
+
+        # 1. Signal/Slot connections can create invisible reference cycles in PySide6.
+        # Disconnecting them ensures del drops the reference count to exactly 0.
+        bridge.data_received.disconnect(bridge.process_incoming)
+
+        # 2. Schedule native C++ deletion
+        window.deleteLater()
+        bridge.deleteLater()
+
+        # 3. Flush the event queue to process the deleteLater() calls natively
+        app.processEvents()
+
+        log.info("qt_destroy")
+
+        # 4. Explicitly drop Python references to trigger immediate C++ destructors
+        # while we are still safely inside the GUI thread.
+
+        # Corner Case: Python's GC is lazy, and QCoreApplication is a C++ singleton.
+        # shiboken6.delete() instantly invalidates the Python wrapper and forces the
+        # C++ destructor to run on THIS thread, preempting PySide6's atexit hook.
+        import shiboken6  # PySide6's underlying C++ wrapper engine
+
+        shiboken6.delete(bridge)
+        shiboken6.delete(window)
+        shiboken6.delete(app)
+        del bridge
+        del window
+        del app
+        log.info("qt_del")
+
+        # --- PHASE 2: Metaprogramming & Registry Eradication ---
+        # 1. Unbind PySide's global atexit hooks to prevent the shutdown crash
+        # try:
+        #     import atexit
+        #     # PySide6 injects internal private teardown functions into atexit.
+        #     # We clear the atexit registry to stop C++ singletons trying to access a dead thread.
+        #     atexit._clear()
+        # except Exception:
+        #     pass
+
+        # 2. Force-purge all PySide6 / Shiboken module caching out of sys.modules.
+        # This destroys the class definitions holding onto those uncollectable Property objects.
+        pyside_modules = [
+            mod
+            for mod in list(sys.modules.keys())
+            if "PySide6" in mod or "shiboken" in mod
+        ]
+        for mod in pyside_modules:
+            del sys.modules[mod]
+
+        # --- PHASE 3: The Ultimate Sweep ---
+        # Clear local frame references and run an aggressive, multi-generational GC collect.
+        import gc
+
+        # Corner Case: Force a GC run inside the thread to clean up any
+        # lingering Python wrappers before the thread dies.
+        gc.collect()
+        # gc.select_subgraph if hasattr(
+        #     gc, "select_subgraph"
+        # ) else None  # For specialized runtimes
+        del gc.garbage[:]  # Force break remaining uncollectable cycles if any exist
+
+        return rc
+
+    except Exception as exc:
+        log.exception(exc)
+        print(log.archive_recent(dump=True), file=sys.stderr)
+        raise
 
 
 if __name__ == "__main__":
-    main()
+    main([], Queue(), Event())

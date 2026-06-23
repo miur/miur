@@ -1,5 +1,6 @@
 import ctypes
 import curses as C
+import gc
 import os
 import signal
 import sys
@@ -11,16 +12,16 @@ from time import monotonic_ns
 import jurigged
 import psutil
 from jurigged.codetools import UpdateOperation
-
-## PERF:(startup): 45ms(bare) -> 75ms(typing) -> 95ms(shutil,time) -> 250ms(wcwidth)
-# ALT:(copy-paste): //site-packages/_pytest/_io/wcwidth.py
 from wcwidth import width
 
+from . import log
 from .kernel import MiurKernel, NaviId
 from .systems.tuisystem import VisibleArea
 from .uicommon.displaylist import TextSpan
 from .uicommon.styleids import Aid
 from .uidrv.multi_drv import MultiUIDriver
+
+gc.set_debug(gc.DEBUG_UNCOLLECTABLE)
 
 g_dkpi: dict[str, int] = {}
 
@@ -68,23 +69,23 @@ class LoopContext(Namespace):
     nvid: NaviId
     va: VisibleArea
     int2key: dict[int, str]
-    prevlog = 0
 
 
 def process_frame(k: MiurKernel, ui: MultiUIDriver, ctx: LoopContext) -> str:
     kpi("input")
-    match wch := ui.input():
+    wch = ui.input()
+    if isinstance(wch, int) and (nm := ctx.int2key.get(wch, "")):
+        wch = nm + f"({wch})"
+    log.warning(f"{wch=}")
+    match wch:
         # case C.ERR:
         #     continue
         case "q":
             return ""
-        # case "j":
-        #     k.log.info("hi")
+        case "j":
+            log("V", "down")
         case _:
             pass
-    if isinstance(wch, int) and (nm := ctx.int2key.get(wch, "")):
-        wch = nm + f"({wch})"
-    k.log.info(f"{wch=}")
 
     kpi("bake")  # NOTE: overwrites prev values -> so keeps only last frame
     # THINK: ui.bake() to apply UI-specific constrains ?
@@ -100,7 +101,7 @@ def process_frame(k: MiurKernel, ui: MultiUIDriver, ctx: LoopContext) -> str:
     ui.clear()
     ui.printdrv.draw_lines(["\n"])
     ui.draw_displ(displ)
-    # k.log.info(ui.printdrv.style_by_id)
+    # log.info(ui.printdrv.style_by_id)
 
     kpi("status")
     ## HACK: draw "status" *after* drawing evels -- to have all actual KPIs
@@ -116,18 +117,15 @@ def process_frame(k: MiurKernel, ui: MultiUIDriver, ctx: LoopContext) -> str:
     kpistr = f"{wch!r} {kpistr} (tokens={len(displ)}) Nfd={ctx.process.num_fds()}"
     kpiw = min(va.wnd_w, width(kpistr))
     tok = TextSpan(0, 0, kpistr, kpiw, Aid.FOOTER)
-    if va.wnd_h > 0:
-        ui.cursesdrv.draw_displ([tok._replace(y=va.wnd_h - 1)])
+    # if va.wnd_h > 0:
+    #     ui.cursesdrv.draw_displ([tok._replace(y=va.wnd_h - 1)])
     ui.printdrv.draw_displ([tok])
 
     # FIXME: remove .printdrv depending on Print vs Curses
     #   IDEA! put ".tag/.tags=footer" into each token for semantic meaning
     #     >> then .printdrv in "worklog" mode can override y=0 for "footer" tag (to avoid gaps),
     #        and yet keep y=N-1 as-is in "screenful" mode to mimic curses
-    endlog = len(k.log.ringbuffer)
-    ui.printdrv.draw_lines(map(str, k.log.ringbuffer[ctx.prevlog : endlog]))
-    ui.printdrv.draw_lines(["---"])
-    ctx.prevlog = endlog
+    ui.printdrv.draw_lines([log.archive_recent(dump=True), "---"])
 
     ui.refresh()
     kpi("done")
@@ -147,7 +145,7 @@ def main_navi() -> str:  # noqa: PLR0915  # pylint:disable=too-many-locals,too-m
         ##   TODO: spawn/reset 500ms timer after each event, and only refresh when timer is done
 
         def jurigged_on_event(event: object) -> None:
-            k.log.info(event)
+            log.verbose(event)
             # OR: if "Evaluating" in str(event) or "Update" in str(event): pass; else: return
             if isinstance(event, UpdateOperation):
                 ## DISABLED:FAIL: doesn't unblock already waiting getch()
@@ -164,7 +162,7 @@ def main_navi() -> str:  # noqa: PLR0915  # pylint:disable=too-many-locals,too-m
         ### HACK: hot-reload (recursive ./*.py files from PWD?)
         ## CHECK: if it has import-hook to discover lazily loaded modules later
         # OR: jurigged.watch(pattern=[fs.dirname(fs.realpath(__file__)) + "/**/*.py"], logger=jurigged_on_event)
-        jurigged.watch(logger=jurigged_on_event)  # pyright: ignore[reportUnknownMemberType]  # <CASE: recursive
+        # jurigged.watch(logger=jurigged_on_event)  # pyright: ignore[reportUnknownMemberType]  # <CASE: recursive
         # jurigged.watch("miur") # <OR watch a specific package directory (non-recursive)
         # import mymod; jurigged.watch(mymod) # <OR watch a specific imported module package
 
@@ -187,10 +185,10 @@ def main_navi() -> str:  # noqa: PLR0915  # pylint:disable=too-many-locals,too-m
                 # from rich.console import Console
                 # console = Console()
                 # console.print_exception(show_locals=True)
-                k.log.info(exc)
-                ui.printdrv.draw_lines([k.log.dump()])
+                log.error(exc)
+                ui.printdrv.draw_lines([log.archive_recent(dump=True)])
 
-    return k.log.dump() + kpistr
+    return kpistr
 
 
 def main() -> str | None:
@@ -204,13 +202,23 @@ def main() -> str | None:
             PR_SET_NAME = 15
             libc.prctl(PR_SET_NAME, appname.encode("utf-8"), 0, 0, 0)
 
-        kpistr = main_navi()
-        if "jurigged" in __import__("sys").modules:
-            return kpistr
-        print(kpistr)
-        return None
-    except Exception:
-        from rich.traceback import install  # PERF:BAD: +400ms
+        try:
+            kpistr = main_navi()
+            log.info("exit")
+        except Exception as exc:
+            log.error(exc)
+            print(log.archive_recent(dump=True))
+            raise
 
-        install(show_locals=True)
+        # FAIL: should only be used for jurigged+devloop
+        #   orse results in exitcode!=0
+        # if "jurigged" in __import__("sys").modules:
+        #     return kpistr
+        # print(str(log) + kpistr)
+    except Exception:
+        # from rich.traceback import install  # PERF:BAD: +400ms
+        #
+        # install(show_locals=True)
         raise
+    log.info("exit_main")
+    return None
