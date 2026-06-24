@@ -1,3 +1,16 @@
+# vim:sw=2:ts=2:sts=2:et:
+#%USAGE:SETUP:
+#       [venv-new]: $ uv sync --project . --group devall [--all-packages --all-extras]
+#   [venv-upgrade]: $ uv lock --project . --upgrade
+#%USAGE:DEV:
+#     [dev-run]: $ ./.venv/bin/python -IBu -Xutf8 -Xdev ./.venv/bin/miur
+#   [hotreload]: $ ./.venv/bin/python -IBu -Xutf8 -Xdev -- "./.venv/bin/jurigged" -v --watch="./src" --loop="miur.__main__:main" -- ./.venv/bin/main
+#          `OR~: $ ./.venv/bin/jurigged -v -w src -m miur
+#%USAGE:CHECK:
+#   [qa-lint]: $ for x in "ruff check" basedpyright mypy "pylint ." "bandit -r ."; do uv run --project . --all-packages $x; done
+#        `OR?: $ xargs -rn1 -d, uv run --project . --all-packages sh -c <<<"ruff check,basedpyright,mypy,pylint .,bandit -r ."
+#   [qa-test]: $ uv run --project . --all-packages pytest -q --tb=short
+#   [qa-perf]: $ ./.venv/bin/python -IBu -Xutf8 -Xdev -Ximporttime -Xtracemalloc=5 -m cProfile -s cumulative -- ./.venv/bin/miur
 [project]
 name = "miur"
 version = "1.0.0"
@@ -22,7 +35,8 @@ classifiers = [
   "Typing :: Typed",
 ]
 
-# # CASE-1: "miur" is meta-package -- which pulls parts
+### CASE:("miur" is meta-package): to use with "uv run --all-packages"
+##   BAD: all tools inside each project should run strictly through "uv" -- to auto-fallback to this .toml
 # dependencies = [
 #   "miurapp",
 #   "miurcache",
@@ -31,30 +45,12 @@ classifiers = [
 #   "miurtui",
 #   "miurview",
 # ]
-
-# CASE-2: "miur" is monolith OR:TRY: provide it as "miur-all" sub-package
-# [project]
 dependencies = ["wcwidth", "rich", "watchdog", "psutil"]  # < only third-party here
-[project.scripts]
-miur = "miur.__main__:main"
-[build-system]
-requires = ["hatchling>=1.27"]
-build-backend = "hatchling.build"
-[tool.hatch.build.targets.wheel]
-packages = ["src/miur"]
-# # This forces the build to include the sub-packages as if they were local modules
-# packages = [
-#     "pkg/miurapp/src/miurapp",
-#     "pkg/miurcache/src/miurcache",
-#     "pkg/miurcore/src/miurcore",
-#     "pkg/miursys/src/miursys",
-#     "pkg/miurtui/src/miurtui",
-#     "pkg/miurview/src/miurview",
-# ]
-# DEBUG: Inspect the contents
-# $ uv build && unzip -l dist/*.whl | grep miur
 
 
+### CASE:("miur" is monolith): everything installed at once
+##  BAD: should flatten deps/scripts/wheels from all sub-pkgs here
+##    OR:TRY: provide it as "miur-all" sub-package
 [project.optional-dependencies]
 # NOTE: use "ec" (EntityCache) or "dc" (DataCache) as global var name
 # mchpy = ...  # USAGE:(switch bw cext/py): $ pip install .[mchpy]
@@ -72,25 +68,31 @@ demo = ["miurdemo"]
 all = ["miur[lmdb,media,demo]"]  # RENAME? full,complete,std
 default = ["miur[lmdb]"]
 
-# Root is a workspace coordinator; executable entry points should live in member packages.
-#   ALT:SEE: https://github.com/astral-sh/uv/issues/13095
-# [project.scripts]
+[project.scripts]
+miur = "miur.__main__:main"
+## DISABLED: Root is a workspace coordinator; executable entry points should live in member packages.
+##   ALT:SEE: https://github.com/astral-sh/uv/issues/13095
 # miur = "miurapp.__main__:main"
 # miur-demo = "miurdemo.__main__:main"
 
-[tool.uv.sources]
-miurapp = { workspace = true }
-# OR: miurcache = { path = "pkg/miurcache" }
-miurcache = { workspace = true }
-miurcore = { workspace = true }
-miurdemo = { workspace = true }
-miursys = { workspace = true }
-miurtui = { workspace = true }
-miurview = { workspace = true }
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
 
-[tool.uv.workspace]
-# OR: members = ["miurcache", "miurcore", ...]
-members = ["pkg/*"]
+# DEBUG: Inspect the contents
+# $ uv build && unzip -l dist/*.whl | grep miur
+[tool.hatch.build.targets.wheel]
+packages = ["src/miur"]
+# OPT: include the sub-packages as if they were local modules
+# packages = [
+#     "pkg/miurapp/src/miurapp",
+#     "pkg/miurcache/src/miurcache",
+#     "pkg/miurcore/src/miurcore",
+#     "pkg/miursys/src/miursys",
+#     "pkg/miurtui/src/miurtui",
+#     "pkg/miurview/src/miurview",
+# ]
+
 
 [dependency-groups]
 dev = [
@@ -115,13 +117,32 @@ devall = [
   "miur[all]",
 ]
 
+
+### !uv
+
 [tool.uv]
 default-groups = ["dev"]
+
+[tool.uv.sources]
+miurapp = { workspace = true }
+# OR: miurcache = { path = "pkg/miurcache" }
+miurcache = { workspace = true }
+miurcore = { workspace = true }
+miurdemo = { workspace = true }
+miursys = { workspace = true }
+miurtui = { workspace = true }
+miurview = { workspace = true }
+
+[tool.uv.workspace]
+# OR: members = ["miurcache", "miurcore", ...]
+members = ["pkg/*"]
 
 # This tells every subprocess (including conan) where to find the profile
 # so you don't have to pass the path manually in every sub-package.
 # config-settings = { CONAN_DEFAULT_PROFILE = "{root}/.conan-profile" }
 
+
+### !pytest
 
 [tool.pytest.ini_options]
 testpaths = ["t"]
@@ -151,6 +172,9 @@ branch = true
 show_missing = true
 skip_covered = true
 
+
+### !ruff
+
 [tool.ruff]
 # ruff auto-detects .venv, nothing needed
 target-version = "py314"
@@ -160,8 +184,7 @@ extend-exclude = ["legacy", "#"]
 
 [tool.ruff.lint]
 # Enable Pycodestyle (E), Pyflakes (F), and Isort (I)
-select = ["E", "F", "I", "PL", "ANN"]
-# REM? extend-select = [ "I" ]
+select = ["E", "F", "I", "PL", "B", "UP", "A", "ANN"]
 ignore = [
   # Ruff formatter does not currently support a separate 'comment-length'.
   # By default, it tries not to reflow comments unless they are docstrings.
@@ -191,11 +214,14 @@ split-on-trailing-comma = true
 # `exclude`, `preview`, `indent-style`, `quote-style`, `nested-string-quote-style`, `skip-magic-trailing-comma`, `line-ending`, `docstring-code-format`, `docstring-code-line-length`
 
 
+### !pylint
+
 [tool.pylint.main]
 py-version = "3.14"
 # REF: https://github.com/pylint-dev/pylint-qt
 load-plugins = ["pylint_qt"]
 extension-pkg-allow-list = ["PySide6"]
+recursive = true
 ignore-paths = ["legacy/.*"]
 ignore = ["t", "alt", "doc", "&", "#", "pkg", "_try", ".git", ".reuse", ".venv"]
 ignore-patterns = ["^[_#&].*"]
@@ -237,6 +263,8 @@ max-args=6
 max-positional-arguments=6
 
 
+### !mypy
+
 [tool.mypy]
 # Paths (Note: TOML doesn't support $MYPY_CONFIG_FILE_DIR; use PWD-relative paths)
 cache_dir = "/d/miur/.mypy_cache"
@@ -246,7 +274,7 @@ python_version = "3.14"
 platform = "linux"
 files = ["src"]  # "pkg","tests"
 # REM? live_mode = false
-exclude = ["^legacy/", "(^|/)#(/|$)"]  # [".git", ".venv", "out"]
+exclude = ["^legacy/", "(^|/)#(/|$)"]  # ["/t/", ".git", ".venv", "out"]
 # '^src/.*/bad_module\\.py$'
 # exclude = '''(?x)(
 #     ^\.(git|reuse|venv)(/|$)            # hidden top-folders
@@ -275,10 +303,12 @@ check_untyped_defs = true
 enable_error_code = ["explicit-override"]
 
 
+### !pyright and !basedpyright
+
 [tool.pyright]
 pythonVersion = "3.14"
 include = ["src"]  # "pkg","tests"
-exclude = ["legacy", "**/#"]
+exclude = ["legacy", "**/#"]  # , "*/t/*"
 extraPaths = ["pkg", "src"]
 venvPath = "."
 venv = ".venv"
@@ -290,3 +320,10 @@ reportImportCycles = "none"
 autoImportCompletions = true
 # autoSearchPaths = true
 useLibraryCodeForTypes = true
+
+
+### !bandit
+
+[tool.bandit]
+exclude_dirs = ["t", "tests", "venv", ".venv"]
+skips = []

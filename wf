@@ -108,8 +108,8 @@ if [[ ${opts[lint]:+x} ]]; then
   chk ruff check
   chk basedpyright
   chk mypy
-  chk pylint
-  # chk bandit
+  chk pylint .
+  # chk bandit -r .
   if ((${#err[@]})); then
     for k in "${!my_array[@]}"; do >&2 echo "$k=${my_array[$k]}"; done
     exit 1
