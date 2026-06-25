@@ -30,7 +30,7 @@ class AutoEnumMeta(type):
 
     def __new__(
         mcs, name: str, bases: tuple[type, ...], ns: dict[str, Any]
-    ) -> "AutoEnumMeta":
+    ) -> AutoEnumMeta:
         cls = super().__new__(mcs, name, bases, ns)
         cls._names_by_id = ["_ERROR"]
         cls._next_autoid = 1

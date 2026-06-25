@@ -7,7 +7,7 @@
 #   [hotreload]: $ ./.venv/bin/python -IBu -Xutf8 -Xdev -- "./.venv/bin/jurigged" -v --watch="./src" --loop="miur.__main__:main" -- ./.venv/bin/main
 #          `OR~: $ ./.venv/bin/jurigged -v -w src -m miur
 #%USAGE:CHECK:
-#   [qa-lint]: $ for x in "ruff check" basedpyright mypy "pylint ." "bandit -r ."; do uv run --project . --all-packages $x; done
+#   [qa-lint]: $ for x in "ruff check" basedpyright mypy "pylint ." "bandit -s B101,B311,B404 -r ."; do uv run --project . --all-packages $x; done
 #        `OR?: $ xargs -rn1 -d, uv run --project . --all-packages sh -c <<<"ruff check,basedpyright,mypy,pylint .,bandit -r ."
 #   [qa-test]: $ uv run --project . --all-packages pytest -q --tb=short
 #   [qa-perf]: $ ./.venv/bin/python -IBu -Xutf8 -Xdev -Ximporttime -Xtracemalloc=5 -m cProfile -s cumulative -- ./.venv/bin/miur
@@ -96,7 +96,7 @@ packages = ["src/miur"]
 
 [dependency-groups]
 dev = [
-  "bandit>=1.9.4",
+  "bandit[toml]>=1.9.4",
   "basedpyright>=1.38.2",
   "jurigged[develoop]>=0.6",
   "mypy>=1.19.1",
@@ -324,6 +324,12 @@ useLibraryCodeForTypes = true
 
 ### !bandit
 
+# NEED: explict config path BAD:(still doesn't work):USE: "-s B101,..."
+#   $ uv run bandit -c /d/miur/pyproject.toml -r .
 [tool.bandit]
 exclude_dirs = ["t", "tests", "venv", ".venv"]
-skips = []
+skips = [
+  "B101",  # Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.
+  "B311",  # Standard pseudo-random generators are not suitable for security/cryptographic purposes.
+  "B404",  # Consider possible security implications associated with the subprocess module.
+]

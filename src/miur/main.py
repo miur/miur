@@ -71,22 +71,9 @@ class LoopContext(Namespace):
     int2key: dict[int, str]
 
 
-def process_frame(k: MiurKernel, ui: MultiUIDriver, ctx: LoopContext) -> str:
-    kpi("input")
-    wch = ui.input()
-    if isinstance(wch, int) and (nm := ctx.int2key.get(wch, "")):
-        wch = nm + f"({wch})"
-    log.warning(f"{wch=}")
-    match wch:
-        # case C.ERR:
-        #     continue
-        case "q":
-            return ""
-        case "j":
-            log("V", "down")
-        case _:
-            pass
-
+def process_frame(
+    k: MiurKernel, ui: MultiUIDriver, ctx: LoopContext, wch: str | int
+) -> str:
     kpi("bake")  # NOTE: overwrites prev values -> so keeps only last frame
     # THINK: ui.bake() to apply UI-specific constrains ?
     #   BUT: ui-model lives in .kernel, so .drv should be dumb
@@ -117,8 +104,8 @@ def process_frame(k: MiurKernel, ui: MultiUIDriver, ctx: LoopContext) -> str:
     kpistr = f"{wch!r} {kpistr} (tokens={len(displ)}) Nfd={ctx.process.num_fds()}"
     kpiw = min(va.wnd_w, width(kpistr))
     tok = TextSpan(0, 0, kpistr, kpiw, Aid.FOOTER)
-    # if va.wnd_h > 0:
-    #     ui.cursesdrv.draw_displ([tok._replace(y=va.wnd_h - 1)])
+    if va.wnd_h > 0:
+        ui.cursesdrv.draw_displ([tok._replace(y=va.wnd_h - 1)])
     ui.printdrv.draw_displ([tok])
 
     # FIXME: remove .printdrv depending on Print vs Curses
@@ -144,6 +131,10 @@ def main_navi() -> str:  # noqa: PLR0915  # pylint:disable=too-many-locals,too-m
         ## BAD: jurigged produces multiple logs per single saved file --> screen refreshes N-times
         ##   TODO: spawn/reset 500ms timer after each event, and only refresh when timer is done
 
+        ## FAIL: when curses is disabled -- no one injects KEY_RESIZE event into getch() to redraw loop
+        ##   and we can't even raise exception from here, risking to break python code
+        # signal.signal(signal.SIGWINCH, lambda si, fr: ui.refresh())
+
         def jurigged_on_event(event: object) -> None:
             log.verbose(event)
             # OR: if "Evaluating" in str(event) or "Update" in str(event): pass; else: return
@@ -162,25 +153,39 @@ def main_navi() -> str:  # noqa: PLR0915  # pylint:disable=too-many-locals,too-m
         ### HACK: hot-reload (recursive ./*.py files from PWD?)
         ## CHECK: if it has import-hook to discover lazily loaded modules later
         # OR: jurigged.watch(pattern=[fs.dirname(fs.realpath(__file__)) + "/**/*.py"], logger=jurigged_on_event)
-        # jurigged.watch(logger=jurigged_on_event)  # pyright: ignore[reportUnknownMemberType]  # <CASE: recursive
+        jurigged.watch(logger=jurigged_on_event)  # pyright: ignore[reportUnknownMemberType]  # <CASE: recursive
         # jurigged.watch("miur") # <OR watch a specific package directory (non-recursive)
         # import mymod; jurigged.watch(mymod) # <OR watch a specific imported module package
 
-        try:
-            # HACK: manually simulate first resize/redraw
-            C.ungetch(C.KEY_RESIZE)
-        except C.error:
-            pass
+        ## DISABLED:FAIL: I would need to send this to *EACH* driver in turn
+        ##   HACK: manually simulate first resize/redraw
+        # try: C.ungetch(C.KEY_RESIZE); except C.error: pass
+
         ctx.int2key = {getattr(C, k): k for k in dir(C) if k.startswith("KEY_")}
 
-        kpistr = "_"
-        while kpistr:
+        wch: str | int = "startup"
+        while True:
             ### FAIL: how to make !jurigged only reload on demand ?
             # from jurigged.register import registry
             # if registry.has_pending():
             #     registry.apply_pending()
             try:
-                kpistr = process_frame(k, ui, ctx)
+                kpistr = process_frame(k, ui, ctx, wch)
+                kpi("input")
+                wch = ui.input()
+                if isinstance(wch, int) and (nm := ctx.int2key.get(wch, "")):
+                    wch = nm + f"({wch})"
+                log.warning(f"{wch=}")
+                match wch:
+                    # case C.ERR:
+                    #     continue
+                    case "q":
+                        break
+                    case "j":
+                        log("V", "down")
+                    case _:
+                        pass
+
             except Exception as exc:
                 # from rich.console import Console
                 # console = Console()
@@ -203,7 +208,7 @@ def main() -> str | None:
             libc.prctl(PR_SET_NAME, appname.encode("utf-8"), 0, 0, 0)
 
         try:
-            kpistr = main_navi()
+            _kpistr = main_navi()
             log.info("exit")
         except Exception as exc:
             log.error(exc)

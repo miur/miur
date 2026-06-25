@@ -1,9 +1,10 @@
 import os
 import random
 import sys
+from collections.abc import Callable
 from queue import Queue
 from threading import Event
-from typing import Callable
+from typing import Any
 
 # pylint:disable=unsupported-assignment-operation
 os.environ["QT_ACCESSIBILITY"] = "0"
@@ -13,7 +14,7 @@ os.environ["QT_NO_DBUS"] = "1"
 # pylint:disable=wrong-import-position
 from PySide6 import QtCore, QtGui, QtWidgets
 from PySide6.QtCore import Property, QRect, Qt
-from PySide6.QtGui import QColor, QFont, QPainter
+from PySide6.QtGui import QColor, QFont, QPainter, QPalette
 from PySide6.QtWidgets import QWidget
 
 from .. import log
@@ -126,10 +127,11 @@ class MillerColumnWidget(QWidget):
         """Handles low-level canvas painting directly within calculated layout constraints."""
         # 1. Paint selection state backgrounds
         if item.is_selected:
-            painter.fillRect(rect, QColor("#2a52be"))  # Royal Blue Selection
-            painter.setPen(QColor("#ffffff"))
-        else:
+            painter.fillRect(rect, QColor("#0087ff"))  # OR #2a52be Royal Blue Selection
             painter.setPen(QColor("#000000"))
+        else:
+            painter.fillRect(rect, QColor("#000000"))
+            painter.setPen(QColor("#ffffff"))
 
         # 2. Paint primary directory/file text
         text_padding_y = 4
@@ -206,13 +208,17 @@ class MillerCanvas(QWidget):
     def generate_mock_directory(self, prefix: str) -> list[FileItem]:
         """Generates random lists to emulate complex item sizes, strings, and states."""
         items: list[FileItem] = []
+        selected = 2
         for i in range(50):
+            # nosec: B311
             has_annot = random.choice([True, False])
             is_mod = random.choice([True, False, False, False])  # 25% chance
             annot_txt = f"[Size: {random.randint(1, 99)}MB]" if has_annot else ""
             name = f"📄 {prefix}_file_item_long_hash_{random.randint(100, 999)}"
             items.append(
-                FileItem(name, annot_txt, is_selected=(i == int(2)), is_modified=is_mod)
+                FileItem(
+                    name, annot_txt, is_selected=(i == selected), is_modified=is_mod
+                )
             )
         return items
 
@@ -271,7 +277,7 @@ class MillerCanvas(QWidget):
 
 
 class MainWindow(QtWidgets.QMainWindow):
-    def __init__(self, recv_q: Queue[dict[str, object]]) -> None:
+    def __init__(self, recv_q: Queue[dict[str, Any]]) -> None:
         super().__init__()
         self.miur_recv_q = recv_q
         self.setWindowTitle("Terminal Miller Navigation - PySide6 IMGUI Loop")
@@ -282,14 +288,31 @@ class MainWindow(QtWidgets.QMainWindow):
         # MAYBE: make it into TEMP status
         #   BUT: I already have statusline in DisplayList!
         #   BET? send logline back
-        self.label = QtWidgets.QLabel("Waiting for live Python objects...", margin=20)
+        self.label = QtWidgets.QLabel("Waiting for live Python objects...")
         self.label.setWordWrap(False)
         P = QtWidgets.QSizePolicy.Policy
         self.label.setSizePolicy(P.Preferred, P.Fixed)
+        # DISABLED:REF: Say No to Qt Style Sheets | KDAB ⌇⡪⠽⢋⠦
+        #   https://www.kdab.com/say-no-to-qt-style-sheets/
+        # label.setStyleSheet("background-color: black; color: white;")
+        palette = self.label.palette()
+        palette.setColor(QPalette.ColorRole.Window, QColor("black"))
+        palette.setColor(QPalette.ColorRole.WindowText, QColor("white"))
+        self.label.setPalette(palette)
+        self.label.setAutoFillBackground(True)  # FIXED: label has transparent bg DFL
 
         self.setCentralWidget(central_widget)
+        ## OR:INFO: Using a specific ID selector (#centralWidget) prevents
+        ##   child widgets (like buttons or labels) from inheriting this background.
+        # central_widget.setObjectName("centralWidget")
+        # self.setStyleSheet("QWidget#centralWidget { background-color: #1e1e1e; }")
+        central_widget.setAutoFillBackground(True)
+        palette = central_widget.palette()
+        palette.setColor(QPalette.ColorRole.Window, QColor("#1e1e1e"))
+        central_widget.setPalette(palette)
+
         layout = QtWidgets.QVBoxLayout(central_widget)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(1, 1, 1, 1)
 
         # Initialize the custom Miller view canvas
         self.canvas = MillerCanvas(self)
@@ -336,7 +359,13 @@ class QtBridge(QtCore.QObject):
     def process_incoming(self, item: object) -> None:
         """Executes strictly inside the Qt main thread loop natively."""
 
-        log.warning(item)
+        log.debug(item)
+
+        text = str(item)
+        lb = self._wnd.label
+        right = Qt.TextElideMode.ElideRight
+        # NOTE: Set Elide mode so long text scales with an ellipsis instead of breaking lines
+        lb.setText(lb.fontMetrics().elidedText(text, right, lb.width()))
 
         # Corner Case: Raw strings for control flow can cause collisions if
         # your data stream normally contains strings. A typed sentinel
@@ -344,25 +373,34 @@ class QtBridge(QtCore.QObject):
         # FIXME: use "MiurEvent" type here
         if item == "SHUTDOWN":
             self._app.quit()
-            log.info("quit")
             self._wnd.miur_recv_q.put({"ev": item})
+            return
+
+        if item == "REDRAW":
+            ## FAIL: Stays stuck in the queue until interaction
+            # self._wnd.update()
+            # self._wnd.canvas.ordered_panels[0].update()
+            ## FIXED: Forces an immediate synchronous draw
+            # self._wnd.repaint()
+            # ALSO? Explicitly iterate and repaint every interior panel using your painter
+            # for panel in self._wnd.findChildren(QWidget):
+            #     panel.repaint()
+            ## ALT: If you prefer keeping .update() because .repaint() causes minor screen flicker,
+            # you must explicitly wake up the main loop dispatcher right after firing your update request.
+            # self._wnd.update()
+            # QCoreApplication.postEvent(self._mainwnd, QEvent(QEvent.Type.LayoutRequest))
+            log("W", "ys")
+            self._wnd.canvas.update_global_layout()
             return
 
         # from .models import DisplayElement
         # if isinstance(item, DisplayElement):
         #     text = f"Rendering a {item.color} {item.shape_type} at ({item.x}, {item.y})"
 
-        text = str(item)
-        # 2. Set Elide mode so long text scales with an ellipsis instead of breaking lines
-        lb = self._wnd.label
-        right = Qt.TextElideMode.ElideRight
-        lb.setText(lb.fontMetrics().elidedText(text, right, lb.width()))
-        # Perform canvas updates...
-
 
 def main(
     send_bridge: list[Callable[[object], None]],
-    miur_recv_q: Queue[dict[str, object]],
+    miur_recv_q: Queue[dict[str, Any]],
     ready_event: Event,
 ) -> int:
     try:
@@ -378,6 +416,18 @@ def main(
 
         # Export the bound emit method to the main thread
         send_bridge.append(bridge.data_received.emit)
+
+        # TODO: only apply when running in standalone process inof a bkgr thread
+        ## FIXED: Force Qt to repaint when jurigged patches a module
+        # import jurigged
+        # from jurigged.codetools import UpdateOperation  # pyright: ignore[reportMissingTypeStubs]
+        # def jurigged_on_event(event: object) -> None:
+        #     if isinstance(event, UpdateOperation):
+        #         # window.canvas.ordered_panels[0].update()
+        #         # window.update()
+        #         bridge.data_received.emit("REDRAW")
+        # jurigged.watch(logger=jurigged_on_event)
+
     except Exception as exc:
         log.exception(exc)
         raise
@@ -449,6 +499,7 @@ def main(
             if "PySide6" in mod or "shiboken" in mod
         ]
         for mod in pyside_modules:
+            # ERR? uidrv/qt6wdg_drv.py:488:16: E1138: 'sys.modules' does not support item deletion (unsupported-delete-operation)
             del sys.modules[mod]
 
         # --- PHASE 3: The Ultimate Sweep ---
@@ -461,6 +512,7 @@ def main(
         # gc.select_subgraph if hasattr(
         #     gc, "select_subgraph"
         # ) else None  # For specialized runtimes
+        # ERR? uidrv/qt6wdg_drv.py:500:12: E1138: 'gc.garbage' does not support item deletion (unsupported-delete-operation)
         del gc.garbage[:]  # Force break remaining uncollectable cycles if any exist
 
         return rc

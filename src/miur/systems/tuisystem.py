@@ -64,7 +64,9 @@ class TuiSystem:
             cx = va.vp_x
 
             # XLR: how to chain this better
-            def unfit(ss: str, wc: int = 0, aid: StyleId = Aid.DEFAULT) -> bool:
+            def unfit(
+                ss: str, wc: int = 0, aid: StyleId = Aid.DEFAULT, cy: int = cy
+            ) -> bool:
                 nonlocal cx
                 sw = wc or width(ss)
                 if cx + sw > va.vp_w:

@@ -23,7 +23,7 @@ def new_termwindow() -> Generator[tuple[TextIO, TextIO]]:
             Popen(
                 "st -n miur -t miur_textstream -e sh -c".split()
                 + [cmd, tmpf.name, str(os.getpid())]
-            )
+            )  # nosec: B603
         )
 
         def _cleanup_terminal() -> None:
@@ -43,7 +43,7 @@ def new_termwindow() -> Generator[tuple[TextIO, TextIO]]:
         ttynm = tmpf.read().strip()
 
         # pylint:disable=consider-using-with
-        rtty = open(ttynm, "r", encoding=sys.stdin.encoding)
+        rtty = open(ttynm, encoding=sys.stdin.encoding)
         stack.callback(rtty.close)
         wtty = open(ttynm, "w", encoding=sys.stdout.encoding)
         stack.callback(wtty.close)

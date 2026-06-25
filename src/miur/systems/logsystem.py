@@ -132,7 +132,7 @@ class LogSystem:  # pylint:disable=too-many-instance-attributes
         if lvl < self.minlevel:
             return
 
-        fr = sys._getframe(1)  # pylint:disable=protected-access
+        fr = sys._getframe(1)  # pylint:disable=protected-access  # pyright:ignore[reportPrivateUsage]
         while pr := fr.f_back:
             if fr.f_code.co_filename != __file__:
                 break
@@ -156,10 +156,12 @@ class LogSystem:  # pylint:disable=too-many-instance-attributes
         )
         self._queue_threadsafe.put(entry)
 
-        # TEMP:DEBUG: get immediate logs for crashes
-        if not self._colors:
-            self._init_colors()
-        print(self._format(entry), end="")
+        ## TEMP:DEBUG: get immediate logs for crashes
+        ##   BET: in multi_drv mode use first terminal for textstream -- and redirect curses to another terminal
+        # if not self._colors:
+        #     self._init_colors()
+        # # TEMP: use "\r" to print traceback in curses.raw() without messing up layout
+        # print(self._format(entry), end="\r")
 
     ## DISABLED: too complicated to avoid repeated declarations...
     ## ALT:PERF~ self(LogLevel[sys._getframe().f_code.co_name.upper()], ...)

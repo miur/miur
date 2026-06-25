@@ -25,7 +25,7 @@ class MultiUIDriver:
     def __enter__(self) -> Self:
         with ExitStack() as stack:
             do = stack.enter_context
-            # self.cursesdrv = do(CursesUIDriver())
+            self.cursesdrv = do(CursesUIDriver())
             rtty, wtty = do(new_termwindow())
             self.printdrv = do(PrintTextUIDriver(rtty, wtty))
             (self.send_to_qt, self.qt_recv_q) = do(new_guithread())
@@ -44,23 +44,23 @@ class MultiUIDriver:
         return self._stack.__exit__(exc_type, exc, tb)
 
     def input(self) -> int | str:
-        ## WARN: unless I run printdrv.input() -- keys are echoed
-        return self.printdrv.input()
-        # return self.cursesdrv.input()
+        return self.cursesdrv.input()
+        # return self.printdrv.input()
 
     def sizewh(self) -> tuple[int, int]:
+        return self.cursesdrv.sizewh()
         return self.printdrv.sizewh()
-        # return self.cursesdrv.sizewh()
 
     def clear(self) -> None:
-        # self.cursesdrv.clear()
+        self.cursesdrv.clear()
         self.printdrv.clear()
 
     def refresh(self) -> None:
-        # self.cursesdrv.refresh()
+        self.cursesdrv.refresh()
         self.printdrv.refresh()
+        self.send_to_qt("REDRAW")
 
     def draw_displ(self, displ: DisplayList) -> None:
         # MAYBE: split into different threads to draw in parallel?
-        # self.cursesdrv.draw_displ(displ)
+        self.cursesdrv.draw_displ(displ)
         self.printdrv.draw_displ(displ)

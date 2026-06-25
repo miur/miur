@@ -1,5 +1,5 @@
 from enum import IntEnum
-from functools import lru_cache
+from functools import cache
 from typing import Final
 
 # from typing_extensions import ReadOnly  # until python=3.15
@@ -36,7 +36,7 @@ type Color = int | str | Palette | tuple[int, int, int]
 #   _FG = (*map(str, range(30, 38)), *map(str, range(90, 98)), *(f'38;5;{i}' for i in range(16, 256)))
 #   _BG = (*map(str, range(40, 48)), *map(str, range(100, 108)), *(f'48;5;{i}' for i in range(16, 256)))
 #  USAGE: parts = _FG[fg], _BG[bg])
-@lru_cache(maxsize=None)
+@cache
 def _color(n: Color, base: int) -> str:
     if isinstance(n, tuple):
         return f"{base + 8};2;{n[0]};{n[1]};{n[2]}"  # Direct 24-bit True Color Printing
@@ -67,7 +67,7 @@ _SGR: Final = {  # <OFF="Select Graphic Rendition"
 
 
 # ex~: "bold-white-on-red": "\033[1;37m;41m"
-@lru_cache(maxsize=None)
+@cache
 def ansicolor(
     # *attrs: int,  # USAGE: parts.extend(str(a) for a in attrs)
     fg: Color | None = None,  # ALT:(None):=-2 , but it's error-prone

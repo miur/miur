@@ -1,4 +1,5 @@
-from typing import Annotated, Callable, NamedTuple
+from collections.abc import Callable
+from typing import Annotated, NamedTuple
 
 from .. import log
 from .styleids import Aid, StyleId
@@ -38,6 +39,10 @@ class StyleDef(NamedTuple):
     efparams: dict[str, object] | None = None
 
 
+def eff_punct2index(t: str) -> int:
+    return next((i for i, s in enumerate(".-_", 1) if s in t), 0)
+
+
 class UnitedStylesheet:
     # DEFAULT = StyleOverride([default=]StyleDef(0x223344, 0x000000), curses=StyleDef(-1, -1))
     # OR:(naming convention): DEFAULT/curses = DEFAULT.override.curses = StyleDef(-1, -1)
@@ -49,11 +54,9 @@ class UnitedStylesheet:
 
     lineidx = StyleDef(0, -1)  # = ansicolor(Palette.black)
     itemidx = StyleDef(10, -1)  # = ansicolor(Palette.greydark)
-    itempunct = StyleDef(
-        fg=(15, 1, 3, 4),
-        # ALT: efid="rainbow", efparams={"rgx": r"[-_.]"})
-        effn=lambda t: next((i for i, s in enumerate(".-_", 1) if s in t), 0),
-    )
+
+    # ALT: efid="rainbow", efparams={"rgx": r"[-_.]"})
+    itempunct = StyleDef(fg=(15, 1, 3, 4), effn=eff_punct2index)
 
     # MAYBE? should return StyleParams inof StyleDef with all None values substituted
     #   BUT? only .drv knows what actual defaults to use for None?

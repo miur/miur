@@ -1,9 +1,13 @@
 from typing import TYPE_CHECKING, Protocol
 
-from .systems import filecontentsystem as FCS
-from .systems import localfilesystem as LFS
-from .systems import sessionstatesystem as SSS
-from .systems import textsystem, tuisystem, viewsystem
+from .systems import (
+    filecontentsystem as FCS,
+    localfilesystem as LFS,
+    sessionstatesystem as SSS,
+    textsystem,
+    tuisystem,
+    viewsystem,
+)
 from .uicommon.displaylist import DisplayList
 
 if TYPE_CHECKING:

@@ -1,6 +1,9 @@
 import os
 import sys
-from typing import Iterable, Iterator, Self, TextIO, assert_never
+import termios
+import tty
+from collections.abc import Iterable, Iterator
+from typing import Final, Self, TextIO, assert_never
 
 from wcwidth import clip, width
 
@@ -9,35 +12,21 @@ from ..uicommon.displaylist import DisplayStream, TextSpan
 from ..uicommon.styleids import Aid, StyleId
 from ..uicommon.stylesheet import Effect, UnitedStylesheet
 
-# ALT: https://pypi.org/project/readkeys/
-if sys.platform == "win32":
-    import msvcrt  # pylint:disable=import-error
-
-    def _get_wch(rfd: TextIO, wfd: TextIO) -> str:
-        _ = rfd, wfd
-        ch = msvcrt.getwch()  # Reads a single Unicode character
-        # Special keys (arrows, F-keys) emit a null or 0xe0 byte first
-        if ch in ("\000", "\xe0"):
-            msvcrt.getwch()  # Consume the extended key code
-            return "TBD"  # Or handle arrow/function keys here
-        return ch
-else:  # Unix implementation (Linux/macOS)
-    import termios
-    import tty
-
-    def _get_wch(rfd: TextIO, wfd: TextIO) -> str:
-        fd = wfd.fileno()
-        old_settings = termios.tcgetattr(fd)
-        try:
-            tty.setraw(fd)
-            ch = rfd.read(1)  # Reads one character
-            # Check for multi-byte sequences (e.g., arrow keys often start with \x1b)
-            if ch == "\x1b":
-                ch += rfd.read(2)  # Read the next 2 bytes of the sequence
-        finally:
-            # MAYBE: instead of single char -- switch stdin mode permanently in __enter/exit ?
-            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
-        return ch
+KEY_MAP: Final = {
+    # Arrows
+    "\x1b[A": "UP",
+    "\x1b[B": "DOWN",
+    "\x1b[C": "RIGHT",
+    "\x1b[D": "LEFT",
+    # Home variations
+    "\x1b[H": "HOME",
+    "\x1b[1~": "HOME",
+    "\x1bOH": "HOME",
+    # End variations
+    "\x1b[F": "END",
+    "\x1b[4~": "END",
+    "\x1bOF": "END",
+}
 
 
 # RENAME? TextStreamUIDriver
@@ -52,22 +41,67 @@ else:  # Unix implementation (Linux/macOS)
 #   * nocolor vs termcolor/style[8/16/256/64K/RGB] (vs rawterm-passthrough/strip-termcodes) (vs VT100-subset)
 #   * last-frame only (vs continuous worklog [append chunks] -- to email/troubleshoot interactions later)
 #   * IDEA: specially adapted TTS (QtTextToSpeech) with abbreviated names and play/stop/pause/jump-to controls
+#   * Full altscreen terminal vs Embeddable into current shell primary screen (similar to "completions-list")
 class PrintTextUIDriver:
     style_by_id: list[Effect[str] | None]
 
     def __init__(self, rfd: TextIO | None = None, wfd: TextIO | None = None) -> None:
         self._rfd = rfd or sys.stdin
         self._wfd = wfd or sys.stdout  # OR: store _writelines to reduce API surface
+        self.old_settings: termios._AttrReturn  # pyright: ignore[reportPrivateUsage]
 
     def __enter__(self) -> Self:
         self.style_by_id = []
+        fd = self._wfd.fileno()
+        self.old_settings = termios.tcgetattr(fd)
+        ## ALT:DISABLED: for "setraw" you would need to "\r" by yourself
+        # tty.setraw(fd)
+        ## Monkeypatch write to automatically inject \r before \n
+        # self._original_write = wfd.write
+        # def raw_write(s: str) -> int:
+        #     return self._original_write(s.replace("\n", "\r\n"))
+        # self._wfd.write = raw_write
+        # # __exit__: self.wfd.write = self._original_write
+        tty.setcbreak(fd)
+
         return self
 
     def __exit__(self, *_a: object) -> None:
-        pass
+        if self.old_settings:
+            termios.tcsetattr(self._wfd.fileno(), termios.TCSADRAIN, self.old_settings)
 
     def input(self) -> str:
-        return _get_wch(self._rfd, self._wfd)
+        ## MAYBE~ push "startup" cookie into stream
+        # if self.initial_ungetch is not None:
+        #     ch = self.initial_ungetch
+        #     self.initial_ungetch = None
+        #     return ch
+        #
+        ## ALT:REF:https://pypi.org/project/readkeys/
+        # if sys.platform == "win32":
+        #     import msvcrt
+        #     ch = msvcrt.getwch()  # Reads a single Unicode character
+        #     # Special keys (arrows, F-keys) emit a null or 0xe0 byte first
+        #     if ch in ("\000", "\xe0"):
+        #         msvcrt.getwch()  # Consume the extended key code
+        #         return "TBD"  # Or handle arrow/function keys here
+        #     return ch
+        getc = self._rfd.read
+        ch = getc(1)
+        if ch == "\x1b":  # Check for multi-byte sequences (e.g., arrow keys/etc)
+            nxt = getc(1)
+            ch += nxt
+            # If it's a standard CSI sequence '\x1b[' or an SS3 sequence '\x1bO'
+            if nxt in ("[", "O"):
+                while True:
+                    body_char = getc(1)
+                    ch += body_char
+                    # ANSI sequences terminate on characters between ASCII 0x40 and 0x7E
+                    # This covers letters (A-Z, a-z) and the tilde '~'
+                    if 0x40 <= ord(body_char) <= 0x7E:  # noqa:PLR2004
+                        break
+                ch = KEY_MAP.get(ch, ch)
+        return ch
 
     def sizewh(self) -> tuple[int, int]:
         # REF: shutil.get_terminal_size(fallback=(80, 24))

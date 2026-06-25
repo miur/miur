@@ -1,6 +1,7 @@
 import curses as C
+from collections.abc import Callable
 from types import TracebackType
-from typing import Callable, Self, assert_never
+from typing import Self, assert_never
 
 from .. import log
 from ..uicommon.displaylist import DisplayStream, TextSpan
@@ -100,6 +101,9 @@ class CursesUIDriver:
         C.noecho()
         __(C.echo)
 
+        ## FAIL: doesn't preserve "\n->\r\n" unlike tty.setcbreak(fd)
+        #   :only: interrupt, quit, suspend, and flow control
+        # C.cbreak(); __(C.nocbreak)
         C.raw()
         __(C.noraw)
 

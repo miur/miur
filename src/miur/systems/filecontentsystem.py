@@ -1,7 +1,8 @@
 import mmap
 import os
 from collections import OrderedDict
-from typing import TYPE_CHECKING, Callable, NamedTuple, Protocol
+from collections.abc import Callable
+from typing import TYPE_CHECKING, NamedTuple, Protocol
 
 from .localfilesystem import FDInt, HPath
 
