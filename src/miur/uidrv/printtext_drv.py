@@ -7,6 +7,7 @@ from typing import Final, Self, TextIO, assert_never
 
 from wcwidth import clip, width
 
+from .. import log
 from ..uicommon.ansicolor import RESET, ansicolor
 from ..uicommon.displaylist import DisplayStream, TextSpan
 from ..uicommon.styleids import Aid, StyleId
@@ -68,7 +69,15 @@ class PrintTextUIDriver:
 
     def __exit__(self, *_a: object) -> None:
         if self.old_settings:
-            termios.tcsetattr(self._wfd.fileno(), termios.TCSADRAIN, self.old_settings)
+            try:
+                fd = self._wfd.fileno()
+                termios.tcsetattr(fd, termios.TCSADRAIN, self.old_settings)
+            except termios.error as exc:
+                log.warning(exc)
+                log.note(
+                    "HYPO: new_termwindow() was most likely manually closed"
+                    " (or killed by system) and its tty pipe had abruptly disappeared"
+                )
 
     def input(self) -> str:
         ## MAYBE~ push "startup" cookie into stream
@@ -128,6 +137,14 @@ class PrintTextUIDriver:
     def draw_lines(self, lines: Iterable[str]) -> None:
         self._wfd.writelines(lines)
         self._wfd.flush()
+        ## FAIL: maybe~ fine to auto-disable for multi_drv, but not for sole _drv
+        # if self._wfd:
+        #     try:
+        #         self._wfd.writelines(lines)
+        #         self._wfd.flush()
+        #     except OSError as exc:
+        #         log.error(exc)
+        #         self._wfd = None
 
     def draw_displ(self, displ: DisplayStream) -> None:
         # TODO: use .sizewh (nof 120) to avoid wrapping in terminal, and "max=None" for textstream

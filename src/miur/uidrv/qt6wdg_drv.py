@@ -429,7 +429,7 @@ def main(
         # jurigged.watch(logger=jurigged_on_event)
 
     except Exception as exc:
-        log.exception(exc)
+        log.error(exc)
         raise
     finally:
         # TEMP:HACK: unblock main app to crash
@@ -518,7 +518,7 @@ def main(
         return rc
 
     except Exception as exc:
-        log.exception(exc)
+        log.error(exc)
         print(log.archive_recent(dump=True), file=sys.stderr)
         raise
 

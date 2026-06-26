@@ -1,3 +1,4 @@
+import asyncio
 import ctypes
 import curses as C
 import gc
@@ -5,8 +6,6 @@ import os
 import signal
 import sys
 from argparse import ArgumentParser, Namespace
-from itertools import pairwise
-from time import monotonic_ns
 
 # pyright: reportMissingTypeStubs=false
 import jurigged
@@ -23,16 +22,10 @@ from .uidrv.multi_drv import MultiUIDriver
 
 gc.set_debug(gc.DEBUG_UNCOLLECTABLE)
 
-g_dkpi: dict[str, int] = {}
 
 if not sys.warnoptions:
     # WHY: print a traceback pinpointing exactly where the unclosed file object was created.
     __import__("warnings").simplefilter("always", ResourceWarning)
-
-
-# MOVE: logger?
-def kpi(seqnm: str) -> None:
-    g_dkpi[seqnm] = monotonic_ns()
 
 
 def cli_spec(parser: ArgumentParser) -> ArgumentParser:
@@ -74,7 +67,7 @@ class LoopContext(Namespace):
 def process_frame(
     k: MiurKernel, ui: MultiUIDriver, ctx: LoopContext, wch: str | int
 ) -> str:
-    kpi("bake")  # NOTE: overwrites prev values -> so keeps only last frame
+    log.measure("bake")  # NOTE: overwrites prev values -> so keeps only last frame
     # THINK: ui.bake() to apply UI-specific constrains ?
     #   BUT: ui-model lives in .kernel, so .drv should be dumb
     #     ~~ unless "baking" inserts colorcodes
@@ -84,24 +77,15 @@ def process_frame(
     va.vp_w, va.vp_h = va.wnd_w, max(2, va.wnd_h - 1)
     displ = k.navi_sequence(ctx.nvid, va)
 
-    kpi("draw")
+    log.measure("draw")
     ui.clear()
     ui.printdrv.draw_lines(["\n"])
     ui.draw_displ(displ)
     # log.info(ui.printdrv.style_by_id)
 
-    kpi("status")
+    log.measure("status")
     ## HACK: draw "status" *after* drawing evels -- to have all actual KPIs
-    kpistr = " ".join(
-        f"{nm}={(t1 - t0) / 1e6:.1f}ms"
-        for (nm, t0), (_, t1) in pairwise(
-            ## DISABLED: order becomes wrong due to draw from prev frame
-            # sorted(g_dkpi.items(), key=lambda x: x[1])
-            ## FIXME: without sorting "bake" is negative
-            g_dkpi.items()
-        )
-    )
-    kpistr = f"{wch!r} {kpistr} (tokens={len(displ)}) Nfd={ctx.process.num_fds()}"
+    kpistr = f"{wch!r} {log.recent_measurements_avg()} (tokens={len(displ)}) "
     kpiw = min(va.wnd_w, width(kpistr))
     tok = TextSpan(0, 0, kpistr, kpiw, Aid.FOOTER)
     if va.wnd_h > 0:
@@ -115,11 +99,12 @@ def process_frame(
     ui.printdrv.draw_lines([log.archive_recent(dump=True), "---"])
 
     ui.refresh()
-    kpi("done")
+    log.measure("wait")
     return kpistr
 
 
-def main_navi() -> str:  # noqa: PLR0915  # pylint:disable=too-many-locals,too-many-statements
+def main_navi() -> None:  # noqa: PLR0915  # pylint:disable=too-many-locals,too-many-statements
+    log.kpi("enter(navi)")
     k = MiurKernel()
     ctx = LoopContext()
     ctx.process = psutil.Process(os.getpid())
@@ -128,6 +113,7 @@ def main_navi() -> str:  # noqa: PLR0915  # pylint:disable=too-many-locals,too-m
     ctx.va = VisibleArea(8, 11)  # OR? use "vpid"
 
     with MultiUIDriver() as ui:
+        log.kpi("after(ui_drv)")
         ## BAD: jurigged produces multiple logs per single saved file --> screen refreshes N-times
         ##   TODO: spawn/reset 500ms timer after each event, and only refresh when timer is done
 
@@ -156,6 +142,7 @@ def main_navi() -> str:  # noqa: PLR0915  # pylint:disable=too-many-locals,too-m
         jurigged.watch(logger=jurigged_on_event)  # pyright: ignore[reportUnknownMemberType]  # <CASE: recursive
         # jurigged.watch("miur") # <OR watch a specific package directory (non-recursive)
         # import mymod; jurigged.watch(mymod) # <OR watch a specific imported module package
+        log.kpi("after(jurigged)")
 
         ## DISABLED:FAIL: I would need to send this to *EACH* driver in turn
         ##   HACK: manually simulate first resize/redraw
@@ -170,8 +157,8 @@ def main_navi() -> str:  # noqa: PLR0915  # pylint:disable=too-many-locals,too-m
             # if registry.has_pending():
             #     registry.apply_pending()
             try:
-                kpistr = process_frame(k, ui, ctx, wch)
-                kpi("input")
+                _kpistr = process_frame(k, ui, ctx, wch)
+                log.measure("input")
                 wch = ui.input()
                 if isinstance(wch, int) and (nm := ctx.int2key.get(wch, "")):
                     wch = nm + f"({wch})"
@@ -193,37 +180,39 @@ def main_navi() -> str:  # noqa: PLR0915  # pylint:disable=too-many-locals,too-m
                 log.error(exc)
                 ui.printdrv.draw_lines([log.archive_recent(dump=True)])
 
-    return kpistr
+    log.kpi("before(asyncio)")
+    asyncio.run(mainloop_asyncio(), debug=True)
+    log.kpi("return(navi)")
 
 
-def main() -> str | None:
+def set_prname(appname: str) -> None:
+    # FIXED:USAGE: $ pkill miur
+    # ALT: https://pypi.org/project/setproctitle/
+    if sys.platform == "linux":
+        maxcommlen = 15
+        assert len(appname) <= maxcommlen, "limit for /proc/PID/comm"
+        libc = ctypes.CDLL("libc.so.6")
+        PR_SET_NAME = 15
+        libc.prctl(PR_SET_NAME, appname.encode("utf-8"), 0, 0, 0)
+
+
+def main() -> int:
+    log.kpi("enter(main)")
+    rc = 1
     try:
-        # FIXED: $ pkill miur  ALT: https://pypi.org/project/setproctitle/
-        if sys.platform == "linux":
-            appname = "miur"
-            maxcommlen = 15
-            assert len(appname) <= maxcommlen, "limit for /proc/PID/comm"
-            libc = ctypes.CDLL("libc.so.6")
-            PR_SET_NAME = 15
-            libc.prctl(PR_SET_NAME, appname.encode("utf-8"), 0, 0, 0)
-
-        try:
-            _kpistr = main_navi()
-            log.info("exit")
-        except Exception as exc:
-            log.error(exc)
-            print(log.archive_recent(dump=True))
-            raise
-
-        # FAIL: should only be used for jurigged+devloop
-        #   orse results in exitcode!=0
-        # if "jurigged" in __import__("sys").modules:
-        #     return kpistr
-        # print(str(log) + kpistr)
-    except Exception:
-        # from rich.traceback import install  # PERF:BAD: +400ms
-        #
+        set_prname("miur")
+        main_navi()
+        rc = 0
+    except Exception as exc:
+        log.error(exc)
+        ## DISABLED:PERF:BAD: +400ms
+        # from rich.traceback import install
         # install(show_locals=True)
-        raise
-    log.info("exit_main")
-    return None
+        # raise
+    log.kpi(f"return(main) -> {rc}")
+    print(log.archive_recent(dump=True), file=sys.stderr)
+    ## DISABLED: should only be used for jurigged+devloop
+    ##   << orse results in exitcode!=0
+    # if "jurigged" in __import__("sys").modules:
+    #     return _kpistr
+    return rc

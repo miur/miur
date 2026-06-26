@@ -49,7 +49,7 @@ class MultiUIDriver:
 
     def sizewh(self) -> tuple[int, int]:
         return self.cursesdrv.sizewh()
-        return self.printdrv.sizewh()
+        # return self.printdrv.sizewh()
 
     def clear(self) -> None:
         self.cursesdrv.clear()
