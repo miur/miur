@@ -1,7 +1,7 @@
 import curses as C
 from contextlib import ExitStack
 from types import TracebackType
-from typing import Self, assert_never
+from typing import TYPE_CHECKING, Self, assert_never
 
 from .. import log
 from ..uicommon.displaylist import DisplayStream, TextSpan
@@ -21,6 +21,7 @@ class CursesUIDriver:
     _stack: ExitStack
     stdscr: C.window
     registered_color_pairs: dict[int, int]
+    int2key: dict[int, str]
     style_by_id: list[Effect[int] | None]
 
     # RENAME? _intern_fgbg
@@ -115,6 +116,7 @@ class CursesUIDriver:
         ##   ALT: py$ try: get_wch() ; except curses.error: pass; curses.napms(100)
         # self.stdscr.nodelay(True)
         __(lambda: self.stdscr.nodelay(False))
+        self.int2key = {getattr(C, k): k for k in dir(C) if k.startswith("KEY_")}
 
         ## BAD: maybe keys should be assigned only *after* initscr
         ##   BUT:FAIL? can't pre-set enum type for self.code2key
@@ -134,17 +136,27 @@ class CursesUIDriver:
     def __exit__(
         self,
         exc_type: type[BaseException] | None,
-        exc: BaseException | None,
-        tb: TracebackType | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
     ) -> bool | None:
-        return self._stack.__exit__(exc_type, exc, tb)
+        return self._stack.__exit__(exc_type, exc_val, exc_tb)
 
     # TBD? translate C.KEY_HOME -> universal "<Home>" str (or my common key_enum.HOME)
     #   WHY: to have the same keybindings for all clients
-    def input(self) -> int | str:
+    def input(self) -> str:
         wch = self.stdscr.get_wch()
+        # log.debug(f"C.{wch=}")
+        if wch == C.ERR:
+            pass  # TBD
         if isinstance(wch, str):
             wch = C.unctrl(wch).decode("utf-8")
+        elif nm := self.int2key.get(wch, ""):
+            wch = nm + f"({wch})"
+        else:
+            wch = str(wch)
+        # if isinstance(wch, str) and len(wch) == 1 and wch.islower() and wch.isalpha():
+        #     return wch
+        # return self.translate_to_unified_input(wch)
         return wch
 
     def sizewh(self) -> tuple[int, int]:
@@ -201,3 +213,10 @@ class CursesUIDriver:
                         return
                 case _:
                     assert_never(token)
+
+
+if TYPE_CHECKING:
+    from .base_drv import BaseUIDriver
+
+    _instance: BaseUIDriver = CursesUIDriver()
+    _factory: type[BaseUIDriver] = CursesUIDriver

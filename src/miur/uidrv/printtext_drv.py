@@ -3,7 +3,8 @@ import sys
 import termios
 import tty
 from collections.abc import Iterable, Iterator
-from typing import Final, Self, TextIO, assert_never
+from types import TracebackType
+from typing import TYPE_CHECKING, Final, Self, TextIO, assert_never
 
 from wcwidth import clip, width
 
@@ -30,7 +31,7 @@ KEY_MAP: Final = {
 }
 
 
-# RENAME? TextStreamUIDriver
+# RENAME? TextStreamUIDriver | LineTermUIDriver
 # SEP/OPT::
 #   * text (vs serialized DisplayList/AST dump for fmt-converters)
 #   * unicode vs ascii
@@ -67,7 +68,12 @@ class PrintTextUIDriver:
 
         return self
 
-    def __exit__(self, *_a: object) -> None:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> bool | None:
         if self.old_settings:
             try:
                 fd = self._wfd.fileno()
@@ -128,7 +134,7 @@ class PrintTextUIDriver:
         return w, h
 
     def clear(self) -> None:
-        pass
+        self.draw_lines(["\n"])
 
     def refresh(self) -> None:
         pass
@@ -297,3 +303,10 @@ class PrintTextUIDriver:
                         nx = max(nx, nx + rw)
         if y is not None:
             yield from mark()
+
+
+if TYPE_CHECKING:
+    from .base_drv import BaseUIDriver
+
+    _instance: BaseUIDriver = PrintTextUIDriver()
+    _factory: type[BaseUIDriver] = PrintTextUIDriver

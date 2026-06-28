@@ -4,16 +4,20 @@ import curses as C
 import sys
 import time
 from argparse import ArgumentParser, Namespace
-from contextlib import AsyncExitStack, ExitStack
+from collections import OrderedDict
+from collections.abc import Callable
+from contextlib import ExitStack
+from dataclasses import dataclass, field
 from enum import IntEnum, auto
-from typing import NamedTuple
+from types import TracebackType
+from typing import Any, Self
 
 from . import log
 from .kernel import MiurKernel, NaviId
 from .systems.tuisystem import VisibleArea
 from .uicommon.displaylist import TextSpan
 from .uicommon.styleids import Aid
-from .uidrv.multi_drv import MultiUIDriver
+from .uidrv.base_drv import BaseUIDriver
 
 
 def cli_spec(parser: ArgumentParser) -> ArgumentParser:
@@ -23,36 +27,18 @@ def cli_spec(parser: ArgumentParser) -> ArgumentParser:
     return parser
 
 
-# def cli_process() -> object:
-#     ns = cli_spec(ArgumentParser()).parse_args(sys.argv[1:])
-#     match ns.ui:
-#         case "mu" | "multi":
-#             from .uidrv.multi_drv import MultiUIDriver
-#
-#             UIDrv = MultiUIDriver
-#         case "cu" | "curses":
-#             from .uidrv.curses_drv import CursesUIDriver
-#
-#             UIDrv = CursesUIDriver
-#         case "pr" | "printtext":
-#             from .uidrv.printtext_drv import PrintTextUIDriver
-#
-#             UIDrv = PrintTextUIDriver
-#         case _:
-#             from typing import assert_never
-#
-#             assert_never(ns.ui)
-#     return UIDrv
+def cli_process() -> None:
+    _ns = cli_spec(ArgumentParser()).parse_args(sys.argv[1:])
 
 
 class LoopContext(Namespace):
     nvid: NaviId
     va: VisibleArea
-    int2key: dict[int, str]
 
 
+# WTF: it seems we need per-client fn, as wnd size is different anyway
 def process_frame(
-    k: MiurKernel, ui: MultiUIDriver, ctx: LoopContext, wch: str | int
+    k: MiurKernel, ui: BaseUIDriver, ctx: LoopContext, wch: str | int
 ) -> str:
     log.measure("bake")  # NOTE: overwrites prev values -> so keeps only last frame
     # THINK: ui.bake() to apply UI-specific constrains ?
@@ -66,30 +52,270 @@ def process_frame(
 
     log.measure("draw")
     ui.clear()
-    ui.printdrv.draw_lines(["\n"])
     ui.draw_displ(displ)
     # log.info(ui.printdrv.style_by_id)
 
     log.measure("status")
-    ## HACK: draw "status" *after* drawing evels -- to have all actual KPIs
-    from wcwidth import width
-
+    # ## HACK: draw "status" *after* drawing evels -- to have all actual KPIs
+    # from wcwidth import width
     kpistr = f"{wch!r} {log.recent_measurements_avg()} (tokens={len(displ)}) "
-    kpiw = min(va.wnd_w, width(kpistr))
-    tok = TextSpan(0, 0, kpistr, kpiw, Aid.FOOTER)
-    if va.wnd_h > 0:
-        ui.cursesdrv.draw_displ([tok._replace(y=va.wnd_h - 1)])
-    ui.printdrv.draw_displ([tok])
+    # kpiw = min(va.wnd_w, width(kpistr))
+    # tok = TextSpan(0, 0, kpistr, kpiw, Aid.FOOTER)
+    # if va.wnd_h > 0:
+    #     ui.cursesdrv.draw_displ([tok._replace(y=va.wnd_h - 1)])
+    # ui.printdrv.draw_displ([tok])
 
     # FIXME: remove .printdrv depending on Print vs Curses
     #   IDEA! put ".tag/.tags=footer" into each token for semantic meaning
     #     >> then .printdrv in "worklog" mode can override y=0 for "footer" tag (to avoid gaps),
     #        and yet keep y=N-1 as-is in "screenful" mode to mimic curses
-    ui.printdrv.draw_lines([log.archive_recent(dump=True), "---"])
+    # ui.printdrv.draw_lines([log.archive_recent(dump=True), "---"])
 
     ui.refresh()
     log.measure("wait")
     return kpistr
+
+
+class ComponentsManager:
+    """Guarantee strict reverse-chronological teardown for togglable init groups"""
+
+    def __init__(self) -> None:
+        # BET? TypedDict to give actual type to possible keys like "curses"
+        # RENAME? _cmpts | _togglables | _active[_resources|_registry]
+        self._registry: OrderedDict[str, tuple[BaseUIDriver, ExitStack]] = OrderedDict()
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> bool | None:  # OR: .close()
+        ## ALT:BAD: we would need to chain exceptions to safely cleanup stuff
+        ##   OR:TRY: inherit whole class from ExitStack to override behavior
+        ##     COS:BAD:(too fragile): cb=._exit_callbacks[-1]  -->  ._exit_callbacks.remove(cb)
+        ##   IDEA? pop all stacks into main_stack before __exit__
+        # for name in list(reversed(self._registry.keys())):
+        #     self.unregister(name)
+        safe_stack = ExitStack()
+        for _, cm in self._registry.values():
+            safe_stack.enter_context(cm)
+        return safe_stack.__exit__(exc_type, exc_val, exc_tb)
+
+    def register(
+        self, nm: str, factory: Callable[[str], tuple[BaseUIDriver, ExitStack]]
+    ) -> BaseUIDriver:
+        if nm in self._registry:
+            # return self._registry[nm][0]
+            raise RuntimeError(f"Component {nm=} is already registered")
+        # The factory constructs the driver and attaches side-effects to the stack
+        cmpt, cmpt_stack = factory(nm)
+        # Store both the stack (for teardown) and the instance (for access)
+        self._registry[nm] = (cmpt, cmpt_stack)
+        return cmpt
+
+    def unregister(self, nm: str) -> None:
+        """Safely tears down a specific resource early by nm."""
+        record = self._registry.pop(nm, None)
+        if record is not None:
+            _, stack = record
+            stack.close()
+
+    def __contains__(self, nm: str) -> bool:
+        return nm in self._registry
+
+    def __getitem__(self, nm: str) -> BaseUIDriver | None:
+        if record := self._registry.get(nm):
+            return record[0]
+        return None
+
+
+class ArchCmd(IntEnum):
+    KERNEL_SHUTDOWN = auto()
+    # CHG: {cmd:enable/disable, arg:multi_drv}
+    #   OR: topo.multi_drv.enable(0/1)
+    #   OR: {grp:UIDrv, arg:Curses, cmd:enable, val:1}
+    UIDRV_TOGGLE = auto()
+    DISPLAYLIST = auto()
+
+
+@dataclass(frozen=True, slots=True)
+class Event:
+    # kind: IntEnum = "ArchCmd"
+    cmd: ArchCmd
+    arg: str = ""
+    val: int = 1
+    ts: int = field(default_factory=time.monotonic_ns)
+    # requester = "kernel"
+    # rpc_ctx = "kernel"
+    # report_to = "client-1"
+
+
+# RENAME? MiurKernel (COS: what I currently call "kernel" is just a lib...)
+#   FIND: should "kernel" in foss be a daemon/process (i.e. have loop), or just a lib?
+class MiurServer:
+    _stack: ExitStack
+    _cmgr: ComponentsManager
+
+    def __init__(self, k: MiurKernel, ctx: LoopContext) -> None:
+        self.k = k
+        self.ctx = ctx
+        # FUT:OPT: pyzmq
+        #   * ZeroMQ as universal bridge to C++/Rust/Go clients
+        #   ~ BUT! we still need plain pipe/socket readers to connect to miur from bash or netcat,
+        #     and it's better to keep stream format/behavior exactly the same over all clients
+        #     ~~ so, basically no point in having zmq yet
+        # FAIL: asyncio.Queue is NOT thread-safe for this intended purpose
+        #   BET? queue.SimpleQueue
+        self.eventq: asyncio.Queue[Event] = asyncio.Queue()
+        self.dispatcher_task: asyncio.Task[None] | None = None
+
+    def __enter__(self) -> Self:
+        with ExitStack() as stack:
+            self._cmgr = stack.enter_context(ComponentsManager())
+            self._stack = stack.pop_all()
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: TracebackType | None,
+    ) -> bool | None:
+        return self._stack.__exit__(exc_type, exc, tb)
+
+    def emit(self, ev: Event) -> None:
+        # TEMP: prefer to error-out when queue is full
+        #   >> decide what to do with it later, as "waiting notfull" isn't good for UI
+        self.eventq.put_nowait(ev)
+
+    def handle_unified_input(self, key: str) -> None:
+        log.warning(f"{key=}")
+        match key:
+            # case str() and "0" <= char <= "9":
+            # case "A" | "B" | "C":
+            # case ["move", str(direction), int(distance)]:
+            # case str() if key.isalnum():
+            case "q":
+                self.emit(Event(ArchCmd.KERNEL_SHUTDOWN))
+                ## ALT:THINK:ARCH-vs-PERF:BET! directly process here for lower latency
+                ##   BUT:BAD: we are missing central_dispatcher/queue with multi-hooks
+                ##     ALT:IDEA: re-insert synthetic events with "already_processed" flag
+                ##       BAD: hooks won't be able to remove/transform events before their execution
+                # self.process_event(Event(...))
+            case "j":
+                log("V", "down")
+            case _:
+                pass
+        # self.key: str | int = "startup" = key
+        self.emit(
+            Event(ArchCmd.DISPLAYLIST, "REGEN", 1)
+        )  # <TEMP:MOVE: after processing cmd itself
+
+    # FIXME: translate into universal key-aliases first, before mapping to Miur*Cmd
+    def handle_input_curses(self) -> None:
+        log.measure("input")
+        ui = self._cmgr["curses"]
+        wch = ui.input()
+        self.handle_unified_input(wch)
+
+    async def central_dispatcher(self) -> None:
+        while True:
+            ev = await self.eventq.get()  # TBD: except QueueShutDown
+            try:
+                # USAGE:(ui keypress): loop.call_soon_threadsafe(self.eventq.put_nowait, Event(...))
+                self.process_event(ev)
+            except Exception as exc:
+                # from rich.console import Console
+                # console = Console()
+                # console.print_exception(show_locals=True)
+                log.error(exc)
+                if ui := self._cmgr["curses"]:
+                    ui.draw_lines([log.archive_recent(dump=True)])
+            finally:
+                self.eventq.task_done()
+
+    async def start(self) -> None:
+        init_cfg = [Event(ArchCmd.UIDRV_TOGGLE, "curses", 1)]
+        self.dispatcher_task = asyncio.create_task(self.central_dispatcher())
+        for ev in init_cfg:
+            self.emit(ev)
+        try:
+            await self.dispatcher_task
+        except asyncio.CancelledError:
+            # WARN:CHECK: may CancelledError be raised here on NOT clean exit?
+            pass
+        # finally:
+        #     # 5. Clean up any transports left open if the engine exits abruptly
+        #     for transport in list(self.transports.values()):
+        #         await transport.stop()
+
+    def process_event(self, ev: Event) -> None:
+        match ev:
+            case Event(cmd=ArchCmd.KERNEL_SHUTDOWN):
+                log.warning("Shutdown signal received. Stopping Core Dispatcher...")
+                if self.dispatcher_task:
+                    self.dispatcher_task.cancel()
+            case Event(cmd=ArchCmd.UIDRV_TOGGLE, arg=arg, val=val):
+                self.toggle_cmpt(arg, enable=val)
+            case Event(cmd=ArchCmd.DISPLAYLIST, arg="REGEN", val=val):
+                # FIXME? instead of redrawing on each event -- simply invalidate flag
+                #   and then trigger redraw after grace period?
+                #   >> at least collapse all such events queued and react only on last one
+                if val > 0:
+                    if ui := self._cmgr["curses"]:
+                        _kpistr = process_frame(self.k, ui, self.ctx, wch="TBD")
+            case _:
+                raise NotImplementedError(ev)
+
+    # RENAME? make_cmpt  FIND: should "Factory" be always Type/Callable, or can be instance?
+    # MOVE?/SPLIT? factory into e.g. -> Curses*UIAdapter (plus .handle_input*)
+    def cmpt_factory(self, nm: str) -> tuple[BaseUIDriver, ExitStack]:
+        with ExitStack() as cmpt_stack:
+            match nm:
+                case "mu" | "multi":
+                    from .uidrv.multi_drv import MultiUIDriver
+
+                    ui = cmpt_stack.enter_context(MultiUIDriver())
+
+                case "cu" | "curses":
+                    from .uidrv.curses_drv import CursesUIDriver
+
+                    ui = cmpt_stack.enter_context(CursesUIDriver())
+
+                    loop = asyncio.get_running_loop()
+                    # loop.add_signal_handler(signal.SIGWINCH, g.curses_ui.resize)
+                    # loop.add_reader(iomgr.CURSES_STDIN_FD, g.curses_ui.handle_input)
+                    CURSES_STDIN_FD = sys.stdin.fileno()
+                    loop.add_reader(CURSES_STDIN_FD, self.handle_input_curses)
+                    cmpt_stack.callback(lambda: loop.remove_reader(CURSES_STDIN_FD))
+
+                case "pr" | "printtext":
+                    from .uidrv.printtext_drv import PrintTextUIDriver
+
+                    ui = cmpt_stack.enter_context(PrintTextUIDriver())
+
+                case _:
+                    raise ValueError(nm)
+            return (ui, cmpt_stack.pop_all())
+
+    # MAYBE? ,factory: Callable[[], AbstractContextManager[BaseUIDriver]],
+    def toggle_cmpt(self, nm: str, enable: int | bool | None = None) -> None:
+        present = nm in self._cmgr
+        if isinstance(enable, int):
+            enable = bool(enable) if enable >= 0 else None
+        if enable is None:
+            enable = not present
+        elif enable == present:
+            return
+        # if enable != bool(factory):
+        #     raise ValueError(factory)
+        if enable:
+            self._cmgr.register(nm, self.cmpt_factory)
+        else:
+            self._cmgr.unregister(nm)
 
 
 def main_navi(stack: ExitStack) -> None:  # noqa: PLR0915  # pylint:disable=too-many-locals,too-many-statements
@@ -112,7 +338,7 @@ def main_navi(stack: ExitStack) -> None:  # noqa: PLR0915  # pylint:disable=too-
 
     from .dev.tracecode import enable_tracelines
 
-    enable_tracelines()
+    # enable_tracelines()
     log.kpi("after(tracelines)")
 
     k = MiurKernel()
@@ -120,116 +346,14 @@ def main_navi(stack: ExitStack) -> None:  # noqa: PLR0915  # pylint:disable=too-
     # h = "/data/g/miur_gen/demo/errors/chained.py"
     ctx.nvid = k.new_navi(0, "/etc")
     ctx.va = VisibleArea(8, 11)  # OR? use "vpid"
-
-    ui = do(MultiUIDriver())
-    ctx.int2key = {getattr(C, k): k for k in dir(C) if k.startswith("KEY_")}
-
     log.kpi("after(ui_drv)")
-    enable_jurigged()
-    log.kpi("after(jurigged)")
-
-    wch: str | int = "startup"
-    while True:
-        try:
-            _kpistr = process_frame(k, ui, ctx, wch)
-
-            ## DISABLED:FAIL: I would need to send this to *EACH* driver in turn
-            ##   HACK: manually simulate first resize/redraw
-            # try: C.ungetch(C.KEY_RESIZE); except C.error: pass
-            log.measure("input")
-            wch = ui.input()
-            if isinstance(wch, int) and (nm := ctx.int2key.get(wch, "")):
-                wch = nm + f"({wch})"
-            log.warning(f"{wch=}")
-            match wch:
-                # case C.ERR:
-                #     continue
-                case "q":
-                    break
-                case "j":
-                    log("V", "down")
-                case _:
-                    pass
-
-        except Exception as exc:
-            # from rich.console import Console
-            # console = Console()
-            # console.print_exception(show_locals=True)
-            log.error(exc)
-            ui.printdrv.draw_lines([log.archive_recent(dump=True)])
 
     log.kpi("before(asyncio)")
-    asyncio.run(mainloop_asyncio(), debug=True)
+    with MiurServer(k, ctx) as srv:
+        # FIND: can we combine "async with MiurServer()" with .run() ?
+        asyncio.run(srv.start(), debug=True)
+    # BET: use lightweight tracer: sys.setprofile(log.profile)
     log.kpi("return(navi)")
-
-
-class ArchCmd(IntEnum):
-    KERNEL_SHUTDOWN = auto()
-    MULTI_DRV_ENABLE = auto()
-    CURSES_DRV_ENABLE = auto()
-
-
-class Event(NamedTuple):
-    # kind: IntEnum
-    cmd: ArchCmd
-    # arg: int = 1
-    # requester = "kernel"
-    # rpc_ctx = "kernel"
-    # report_to = "client-1"
-
-
-class MiurApp:
-    def __init__(self) -> None:
-        # FUT:OPT: pyzmq
-        #   * ZeroMQ as universal bridge to C++/Rust/Go clients
-        #   ~ BUT! we still need plain pipe/socket readers to connect to miur from bash or netcat,
-        #     and it's better to keep stream format/behavior exactly the same over all clients
-        #     ~~ so, basically no point in having zmq yet
-        # FAIL: asyncio.Queue is NOT thread-safe for this intended purpose
-        #   BET? queue.SimpleQueue
-        self.eventq: asyncio.Queue[Event] = asyncio.Queue()
-        self.dispatcher_task: asyncio.Task | None = None
-
-    async def central_dispatcher(self) -> None:
-        try:
-            while True:
-                ev = await self.eventq.get()
-                try:
-                    # When the UI thread catches a keypress, it safely schedules it into the loop:
-                    # loop.call_soon_threadsafe(event_queue.put_nowait, clicked_event)
-                    self.process_event(ev)
-                except Exception as exc:
-                    print(f"Pipeline error processing event: {exc}", file=sys.stderr)
-                finally:
-                    self.eventq.task_done()
-        except asyncio.CancelledError:
-            print("Central dispatcher closing down.")
-            raise
-
-    async def start(self) -> None:
-        async with AsyncExitStack() as stack:
-            # loop = asyncio.get_running_loop()
-            # loop.add_signal_handler(signal.SIGWINCH, g.curses_ui.resize)
-            # loop.add_reader(iomgr.CURSES_STDIN_FD, g.curses_ui.handle_input)
-            self.dispatcher_task = asyncio.create_task(self.central_dispatcher())
-            # 2. Inject an admin command onto the queue to activate the initial transport cleanly
-            await self.eventq.put(ArchCmd.MULTI_DRV_ENABLE)
-        # 4. Block on the dispatcher's execution lifecycle
-        try:
-            await self.dispatcher_task
-        except asyncio.CancelledError:
-            pass
-
-    async def process_event(self, ev: Event) -> None:
-        match ev.cmd:
-            case ArchCmd.KERNEL_SHUTDOWN:
-                log.warning("Shutdown signal received. Stopping Core Dispatcher...")
-                if self.dispatcher_task:
-                    self.dispatcher_task.cancel()
-            case ArchCmd.MULTI_DRV_ENABLE:  # REMOVE multi and spawn each individually
-                raise NotImplementedError
-            case _:
-                assert_never(ev.cmd)
 
 
 def set_prname(appname: str) -> None:
