@@ -1,22 +1,17 @@
 import asyncio
-import ctypes
-import curses as C
 import sys
 import time
 from argparse import ArgumentParser, Namespace
-from collections import OrderedDict
 from collections.abc import Callable
 from contextlib import ExitStack
 from dataclasses import dataclass, field
 from enum import IntEnum, auto
 from types import TracebackType
-from typing import Any, Self
+from typing import Self
 
 from . import log
 from .kernel import MiurKernel, NaviId
 from .systems.tuisystem import VisibleArea
-from .uicommon.displaylist import TextSpan
-from .uicommon.styleids import Aid
 from .uidrv.base_drv import BaseUIDriver
 
 
@@ -53,23 +48,14 @@ def process_frame(
     log.measure("draw")
     ui.clear()
     ui.draw_displ(displ)
-    # log.info(ui.printdrv.style_by_id)
 
     log.measure("status")
-    # ## HACK: draw "status" *after* drawing evels -- to have all actual KPIs
-    # from wcwidth import width
+    ## HACK: draw "status" *after* drawing evels -- to have all actual KPIs
     kpistr = f"{wch!r} {log.recent_measurements_avg()} (tokens={len(displ)}) "
-    # kpiw = min(va.wnd_w, width(kpistr))
-    # tok = TextSpan(0, 0, kpistr, kpiw, Aid.FOOTER)
-    # if va.wnd_h > 0:
-    #     ui.cursesdrv.draw_displ([tok._replace(y=va.wnd_h - 1)])
-    # ui.printdrv.draw_displ([tok])
+    ui.draw_status(kpistr)
 
-    # FIXME: remove .printdrv depending on Print vs Curses
-    #   IDEA! put ".tag/.tags=footer" into each token for semantic meaning
-    #     >> then .printdrv in "worklog" mode can override y=0 for "footer" tag (to avoid gaps),
-    #        and yet keep y=N-1 as-is in "screenful" mode to mimic curses
-    # ui.printdrv.draw_lines([log.archive_recent(dump=True), "---"])
+    if ui.__class__.__name__ == "PrintTextUIDriver":
+        ui.draw_lines([log.archive_recent(dump=True), "---"])
 
     ui.refresh()
     log.measure("wait")
@@ -80,6 +66,8 @@ class ComponentsManager:
     """Guarantee strict reverse-chronological teardown for togglable init groups"""
 
     def __init__(self) -> None:
+        from collections import OrderedDict
+
         # BET? TypedDict to give actual type to possible keys like "curses"
         # RENAME? _cmpts | _togglables | _active[_resources|_registry]
         self._registry: OrderedDict[str, tuple[BaseUIDriver, ExitStack]] = OrderedDict()
@@ -147,6 +135,7 @@ class Event:
     cmd: ArchCmd
     arg: str = ""
     val: int = 1
+    key: str = ""
     ts: int = field(default_factory=time.monotonic_ns)
     # requester = "kernel"
     # rpc_ctx = "kernel"
@@ -211,13 +200,13 @@ class MiurServer:
                 pass
         # self.key: str | int = "startup" = key
         self.emit(
-            Event(ArchCmd.DISPLAYLIST, "REGEN", 1)
+            Event(ArchCmd.DISPLAYLIST, "REGEN", val=1, key=key)
         )  # <TEMP:MOVE: after processing cmd itself
 
     # FIXME: translate into universal key-aliases first, before mapping to Miur*Cmd
-    def handle_input_curses(self) -> None:
+    def handle_input(self, nm: str) -> None:
         log.measure("input")
-        ui = self._cmgr["curses"]
+        ui = self._cmgr[nm]
         wch = ui.input()
         self.handle_unified_input(wch)
 
@@ -238,7 +227,12 @@ class MiurServer:
                 self.eventq.task_done()
 
     async def start(self) -> None:
-        init_cfg = [Event(ArchCmd.UIDRV_TOGGLE, "curses", 1)]
+        init_cfg = [
+            Event(ArchCmd.UIDRV_TOGGLE, "printtext", 1),
+            Event(ArchCmd.UIDRV_TOGGLE, "curses", 1),
+            Event(ArchCmd.DISPLAYLIST, "REGEN", 1, key="startup"),
+            # Event(cmd=ArchCmd.KERNEL_SHUTDOWN),  # <PERF:DEBUG:(immediate shutdown)
+        ]
         self.dispatcher_task = asyncio.create_task(self.central_dispatcher())
         for ev in init_cfg:
             self.emit(ev)
@@ -260,42 +254,68 @@ class MiurServer:
                     self.dispatcher_task.cancel()
             case Event(cmd=ArchCmd.UIDRV_TOGGLE, arg=arg, val=val):
                 self.toggle_cmpt(arg, enable=val)
-            case Event(cmd=ArchCmd.DISPLAYLIST, arg="REGEN", val=val):
+            case Event(cmd=ArchCmd.DISPLAYLIST, arg="REGEN", val=val, key=key):
                 # FIXME? instead of redrawing on each event -- simply invalidate flag
                 #   and then trigger redraw after grace period?
                 #   >> at least collapse all such events queued and react only on last one
                 if val > 0:
+                    # TODO: opt arg to DISPLAYLIST to update only listed affected UI
                     if ui := self._cmgr["curses"]:
-                        _kpistr = process_frame(self.k, ui, self.ctx, wch="TBD")
+                        _kpistr = process_frame(self.k, ui, self.ctx, wch=key)
+                    if ui := self._cmgr["printtext"]:
+                        try:
+                            _kpistr = process_frame(self.k, ui, self.ctx, wch=key)
+                        except OSError as exc:
+                            import errno
+
+                            if exc.errno == errno.EIO:
+                                log.warning("HYPO: term died")
+                                self._cmgr.unregister("printtext")
+                                # NOTE: redraw other windows, as they most likely resized
+                                #   FAIL? doesn't work, maybe need SIGWINCH handler ?
+                                # self.emit(Event(ArchCmd.DISPLAYLIST, "REGEN", val=1, key="crash"))
+                            else:
+                                raise
+
             case _:
                 raise NotImplementedError(ev)
 
     # RENAME? make_cmpt  FIND: should "Factory" be always Type/Callable, or can be instance?
     # MOVE?/SPLIT? factory into e.g. -> Curses*UIAdapter (plus .handle_input*)
     def cmpt_factory(self, nm: str) -> tuple[BaseUIDriver, ExitStack]:
+        loop = asyncio.get_running_loop()
         with ExitStack() as cmpt_stack:
+            do = cmpt_stack.enter_context
+            __ = cmpt_stack.callback
             match nm:
                 case "mu" | "multi":
                     from .uidrv.multi_drv import MultiUIDriver
 
-                    ui = cmpt_stack.enter_context(MultiUIDriver())
+                    ui = do(MultiUIDriver())
 
                 case "cu" | "curses":
                     from .uidrv.curses_drv import CursesUIDriver
 
-                    ui = cmpt_stack.enter_context(CursesUIDriver())
+                    ui = do(CursesUIDriver())
 
-                    loop = asyncio.get_running_loop()
                     # loop.add_signal_handler(signal.SIGWINCH, g.curses_ui.resize)
                     # loop.add_reader(iomgr.CURSES_STDIN_FD, g.curses_ui.handle_input)
                     CURSES_STDIN_FD = sys.stdin.fileno()
-                    loop.add_reader(CURSES_STDIN_FD, self.handle_input_curses)
-                    cmpt_stack.callback(lambda: loop.remove_reader(CURSES_STDIN_FD))
+                    loop.add_reader(
+                        CURSES_STDIN_FD, lambda: self.handle_input("curses")
+                    )
+                    __(lambda: loop.remove_reader(CURSES_STDIN_FD))
 
                 case "pr" | "printtext":
+                    from .uidrv.connectors.termpipe import new_termwindow
                     from .uidrv.printtext_drv import PrintTextUIDriver
 
-                    ui = cmpt_stack.enter_context(PrintTextUIDriver())
+                    rtty, wtty = do(new_termwindow())
+                    ui = do(PrintTextUIDriver(rtty, wtty))
+
+                    rfd = rtty.fileno()
+                    loop.add_reader(rfd, lambda: self.handle_input("printtext"))
+                    __(lambda: loop.remove_reader(rfd))
 
                 case _:
                     raise ValueError(nm)
@@ -360,6 +380,8 @@ def set_prname(appname: str) -> None:
     # FIXED:USAGE: $ pkill miur
     # ALT: https://pypi.org/project/setproctitle/
     if sys.platform == "linux":
+        import ctypes
+
         maxcommlen = 15
         assert len(appname) <= maxcommlen, "limit for /proc/PID/comm"
         libc = ctypes.CDLL("libc.so.6")

@@ -152,6 +152,15 @@ class PrintTextUIDriver:
         #         log.error(exc)
         #         self._wfd = None
 
+    # IDEA! put ".tag/.tags=footer" into each token for semantic meaning
+    #   >> then .printdrv in "worklog" mode can override y=0 for "footer" tag (to avoid gaps),
+    #      and yet keep y=N-1 as-is in "screenful" mode to mimic curses
+    def draw_status(self, text: str) -> None:
+        wnd_w, _ = self.sizewh()
+        tw = min(wnd_w, width(text))
+        tok = TextSpan(0, 0, text, tw, Aid.FOOTER)
+        self.draw_displ([tok])
+
     def draw_displ(self, displ: DisplayStream) -> None:
         # TODO: use .sizewh (nof 120) to avoid wrapping in terminal, and "max=None" for textstream
         #   MAYBE? use "1024" for text logfiles (to avoid too long lines)

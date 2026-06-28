@@ -3,6 +3,8 @@ from contextlib import ExitStack
 from types import TracebackType
 from typing import TYPE_CHECKING, Self, assert_never
 
+from wcwidth import width
+
 from .. import log
 from ..uicommon.displaylist import DisplayStream, TextSpan
 from ..uicommon.styleids import Aid, StyleId
@@ -174,6 +176,13 @@ class CursesUIDriver:
     def draw_lines(self, lines: list[str]) -> None:  # CHG? bytes
         for s in lines:
             self.stdscr.addstr(s)
+
+    def draw_status(self, text: str) -> None:
+        wnd_w, wnd_h = self.sizewh()
+        if wnd_h > 0:
+            tw = min(wnd_w, width(text))
+            tok = TextSpan(0, 0, text, tw, Aid.FOOTER)
+            self.draw_displ([tok._replace(y=wnd_h - 1)])
 
     def draw_displ(self, displ: DisplayStream) -> None:
         # HACK:(hotreload): reset style-map on each frame to refresh after jurigged DEV
