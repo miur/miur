@@ -79,11 +79,16 @@ class PrintTextUIDriver:
                 fd = self._wfd.fileno()
                 termios.tcsetattr(fd, termios.TCSADRAIN, self.old_settings)
             except termios.error as exc:
-                log.warning(exc)
-                log.note(
-                    "HYPO: new_termwindow() was most likely manually closed"
-                    " (or killed by system) and its tty pipe had abruptly disappeared"
-                )
+                import errno
+
+                if exc.args and exc.args[0] == errno.EIO:
+                    log.warning(f"can't write into term {self._wfd=}")
+                    log.note(
+                        "HYPO: new_termwindow() was most likely manually closed or <C-c>'ed"
+                        " (or killed by system) and its TTY-pipe had abruptly disappeared"
+                    )
+                else:
+                    raise
 
     def input(self) -> str:
         ## MAYBE~ push "startup" cookie into stream

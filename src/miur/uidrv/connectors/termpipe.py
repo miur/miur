@@ -16,9 +16,11 @@ from ... import log
 @contextmanager
 def new_termwindow() -> Generator[tuple[TextIO, TextIO]]:
     with ExitStack() as stack:
-        tmpf = stack.enter_context(tempfile.NamedTemporaryFile(mode="r"))
+        do = stack.enter_context
+        __ = stack.callback
+        tmpf = do(tempfile.NamedTemporaryFile(mode="r"))
         cmd = 'tty > "$0"; trap "kill -WINCH $1" WINCH; inotifywait -qq -e delete_self "$0"'
-        bgtty = stack.enter_context(
+        bgtty = do(
             # DISABLED:("-M"): I need to scroll history up
             #   BAD:(need -M): orse tmux from newterm issues esccode into mainterm tmux,
             #     which prints ERR: erresc: unknown private set/reset mode 2031
@@ -36,17 +38,26 @@ def new_termwindow() -> Generator[tuple[TextIO, TextIO]]:
                 ## WARN: force terminal death before ExitStack tries to wait on it!
                 bgtty.terminate()
 
-        stack.callback(_cleanup_terminal)
+        __(_cleanup_terminal)
         ## HACK: close file to exit remote terminal *before* terminating
-        stack.callback(tmpf.close)
+        __(tmpf.close)
 
         time.sleep(0.3)
         tmpf.seek(0)
         ttynm = tmpf.read().strip()
 
+        def _safe_close_killed_tty(fdt: TextIO) -> None:
+            try:
+                fdt.close()
+            except OSError as exc:
+                import errno
+
+                if exc.errno != errno.EIO:
+                    raise
+
         # pylint:disable=consider-using-with
         rtty = open(ttynm, encoding=sys.stdin.encoding)
-        stack.callback(rtty.close)
+        __(lambda: _safe_close_killed_tty(rtty))
         wtty = open(ttynm, "w", encoding=sys.stdout.encoding)
-        stack.callback(wtty.close)
+        __(lambda: _safe_close_killed_tty(wtty))
         yield (rtty, wtty)

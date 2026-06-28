@@ -221,8 +221,13 @@ class MiurServer:
                 # console = Console()
                 # console.print_exception(show_locals=True)
                 log.error(exc)
-                if ui := self._cmgr["curses"]:
-                    ui.draw_lines([log.archive_recent(dump=True)])
+                try:
+                    # BUT:WHY? when printing to not-crashed curses we also got ERR
+                    #   _curses.error: addwstr() returned ERR
+                    if ui := self._cmgr["printtext"]:
+                        ui.draw_lines([log.archive_recent(dump=True)])
+                except Exception:
+                    pass
             finally:
                 self.eventq.task_done()
 
@@ -394,6 +399,11 @@ def main() -> int:
     rc = 1
     try:
         set_prname("miur")
+
+        from .dev.exitstack import enable_erasure_guardians
+
+        enable_erasure_guardians()
+
         with ExitStack() as stack:
             main_navi(stack)
             rc = 2  # <CASE: successful init but failing deinit
