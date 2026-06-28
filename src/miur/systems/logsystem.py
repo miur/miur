@@ -14,12 +14,15 @@ if TYPE_CHECKING:
         pass
 
 
+type LogLevelChar = Literal["F", "E", "W", "P", "I", "N", "D", "V", "T"]
+
+
 class LogLevel(enum.IntEnum):
     F = FAILURE = 90  # FATAL, EMERGENCY, ABORT
     # X = CRITICAL = 70  # +ALERT
     E = ERROR = 50
     W = WARNING = 45
-    P = PERF = 42  # OR? =KPI  // :PERF: latency/cpu/memory
+    P = PERF = 42  # OR? K=KPI  // :PERF: latency/cpu/memory
     # STATE = 35  # STATUS | ARGS | STARTUP // env/pwd/args/etc. (crucial exec ctx)
     # HAPPEN = 32  # ACTION|NORMAL|FLOW|HAPPYPATH|SEQ  // keypress, tasklet, events, comm
     I = INFO = 30  # +NOTICE | SUCCESS = 25
@@ -27,12 +30,12 @@ class LogLevel(enum.IntEnum):
     D = DEBUG = 25
     # OPTIONAL = 20
     V = VERBOSE = 15  # DETAILED = 10
-    # TRACE = 10  # +TR1..TR9 (USE: gradually dimming gray colors, darker than .INFO)
+    T = TRACE = 10  # +TR1..TR9 (USE: gradually dimming gray colors, darker than .INFO)
     # COMMENT = 2
-    # ANYTHING = 0  # OR: lvl=None
+    ALL = 0  # ANY|ANYTHING|UNRESTRICTED  OR: lvl=None
 
 
-def colorscheme(enabled: bool = True) -> dict[str, str]:
+def colorscheme(enabled: bool = True) -> dict[LogLevelChar | str, str]:
     if not enabled:
         from collections import defaultdict
 
@@ -52,7 +55,7 @@ def colorscheme(enabled: bool = True) -> dict[str, str]:
         "N": ansicolor(2),  # green
         "D": ansicolor(13),  # purple
         "V": ansicolor(6),  # cyan
-        # "T": ansicolor(-1),  # dfl-on-dfl (none)
+        "T": ansicolor(-1),  # dfl-on-dfl (none)
         "tid": ansicolor(0),
         "b": ansicolor(10),
         "": RESET,
@@ -63,7 +66,7 @@ class LogEntry(NamedTuple):
     ts: int
     lvl: LogLevel
     tid: int
-    modnm: str
+    loci: str
     lnum: int
     obj: object
 
@@ -94,7 +97,7 @@ def calibrate_clock_drift(samples: int = 20) -> int:
 class LogSystem:  # pylint:disable=too-many-instance-attributes
     def __init__(self, kernel: IKernel | None) -> None:
         self.k = kernel
-        self.minlevel = LogLevel.VERBOSE
+        self.minlevel = LogLevel.ALL
         self.enablecolors = True
         self._init_tid = get_native_id()
 
@@ -112,9 +115,14 @@ class LogSystem:  # pylint:disable=too-many-instance-attributes
         import psutil
 
         self.process = psutil.Process()
-        epoch_ns = int(self.process.create_time() * 1e9)
-        drift_ns = calibrate_clock_drift()
-        self._prevkpi_ts = self._appstart_ts = epoch_ns - drift_ns
+        # epoch_ns = int(self.process.create_time() * 1e9) - calibrate_clock_drift()
+        epoch_ns = int(self.process._proc.create_time(monotonic=True) * 1e9)
+        # WTF: why dts>zsh.time and dcpu<zsh.time ?
+        #    1.078  P[main:336]   enter(main)      // KPI[ dts=+1078.14 dcpu=+268.16(Σ0.36) ]
+        # ...
+        # 1.081  P[main:351]   return(main) -> 0 // KPI[ dts=+0.16 dcpu=+0.16(Σ0.37) ]
+        # 428ms 98%(388ms+36ms) | ram=0+0kB,40592kB fault=0/7693 ios=0/0/0 ctx=1/7
+        self._prevkpi_ts = self._appstart_ts = epoch_ns
         self._prevkpi_cpu = time.process_time_ns()
 
         # tracemalloc.start()  # OR: -X tracemalloc
@@ -157,26 +165,48 @@ class LogSystem:  # pylint:disable=too-many-instance-attributes
         # ADD? "#{self._counter:03d} {dts:+6.3f} ..."
         lvl = e.lvl.name[0]
         tid = f"<{e.tid}>" if e.tid != self._init_tid else ""
+        if e.loci[0].isalnum():
+            loci = f"[{e.loci}:{e.lnum}]"
+        else:
+            loci = f"*[{e.loci}:{e.lnum}]"
+        if isinstance(e.obj, BaseException):
+            import traceback
+
+            # FIXME: use my legacy log_exc()
+            #   CHECK:CMP: vs newest impl of std traceback printing
+            te = traceback.TracebackException.from_exception(e.obj, compact=True)
+            text = "".join(te.format())
+        else:
+            text = e.obj
         return (
             f"{e.ts / 1e9:8.3f} {tid} "
-            f"{c[lvl]}{lvl}{c['b']}{f'[{e.modnm}:{e.lnum}]':<{12}s}"
-            f" {c[lvl]}{e.obj}{c['']}\n"
+            f"{c[lvl]}{lvl}{c['b']}{loci:<{12}s}"
+            f" {c[lvl]}{text}{c['']}\n"
         )
 
     # MAYBE? allow [*aobj, **kobj] and store all of them to rasterize later?
     def __call__(
-        self, lvl: Literal["F", "E", "W", "I", "D", "V"] | LogLevel, obj: object
+        self,
+        lvl: LogLevelChar | LogLevel,
+        obj: object,
+        *,
+        loci: str = "",
+        lnum: int = 0,
     ) -> None:
         if isinstance(lvl, str):
             lvl = LogLevel[lvl]
         if lvl < self.minlevel:
             return
 
-        fr = sys._getframe(1)  # pylint:disable=protected-access  # pyright:ignore[reportPrivateUsage]
-        while pr := fr.f_back:
-            if fr.f_code.co_filename != __file__:
-                break
-            fr = pr
+        if not loci or not lnum:
+            fr = sys._getframe(1)  # pylint:disable=protected-access  # pyright:ignore[reportPrivateUsage]
+            while pr := fr.f_back:
+                if fr.f_code.co_filename != __file__:
+                    break
+                fr = pr
+            lnum = fr.f_lineno
+            if not loci:
+                loci = fr.f_globals["__name__"].rpartition(".")[2]
 
         # MAYBE: keep object as-is until dump() -- but run lambda() immediately here
         #   BUT: class objects are mutable, so we may need deepcopy() unless its primitive type
@@ -190,10 +220,8 @@ class LogSystem:  # pylint:disable=too-many-instance-attributes
             ts=time.monotonic_ns() - self._appstart_ts,
             lvl=lvl,  # MAYBE? lvl=LogLevel.FAILURE if isinstance(obj, BaseException) else lvl
             tid=get_native_id(),
-            modnm=fr.f_globals["__name__"].rpartition(".")[2],
-            lnum=fr.f_lineno,
-            # FIXME: use my legacy log_exc()
-            #   CHECK:CMP: vs newest impl of std traceback printing
+            loci=loci,
+            lnum=lnum,
             obj=obj if isinstance(obj, BaseException) else str(obj),
         )
         self._queue_threadsafe.put(entry)
@@ -225,6 +253,9 @@ class LogSystem:  # pylint:disable=too-many-instance-attributes
     #         _ns[_fnm] = _mklog(_lvl)
     #     del _ns, _fnm, _mklog, _lvl
 
+    def failure(self, obj: object, /) -> None:
+        self(LogLevel.FAILURE, obj)
+
     def error(self, obj: object, /) -> None:
         self(LogLevel.ERROR, obj)
 
@@ -242,6 +273,9 @@ class LogSystem:  # pylint:disable=too-many-instance-attributes
 
     def verbose(self, obj: object, /) -> None:
         self(LogLevel.VERBOSE, obj)
+
+    def trace(self, obj: object, /) -> None:
+        self(LogLevel.TRACE, obj)
 
     # RENAME? refpt -> seqnm
     # MAYBE: allow additional :int args to e.g. calc avg "tokens"

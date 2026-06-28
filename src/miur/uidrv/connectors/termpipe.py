@@ -20,6 +20,8 @@ def new_termwindow() -> Generator[tuple[TextIO, TextIO]]:
         cmd = 'tty > "$0"; trap "kill -WINCH $1" WINCH; inotifywait -qq -e delete_self "$0"'
         bgtty = stack.enter_context(
             # DISABLED:("-M"): I need to scroll history up
+            #   BAD:(need -M): orse tmux from newterm issues esccode into mainterm tmux,
+            #     which prints ERR: erresc: unknown private set/reset mode 2031
             Popen(
                 "st -n miur -t miur_textstream -e sh -c".split()
                 + [cmd, tmpf.name, str(os.getpid())]

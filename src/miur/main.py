@@ -1,15 +1,12 @@
 import asyncio
 import ctypes
 import curses as C
-import gc
-import os
-import signal
 import sys
+import time
 from argparse import ArgumentParser, Namespace
 from contextlib import AsyncExitStack, ExitStack
-from typing import NamedTuple, assert_never
-
-from wcwidth import width
+from enum import IntEnum, auto
+from typing import NamedTuple
 
 from . import log
 from .kernel import MiurKernel, NaviId
@@ -17,13 +14,6 @@ from .systems.tuisystem import VisibleArea
 from .uicommon.displaylist import TextSpan
 from .uicommon.styleids import Aid
 from .uidrv.multi_drv import MultiUIDriver
-
-gc.set_debug(gc.DEBUG_UNCOLLECTABLE)
-
-
-if not sys.warnoptions:
-    # WHY: print a traceback pinpointing exactly where the unclosed file object was created.
-    __import__("warnings").simplefilter("always", ResourceWarning)
 
 
 def cli_spec(parser: ArgumentParser) -> ArgumentParser:
@@ -55,43 +45,6 @@ def cli_spec(parser: ArgumentParser) -> ArgumentParser:
 #     return UIDrv
 
 
-def enable_jurigged() -> None:
-    ## BAD: jurigged produces multiple logs per single saved file --> screen refreshes N-times
-    ##   TODO: spawn/reset 500ms timer after each event, and only refresh when timer is done
-
-    ## FAIL: when curses is disabled -- no one injects KEY_RESIZE event into getch() to redraw loop
-    ##   and we can't even raise exception from here, risking to break python code
-    # signal.signal(signal.SIGWINCH, lambda si, fr: ui.refresh())
-
-    import jurigged  # pyright: ignore[reportMissingTypeStubs]
-
-    def jurigged_on_event(event: object) -> None:
-        log.verbose(event)
-        # OR: if "Evaluating" in str(event) or "Update" in str(event): pass; else: return
-        if str(event).startswith("Update "):
-            ## DISABLED:FAIL: doesn't unblock already waiting getch()
-            # try:
-            #     # HACK: unblock current .getch()
-            #     # C.ungetch(C.KEY_REFRESH)
-            #     # C.ungetch(C.KEY_RESIZE)  # safe
-            #     # OR:(^L=12): ungetch(12) | ungetch(C.KEY_F5)
-            # except C.error:
-            #     pass
-            ## FIXED:WKRND: Send a native signal to wake up the main thread's getch()
-            os.kill(os.getpid(), signal.SIGWINCH)
-
-    ### HACK: hot-reload (recursive ./*.py files from PWD?)
-    ## CHECK: if it has import-hook to discover lazily loaded modules later
-    # OR: jurigged.watch(pattern=[fs.dirname(fs.realpath(__file__)) + "/**/*.py"], logger=jurigged_on_event)
-    jurigged.watch(logger=jurigged_on_event)  # pyright: ignore[reportUnknownMemberType]  # <CASE: recursive
-    # jurigged.watch("miur") # <OR watch a specific package directory (non-recursive)
-    # import mymod; jurigged.watch(mymod) # <OR watch a specific imported module package
-
-    ### FAIL: how to make !jurigged only reload on demand ?
-    # from jurigged.register import registry
-    # while True: ... if registry.has_pending(): registry.apply_pending()
-
-
 class LoopContext(Namespace):
     nvid: NaviId
     va: VisibleArea
@@ -119,6 +72,8 @@ def process_frame(
 
     log.measure("status")
     ## HACK: draw "status" *after* drawing evels -- to have all actual KPIs
+    from wcwidth import width
+
     kpistr = f"{wch!r} {log.recent_measurements_avg()} (tokens={len(displ)}) "
     kpiw = min(va.wnd_w, width(kpistr))
     tok = TextSpan(0, 0, kpistr, kpiw, Aid.FOOTER)
@@ -140,6 +95,26 @@ def process_frame(
 def main_navi(stack: ExitStack) -> None:  # noqa: PLR0915  # pylint:disable=too-many-locals,too-many-statements
     do = stack.enter_context
     log.kpi("enter(navi)")
+
+    from .dev.excepthook import set_excepthook
+
+    do(set_excepthook())
+
+    from .dev.warnings import enable_warnings
+
+    enable_warnings()
+    log.kpi("after(warnings)")
+
+    # from .dev.hotreload import enable_jurigged
+    #
+    # enable_jurigged()
+    # log.kpi("after(jurigged)")
+
+    from .dev.tracecode import enable_tracelines
+
+    enable_tracelines()
+    log.kpi("after(tracelines)")
+
     k = MiurKernel()
     ctx = LoopContext()
     # h = "/data/g/miur_gen/demo/errors/chained.py"
@@ -186,9 +161,6 @@ def main_navi(stack: ExitStack) -> None:  # noqa: PLR0915  # pylint:disable=too-
     log.kpi("before(asyncio)")
     asyncio.run(mainloop_asyncio(), debug=True)
     log.kpi("return(navi)")
-
-
-from enum import IntEnum, auto
 
 
 class ArchCmd(IntEnum):
@@ -278,13 +250,15 @@ def main() -> int:
         set_prname("miur")
         with ExitStack() as stack:
             main_navi(stack)
-        rc = 0
+            rc = 2  # <CASE: successful init but failing deinit
     except Exception as exc:
         log.error(exc)
         ## DISABLED:PERF:BAD: +400ms
         # from rich.traceback import install
         # install(show_locals=True)
         # raise
+    else:
+        rc = 0
     log.kpi(f"return(main) -> {rc}")
     print(log.archive_recent(dump=True), file=sys.stderr)
     ## DISABLED: should only be used for jurigged+devloop

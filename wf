@@ -11,8 +11,9 @@ if (return 0 2>/dev/null); then
   # builtin source "${__app%/*}/aliases.sh" "$__app" "$@" || return
 
   ## WARN: don't exec anything during "source", orse <C-c> won't work
-  ## USAGE: $ . /d/miur/wf && mw
+  ## USAGE: $ cd /d/miur/src/miur && . /d/miur/wf && mw
   mr(){ printf '\n---\n'; time "$__here/run" "$@"; }
+  mx(){ local vx="$__here/.venv/bin"; printf '\n---\n'; time "$vx/python" -IBu -Xutf8 -Xdev -Ximporttime -Xtracemalloc=5 -m cProfile -s cumulative -- "$vx/miur" "$@"; }
   mw(){ mr "$@"; inotifywait -r -m -q -e modify --format '%w%f %e' "$__here/src" | while read; do mr "$@"; done; }
   mj(){ local vx="$__here/.venv/bin"; printf '\n---\n'; time "$vx/python" -IBu -Xutf8 -Xdev -- "$vx/jurigged" -v --watch="$__here/src" --loop="miur.main:main" -- "$vx/miur" "$@"; }
   alias wf="$__app"
