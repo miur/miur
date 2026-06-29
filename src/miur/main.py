@@ -9,7 +9,7 @@ from enum import IntEnum, auto
 from types import TracebackType
 from typing import Self
 
-from . import log
+from . import PKGSRC_DIR, log
 from .kernel import MiurKernel, NaviId
 from .systems.tuisystem import VisibleArea
 from .uidrv.base_drv import BaseUIDriver
@@ -17,8 +17,8 @@ from .uidrv.base_drv import BaseUIDriver
 
 def cli_spec(parser: ArgumentParser) -> ArgumentParser:
     o = parser.add_argument
-    _uiset = "pr printtext cu curses mu multi".split()
-    o("--ui", choices=_uiset, default="multi")
+    _uiset = "pr printtext cu curses".split()
+    o("--ui", choices=_uiset, default="curses")
     return parser
 
 
@@ -57,7 +57,7 @@ def process_frame(
     if ui.__class__.__name__ == "PrintTextUIDriver":
         ui.draw_lines([log.archive_recent(dump=True), "---"])
 
-    ui.refresh()
+    ui.refresh()  # self.send_to_qt("REDRAW")
     log.measure("wait")
     return kpistr
 
@@ -194,6 +194,8 @@ class MiurServer:
                 ##     ALT:IDEA: re-insert synthetic events with "already_processed" flag
                 ##       BAD: hooks won't be able to remove/transform events before their execution
                 # self.process_event(Event(...))
+            case "t":
+                self.emit(Event(ArchCmd.UIDRV_TOGGLE, "qt", 1))
             case "j":
                 log("V", "down")
             case _:
@@ -260,6 +262,7 @@ class MiurServer:
             case Event(cmd=ArchCmd.UIDRV_TOGGLE, arg=arg, val=val):
                 self.toggle_cmpt(arg, enable=val)
             case Event(cmd=ArchCmd.DISPLAYLIST, arg="REGEN", val=val, key=key):
+                # MAYBE: split into different threads to draw in parallel?
                 # FIXME? instead of redrawing on each event -- simply invalidate flag
                 #   and then trigger redraw after grace period?
                 #   >> at least collapse all such events queued and react only on last one
@@ -293,11 +296,6 @@ class MiurServer:
             do = cmpt_stack.enter_context
             __ = cmpt_stack.callback
             match nm:
-                case "mu" | "multi":
-                    from .uidrv.multi_drv import MultiUIDriver
-
-                    ui = do(MultiUIDriver())
-
                 case "cu" | "curses":
                     from .uidrv.curses_drv import CursesUIDriver
 
@@ -322,6 +320,73 @@ class MiurServer:
                     loop.add_reader(rfd, lambda: self.handle_input("printtext"))
                     __(lambda: loop.remove_reader(rfd))
 
+                case "qt" | "qt6wdg":
+                    # CMP:OPT: spawn either new process vs fork miur with multiprocessing
+                    # OPT: connect by socket vs reuse stdin/stdout for pipe
+                    #   BAD: need two different channels -- for streaming and for priority msgs
+                    ## ALSO:TRY? https://docs.python.org/3.14/whatsnew/3.14.html#whatsnew314-multiple-interpreters
+                    ##   BAD: won't work for qt or any other native-library, as they are shared bw interpreters
+                    # from concurrent import interpreters
+                    # interp = interpreters.create(nm)
+                    # res = interp.call(_child_exec, tgt)
+                    # OR: t = interp.call_in_thread(_child_exec, tgt); t.join()
+                    ## ALT:FAIL: MP will fork() whole RAM of MIUR, which children UI don't need
+                    # p = MP.Process(name=nm, target=_child_exec, args=(tgt,)); p.start(); __(p.join)
+
+                    ## NOTE: with Popen I could run in totally dif .venv OR even native C++ client
+                    ##   IDEA:FUT: if standalone client can't communicate with miur-kernel,
+                    ##     then it should print errors/logs locally, orse send them to miur-kernel
+
+                    # TODO: unless server was spawned "explicitly" -- tear it down after last client disconnects
+                    # if "server" not in self._cmgr:
+                    #     self.toggle_cmpt(self, "server", enable=True)
+
+                    import ctypes
+                    import signal
+                    from subprocess import Popen, TimeoutExpired
+
+                    def set_pdeathsig():
+                        """Sets a death signal so the child dies with the parent."""
+                        libc = ctypes.CDLL("libc.so.6")
+                        PR_SET_PDEATHSIG = 1
+                        # Sends SIGKILL (9) to the subprocess when the parent dies
+                        libc.prctl(PR_SET_PDEATHSIG, signal.SIGKILL)
+
+                    log.info("1")
+                    # CHG? use asyncio to spawn it and to communicate on stdin/stdout for e.g. logs
+                    # TODO: redir stdin/stdout to logs inof interfering with curses
+                    process = do(
+                        Popen(
+                            # ["st"],
+                            [sys.executable, PKGSRC_DIR + "uiapps/qt6wdg_app.py"],
+                            preexec_fn=set_pdeathsig,
+                        )
+                    )
+                    log.info("2")
+
+                    def _cleanup_process() -> None:
+                        log.info("un-process")
+                        try:
+                            process.wait(timeout=0.2)
+                        except TimeoutExpired:
+                            process.terminate()
+
+                    __(_cleanup_process)
+
+                    from .uidrv.client_drv import ClientUIDriver
+
+                    # recvq, sendq = do(new_process())
+                    # ui = do(ClientUIDriver(recvq, sendq))
+                    ui = process
+
+                    # qt6wdgdrv: ...
+                    # send_to_qt: Callable[[object], None]
+                    # qt_recv_q: Queue[dict[str, object]]
+                    # (self.send_to_qt, self.qt_recv_q) = do(new_guithread())
+                    # self.send_to_qt("INIT")
+                    # reply = self.qt_recv_q.get()
+                    # print(reply)
+
                 case _:
                     raise ValueError(nm)
             return (ui, cmpt_stack.pop_all())
@@ -334,6 +399,7 @@ class MiurServer:
         if enable is None:
             enable = not present
         elif enable == present:
+            log.warning(f"Ignored: cmpt={nm} is already {enable=}")
             return
         # if enable != bool(factory):
         #     raise ValueError(factory)
@@ -416,7 +482,9 @@ def main() -> int:
     else:
         rc = 0
     log.kpi(f"return(main) -> {rc}")
-    print(log.archive_recent(dump=True), file=sys.stderr)
+    ## DISABLED: only use when mainterm==printtext
+    # print(log.archive_recent(dump=True), file=sys.stderr)
+    print(str(log), file=sys.stderr)
     ## DISABLED: should only be used for jurigged+devloop
     ##   << orse results in exitcode!=0
     # if "jurigged" in __import__("sys").modules:

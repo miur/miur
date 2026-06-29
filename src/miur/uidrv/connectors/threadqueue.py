@@ -56,6 +56,8 @@ def new_guithread() -> Generator[
         except Empty:
             log.warning("WARN: can't safely close Qt")
 
+        ## WARN: don't use Threads [which living less than MainThread] for UI
+        ##   as Qt GUI-thread should be never destroyed! (even after app.quit())
         # WARN:ARCH: actually, this thread should NEVER end after first ever Qt import
         #   >> if you wish to recreate Qt window AGAIN -- you need *same* thread
         #   IDEA: only join on !miur exit, and all other time -- keep thread running in a loop,
